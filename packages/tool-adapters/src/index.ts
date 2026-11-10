@@ -19,6 +19,7 @@ export {
   createUnreconciledAppendLeaseError,
   createLostAppendLeaseError,
   reconcileDispatchedLeaseAgainstRows,
+  executeAppendLeaseReconciliation,
   SHEETS_DIGEST_MAX_DATA_ROWS,
   SHEETS_DIGEST_SCAN_ROW_LIMIT,
   SHEETS_DIGEST_MAX_COLUMNS,

@@ -1,4 +1,8 @@
-import type { SheetsAppendDispatchMetadata, SheetsAppendLeaseStore } from '@wap/tool-schemas';
+import type {
+  SheetsAppendDispatchMetadata,
+  SheetsAppendLeaseStore,
+  SheetsAppendManualRecoveryDecision,
+} from '@wap/tool-schemas';
 import { BaseAdapter, StepError, type BaseAdapterConfig } from '../base-adapter.js';
 import type { GmailAccessTokenProvider } from '../gmail/token-provider.js';
 import { SHEETS_MAX_CELL_CHARS, SHEETS_MAX_COLUMNS, clipText } from '../bounds.js';
@@ -11,6 +15,7 @@ import {
   buildPartialCellUpdates,
   buildRowDedupSignature,
   computeSheetAggregation,
+  executeAppendLeaseReconciliation,
   executeReadDigestWindow,
   extractTabHeaders,
   filterDuplicateRows,
@@ -18,7 +23,6 @@ import {
   invalid,
   mapRecordsToRows,
   queryText,
-  reconcileDispatchedLeaseAgainstRows,
   resolveDeduplicationPolicy,
   resolveReadRange,
   safeRows,
@@ -625,19 +629,23 @@ export class PersonalSheetsAdapter extends BaseAdapter {
                 majorDimension: 'ROWS',
                 values: safeRows([u.row]),
               }));
+              const allLogicalKeys = [
+                ...filtered.updates.map((u) => buildRowDedupSignature(u.row, null)),
+                ...safeRows(rowsToWrite).map((r) => buildRowDedupSignature(r, null)),
+              ];
               const batchDispatchMeta: SheetsAppendDispatchMetadata = {
                 operation: 'upsert',
-                rowCount: filtered.updates.length,
-                candidateKeys: filtered.updates.map((u) => buildRowDedupSignature(u.row, null)),
+                rowCount: allLogicalKeys.length,
+                candidateKeys: allLogicalKeys,
                 keyColumns: dedupPolicy.keyColumns,
               };
+              activeDispatchMeta = batchDispatchMeta;
               const batchRes = await this.request(
                 id + '/values:batchUpdate',
                 signal,
                 { valueInputOption: 'USER_ENTERED', data: batchData },
                 (dispatched) => { writeDispatched = dispatched; },
                 async () => {
-                  activeDispatchMeta = batchDispatchMeta;
                   await lease?.beginWriteDispatch?.(batchDispatchMeta);
                 }
               );
@@ -660,10 +668,11 @@ export class PersonalSheetsAdapter extends BaseAdapter {
             }
           }
           const rows = safeRows(rowsToWrite);
+          const appendCandidateKeys = activeDispatchMeta?.candidateKeys ?? rows.map((r) => buildRowDedupSignature(r, null));
           const appendDispatchMeta: SheetsAppendDispatchMetadata = {
             operation: 'append',
-            rowCount: rows.length,
-            candidateKeys: rows.map((r) => buildRowDedupSignature(r, null)),
+            rowCount: appendCandidateKeys.length,
+            candidateKeys: appendCandidateKeys,
             keyColumns: dedupPolicy.keyColumns,
           };
           const value = await this.request(
@@ -1189,38 +1198,32 @@ export class PersonalSheetsAdapter extends BaseAdapter {
     sheet: string;
     leaseId?: string;
     fencingToken?: number;
+    manualOperatorDecision?: SheetsAppendManualRecoveryDecision;
+    acknowledgeDuplicateRisk?: boolean;
+    confirmDuplicateRisk?: boolean;
     signal?: AbortSignal;
   }): Promise<{
     reconciled: boolean;
     committedOnProvider: boolean;
     matchedSignatures: string[];
     scopeKey: string;
+    inconclusiveReason?: string;
   }> {
     const id = this.checkedId(input?.spreadsheetId);
     const sheet = titleText(input?.sheet);
-    const scopeKey = `${id}::${sheet.trim().toLowerCase()}`;
-    const state = await this.appendLeaseStore.getLeaseState?.(scopeKey);
-    const quotedSheet = /\s|'/.test(sheet) ? "'" + sheet.replaceAll("'", "''") + "'" : sheet;
-    const readRange = `${quotedSheet}!A1:Z500`;
-    const existingData = await this.request(id + '/values/' + encodeURIComponent(readRange), input.signal);
-    const existingRows = Array.isArray(existingData?.values) ? (existingData.values as unknown[][]) : [];
-    const { committedOnProvider, matchedSignatures } = reconcileDispatchedLeaseAgainstRows(
-      state?.dispatchedMeta,
-      existingRows
-    );
-    const reconciled =
-      (await this.appendLeaseStore.reconcileUnknownLease?.({
-        scopeKey,
-        leaseId: input.leaseId ?? state?.leaseId,
-        fencingToken: input.fencingToken ?? state?.fencingToken,
-        reason: committedOnProvider ? 'committed' : 'aborted',
-      })) ?? false;
-    return {
-      reconciled,
-      committedOnProvider,
-      matchedSignatures,
-      scopeKey,
-    };
+    return executeAppendLeaseReconciliation({
+      spreadsheetId: id,
+      sheet,
+      leaseId: input.leaseId,
+      fencingToken: input.fencingToken,
+      manualOperatorDecision: input.manualOperatorDecision,
+      acknowledgeDuplicateRisk: input.acknowledgeDuplicateRisk,
+      confirmDuplicateRisk: input.confirmDuplicateRisk,
+      signal: input.signal,
+      appendLeaseStore: this.appendLeaseStore,
+      fetchSheetValues: (readRange, sig) =>
+        this.request(id + '/values/' + encodeURIComponent(readRange), sig),
+    });
   }
 
   private async tabs(

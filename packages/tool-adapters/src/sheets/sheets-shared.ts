@@ -6,6 +6,7 @@ import type {
   SheetsAppendLeaseState,
   SheetsAppendLeaseStatus,
   SheetsAppendLeaseStore,
+  SheetsAppendManualRecoveryDecision,
   SheetsDigestDataScope,
 } from '@wap/tool-schemas';
 import { StepError } from '../base-adapter.js';
@@ -90,31 +91,295 @@ export function createLostAppendLeaseError(
 
 export function reconcileDispatchedLeaseAgainstRows(
   dispatchedMeta: SheetsAppendDispatchMetadata | null | undefined,
-  existingRows: unknown[][]
+  existingRows: unknown,
+  options?: {
+    windowRowLimit?: number;
+    readbackMalformed?: boolean;
+  }
 ): {
   committedOnProvider: boolean;
   matchedSignatures: string[];
+  inconclusiveReason?: string;
 } {
-  const expectedSigs = dispatchedMeta?.candidateKeys ?? [];
-  if (expectedSigs.length === 0) {
-    return { committedOnProvider: false, matchedSignatures: [] };
+  if (
+    options?.readbackMalformed === true ||
+    !Array.isArray(existingRows) ||
+    existingRows.some((row) => !Array.isArray(row))
+  ) {
+    return {
+      committedOnProvider: false,
+      matchedSignatures: [],
+      inconclusiveReason: 'malformed_readback',
+    };
   }
-  const existingFullSigs = new Set<string>();
-  const existingCol0Sigs = new Set<string>();
-  for (let i = 0; i < existingRows.length; i++) {
-    const row = existingRows[i];
-    if (!Array.isArray(row)) continue;
-    const fullSig = buildRowDedupSignature(row, null);
-    if (fullSig) existingFullSigs.add(fullSig);
-    const col0Sig = buildRowDedupSignature(row, [0]);
-    if (col0Sig) existingCol0Sigs.add(col0Sig);
+
+  const expectedSigs = dispatchedMeta?.candidateKeys;
+  const expectedRowCount = dispatchedMeta?.rowCount;
+  if (
+    !dispatchedMeta ||
+    !Array.isArray(expectedSigs) ||
+    expectedSigs.length === 0 ||
+    !Number.isInteger(expectedRowCount) ||
+    expectedRowCount! < 1 ||
+    expectedSigs.length !== expectedRowCount ||
+    expectedSigs.some((sig) => typeof sig !== 'string' || sig.trim().length === 0)
+  ) {
+    return {
+      committedOnProvider: false,
+      matchedSignatures: [],
+      inconclusiveReason: 'missing_or_incomplete_metadata',
+    };
   }
-  const matchedSignatures = expectedSigs.filter(
-    (sig: string) => existingFullSigs.has(sig) || existingCol0Sigs.has(sig)
-  );
+
+  const windowLimit = Math.max(1, options?.windowRowLimit ?? 500);
+  if (existingRows.length > windowLimit) {
+    return {
+      committedOnProvider: false,
+      matchedSignatures: [],
+      inconclusiveReason: 'out_of_window',
+    };
+  }
+
+  const windowRows = existingRows.slice(0, windowLimit) as unknown[][];
+  const windowSaturated = existingRows.length >= windowLimit;
+  const usedRowIndices = new Set<number>();
+  const matchedSignatures: string[] = [];
+  const startIdx = windowRows.length > 1 ? 1 : 0;
+
+  for (const rawExpectedSig of expectedSigs) {
+    const expectedSig = rawExpectedSig.trim();
+    let matchedIdx = -1;
+    for (let i = startIdx; i < windowRows.length; i++) {
+      if (usedRowIndices.has(i)) continue;
+      const row = windowRows[i];
+      if (!Array.isArray(row)) continue;
+      const fullSig = buildRowDedupSignature(row, null);
+      const col0Sig = buildRowDedupSignature(row, [0]);
+      const keyColSig =
+        dispatchedMeta.keyColumns && dispatchedMeta.keyColumns.length > 0
+          ? buildRowDedupSignature(row, dispatchedMeta.keyColumns)
+          : null;
+      if (
+        fullSig === expectedSig ||
+        (keyColSig !== null && keyColSig === expectedSig) ||
+        (!expectedSig.includes('\u001f') && col0Sig === expectedSig)
+      ) {
+        matchedIdx = i;
+        break;
+      }
+    }
+    if (matchedIdx !== -1) {
+      usedRowIndices.add(matchedIdx);
+      matchedSignatures.push(rawExpectedSig);
+    }
+  }
+
+  if (matchedSignatures.length === expectedSigs.length) {
+    return {
+      committedOnProvider: true,
+      matchedSignatures,
+    };
+  }
+
+  if (matchedSignatures.length > 0) {
+    return {
+      committedOnProvider: false,
+      matchedSignatures,
+      inconclusiveReason: 'partial_batch',
+    };
+  }
+
+  if (windowSaturated) {
+    return {
+      committedOnProvider: false,
+      matchedSignatures: [],
+      inconclusiveReason: 'out_of_window',
+    };
+  }
+
   return {
-    committedOnProvider: matchedSignatures.length === expectedSigs.length,
+    committedOnProvider: false,
+    matchedSignatures: [],
+    inconclusiveReason: 'absent_on_readback',
+  };
+}
+
+export async function executeAppendLeaseReconciliation(params: {
+  spreadsheetId: string;
+  sheet: string;
+  leaseId?: string;
+  fencingToken?: number;
+  manualOperatorDecision?: SheetsAppendManualRecoveryDecision;
+  acknowledgeDuplicateRisk?: boolean;
+  confirmDuplicateRisk?: boolean;
+  signal?: AbortSignal;
+  appendLeaseStore: SheetsAppendLeaseStore;
+  fetchSheetValues: (readRange: string, signal?: AbortSignal) => Promise<any>;
+}): Promise<{
+  reconciled: boolean;
+  committedOnProvider: boolean;
+  matchedSignatures: string[];
+  scopeKey: string;
+  inconclusiveReason?: string;
+}> {
+  const {
+    spreadsheetId,
+    sheet,
+    leaseId,
+    fencingToken,
+    manualOperatorDecision,
+    acknowledgeDuplicateRisk,
+    confirmDuplicateRisk,
+    signal,
+    appendLeaseStore,
+    fetchSheetValues,
+  } = params;
+  const scopeKey = `${spreadsheetId}::${sheet.trim().toLowerCase()}`;
+  const state = await appendLeaseStore.getLeaseState?.(scopeKey);
+  if (!state) {
+    return {
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: [],
+      scopeKey,
+      inconclusiveReason: 'no_lease_state',
+    };
+  }
+  if (leaseId !== undefined && state.leaseId !== leaseId) {
+    return {
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: [],
+      scopeKey,
+      inconclusiveReason: 'lease_generation_mismatch',
+    };
+  }
+  if (fencingToken !== undefined && state.fencingToken !== fencingToken) {
+    return {
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: [],
+      scopeKey,
+      inconclusiveReason: 'lease_generation_mismatch',
+    };
+  }
+  if (state.status === 'dispatched') {
+    return {
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: [],
+      scopeKey,
+      inconclusiveReason: 'write_still_in_flight',
+    };
+  }
+  if (state.status !== 'unknown_outcome') {
+    return {
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: [],
+      scopeKey,
+      inconclusiveReason: `lease_status_${state.status}`,
+    };
+  }
+
+  const targetLeaseId = leaseId ?? state.leaseId;
+  const targetFencingToken = fencingToken ?? state.fencingToken;
+
+  const quotedSheet = /\s|'/.test(sheet) ? "'" + sheet.replaceAll("'", "''") + "'" : sheet;
+  const readRange = `${quotedSheet}!A1:Z500`;
+  const existingData = await fetchSheetValues(readRange, signal);
+
+  const readbackMalformed =
+    existingData == null ||
+    typeof existingData !== 'object' ||
+    Array.isArray(existingData) ||
+    (existingData.values !== undefined &&
+      (!Array.isArray(existingData.values) ||
+        existingData.values.some((row: unknown) => !Array.isArray(row)))) ||
+    (existingData.values === undefined && typeof existingData.range !== 'string');
+
+  const existingRows: unknown[][] =
+    !readbackMalformed && Array.isArray(existingData?.values)
+      ? (existingData.values as unknown[][])
+      : [];
+
+  const { committedOnProvider, matchedSignatures, inconclusiveReason } =
+    reconcileDispatchedLeaseAgainstRows(state.dispatchedMeta, existingRows, {
+      windowRowLimit: 500,
+      readbackMalformed,
+    });
+
+  if (committedOnProvider) {
+    const reconciled =
+      (await appendLeaseStore.reconcileUnknownLease?.({
+        scopeKey,
+        leaseId: targetLeaseId,
+        fencingToken: targetFencingToken,
+        reason: 'committed_on_provider',
+        verify: async (latestState) => {
+          if (
+            latestState.status !== 'unknown_outcome' ||
+            latestState.leaseId !== targetLeaseId ||
+            latestState.fencingToken !== targetFencingToken
+          ) {
+            return false;
+          }
+          const verifyCheck = reconcileDispatchedLeaseAgainstRows(
+            latestState.dispatchedMeta,
+            existingRows,
+            {
+              windowRowLimit: 500,
+              readbackMalformed,
+            }
+          );
+          return verifyCheck.committedOnProvider;
+        },
+      })) ?? false;
+
+    return {
+      reconciled,
+      committedOnProvider: true,
+      matchedSignatures,
+      scopeKey,
+      ...(reconciled ? {} : { inconclusiveReason: inconclusiveReason ?? 'cas_rejected' }),
+    };
+  }
+
+  const isExplicitManualOverride =
+    (manualOperatorDecision === 'operator_confirm_aborted_allow_retry' ||
+      manualOperatorDecision === 'operator_acknowledge_duplicate_risk') &&
+    (acknowledgeDuplicateRisk === true || confirmDuplicateRisk === true);
+
+  if (isExplicitManualOverride) {
+    const reconciled =
+      (await appendLeaseStore.reconcileUnknownLease?.({
+        scopeKey,
+        leaseId: targetLeaseId,
+        fencingToken: targetFencingToken,
+        reason: 'manual_operator_override',
+        manualOperatorDecision,
+        acknowledgeDuplicateRisk: true,
+        verify: async (latestState) =>
+          latestState.status === 'unknown_outcome' &&
+          latestState.leaseId === targetLeaseId &&
+          latestState.fencingToken === targetFencingToken,
+      })) ?? false;
+
+    return {
+      reconciled,
+      committedOnProvider: false,
+      matchedSignatures,
+      scopeKey,
+      ...(inconclusiveReason ? { inconclusiveReason } : {}),
+    };
+  }
+
+  return {
+    reconciled: false,
+    committedOnProvider: false,
     matchedSignatures,
+    scopeKey,
+    inconclusiveReason: inconclusiveReason ?? 'absent_on_readback',
   };
 }
 
@@ -164,16 +429,30 @@ export class InMemorySheetsAppendLeaseStore implements SheetsAppendLeaseStore {
     };
   }
 
+  private promoteExpiredDispatched(entry: InMemoryLeaseEntry): void {
+    if (
+      entry.status === 'dispatched' &&
+      new Date(entry.expiresAt).getTime() <= Date.now()
+    ) {
+      entry.status = 'unknown_outcome';
+      entry.unknownReason =
+        entry.unknownReason ??
+        'dispatched append lease expired without outcome confirmation';
+    }
+  }
+
   async getLeaseState(scopeKey: string): Promise<SheetsAppendLeaseState | null> {
     const entry = this.locks.get(scopeKey);
     if (!entry || entry.fencingToken === 0) return null;
+    this.promoteExpiredDispatched(entry);
     return this.toState(scopeKey, entry);
   }
 
   async reconcileUnknownLease(input: SheetsAppendLeaseReconcileInput): Promise<boolean> {
     const entry = this.locks.get(input.scopeKey);
     if (!entry) return false;
-    if (entry.status !== 'unknown_outcome' && entry.status !== 'dispatched') {
+    this.promoteExpiredDispatched(entry);
+    if (entry.status !== 'unknown_outcome') {
       return false;
     }
     if (input.leaseId !== undefined && entry.leaseId !== input.leaseId) {
@@ -182,15 +461,54 @@ export class InMemorySheetsAppendLeaseStore implements SheetsAppendLeaseStore {
     if (input.fencingToken !== undefined && entry.fencingToken !== input.fencingToken) {
       return false;
     }
-    if (input.verify) {
+    const targetLeaseId = input.leaseId ?? entry.leaseId;
+    const targetFencingToken = input.fencingToken ?? entry.fencingToken;
+
+    const isExplicitManualOverride =
+      (input.manualOperatorDecision === 'operator_confirm_aborted_allow_retry' ||
+        input.manualOperatorDecision === 'operator_acknowledge_duplicate_risk') &&
+      (input.acknowledgeDuplicateRisk === true || input.confirmDuplicateRisk === true);
+
+    if (!isExplicitManualOverride) {
+      if (input.reason === 'aborted') {
+        return false;
+      }
+      if (typeof input.verify !== 'function') {
+        return false;
+      }
+      const meta = entry.dispatchedMeta;
+      if (
+        !meta ||
+        !Array.isArray(meta.candidateKeys) ||
+        meta.candidateKeys.length === 0 ||
+        !Number.isInteger(meta.rowCount) ||
+        meta.rowCount < 1 ||
+        meta.candidateKeys.length !== meta.rowCount ||
+        meta.candidateKeys.some((sig) => typeof sig !== 'string' || sig.trim().length === 0)
+      ) {
+        return false;
+      }
+      const verified = await input.verify(this.toState(input.scopeKey, entry));
+      if (!verified) return false;
+    } else if (typeof input.verify === 'function') {
       const verified = await input.verify(this.toState(input.scopeKey, entry));
       if (!verified) return false;
     }
+
+    const latest = this.locks.get(input.scopeKey);
+    if (
+      !latest ||
+      latest.status !== 'unknown_outcome' ||
+      latest.leaseId !== targetLeaseId ||
+      latest.fencingToken !== targetFencingToken
+    ) {
+      return false;
+    }
     const nowIso = new Date().toISOString();
-    entry.status = 'released';
-    entry.reconciledAt = nowIso;
-    entry.releasedAt = nowIso;
-    entry.unknownReason = null;
+    latest.status = 'released';
+    latest.reconciledAt = nowIso;
+    latest.releasedAt = nowIso;
+    latest.unknownReason = null;
     return true;
   }
 

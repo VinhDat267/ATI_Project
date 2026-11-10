@@ -1544,13 +1544,15 @@ describe('PersonalSheetsAdapter', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it('GAS-10: mysheets.append_rows calls markUnknownOutcome on ambiguous post-dispatch failure, preserves unknown_outcome across release(), blocks un-reconciled retries, and recovers after reconcileAppendLease', async () => {
+  it('GAS-10: mysheets.append_rows fails closed on delayed commit, partial batch, >500-row out-of-window, malformed readback, and live dispatched lease; prevents duplicate write when first commit lands after reconciliation attempt', async () => {
     const leaseStore = new InMemorySheetsAppendLeaseStore();
     const sheetRows: string[][] = [
       ['Issue', 'Title'],
       ['GH#100', 'Initial'],
     ];
     let postAttempts = 0;
+    let delayedCommitRows: string[][] = [];
+    let returnMalformedReadback = false;
 
     const customFetch = (async (input: any, init: any) => {
       const url = new URL(String(input));
@@ -1558,21 +1560,26 @@ describe('PersonalSheetsAdapter', () => {
         return json({ sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }] });
       }
       if ((init?.method ?? 'GET') === 'GET' && url.pathname.includes('/values/')) {
-        return json({ range: 'Sheet1!A1:B20', values: sheetRows.map((r) => [...r]) });
+        if (returnMalformedReadback) {
+          return json({ values: 'not-an-array' });
+        }
+        return json({ range: 'Sheet1!A1:B500', values: sheetRows.slice(0, 500).map((r) => [...r]) });
       }
       if (init?.method === 'POST' && url.pathname.includes(':append')) {
         postAttempts += 1;
         const parsed = JSON.parse(String(init.body ?? '{}'));
-        for (const r of parsed.values ?? []) {
-          sheetRows.push(r.map(String));
-        }
+        const incoming = (parsed.values ?? []).map((r: unknown[]) => r.map(String));
         if (postAttempts === 1) {
-          // Provider mutated sheet, then returned 503 (ambiguous outcome)
+          // Hold commit behind barrier and return 503 (ambiguous outcome while write is still in flight on backend)
+          delayedCommitRows = incoming;
           return new Response('Service Unavailable', { status: 503 });
+        }
+        for (const r of incoming) {
+          sheetRows.push(r);
         }
         return json({
           spreadsheetId,
-          updates: { updatedRange: `Sheet1!A${sheetRows.length}:B${sheetRows.length}`, updatedRows: 1 },
+          updates: { updatedRange: `Sheet1!A${sheetRows.length}:B${sheetRows.length}`, updatedRows: incoming.length },
         });
       }
       return json({});
@@ -1610,7 +1617,25 @@ describe('PersonalSheetsAdapter', () => {
     expect(stateAfterFailure?.status).toBe('unknown_outcome');
     expect(stateAfterFailure?.fencingToken).toBe(1);
 
-    // Un-reconciled retry on adapter2 must be blocked before dispatching any POST
+    // 1. Reconcile BEFORE delayed provider commit lands -> MUST fail closed (not infer aborted!)
+    const prematureReconcile = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+    });
+    expect(prematureReconcile).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: [],
+      scopeKey,
+      inconclusiveReason: 'absent_on_readback',
+    });
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('unknown_outcome');
+
+    // 2. Direct store.reconcileUnknownLease without verify or manual operator decision MUST also fail closed
+    expect(await leaseStore.reconcileUnknownLease({ scopeKey, reason: 'aborted' })).toBe(false);
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('unknown_outcome');
+
+    // 3. Retry after failed reconciliation MUST still be blocked before dispatching any second POST
     await expect(
       adapter2.execute('mysheets.append_rows', {
         spreadsheetId,
@@ -1627,15 +1652,45 @@ describe('PersonalSheetsAdapter', () => {
     });
     expect(postAttempts).toBe(1);
 
-    // Reconcile by reading back the sheet and verifying state
-    const reconciled = await (adapter2 as any).reconcileAppendLease({
+    // 4. Now release delayed provider commit AFTER reconciliation attempt and retry
+    sheetRows.push(...delayedCommitRows);
+    expect(sheetRows.filter((r) => r[0] === 'GH#321')).toHaveLength(1);
+
+    // 5. Malformed readback MUST fail closed even if row is on provider
+    returnMalformedReadback = true;
+    const malformedRec = await adapter2.reconcileAppendLease({
       spreadsheetId,
       sheet: 'Sheet1',
     });
-    expect(reconciled).toMatchObject({ reconciled: true });
+    expect(malformedRec).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      inconclusiveReason: 'malformed_readback',
+    });
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('unknown_outcome');
+    returnMalformedReadback = false;
+
+    // 6. Generation/token mismatch MUST fail closed
+    const wrongGenRec = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+      fencingToken: 999,
+    });
+    expect(wrongGenRec.reconciled).toBe(false);
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('unknown_outcome');
+
+    // 7. Reconcile with terminal provider evidence (row now present in A1:Z500) succeeds
+    const reconciled = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+    });
+    expect(reconciled).toMatchObject({
+      reconciled: true,
+      committedOnProvider: true,
+    });
     expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('released');
 
-    // Retry after reconciliation acquires fencingToken 2, sees GH#321 already in sheetRows, and skips without a second POST
+    // 8. Retry after reconciliation acquires fencingToken 2, sees GH#321 already in sheetRows, and skips without a second POST
     const retryRes = await adapter2.execute('mysheets.append_rows', {
       spreadsheetId,
       sheet: 'Sheet1',
@@ -1648,7 +1703,91 @@ describe('PersonalSheetsAdapter', () => {
       skippedDuplicates: 1,
     });
     expect(postAttempts).toBe(1);
+    expect(sheetRows.filter((r) => r[0] === 'GH#321')).toHaveLength(1);
     expect((await leaseStore.getLeaseState?.(scopeKey))?.fencingToken).toBe(2);
+
+    // 9. Partial multi-row batch boundary: only 1 of 2 rows present -> fails closed
+    const partialHandle = await leaseStore.acquireLease({
+      scopeKey,
+      spreadsheetId,
+      sheetTitle: 'Sheet1',
+      ownerId: 'worker-partial',
+    });
+    await partialHandle.beginWriteDispatch?.({
+      operation: 'append',
+      rowCount: 2,
+      candidateKeys: ['GH#401\u001fPart 1', 'GH#402\u001fPart 2'],
+    });
+    sheetRows.push(['GH#401', 'Part 1']); // Only 1 of 2 rows landed!
+    // While still live 'dispatched', reconcileAppendLease MUST refuse to clear live dispatched lease
+    const inFlightRec = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+      manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
+      acknowledgeDuplicateRisk: true,
+    });
+    expect(inFlightRec).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      inconclusiveReason: 'write_still_in_flight',
+    });
+    await partialHandle.markUnknownOutcome?.('503 mid-batch');
+    await partialHandle.release();
+
+    const partialRec = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+    });
+    expect(partialRec).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: ['GH#401\u001fPart 1'],
+      inconclusiveReason: 'partial_batch',
+    });
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('unknown_outcome');
+
+    // Explicit manual operator decision acknowledging duplicate risk releases the blocked lease
+    const manualRec = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+      manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
+      acknowledgeDuplicateRisk: true,
+    });
+    expect(manualRec).toMatchObject({
+      reconciled: true,
+      committedOnProvider: false,
+    });
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('released');
+
+    // 10. >500-row absence / out-of-window boundary: row at index >= 500 (row 501+) fails closed
+    while (sheetRows.length <= 500) {
+      sheetRows.push([`GH#FILL_${sheetRows.length}`, `Row ${sheetRows.length}`]);
+    }
+    sheetRows.push(['GH#505', 'Beyond 500 window']);
+    const windowHandle = await leaseStore.acquireLease({
+      scopeKey,
+      spreadsheetId,
+      sheetTitle: 'Sheet1',
+      ownerId: 'worker-window',
+    });
+    await windowHandle.markUnknownOutcome?.('503 at row 502', {
+      operation: 'append',
+      rowCount: 1,
+      candidateKeys: ['GH#505\u001fBeyond 500 window'],
+    });
+    await windowHandle.release();
+
+    const outOfWindowRec = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+    });
+    expect(outOfWindowRec).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: [],
+      inconclusiveReason: 'out_of_window',
+    });
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('unknown_outcome');
   });
 
   it('GAS-10: mysheets.append_rows fences off provider POST when beginWriteDispatch rejects due to lost lease ownership', async () => {
