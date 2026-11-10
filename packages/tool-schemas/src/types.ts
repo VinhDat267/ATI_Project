@@ -409,6 +409,34 @@ export interface SheetsDigestDelivery {
   manualResolution?: SheetsDigestManualResolution;
 }
 
+export type SheetsAppendLeaseStatus =
+  | 'active'
+  | 'dispatched'
+  | 'unknown_outcome'
+  | 'released';
+
+export interface SheetsAppendDispatchMetadata {
+  operation: 'append' | 'upsert';
+  rowCount: number;
+  candidateKeys?: string[];
+  keyColumns?: number[] | null;
+}
+
+export interface SheetsAppendLeaseState {
+  scopeKey: string;
+  spreadsheetId: string;
+  sheetTitle: string;
+  leaseId: string;
+  ownerId: string;
+  fencingToken: number;
+  status: SheetsAppendLeaseStatus;
+  acquiredAt?: string;
+  expiresAt?: string;
+  dispatchedAt?: string | null;
+  unknownReason?: string | null;
+  dispatchedMeta?: SheetsAppendDispatchMetadata | null;
+}
+
 export interface SheetsAppendLeaseAcquireInput {
   scopeKey: string;
   spreadsheetId: string;
@@ -423,12 +451,25 @@ export interface SheetsAppendLeaseHandle {
   leaseId: string;
   fencingToken: number;
   waitedForContention: boolean;
+  beginWriteDispatch?: (meta?: SheetsAppendDispatchMetadata) => Promise<void>;
+  completeWrite?: () => Promise<void>;
+  abortUncommittedWrite?: () => Promise<void>;
   release: () => Promise<void>;
-  markUnknownOutcome?: (reason: string) => Promise<void>;
+  markUnknownOutcome?: (reason: string, meta?: SheetsAppendDispatchMetadata) => Promise<void>;
+}
+
+export interface SheetsAppendLeaseReconcileInput {
+  scopeKey: string;
+  leaseId?: string;
+  fencingToken?: number;
+  reason?: string;
+  verify?: (state: SheetsAppendLeaseState) => Promise<boolean>;
 }
 
 export interface SheetsAppendLeaseStore {
   acquireLease(input: SheetsAppendLeaseAcquireInput): Promise<SheetsAppendLeaseHandle>;
+  getLeaseState?(scopeKey: string): Promise<SheetsAppendLeaseState | null>;
+  reconcileUnknownLease?(input: SheetsAppendLeaseReconcileInput): Promise<boolean>;
 }
 
 export interface CalendarDigestConfig {

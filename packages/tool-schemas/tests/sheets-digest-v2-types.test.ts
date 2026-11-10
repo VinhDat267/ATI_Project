@@ -17,6 +17,10 @@ import {
   type SheetsDigestWorkspaceMode,
   type SheetsAppendLeaseStore,
   type SheetsAppendLeaseHandle,
+  type SheetsAppendLeaseStatus,
+  type SheetsAppendDispatchMetadata,
+  type SheetsAppendLeaseState,
+  type SheetsAppendLeaseReconcileInput,
 } from '../src/index.js';
 
 describe('SheetsDigestConfigV2 & Gate A recovery schema contracts', () => {
@@ -428,15 +432,53 @@ describe('SheetsDigestConfigV2 & Gate A recovery schema contracts', () => {
       dispatchedConfigHash: 'hash-v1',
     };
 
+    const dispatchMeta: SheetsAppendDispatchMetadata = {
+      operation: 'append',
+      rowCount: 1,
+      candidateKeys: ['GH#321'],
+      keyColumns: [0],
+    };
+    let status: SheetsAppendLeaseStatus = 'active';
     const mockStore: SheetsAppendLeaseStore = {
       acquireLease: async (input) => {
         const handle: SheetsAppendLeaseHandle = {
           leaseId: `lease:${input.scopeKey}`,
           fencingToken: 1,
           waitedForContention: false,
-          release: async () => {},
+          beginWriteDispatch: async () => {
+            status = 'dispatched';
+          },
+          completeWrite: async () => {
+            status = 'released';
+          },
+          abortUncommittedWrite: async () => {
+            status = 'active';
+          },
+          markUnknownOutcome: async () => {
+            status = 'unknown_outcome';
+          },
+          release: async () => {
+            if (status === 'active') status = 'released';
+          },
         };
         return handle;
+      },
+      getLeaseState: async (scopeKey): Promise<SheetsAppendLeaseState> => ({
+        scopeKey,
+        spreadsheetId: 'sheet-123',
+        sheetTitle: 'Tasks',
+        leaseId: `lease:${scopeKey}`,
+        ownerId: 'worker-1',
+        fencingToken: 1,
+        status,
+        dispatchedMeta: dispatchMeta,
+      }),
+      reconcileUnknownLease: async (input: SheetsAppendLeaseReconcileInput) => {
+        if (input.scopeKey && status === 'unknown_outcome') {
+          status = 'released';
+          return true;
+        }
+        return false;
       },
     };
 
@@ -452,6 +494,12 @@ describe('SheetsDigestConfigV2 & Gate A recovery schema contracts', () => {
     expect(delivery.dispatchedConfigHash).toBe('hash-v1');
     expect(lease.fencingToken).toBe(1);
     expect(lease.waitedForContention).toBe(false);
+    await lease.beginWriteDispatch?.(dispatchMeta);
+    expect((await mockStore.getLeaseState?.('sheet-123::Tasks'))?.status).toBe('dispatched');
+    await lease.markUnknownOutcome?.('503 after dispatch', dispatchMeta);
     await lease.release();
+    expect((await mockStore.getLeaseState?.('sheet-123::Tasks'))?.status).toBe('unknown_outcome');
+    expect(await mockStore.reconcileUnknownLease?.({ scopeKey: 'sheet-123::Tasks' })).toBe(true);
+    expect((await mockStore.getLeaseState?.('sheet-123::Tasks'))?.status).toBe('released');
   });
 });
