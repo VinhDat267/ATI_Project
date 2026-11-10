@@ -11,6 +11,11 @@ export * from './sheets/sheets-adapter.js';
 export * from './sheets/personal-sheets-adapter.js';
 export {
   normalizeSpreadsheetIdInput,
+  parseSheetNumber,
+  computeSheetAggregation,
+  filterSearchedRows,
+  InMemorySheetsAppendLeaseStore,
+  sharedProcessSheetsAppendLeaseStore,
   SHEETS_DIGEST_MAX_DATA_ROWS,
   SHEETS_DIGEST_SCAN_ROW_LIMIT,
   SHEETS_DIGEST_MAX_COLUMNS,
@@ -22,6 +27,7 @@ export {
   type ReadDigestWindowInput,
   type ReadDigestWindowResult,
   type ResolvedDigestScanWindow,
+  type SheetNumberParseOptions,
 } from './sheets/sheets-shared.js';
 export * from './calendar/calendar-adapter.js';
 export * from './calendar/personal-calendar-adapter.js';

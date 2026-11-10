@@ -415,6 +415,7 @@ export interface SheetsAppendLeaseAcquireInput {
   ownerId: string;
   ttlMs?: number;
   signal?: AbortSignal;
+  onContention?: () => Promise<void>;
 }
 
 export interface SheetsAppendLeaseHandle {

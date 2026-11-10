@@ -158,4 +158,29 @@ describe('packages/tool-adapters (Task 5: Slack Adapter & Allowed Channels Filte
       ],
     });
   });
+
+  it('GAS-01: rejects sendMessage when Slack chat.postMessage returns missing or non-string ts with UNKNOWN category', async () => {
+    for (const invalidPayload of [
+      { ok: true, channel: 'C2' },
+      { ok: true, channel: 'C2', ts: '' },
+      { ok: true, channel: 'C2', ts: { bad: 1 } },
+    ]) {
+      const adapter = new SlackAdapter({
+        credentials: { botToken: 'xoxb-valid' },
+        allowedScope: { channels: ['C2'] },
+        fetchFn: vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => invalidPayload,
+        }) as any,
+      });
+
+      await expect(
+        adapter.sendMessage({ channel: 'C2', text: 'Digest body' })
+      ).rejects.toMatchObject({
+        category: 'UNKNOWN',
+        retryable: false,
+      });
+    }
+  });
 });

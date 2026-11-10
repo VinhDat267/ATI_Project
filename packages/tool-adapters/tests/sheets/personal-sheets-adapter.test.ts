@@ -1350,4 +1350,196 @@ describe('PersonalSheetsAdapter', () => {
     expect(calls[0]!.url.toString()).toMatch(/^https:\/\/www\.googleapis\.com\/drive\/v3\/files\?/);
     expect(calls[1]!.url.toString()).toMatch(/^https:\/\/www\.googleapis\.com\/upload\/drive\/v3\/files\?/);
   });
+
+  it('GAS-06: mysheets.aggregate_rows respects vi_VN spreadsheet locale for 1.234 + 2.345 (= 3579) and UNFORMATTED_VALUE typed numbers', async () => {
+    const { adapter } = setup({
+      handler: (url) => {
+        if (url.pathname.includes('/values/')) {
+          return json({
+            range: "'Doanh thu'!A1:B3",
+            values: [
+              ['Mục', 'Số tiền'],
+              ['A', '1.234'],
+              ['B', '2.345'],
+            ],
+          });
+        }
+        return json({
+          properties: { locale: 'vi_VN' },
+          sheets: [{ properties: { sheetId: 0, title: 'Doanh thu' } }],
+        });
+      },
+    });
+
+    const agg = await adapter.execute('mysheets.aggregate_rows', {
+      spreadsheetId,
+      sheet: 'Doanh thu',
+      metrics: [{ column: 'Số tiền', fn: 'sum' }],
+    });
+    expect(agg.totals).toEqual({
+      'Số tiền_sum': 3579,
+    });
+  });
+
+  it('GAS-07: mysheets.aggregate_rows groups by raw unclipped values so keys sharing a >500-char prefix stay distinct and sets truncated: true', async () => {
+    const sharedPrefix = 'KHACH_HANG_PREFIX_'.padEnd(500, 'X');
+    const keyA = `${sharedPrefix}_CHI_NHANH_HA_NOI`;
+    const keyB = `${sharedPrefix}_CHI_NHANH_SAI_GON`;
+
+    const { adapter } = setup({
+      handler: (url) => {
+        if (url.pathname.includes('/values/')) {
+          return json({
+            range: "'Doanh thu'!A1:B3",
+            values: [
+              ['Khách hàng', 'Doanh thu'],
+              [keyA, '100'],
+              [keyB, '250'],
+            ],
+          });
+        }
+        return json({
+          sheets: [{ properties: { sheetId: 0, title: 'Doanh thu' } }],
+        });
+      },
+    });
+
+    const agg = await adapter.execute('mysheets.aggregate_rows', {
+      spreadsheetId,
+      sheet: 'Doanh thu',
+      groupBy: 'Khách hàng',
+      metrics: [{ column: 'Doanh thu', fn: 'sum' }],
+    });
+
+    expect(agg.truncated).toBe(true);
+    expect(agg.groups).toHaveLength(2);
+    expect(agg.groups[0]!.key).not.toBe(agg.groups[1]!.key);
+    expect(agg.groups[0]!.key.length).toBeLessThanOrEqual(500);
+    expect(agg.groups[1]!.key.length).toBeLessThanOrEqual(500);
+    expect(agg.groups.map((g: any) => g.metrics['Doanh thu_sum'])).toEqual([100, 250]);
+  });
+
+  it('GAS-10: concurrent deduplicated mysheets.append_rows calls across two independent adapter instances serialize and write GH#321 once', async () => {
+    const sheetRows: string[][] = [
+      ['Issue', 'Title'],
+      ['GH#100', 'Old'],
+    ];
+    let readCount = 0;
+    let appendCount = 0;
+    let releaseReads!: () => void;
+    const bothRead = new Promise<void>((resolve) => {
+      releaseReads = resolve;
+    });
+
+    const sharedFetchFn = (async (input: any, init: any) => {
+      const url = new URL(String(input));
+      if ((init?.method ?? 'GET') === 'GET' && url.searchParams.get('fields')?.includes('sheets.properties')) {
+        return json({
+          sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }],
+        });
+      }
+      if ((init?.method ?? 'GET') === 'GET' && url.pathname.includes('/values/')) {
+        readCount += 1;
+        if (readCount >= 2) releaseReads();
+        await bothRead;
+        return json({
+          range: 'Sheet1!A1:B20',
+          values: sheetRows.map((r) => [...r]),
+        });
+      }
+      if (init?.method === 'POST' && url.pathname.includes(':append')) {
+        appendCount += 1;
+        const parsed = JSON.parse(String(init.body ?? '{}'));
+        const rows = Array.isArray(parsed.values) ? parsed.values : [];
+        for (const r of rows) {
+          sheetRows.push(Array.isArray(r) ? r.map(String) : []);
+        }
+        return json({
+          spreadsheetId,
+          updates: {
+            updatedRange: `Sheet1!A${sheetRows.length}:B${sheetRows.length}`,
+            updatedRows: rows.length,
+          },
+        });
+      }
+      return json({});
+    }) as unknown as typeof fetch;
+
+    const tokens: GmailAccessTokenProvider = {
+      getAccessToken: async () => 'mock-sheets-token',
+    };
+    const a1 = createPersonalSheetsAdapter({
+      userId,
+      tokens,
+      allowedScope: { spreadsheets: [spreadsheetId] },
+      fetchFn: sharedFetchFn,
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+    });
+    const a2 = createPersonalSheetsAdapter({
+      userId,
+      tokens,
+      allowedScope: { spreadsheets: [spreadsheetId] },
+      fetchFn: sharedFetchFn,
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+    });
+
+    const [r1, r2] = await Promise.all([
+      a1.execute('mysheets.append_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        rows: [['GH#321', 'Fix race']],
+      }),
+      a2.execute('mysheets.append_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        rows: [['GH#321', 'Fix race']],
+      }),
+    ]);
+
+    expect(appendCount).toBe(1);
+    expect(sheetRows).toHaveLength(3);
+    expect([r1.updatedRows, r2.updatedRows].sort()).toEqual([0, 1]);
+    expect([r1.skippedDuplicates ?? 0, r2.skippedDuplicates ?? 0].sort()).toEqual([0, 1]);
+  });
+
+  it('GAS-11: rejects move_drive_file and append_doc_text on unselected external Drive file even when enableDriveWriteTools is true', async () => {
+    const { adapter, calls } = setup({
+      enableDriveWriteTools: true,
+      allowedScope: { spreadsheets: [spreadsheetId] },
+    });
+
+    await expect(
+      adapter.execute('mysheets.move_drive_file', {
+        fileId: 'file_other_B',
+        folderId: 'folder_target_C',
+      })
+    ).rejects.toMatchObject({
+      category: 'AUTH_ERROR',
+      statusCode: 403,
+      details: {
+        code: 'MYSHEETS_DRIVE_TARGET_NOT_ALLOWED',
+        tool: 'mysheets.move_drive_file',
+        resourceId: 'file_other_B',
+        requestSent: false,
+      },
+    });
+
+    await expect(
+      adapter.execute('mysheets.append_doc_text', {
+        documentId: 'file_other_B',
+        text: 'Unauthorized append',
+      })
+    ).rejects.toMatchObject({
+      category: 'AUTH_ERROR',
+      statusCode: 403,
+      details: {
+        code: 'MYSHEETS_DRIVE_TARGET_NOT_ALLOWED',
+        tool: 'mysheets.append_doc_text',
+        resourceId: 'file_other_B',
+        requestSent: false,
+      },
+    });
+
+    expect(calls).toHaveLength(0);
+  });
 });

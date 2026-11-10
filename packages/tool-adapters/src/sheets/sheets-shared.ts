@@ -1,6 +1,11 @@
-import type { SheetsDigestDataScope } from '@wap/tool-schemas';
+import type {
+  SheetsAppendLeaseAcquireInput,
+  SheetsAppendLeaseHandle,
+  SheetsAppendLeaseStore,
+  SheetsDigestDataScope,
+} from '@wap/tool-schemas';
 import { StepError } from '../base-adapter.js';
-import { SHEETS_MAX_CELL_CHARS, clipText } from '../bounds.js';
+import { SHEETS_MAX_CELL_CHARS, SHEETS_MAX_COLUMNS, clipText } from '../bounds.js';
 import { GlobalRateLimiter } from '../rate-limiter.js';
 
 export const SHEETS_DIGEST_MAX_DATA_ROWS = 500;
@@ -32,7 +37,112 @@ export interface ReadDigestWindowResult {
   values: string[][];
   tailRecords: Array<Record<string, string>>;
   tailValues: string[][];
+  locale?: string;
+  unformattedValues?: unknown[][];
 }
+
+interface InMemoryLeaseEntry {
+  tail: Promise<void>;
+  activeCount: number;
+  fencingToken: number;
+  unknownReason?: string;
+}
+
+/**
+ * Process-wide in-memory lease store for serializing deduplicated Sheets appends across
+ * independent PersonalSheetsAdapter / SheetsAdapter instances within the same Node process.
+ * Multi-worker deployments inject a PostgreSQL-backed SheetsAppendLeaseStore via AdapterFactory.
+ */
+export class InMemorySheetsAppendLeaseStore implements SheetsAppendLeaseStore {
+  private readonly locks = new Map<string, InMemoryLeaseEntry>();
+
+  async acquireLease(input: SheetsAppendLeaseAcquireInput): Promise<SheetsAppendLeaseHandle> {
+    const { scopeKey, signal, onContention } = input;
+    if (signal?.aborted) {
+      throw new StepError({
+        message: 'Sheets append lease cancelled before dispatch',
+        category: 'NETWORK',
+      });
+    }
+    let entry = this.locks.get(scopeKey);
+    if (!entry) {
+      entry = { tail: Promise.resolve(), activeCount: 0, fencingToken: 0 };
+      this.locks.set(scopeKey, entry);
+    }
+    const waitedForContention = entry.activeCount > 0;
+    entry.activeCount += 1;
+    const prevTail = entry.tail;
+    let releaseCurrent!: () => void;
+    const currentGate = new Promise<void>((resolve) => {
+      releaseCurrent = resolve;
+    });
+    entry.tail = prevTail.then(
+      () => currentGate,
+      () => currentGate
+    );
+
+    if (waitedForContention && onContention) {
+      // Trigger pre-flight contention hook without blocking the queue release chain
+      void onContention().catch(() => {});
+    }
+
+    try {
+      if (signal) {
+        await Promise.race([
+          prevTail,
+          new Promise<never>((_, reject) => {
+            const onAbort = () =>
+              reject(
+                new StepError({
+                  message: 'Sheets append lease cancelled while waiting',
+                  category: 'NETWORK',
+                })
+              );
+            if (signal.aborted) {
+              onAbort();
+              return;
+            }
+            signal.addEventListener('abort', onAbort, { once: true });
+          }),
+        ]);
+      } else {
+        await prevTail;
+      }
+    } catch (error) {
+      entry.activeCount = Math.max(0, entry.activeCount - 1);
+      releaseCurrent();
+      if (entry.activeCount === 0 && this.locks.get(scopeKey) === entry) {
+        this.locks.delete(scopeKey);
+      }
+      throw error;
+    }
+
+    entry.fencingToken += 1;
+    const token = entry.fencingToken;
+    const leaseId = `${scopeKey}#${token}`;
+    let released = false;
+
+    return {
+      leaseId,
+      fencingToken: token,
+      waitedForContention,
+      markUnknownOutcome: async (reason: string) => {
+        entry!.unknownReason = reason;
+      },
+      release: async () => {
+        if (released) return;
+        released = true;
+        entry!.activeCount = Math.max(0, entry!.activeCount - 1);
+        releaseCurrent();
+        if (entry!.activeCount === 0 && this.locks.get(scopeKey) === entry) {
+          this.locks.delete(scopeKey);
+        }
+      },
+    };
+  }
+}
+
+export const sharedProcessSheetsAppendLeaseStore = new InMemorySheetsAppendLeaseStore();
 
 export const spreadsheetPattern = /^[A-Za-z0-9_-]{20,}$/;
 export const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets/';
@@ -623,16 +733,44 @@ export function mapRecordsToRows(records: unknown, headers: string[]): string[][
   return mapped;
 }
 
-export function parseSheetNumber(raw: string): number | null {
-  const hasVnCurrency = /(?:vnđ|vnd|đ|₫)/iu.test(raw);
-  const cleaned = raw
-    .replace(/(?:vnđ|vnd|usd|đ|₫|\$|€|%)/giu, '')
+export interface SheetNumberParseOptions {
+  locale?: string;
+}
+
+export function parseSheetNumber(
+  raw: unknown,
+  options?: SheetNumberParseOptions
+): number | null {
+  if (typeof raw === 'number') {
+    return Number.isFinite(raw) ? raw : null;
+  }
+  if (typeof raw !== 'string') {
+    return null;
+  }
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  // Never misparse formatted date strings as numbers
+  if (parseSheetDateMs(trimmed) !== null) {
+    return null;
+  }
+
+  const hasVnCurrency = /(?:vnđ|vnd|đ|₫)/iu.test(trimmed);
+  const cleaned = trimmed
+    .replace(/(?:vnđ|vnd|usd|eur|gbp|jpy|đ|₫|\$|€|£|¥|%)/giu, '')
+    .replace(/\s+/g, '')
     .trim();
   if (!cleaned) return null;
+
+  const localeStr = typeof options?.locale === 'string' ? options.locale.trim() : '';
+  const isDotThousandsLocale = /^(?:vi|de|fr|es|it|pt|nl|tr|id)(?:[-_]|$)/i.test(localeStr);
+  const isCommaThousandsLocale = /^(?:en|ja|zh|ko)(?:[-_]|$)/i.test(localeStr);
+
   if (
     /^-?[1-9]\d{0,2}(?:\.\d{3}){2,}(?:,\d+)?$/.test(cleaned) ||
     /^-?[1-9]\d{0,2}(?:\.\d{3})+,\d+$/.test(cleaned) ||
-    (hasVnCurrency && /^-?[1-9]\d{0,2}(?:\.\d{3})+$/.test(cleaned))
+    ((hasVnCurrency || (isDotThousandsLocale && !isCommaThousandsLocale)) &&
+      /^-?[1-9]\d{0,2}(?:\.\d{3})+$/.test(cleaned))
   ) {
     const normalized = cleaned.replaceAll('.', '').replace(',', '.');
     const n = Number(normalized);
@@ -703,12 +841,14 @@ const ALLOWED_FILTER_OPS = new Set<string>([
 export function matchesSheetCondition(
   rawCell: string,
   op: SheetFilterOperator,
-  rawTarget: string
+  rawTarget: string,
+  options?: { rawValue?: unknown; locale?: string }
 ): boolean {
   const trimmedCell = rawCell.trim();
   const cellLower = trimmedCell.toLowerCase();
   const targetTrimmed = rawTarget.trim();
   const targetLower = targetTrimmed.toLowerCase();
+  const localeOpt = options?.locale ? { locale: options.locale } : undefined;
 
   if (op === 'empty') return trimmedCell === '';
   if (op === 'not_empty') return trimmedCell !== '';
@@ -722,8 +862,11 @@ export function matchesSheetCondition(
       if (cellDate !== null && targetDate !== null) {
         isEq = cellDate === targetDate;
       } else {
-        const cellNum = parseSheetNumber(trimmedCell);
-        const targetNum = parseSheetNumber(targetTrimmed);
+        const cellNum =
+          typeof options?.rawValue === 'number'
+            ? parseSheetNumber(options.rawValue)
+            : parseSheetNumber(trimmedCell, localeOpt);
+        const targetNum = parseSheetNumber(targetTrimmed, localeOpt);
         if (cellNum !== null && targetNum !== null) {
           isEq = cellNum === targetNum;
         }
@@ -743,8 +886,11 @@ export function matchesSheetCondition(
     if (op === 'lte') return cellDate <= targetDate;
   }
 
-  const cellNum = parseSheetNumber(trimmedCell);
-  const targetNum = parseSheetNumber(targetTrimmed);
+  const cellNum =
+    typeof options?.rawValue === 'number'
+      ? parseSheetNumber(options.rawValue)
+      : parseSheetNumber(trimmedCell, localeOpt);
+  const targetNum = parseSheetNumber(targetTrimmed, localeOpt);
   if (cellNum !== null && targetNum !== null) {
     if (op === 'gt') return cellNum > targetNum;
     if (op === 'gte') return cellNum >= targetNum;
@@ -761,10 +907,11 @@ export function matchesSheetCondition(
 
 export function filterSearchedRows(
   sheet: string,
-  rawRows: string[][],
+  rawRows: unknown[][],
   args: Record<string, unknown>,
   limit: number,
-  initialTruncated = false
+  initialTruncated = false,
+  options?: { locale?: string }
 ): {
   sheet: string;
   headers: string[];
@@ -785,10 +932,16 @@ export function filterSearchedRows(
     invalid('value must be a string up to 500 characters');
   }
 
+  const locale =
+    typeof args.locale === 'string' && args.locale.trim()
+      ? args.locale.trim()
+      : typeof options?.locale === 'string' && options.locale.trim()
+        ? options.locale.trim()
+        : undefined;
   let truncated = initialTruncated;
   const headerRow = rawRows[0] ?? [];
   const headers = headerRow.map((h, idx) => {
-    const rawH = h.trim() || `col_${idx + 1}`;
+    const rawH = (h == null ? '' : String(h)).trim() || `col_${idx + 1}`;
     const clippedH = clipText(rawH, SHEETS_MAX_CELL_CHARS);
     if (clippedH.clipped) truncated = true;
     return clippedH.text;
@@ -837,18 +990,20 @@ export function filterSearchedRows(
 
   const allMatches: Array<{ rowNumber: number; rawValues: string[] }> = [];
   for (let i = 1; i < rawRows.length; i++) {
-    const row = rawRows[i] ?? [];
-    if (row.every((c) => c.trim() === '')) continue;
+    const row = Array.isArray(rawRows[i]) ? rawRows[i]! : [];
+    const strRow = row.map((c) => (c == null ? '' : String(c)));
+    if (strRow.every((c) => c.trim() === '')) continue;
 
     if (queryLower) {
-      const hasQuery = row.some((c) => c.toLowerCase().includes(queryLower));
+      const hasQuery = strRow.some((c) => c.toLowerCase().includes(queryLower));
       if (!hasQuery) continue;
     }
 
     let allCondsPass = true;
     for (const cond of resolvedConditions) {
-      const rawCell = row[cond.colIdx] ?? '';
-      if (!matchesSheetCondition(rawCell, cond.op, cond.value)) {
+      const rawCellStr = strRow[cond.colIdx] ?? '';
+      const rawCellVal = row[cond.colIdx];
+      if (!matchesSheetCondition(rawCellStr, cond.op, cond.value, { rawValue: rawCellVal, locale })) {
         allCondsPass = false;
         break;
       }
@@ -857,7 +1012,7 @@ export function filterSearchedRows(
 
     allMatches.push({
       rowNumber: i + 1,
-      rawValues: row,
+      rawValues: strRow,
     });
   }
 
@@ -891,36 +1046,99 @@ export function filterSearchedRows(
 
 export function computeSheetAggregation(
   sheet: string,
-  rawRows: string[][],
-  args: Record<string, unknown>
+  rawRows: unknown[][],
+  args: Record<string, unknown>,
+  initialTruncatedOrOptions: boolean | { locale?: string; rowTruncated?: boolean } = false
 ): {
   sheet: string;
   totalRowsScanned: number;
   matchedRows: number;
+  truncated?: boolean;
   groups: Array<{ key: string; count: number; metrics: Record<string, number> }>;
   totals: Record<string, number>;
 } {
-  const nonEmptyDataRows = rawRows.slice(1).filter((r) => r.some((c) => c.trim() !== ''));
-  const searched = filterSearchedRows(
-    sheet,
-    rawRows,
-    {
-      ...(args.query !== undefined ? { query: args.query } : {}),
-      ...(args.column !== undefined ? { column: args.column } : {}),
-      ...(args.operator !== undefined ? { operator: args.operator } : {}),
-      ...(args.value !== undefined ? { value: args.value } : {}),
-      ...(args.filters !== undefined ? { filters: args.filters } : {}),
-    },
-    500
-  );
+  if (args.query !== undefined && (typeof args.query !== 'string' || args.query.length > 200)) {
+    invalid('query must be a string up to 200 characters');
+  }
+  if (args.column !== undefined && (typeof args.column !== 'string' || !args.column.trim() || args.column.length > 100)) {
+    invalid('column must be a non-empty string');
+  }
+  if (args.operator !== undefined && (typeof args.operator !== 'string' || !ALLOWED_FILTER_OPS.has(args.operator))) {
+    invalid('operator is invalid');
+  }
+  if (args.value !== undefined && (typeof args.value !== 'string' || args.value.length > 500)) {
+    invalid('value must be a string up to 500 characters');
+  }
 
-  const headers = searched.headers;
+  const opts =
+    typeof initialTruncatedOrOptions === 'object' && initialTruncatedOrOptions !== null
+      ? initialTruncatedOrOptions
+      : { rowTruncated: Boolean(initialTruncatedOrOptions) };
+  const locale =
+    typeof args.locale === 'string' && args.locale.trim()
+      ? args.locale.trim()
+      : typeof opts.locale === 'string' && opts.locale.trim()
+        ? opts.locale.trim()
+        : undefined;
+  let truncated =
+    Boolean(opts.rowTruncated) ||
+    rawRows.length > 500 ||
+    rawRows.slice(0, 500).some((r) => Array.isArray(r) && r.length > SHEETS_MAX_COLUMNS);
+
+  const boundedRows = rawRows.slice(0, 500).map((r) => (Array.isArray(r) ? r.slice(0, SHEETS_MAX_COLUMNS) : []));
+  const headerRow = boundedRows[0] ?? [];
+  const rawHeaders = headerRow.map((h, idx) => (h == null ? '' : String(h)).trim() || `col_${idx + 1}`);
+  const headers = rawHeaders.map((rawH) => {
+    const clippedH = clipText(rawH, SHEETS_MAX_CELL_CHARS);
+    if (clippedH.clipped) truncated = true;
+    return clippedH.text;
+  });
+
+  const resolvedConditions: Array<{
+    colIdx: number;
+    op: SheetFilterOperator;
+    value: string;
+  }> = [];
+
+  if (typeof args.column === 'string') {
+    const colIdx = resolveSheetColumnIndex(args.column, rawHeaders);
+    const op = (typeof args.operator === 'string' ? args.operator : 'contains') as SheetFilterOperator;
+    const val = typeof args.value === 'string' ? args.value : '';
+    resolvedConditions.push({ colIdx, op, value: val });
+  }
+
+  if (args.filters !== undefined) {
+    if (!Array.isArray(args.filters) || args.filters.length < 1 || args.filters.length > 10) {
+      invalid('filters must be an array of 1..10 conditions');
+    }
+    for (const cond of args.filters) {
+      if (!cond || typeof cond !== 'object' || Array.isArray(cond)) {
+        invalid('filter condition must be an object');
+      }
+      const c = cond as Record<string, unknown>;
+      if (typeof c.column !== 'string' || !c.column.trim() || c.column.length > 100) {
+        invalid('filter column must be a non-empty string');
+      }
+      if (c.operator !== undefined && (typeof c.operator !== 'string' || !ALLOWED_FILTER_OPS.has(c.operator))) {
+        invalid('filter operator is invalid');
+      }
+      if (c.value !== undefined && (typeof c.value !== 'string' || c.value.length > 500)) {
+        invalid('filter value must be a string up to 500 characters');
+      }
+      resolvedConditions.push({
+        colIdx: resolveSheetColumnIndex(c.column, rawHeaders),
+        op: (typeof c.operator === 'string' ? c.operator : 'contains') as SheetFilterOperator,
+        value: typeof c.value === 'string' ? c.value : '',
+      });
+    }
+  }
+
   let groupByIdx: number | null = null;
   if (args.groupBy !== undefined) {
     if (typeof args.groupBy !== 'string' || !args.groupBy.trim() || args.groupBy.length > 100) {
       invalid('groupBy must be a non-empty string');
     }
-    groupByIdx = resolveSheetColumnIndex(args.groupBy, headers);
+    groupByIdx = resolveSheetColumnIndex(args.groupBy, rawHeaders);
   }
 
   const allowedFns = new Set(['sum', 'avg', 'min', 'max', 'count']);
@@ -940,7 +1158,7 @@ export function computeSheetAggregation(
       if (typeof item.fn !== 'string' || !allowedFns.has(item.fn)) {
         invalid('metric fn must be sum, avg, min, max, or count');
       }
-      const colIdx = resolveSheetColumnIndex(item.column, headers);
+      const colIdx = resolveSheetColumnIndex(item.column, rawHeaders);
       metricSpecs.push({
         colIdx,
         colName: headers[colIdx] || item.column.trim(),
@@ -949,17 +1167,54 @@ export function computeSheetAggregation(
     }
   }
 
-  const computeMetricsForRows = (rows: Array<{ values: string[] }>): Record<string, number> => {
+  const queryLower = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
+  const nonEmptyDataRows: Array<{ raw: unknown[]; str: string[] }> = [];
+  const matchedRows: Array<{ raw: unknown[]; str: string[] }> = [];
+
+  for (let i = 1; i < boundedRows.length; i++) {
+    const raw = boundedRows[i] ?? [];
+    const str = raw.map((c) => {
+      const s = c == null ? '' : String(c);
+      if (s.length > SHEETS_MAX_CELL_CHARS) truncated = true;
+      return s;
+    });
+    if (str.every((c) => c.trim() === '')) continue;
+    nonEmptyDataRows.push({ raw, str });
+
+    if (queryLower) {
+      const hasQuery = str.some((c) => c.toLowerCase().includes(queryLower));
+      if (!hasQuery) continue;
+    }
+
+    let allCondsPass = true;
+    for (const cond of resolvedConditions) {
+      const rawCellStr = str[cond.colIdx] ?? '';
+      const rawCellVal = raw[cond.colIdx];
+      if (!matchesSheetCondition(rawCellStr, cond.op, cond.value, { rawValue: rawCellVal, locale })) {
+        allCondsPass = false;
+        break;
+      }
+    }
+    if (!allCondsPass) continue;
+
+    matchedRows.push({ raw, str });
+  }
+
+  const computeMetricsForRows = (rows: Array<{ raw: unknown[]; str: string[] }>): Record<string, number> => {
     const out: Record<string, number> = {};
     for (const spec of metricSpecs) {
       const key = `${spec.colName}_${spec.fn}`;
       if (spec.fn === 'count') {
-        out[key] = rows.filter((r) => (r.values[spec.colIdx] ?? '').trim() !== '').length;
+        out[key] = rows.filter((r) => (r.str[spec.colIdx] ?? '').trim() !== '').length;
         continue;
       }
       const nums: number[] = [];
       for (const r of rows) {
-        const parsed = parseSheetNumber(r.values[spec.colIdx] ?? '');
+        const rawCellVal = r.raw[spec.colIdx];
+        const parsed =
+          typeof rawCellVal === 'number'
+            ? parseSheetNumber(rawCellVal)
+            : parseSheetNumber(r.str[spec.colIdx] ?? '', locale ? { locale } : undefined);
         if (parsed !== null) nums.push(parsed);
       }
       if (nums.length === 0) {
@@ -975,17 +1230,37 @@ export function computeSheetAggregation(
     return out;
   };
 
-  const groupsMap = new Map<string, Array<{ values: string[] }>>();
-  for (const match of searched.matches) {
-    const gKey =
-      groupByIdx !== null ? (match.values[groupByIdx] ?? '').trim() || '(Trống)' : 'Tất cả';
-    const bucket = groupsMap.get(gKey) ?? [];
+  // Group by RAW unclipped key so distinct keys sharing a >500-char prefix never merge!
+  const groupsMap = new Map<string, Array<{ raw: unknown[]; str: string[] }>>();
+  for (const match of matchedRows) {
+    const rawGroupKey =
+      groupByIdx !== null ? (match.str[groupByIdx] ?? '').trim() || '(Trống)' : 'Tất cả';
+    const bucket = groupsMap.get(rawGroupKey) ?? [];
     bucket.push(match);
-    groupsMap.set(gKey, bucket);
+    groupsMap.set(rawGroupKey, bucket);
   }
 
-  const groups = [...groupsMap.entries()].map(([key, bucket]) => ({
-    key,
+  // Detect whether any clipped group keys collide so we preserve the distinguishing tail within 500 chars
+  const clippedKeyCounts = new Map<string, number>();
+  for (const rawKey of groupsMap.keys()) {
+    const c = clipText(rawKey, SHEETS_MAX_CELL_CHARS);
+    if (c.clipped) truncated = true;
+    clippedKeyCounts.set(c.text, (clippedKeyCounts.get(c.text) ?? 0) + 1);
+  }
+
+  const formatGroupDisplayKey = (rawKey: string): string => {
+    const c = clipText(rawKey, SHEETS_MAX_CELL_CHARS);
+    if (!c.clipped) return c.text;
+    if ((clippedKeyCounts.get(c.text) ?? 0) <= 1) return c.text;
+    const suffix = '…[đã cắt]';
+    const tailLen = Math.min(24, Math.max(4, Math.floor(rawKey.length / 10)));
+    const tailPart = rawKey.slice(-tailLen);
+    const headLen = Math.max(1, SHEETS_MAX_CELL_CHARS - suffix.length - tailPart.length - 1);
+    return `${rawKey.slice(0, headLen)}…${tailPart}${suffix}`;
+  };
+
+  const groups = [...groupsMap.entries()].map(([rawKey, bucket]) => ({
+    key: formatGroupDisplayKey(rawKey),
     count: bucket.length,
     metrics: computeMetricsForRows(bucket),
   }));
@@ -993,9 +1268,10 @@ export function computeSheetAggregation(
   return {
     sheet,
     totalRowsScanned: nonEmptyDataRows.length,
-    matchedRows: searched.matches.length,
+    matchedRows: matchedRows.length,
+    ...(truncated ? { truncated: true } : {}),
     groups,
-    totals: computeMetricsForRows(searched.matches),
+    totals: computeMetricsForRows(matchedRows),
   };
 }
 
@@ -1385,6 +1661,8 @@ export function transformDigestWindowValues(params: {
   gridColumnCapacity: number | null;
   tailCount: number;
   rawValues: unknown[][];
+  locale?: string;
+  unformattedValues?: unknown[][];
 }): ReadDigestWindowResult {
   const {
     spreadsheetId,
@@ -1397,6 +1675,8 @@ export function transformDigestWindowValues(params: {
     gridColumnCapacity,
     tailCount,
     rawValues,
+    locale,
+    unformattedValues,
   } = params;
 
   const nonEmptyRawRows = [...rawValues];
@@ -1437,6 +1717,7 @@ export function transformDigestWindowValues(params: {
       values: [],
       tailRecords: [],
       tailValues: [],
+      ...(locale ? { locale } : {}),
     };
   }
 
@@ -1487,6 +1768,17 @@ export function transformDigestWindowValues(params: {
     gridColumnCapacity,
   });
 
+  const hasNativeTypedNumbers = nonEmptyRawRows
+    .slice(1)
+    .some((row) => Array.isArray(row) && row.some((cell) => typeof cell === 'number'));
+  const effectiveUnformatted =
+    unformattedValues ??
+    (hasNativeTypedNumbers
+      ? nonEmptyRawRows
+          .slice(0, SHEETS_DIGEST_MAX_DATA_ROWS + 1)
+          .map((row) => (Array.isArray(row) ? row.slice(0, SHEETS_DIGEST_MAX_COLUMNS) : []))
+      : undefined);
+
   return {
     spreadsheetId,
     sheetTitle,
@@ -1505,6 +1797,8 @@ export function transformDigestWindowValues(params: {
     values,
     tailRecords,
     tailValues,
+    ...(locale ? { locale } : {}),
+    ...(effectiveUnformatted ? { unformattedValues: effectiveUnformatted } : {}),
   };
 }
 
@@ -1515,7 +1809,7 @@ export async function executeReadDigestWindow(
   signal?: AbortSignal
 ): Promise<ReadDigestWindowResult> {
   const resolvedScan = resolveDigestScanWindow(input);
-  const metaFields = 'sheets.properties(sheetId,title,gridProperties(rowCount,columnCount))';
+  const metaFields = 'properties.locale,sheets.properties(sheetId,title,gridProperties(rowCount,columnCount))';
   const meta = await requestFn(
     `${spreadsheetId}?fields=${encodeURIComponent(metaFields)}`,
     signal
@@ -1575,6 +1869,15 @@ export async function executeReadDigestWindow(
   }
 
   const rawValues: unknown[][] = Array.isArray(value.values) ? value.values : [];
+  const locale =
+    typeof meta?.properties?.locale === 'string' && meta.properties.locale.trim()
+      ? meta.properties.locale.trim()
+      : typeof value?.locale === 'string' && value.locale.trim()
+      ? value.locale.trim()
+      : undefined;
+  const unformattedValues = Array.isArray(value?.unformattedValues)
+    ? (value.unformattedValues as unknown[][])
+    : undefined;
 
   return transformDigestWindowValues({
     spreadsheetId,
@@ -1587,5 +1890,7 @@ export async function executeReadDigestWindow(
     gridColumnCapacity,
     tailCount: resolvedScan.tailCount,
     rawValues,
+    locale,
+    unformattedValues,
   });
 }

@@ -199,9 +199,20 @@ export class SlackAdapter extends BaseAdapter {
       signal: options?.signal,
     });
 
+    if (typeof res?.ts !== 'string' || !res.ts.trim()) {
+      throw new StepError({
+        message: 'Slack returned an invalid or missing message timestamp (ts)',
+        category: 'UNKNOWN',
+        retryable: false,
+      });
+    }
+
     return {
-      ts: String(res.ts),
-      channel: String(res.channel || args.channel),
+      ts: res.ts.trim(),
+      channel:
+        typeof res.channel === 'string' && res.channel.trim().length > 0
+          ? res.channel.trim()
+          : args.channel,
     };
   }
 
