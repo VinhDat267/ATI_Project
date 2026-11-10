@@ -1,0 +1,17 @@
+﻿=== npm run typecheck:v3 ===
+  === npm test --workspace=@wap/tool-adapters (tail) === System.Object[]> typecheck:v3
+> tsc -p apps/chat-api/tsconfig.json --noEmit && tsc -p apps/chat-web/tsconfig.json --noEmit
+  === npm test --workspace=@wap/tool-adapters (tail) === System.Object[]
+  === npm test --workspace=@wap/tool-adapters (tail) === System.Object[]=== npx vitest run evaluations/generic-plumbing/static-guard.test.ts ===
+  === npm test --workspace=@wap/tool-adapters (tail) === System.Object[]RUN  v4.1.11 C:/Users/VinhDat/orca/workspaces/ATI_Project/ati-v3-cross-service-integration-gate
+
+ ✓ evaluations/generic-plumbing/static-guard.test.ts (2 tests) 2028ms
+   ✓ contains no service-specific core branches beyond exact documented exceptions  2017ms
+
+ Test Files  1 passed (1)
+      Tests  2 passed (2)
+   Start at  02:05:36
+   Duration  3.38s (transform 576ms, setup 0ms, import 997ms, tests 2.03s, environment 0ms)
+  === npm test --workspace=@wap/tool-adapters (tail) === System.Object[]
+  === npm test --workspace=@wap/tool-adapters (tail) === System.Object[]=== npm test --workspace=@wap/tool-schemas (tail) ===
+  === npm test --workspace=@wap/tool-adapters (tail) === System.Object[]System.Object[]

@@ -1,0 +1,12 @@
+﻿=== 82 Affected @wap/chat-api Suites (--maxWorkers=2, summary & PID lines) ===
+  === Public Schema Migration + 2 Extension Suites (calendar-extension & sheets-extension) === RUN  v4.1.11 C:/Users/VinhDat/orca/workspaces/ATI_Project/ati-v3-cross-service-integration-gate
+
+ ✓ apps/chat-api/tests/integration/calendar-extension.test.ts (1 test) 362ms
+   ✓ integrates Calendar HTTP metadata, encrypted real SQL, read connection check, factory and observed-id grounding  360ms
+ ✓ apps/chat-api/tests/integration/sheets-extension.test.ts (1 test) 399ms
+   ✓ integrates Sheets through HTTP, encrypted real SQL, connection check, factory and observed parent/child planning  398ms
+
+ Test Files  2 passed (2)
+      Tests  2 passed (2)
+   Start at  02:22:02
+   Duration  3.38s (transform 3.52s, setup 0ms, import 5.50s, tests 761ms, environment 0ms)System.Object[]

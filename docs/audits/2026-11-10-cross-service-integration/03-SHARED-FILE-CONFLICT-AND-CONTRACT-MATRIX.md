@@ -1,8 +1,8 @@
 # 03 — Shared-File Conflict & Cross-Service Contract Matrix
 
 **Audit Bundle:** `docs/audits/2026-11-10-cross-service-integration/`  
-**Document Status:** Task B Completed — Combined Candidate Assembled (`07c086bfb5299632fc35dd85cbcf906ce4cd1099`, full-tree `fcd0e64019b0c70eb96f7e0d6352ead5f1fc7d4d`) & Shared Resolutions / Focused Contracts `INDEPENDENTLY VERIFIED`; Tasks C, D, E `PENDING / NOT RUN`  
-**Date:** 2026-11-10  
+**Document Status:** Tasks B & C Completed — Combined Candidate Assembled (`07c086bf`) & Backend Cross-Service Runtime Gate Verified (`7dcd3753742c755f3493ba3f010a7a743c72a074`, full-tree `f12bcb2d71d2812f95486d985e5431fe36ef9a89`); Tasks D & E `PENDING / NOT RUN`  
+**Date:** 2026-11-11  
 **Isolated Integration Worktree:** `C:\Users\VinhDat\orca\workspaces\ATI_Project\ati-v3-cross-service-integration-gate`  
 **Integration Branch:** `VinhDat267/ati-v3-cross-service-integration-gate` (local only — not pushed, no PR yet)  
 **Current Gate Status:** Gate A `NOT READY — BLOCKING DEFECT OR MISSING CRITICAL EVIDENCE` | Gate B `NOT READY` | Gate C `PRODUCTION ACTIVATION — HOLD`  
@@ -101,7 +101,7 @@ Textual mergeability does not establish semantic correctness. Before any merge o
 2. `scripts/fake-google-gmail.mjs` enforces PR `#314`'s recurring Calendar event `start.timeZone` / `end.timeZone` validation (returning HTTP `400` before incrementing `stats.writes` if missing or mismatched) while remaining 100% compatible with Gmail and Sheets loopback flows (`gmail_03`, `mysheets`, `sheets_digest_v2_recovery`, `nine_service`).
 
 ### 2.10. Database Migrations & Shared Test Harness Isolation
-1. Sequential migrations `db/v3/0001_v3_core.sql` through `db/v3/0035_sheets_gas_r2_remediation.sql` (`35` SQL files total; only PR `#306` adds `0035_sheets_gas_r2_remediation.sql`) must apply cleanly and idempotently on both fresh PostgreSQL 16 schemas and prior `<=0032` / `0034` upgrade paths (`apps/chat-api/tests/services/sheets-digest-concurrency.test.ts` filters prior migrations via `Number(m[1]) <= 32`).
+1. Sequential migrations `db/v3/0001_v3_core.sql` through `db/v3/0035_sheets_gas_r2_remediation.sql` (**`47` SQL files total across numeric prefixes `0001..0035`** — `44` files `<= 0032` plus `0033`, `0034`, `0035`; only PR `#306` adds `0035_sheets_gas_r2_remediation.sql`) must apply cleanly and idempotently on both fresh PostgreSQL 16 schemas and prior `<=0032` / `0034` upgrade paths (`apps/chat-api/tests/services/sheets-digest-concurrency.test.ts` filters prior migrations via `Number(m[1]) <= 32`; note `0034_github_workspace_scoped_team_scope.sql` contains explicit `BEGIN; ... COMMIT;` documented in `05` §2.2 and `07` `XSVC-RISK-09`).
 2. `apps/chat-api/tests/helpers/jira-test-db.ts` preserves `ALLOW_ISOLATED_TEST_PORT === '1'` (allowing isolated disposable PostgreSQL ports other than `55533` alongside `56534` and CI `5432/ati_v3`).
 3. `apps/chat-api/tests/routes/workspace-isolation.test.ts` preserves `drainExecutionService()` before `TRUNCATE` to prevent `40P01` PostgreSQL lock-order deadlocks against detached background `ExecutionService` runs.
 
@@ -208,8 +208,9 @@ All three source PRs were merged via `--no-ff` in the planned sequence (`M0` `#3
 | 9 | `apps/chat-api/src/server.ts` | `678c5337` (clean auto-merge) | Verified `PostgresSheetsAppendLeaseStore(pool)` + `createTrelloDigestRunner` wiring. | `INDEPENDENTLY VERIFIED` (compile/typecheck `npm run typecheck:v3` `exit 0`); full server E2E `NOT RUN` in Task B | Task C/D/E live loopback server + Chromium E2E startup (`PENDING / NOT RUN`) |
 | 10 | `packages/tool-schemas/src/types.ts` | `678c5337` (clean auto-merge) | Verified additive Sheets V2/lease + Trello/Telegram digest types. | `INDEPENDENTLY VERIFIED` (`npm test --workspace=@wap/tool-schemas`: `27` files, `593/593` passed; `typecheck:v3` & `build:v3` `exit 0`) | Complete at schema/type layer |
 
-### 7.2. Cross-File Couplings (`XC-01..XC-06`) & Remaining Blocker (`MB-05`) Status After Task B
+### 7.2. Cross-File Couplings (`XC-01..XC-06`), Task C Backend Gate (`7dcd3753`) & Remaining Task D/E Scope
 
-- **`XC-01` (`ALL_TOOLS` & Planner Prompt SHA-256 Hashes):** Transitioned to **`INDEPENDENTLY VERIFIED`** (`packages/planner/tests/read-answers.test.ts` + `packages/planner/tests/schedules.test.ts` passed unmodified on `07c086bf`, `49/49` tests).
-- **`XC-03` (`ScheduleSection.tsx` + `ScheduleRunRecovery.tsx`):** Component/jsdom layer **`INDEPENDENTLY VERIFIED`** (`schedule-sheets-digest-v2.test.tsx` + `schedule-trello-digest-mode.test.tsx`); real Chromium verification **`PENDING / NOT RUN`** (Task D).
-- **`XC-02` (`0035` Fresh + `<=0032` Upgrade Migrations & `workspace-isolation.test.ts`), `XC-04` (`StepRunner`/`ExecutionService` cross-adapter `unknown` -> `reconciliation_required`), `XC-05` (`fake-google-gmail.mjs` full Chromium routing), `XC-06` (Cockpit moments in Chromium), and `MB-05` (Calendar `C1/C2` Chromium E2E):** Remain **`PENDING / NOT RUN`** for Tasks C and D. Full commit/ancestry/command details are recorded in `02-SOURCE-ANCESTRY-AND-MERGE-EVIDENCE.md`.
+- **`XC-01` (`ALL_TOOLS` & Planner Prompt SHA-256 Hashes):** **`INDEPENDENTLY VERIFIED`** (`npm test --workspace=@wap/planner`: `40` files, `567/567` passed on `7dcd3753`).
+- **`XC-02` (`0035` Fresh + `<=0032` Upgrade Migrations & `workspace-isolation.test.ts`):** **`INDEPENDENTLY VERIFIED`** in Task C (`47` SQL files applied via `node db/v3/migrate.mjs` on fresh DB + `<=0032` (`44` files) -> `0035` upgrade with row preservation + idempotency; `workspace-isolation.test.ts` passed in 82-file sweep).
+- **`XC-04` (`StepRunner`/`ExecutionService` cross-adapter `unknown` -> `reconciliation_required` & Pre-Dispatch Guards):** **`INDEPENDENTLY VERIFIED`** in Task C (`@wap/executor` `56/56`, `@wap/tool-adapters` `744/744`, `cross-service-combined-gate.test.ts` `15/15` including `S1`–`S6`, `N1`–`N7`, and 4 `RED -> GREEN` fixes in `adapter-factory.ts`, `execution-service.ts`, `plan-repo.ts`, `calendar-digest-runner.ts`, and `trello-digest-runner.ts` at commit `7dcd3753742c755f3493ba3f010a7a743c72a074`).
+- **`XC-03` (`ScheduleSection.tsx` + `ScheduleRunRecovery.tsx`), `XC-05` (`fake-google-gmail.mjs` full Chromium routing), `XC-06` (Cockpit moments in Chromium), and `MB-05` (Calendar `C1/C2` Chromium E2E):** Remain **`PENDING / NOT RUN`** for Tasks D and E. Full backend runtime evidence and risk records are documented in `05-REGRESSION-TEST-EVIDENCE.md` and `07-INHERITED-RISKS-AND-STAGING-GAPS.md`.

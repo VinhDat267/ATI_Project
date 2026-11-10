@@ -3,7 +3,7 @@
 - **Mã task:** `XSVC-INTEGRATION-V2`
 - **Nhánh tích hợp cô lập:** `VinhDat267/ati-v3-cross-service-integration-gate`
 - **Worktree chuyên dụng:** `C:\Users\VinhDat\orca\workspaces\ATI_Project\ati-v3-cross-service-integration-gate`
-- **Trạng thái tổng thể:** `IN PROGRESS` (`Tasks A & B: COMPLETED`; `Tasks C–E: PENDING / NOT RUN`)
+- **Trạng thái tổng thể:** `IN PROGRESS` (`Tasks A, B & C: COMPLETED`; `Tasks D & E: PENDING / NOT RUN`)
 - **Tài liệu chuẩn tắc:** `AGENTS.md` (v3.1), `docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md`, `docs/team-workflow.md`, `docs/handoff/REVIEW-CHECKLIST.md`
 - **Hồ sơ kiểm toán (Audit Bundle):** `docs/audits/2026-11-10-cross-service-integration/` (`01`..`08`)
 
@@ -45,9 +45,9 @@ Hợp nhất có truy vết nguồn gốc (traceable `--no-ff` merges), kiểm t
 - **Task B — Branch Assembly & Conflict Resolution (`COMPLETED`):**
   - Merge có truy vết theo thứ tự `Trello (#313) -> Calendar (#314) -> Sheets (#306)` (`M0`, `M1`, `M2`), giải quyết 3 xung đột văn bản (`schedule-service.ts`, `slack-adapter.ts`, `scripts/test-v3-browser.mjs`) và căn chỉnh đoạn tổng quan Google trong `PrivacyPage.tsx` theo đúng hợp đồng tại `03-SHARED-FILE-CONFLICT-AND-CONTRACT-MATRIX.md`.
   - Xuất `02-SOURCE-ANCESTRY-AND-MERGE-EVIDENCE.md`.
-- **Task C — Backend, DB Migrations (`0001..0035`), Concurrency, Crash/Kill & Negative Auth (`PENDING`):**
-  - Sở hữu kiểm thử/sửa lỗi tích hợp tầng `packages/**`, `apps/chat-api/**`, `db/v3/**` (tạo `apps/chat-api/tests/services/schedules/cross-service-combined-gate.test.ts`).
-  - Chứng minh trên PostgreSQL 16 thật (fresh `0001..0035` + upgrade `<=0032 -> 0033 -> 0034 -> 0035`), 3 digest đến hạn đồng thời, 2 tiến trình OS `ScheduleRunner`, kill tiến trình con (`SIGKILL`) + `reconcileScheduleRuns`, thu hồi credential trước khi gửi, ma trận negative auth (`outbound === 0`), biên nhận lỗi (`ts: {}`, `ts: 12345`, `ts: 'undefined'`) và append lease fencing.
+- **Task C — Backend, DB Migrations (`0001..0035`), Concurrency, Crash/Kill & Negative Auth (`COMPLETED`):**
+  - Sở hữu kiểm thử/sửa lỗi tích hợp tầng `packages/**`, `apps/chat-api/**`, `db/v3/**` (tạo `apps/chat-api/tests/services/schedules/cross-service-combined-gate.test.ts` và `apps/chat-api/tests/helpers/cross-service-scheduler-worker.ts`).
+  - Chứng minh trên PostgreSQL 16 thật (fresh `0001..0035` gồm **47** file `.sql` + upgrade `<=0032 -> 0033 -> 0034 -> 0035`), 3 digest đến hạn đồng thời (`S1`), 2 tiến trình OS `ScheduleRunner` (`S2`), tạm dừng/hủy trước và sau rào chắn gửi (`S3`), kill tiến trình con thật (`SIGKILL`, `S4a` & `S4b`) + `reconcileScheduleRuns` + append lease fencing, thu hồi credential trước khi gửi (`S5`), cô lập lỗi hỗn hợp (`S6`), và ma trận negative auth `N1`–`N7` (`unauthorizedOutbound === 0`).
 - **Task D — Frontend, Privacy, Recovery UI & Chromium E2E (`PENDING`):**
   - Sở hữu kiểm thử/sửa lỗi tích hợp tầng `apps/chat-web/**`, `scripts/test-v3-browser.mjs` (mở rộng `apps/chat-web/tests/browser/mycalendar.spec.ts` cho `C1/C2` cross-midnight/DST/IANA approved instant, `sendInvites` và recurring `timeZone` trên Chromium thật, cùng recovery/privacy của Sheets & Trello).
 - **Task E — Full Gate D, Draft PR, Exact-Head CI & Final Verdict (`PENDING`):**
@@ -123,6 +123,26 @@ node scripts/test-v3-browser.mjs
   - Cập nhật `01-INTEGRATION-EXECUTION-PLAN.md`, `03-SHARED-FILE-CONFLICT-AND-CONTRACT-MATRIX.md`, `docs/handoff/tasks/XSVC-INTEGRATION-V2.md`
   - `docs/handoff/log/2026-11-10-xsvc-integration-v2-task-b-assembly.md`
 
-### 5.3. Kết quả Tasks C, D, E (`PENDING / NOT RUN`)
-- **Trạng thái Gate hiện tại:** Gate A = `NOT READY — BLOCKING DEFECT OR MISSING CRITICAL EVIDENCE`; Gate B = `NOT READY`; Gate C = `PRODUCTION ACTIVATION — HOLD`.
-- Chưa chạy Task C (full backend cross-service multi-process/kill/negative-auth & full migration upgrade matrix), chưa chạy Task D (real Chromium Playwright E2E & Calendar `C1/C2` browser assertions), chưa chạy Task E (full `npm run check` + 25 nhóm Chromium, chưa `git push`, chưa mở Draft PR, chưa hoàn thiện `04..08`).
+### 5.3. Kết quả Task C (Backend Runtime Gate, Migrations `0001..0035`, OS `SIGKILL` & Negative Auth — `COMPLETED` `2026-11-11`)
+- **Code+Test Anchor Commit (`7dcd3753742c755f3493ba3f010a7a743c72a074`, full-tree `f12bcb2d71d2812f95486d985e5431fe36ef9a89`):**
+  - Chạy trên container PostgreSQL 16.15 dùng một lần do Task C sở hữu `ati-xsvc-v2-taskc-56791` (`432c5fa8ca7d`, `127.0.0.1:56791->5432/tcp`, DB `ati_v3_taskc`, `ALLOW_ISOLATED_TEST_PORT=1`, `has_dotenv=False`), đã dọn sạch bằng `docker rm -f ati-xsvc-v2-taskc-56791` sau khi xác minh; tuyệt đối không đụng chạm `ati-cal-combined-gate-56657` (`9718bcf4290f`) hay `ati-v3-test-db-56534`.
+  - **Xác minh Migration thực tế (`node db/v3/migrate.mjs`):** Đã kiểm kê chính xác **47** file `.sql` thuộc dải tiền tố `0001..0035` (`44` file `<=0032` + `0033`, `0034`, `0035`); chứng minh chạy mới nhiều lần (idempotent) và nâng cấp từ `<=0032` lên `0035` bảo toàn 100% dòng dữ liệu đã seed + kích hoạt trigger `trg_schedule_runs_capture_dispatched_config` (`exit 0`). Ghi nhận việc `0034` có `BEGIN; ... COMMIT;` tường minh làm nhả sớm `pg_advisory_xact_lock(20260929)` của `migrate.mjs` vào `07` (`XSVC-RISK-09`).
+  - **Chu trình TDD `RED -> GREEN` cho 4 lỗi tích hợp/ủy quyền thực tế (0 migration mới, 0 nới lỏng timeout/assertion):**
+    1. `calendar-digest-runner.ts` & `trello-digest-runner.ts`: bổ sung `connections.telegram` (và kiểm khớp pin `telegramCredentialId` cho Trello) khi lấy adapter `telegram` từ `AdapterFactory` (`XSVC-RISK-01`).
+    2. `adapter-factory.ts` & `execution-service.ts`: chặn fail-closed `workspaceId` rỗng ở chế độ `organization` (và `userId` rỗng / `service_account` ở chế độ `personal`) **trước** khi tính `cacheKey` / tra cứu cache hoặc mở snapshot hội thoại (`XSVC-RISK-02`).
+    3. `adapter-factory.ts`: tái kiểm trạng thái `active` trên `CredentialRepo` ở mọi lệnh gọi `phase === 'execution'` để trục xuất adapter trong warm cache ngay khi credential bị thu hồi/xóa trước lúc gửi (`XSVC-RISK-03`), giữ nguyên `static-guard.test.ts` (`2/2` PASS).
+    4. `plan-repo.ts` (`assertSourceDispatchAllowed`) & `execution-service.ts`: kiểm tra trực tiếp trong transaction trạng thái `users.status` / `workspace_members.status = 'active'` và khớp `expectedScope` (`workspaceMode`, `workspaceId`) ngay trước khi thực thi từng bước (`XSVC-RISK-04`).
+  - **Kết quả kiểm thử thực chứng (`INDEPENDENTLY VERIFIED` trên `7dcd3753`):**
+    - `cross-service-combined-gate.test.ts`: `RED` baseline `9 passed | 6 failed` -> `GREEN` **`15/15` passed** (`0` skipped), bao gồm đủ `S1`–`S6` (PID thật của tiến trình con OS: `S2` `33948`/`10340`, `S4a` digest `SIGKILL` `pid=33456` `exitCode=1`, `S4b` append lease `SIGKILL` `pid=32580` `exitCode=1`), `N1`–`N7` (`unauthorizedOutbound === 0` cho cả 7 nhóm, tách bạch rõ các precheck metadata hợp lệ tối thiểu của Trello), biên nhận lỗi/partial-write, manual recovery snapshot, và độ phủ/múi giờ IANA của Calendar.
+    - Layer A Workspaces: `npm run typecheck:v3` (`exit 0`), `static-guard.test.ts` (`2/2`), `@wap/tool-schemas` (`27` files / `593` tests), `@wap/tool-adapters` (`712` Vitest + `32` `node --test` = `744` tests), `@wap/planner` (`40` files / `567` tests), `@wap/executor` (`7` files / `56` tests), `npm run test:eval:v3` (`31` files / `500` passed, `1` skipped).
+    - Hồi quy hậu sửa lỗi `@wap/chat-api`: **82/82** file bị ảnh hưởng (**800/800** tests, `0` skipped) PASS với `--maxWorkers=2` + `node db/v3/migrate.mjs` trên `public` (ghi nhận thêm hiện tượng tranh chấp lock DDL `beforeAll` `10000ms` của Vitest khi chạy 276 file với 12 worker mặc định trên WSL2 vào phân loại `environmental` tại `05`).
+- **Sản phẩm bàn giao Task C:**
+  - `apps/chat-api/tests/services/schedules/cross-service-combined-gate.test.ts` & `apps/chat-api/tests/helpers/cross-service-scheduler-worker.ts` (+ 6 file backend/test trong `7dcd3753`)
+  - `docs/audits/2026-11-10-cross-service-integration/05-REGRESSION-TEST-EVIDENCE.md` (kèm log `.txt` tại `evidence/`)
+  - `docs/audits/2026-11-10-cross-service-integration/07-INHERITED-RISKS-AND-STAGING-GAPS.md`
+  - Cập nhật `02`, `03`, `docs/handoff/tasks/XSVC-INTEGRATION-V2.md` và thêm `docs/handoff/log/2026-11-11-xsvc-integration-v2-task-c-backend.md`
+  - **Không sửa** bất kỳ file nào thuộc `apps/chat-web/**`, `scripts/test-v3-browser.mjs`, `CURRENT-STATE.md`, hay `ROADMAP.md`.
+
+### 5.4. Kết quả Tasks D & E (`PENDING / NOT RUN`)
+- **Trạng thái Gate hiện tại:** Gate A = `NOT READY — BLOCKING DEFECT OR MISSING CRITICAL EVIDENCE` (chưa thể kết luận `PASS` chỉ từ Task B/C khi chưa có bằng chứng Task D & E); Gate B = `NOT READY`; Gate C = `PRODUCTION ACTIVATION — HOLD`.
+- Bàn giao sạch cây làm việc trên nhánh `VinhDat267/ati-v3-cross-service-integration-gate` cho **Task D** (`apps/chat-web/**`, `scripts/test-v3-browser.mjs`, đặc tả Chromium `C1/C2` trong `apps/chat-web/tests/browser/mycalendar.spec.ts`) và **Task E** (`npm run check` + đủ 25 nhóm Chromium + Draft PR + GitHub Actions `v3 check` trên đúng `HEAD` cuối + hoàn thiện bộ hồ sơ `04..08`).

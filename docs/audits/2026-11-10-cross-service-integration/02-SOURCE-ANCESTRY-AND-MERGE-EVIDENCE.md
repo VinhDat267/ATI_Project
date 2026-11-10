@@ -1,8 +1,8 @@
 # 02 — Source Ancestry, `--no-ff` Merge Assembly & Task B Focused Contract Evidence
 
 **Audit Bundle:** `docs/audits/2026-11-10-cross-service-integration/`  
-**Document Status:** Task B Completed — Combined Candidate Assembled & Shared Contracts Verified (`INDEPENDENTLY VERIFIED`); Tasks C, D, E `PENDING / NOT RUN`  
-**Date:** 2026-11-10  
+**Document Status:** Tasks B & C Completed — Combined Candidate Assembled (`07c086bf`) & Backend Cross-Service Runtime Gate Verified (`7dcd3753742c755f3493ba3f010a7a743c72a074`, full-tree `f12bcb2d71d2812f95486d985e5431fe36ef9a89`); Tasks D & E `PENDING / NOT RUN`  
+**Date:** 2026-11-11  
 **Isolated Integration Worktree:** `C:\Users\VinhDat\orca\workspaces\ATI_Project\ati-v3-cross-service-integration-gate`  
 **Integration Branch:** `VinhDat267/ati-v3-cross-service-integration-gate` (local only — **not pushed**, **no PR opened yet**)  
 **Current Gate Status:**
@@ -48,7 +48,9 @@ Executed `git fetch origin --prune`, `git rev-parse`, and `gh pr view 313/314/30
 | **`M0`** | `b0232fdd9f5f59c6d1b4c0fc2b882eaf2fcd8954` | `d896d0997d3b79f3265ad40ac10e306b717ac773` | `f228d8a4159b944a466f246ec44a9b6e1b28b74c` `1c17527f16715b2c6655c170cdb448673a84dd1b` | `chore(integration): merge trello combined gate PR #313 (1c17527f)` (`exit 0`, `0` conflicts) |
 | **`M1`** | `edbeeffeca97cdb95a4b5dec88f9ee61645910aa` | `021ce568864dbb9fb33e095e72bf8e820b0361e9` | `b0232fdd9f5f59c6d1b4c0fc2b882eaf2fcd8954` `3807986542dbe3470b8f3f1cd42413cb7bd460dd` | `chore(integration): merge calendar combined gate PR #314 (38079865)` (`exit 0`, clean auto-merge of `chat-service.ts`; intermediate `npm run typecheck:v3` `exit 0`) |
 | **`M2`** | `678c5337f0558c3158994825a23e9d09d6ad744c` | `6185a45a29537cad679a3b161ede539350696877` | `edbeeffeca97cdb95a4b5dec88f9ee61645910aa` `f292884d0ae965ffb9841e7063b8843cd266b17e` | `chore(integration): merge sheets r2 gate PR #306 (f292884d) and resolve shared contracts` (`--no-commit` exited `1` on exact 3 conflicts; resolved & verified `typecheck:v3` + `static-guard.test.ts` `exit 0`) |
-| **`C_B1` (Code+Test Anchor)** | **`07c086bfb5299632fc35dd85cbcf906ce4cd1099`** | **`fcd0e64019b0c70eb96f7e0d6352ead5f1fc7d4d`** | `678c5337f0558c3158994825a23e9d09d6ad744c` | `fix(integration): align Google privacy overview and add combined contract tests` (5 files: `PrivacyPage.tsx` + 4 focused contract test suites) |
+| **`C_B1` (Task B Code+Test Anchor)** | **`07c086bfb5299632fc35dd85cbcf906ce4cd1099`** | **`fcd0e64019b0c70eb96f7e0d6352ead5f1fc7d4d`** | `678c5337f0558c3158994825a23e9d09d6ad744c` | `fix(integration): align Google privacy overview and add combined contract tests` (5 files: `PrivacyPage.tsx` + 4 focused contract test suites) |
+| **`C_B2` (Task B Docs)** | `2fa749fc2a82fc642c008957f31df7a7a61d5ab0` | `9512c3e25bd161824234ac84421c7ae67915b927` | `07c086bfb5299632fc35dd85cbcf906ce4cd1099` | `docs(audit): record task b --no-ff merge ancestry and contract proofs` (5 docs-only files; zero code/test changes) |
+| **`C_C1` (Task C Code+Test Anchor)** | **`7dcd3753742c755f3493ba3f010a7a743c72a074`** | **`f12bcb2d71d2812f95486d985e5431fe36ef9a89`** | `2fa749fc2a82fc642c008957f31df7a7a61d5ab0` | `fix(chat-api): enforce cross-service pre-dispatch guards and digest telegram bindings` (8 backend code+test files: 4 TDD `RED -> GREEN` runtime/auth fixes + `cross-service-combined-gate.test.ts` + child worker + `trello-token-manager.test.ts` hook isolation) |
 
 ### 2.2. Cryptographic Ancestry Verification (`INDEPENDENTLY VERIFIED`)
 
@@ -97,7 +99,9 @@ No blind `ours`/`theirs` resolution was used on any file. Every shared file owne
 
 ---
 
-## 4. Task B Verification Log (`INDEPENDENTLY VERIFIED` on `07c086bfb5299632fc35dd85cbcf906ce4cd1099`)
+## 4. Task B Verification Log (`07c086bfb5299632fc35dd85cbcf906ce4cd1099` / `2fa749fc2a82fc642c008957f31df7a7a61d5ab0`)
+
+> **Provenance Attribution Note (`2026-11-11`):** On `2fa749fc2a82fc642c008957f31df7a7a61d5ab0`, coordinator Codex **independently re-verified** all cryptographic ancestry checks and 4 focused suites (`15` tests PASS: `packages/tool-adapters/tests/slack-adapter.test.ts`, `apps/chat-web/tests/browser-scenario-selection.test.ts`, `apps/chat-web/tests/calendar-rem-c-09-oauth-disclosure.test.tsx`, and `evaluations/generic-plumbing/static-guard.test.ts`). The remaining Task B table rows below (`593` schema, `127` non-DB, `22` DB) were `WORKER REPORTED` at the close of Task B; all backend workspace and DB suites were subsequently re-executed and expanded in Task C (`05-REGRESSION-TEST-EVIDENCE.md`, anchored at `7dcd3753742c755f3493ba3f010a7a743c72a074`).
 
 All commands below were executed sequentially from `C:\Users\VinhDat\orca\workspaces\ATI_Project\ati-v3-cross-service-integration-gate` without `.env`:
 
@@ -113,8 +117,8 @@ All commands below were executed sequentially from `C:\Users\VinhDat\orca\worksp
 
 ---
 
-## 5. Remaining Scope Explicitly `PENDING / NOT RUN` After Task B
+## 5. Remaining Scope After Task C (`7dcd3753742c755f3493ba3f010a7a743c72a074`)
 
-- **Task C (`PENDING / NOT RUN`):** Full backend cross-service runtime verification (`cross-service-combined-gate.test.ts`, fresh `0001..0035` + `<=0032` upgrade migration suite, simultaneous 3-service due digests, 2-process OS scheduler + `SIGKILL` crash/reconciliation, full negative-auth `outbound === 0` matrix, and full `@wap/tool-adapters` / `@wap/executor` / `@wap/chat-api` workspace runs).
-- **Task D (`PENDING / NOT RUN`):** Real Chromium Playwright E2E scenarios (`scripts/test-v3-browser.mjs`) and Calendar `C1/C2` Chromium extension in `apps/chat-web/tests/browser/mycalendar.spec.ts`.
+- **Task C (`COMPLETED` — see `05-REGRESSION-TEST-EVIDENCE.md` & `07-INHERITED-RISKS-AND-STAGING-GAPS.md`):** Verified 47 SQL migrations (`0001..0035` fresh + `<=0032 -> 0035` upgrade + idempotency), Layer A workspaces (`@wap/tool-schemas` `593`, `@wap/tool-adapters` `744`, `@wap/planner` `567`, `@wap/executor` `56`, `test:eval:v3` `500`), 4 TDD `RED -> GREEN` backend integration fixes, `cross-service-combined-gate.test.ts` (`15/15` PASS including `S1`–`S6` with real OS child `SIGKILL` PIDs & `N1`–`N7` `unauthorizedOutbound = 0`), and 82 post-fix `@wap/chat-api` suites (`800/800` PASS) on owned disposable PostgreSQL 16 `ati-xsvc-v2-taskc-56791` (created & removed).
+- **Task D (`PENDING / NOT RUN`):** Frontend unit sweep (`npm test --workspace=@wap/chat-web`), real Chromium Playwright E2E scenarios (`scripts/test-v3-browser.mjs`), and Calendar `C1/C2` Chromium extension in `apps/chat-web/tests/browser/mycalendar.spec.ts`.
 - **Task E (`PENDING / NOT RUN`):** Uninterrupted full `npm run check` + all 25 Chromium scenario groups, Draft PR publication, exact-head GitHub Actions `v3 check` (single job `v3`) verification, and final audit bundle `04..08`.
