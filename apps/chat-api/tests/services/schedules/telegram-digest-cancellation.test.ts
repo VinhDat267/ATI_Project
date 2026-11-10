@@ -115,7 +115,7 @@ describe('Telegram digest dispatch cancellation on PostgreSQL', () => {
     expect(run.delivery).toMatchObject({ chatId: '777', messageId: 901 });
   });
 
-  it('holds a real schedule row lock while a Telegram send is in flight', async () => {
+  it('persists a durable delivery_started_at claim before outbound send without holding a schedule row lock across network I/O', async () => {
     const entered = barrier(), finishSend = barrier();
     const f = await fixture(async () => { entered.release(); await finishSend.promise; });
     const digest = new TelegramDigestRunner({
@@ -133,8 +133,11 @@ describe('Telegram digest dispatch cancellation on PostgreSQL', () => {
     const concurrent = await db.pool.connect();
     try {
       await concurrent.query('BEGIN');
-      await expect(concurrent.query('SELECT id FROM schedules WHERE id=$1 FOR UPDATE NOWAIT', [f.schedule.id]))
-        .rejects.toMatchObject({ code: '55P03' });
+      const schedLock = await concurrent.query('SELECT id FROM schedules WHERE id=$1 FOR UPDATE NOWAIT', [f.schedule.id]);
+      expect(schedLock.rowCount).toBe(1);
+      const inFlightRun = (await concurrent.query('SELECT status, delivery_started_at FROM schedule_runs WHERE schedule_id=$1', [f.schedule.id])).rows[0];
+      expect(inFlightRun.status).toBe('planning');
+      expect(inFlightRun.delivery_started_at).not.toBeNull();
     } finally {
       await concurrent.query('ROLLBACK');
       concurrent.release();

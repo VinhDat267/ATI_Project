@@ -26,7 +26,7 @@ import { createScheduleRuntime } from './config/schedules-runtime.js';
 import { evaluateCalendarDigestCandidate } from './services/schedules/calendar-digest-candidate.js';
 import { createCalendarDigestExecutor } from './services/schedules/calendar-digest-runner.js';
 import { createGithubDigestRunner, type RunGithubDigest } from './services/schedules/github-digest-runner.js';
-import { createTrelloDigestRunner, type RunTrelloDigest } from './services/schedules/trello-digest-runner.js';
+import { createTrelloDigestRunner, buildTrelloAiPromptPayload, type RunTrelloDigest } from './services/schedules/trello-digest-runner.js';
 import { createNotionDigestRunner, type RunNotionDigest } from './services/schedules/notion-digest-runner.js';
 import { AdapterFactory, type AdapterContext } from './services/adapter-factory.js';
 import { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
@@ -904,6 +904,7 @@ async function bootstrap() {
     });
     trelloDigestRunnerImpl = createTrelloDigestRunner({
       pool,
+      timeZone: env.APP_TIME_ZONE,
       trelloConnection,
       telegramConnection,
       getAdapter: (serviceName, context) => adapterFactory.getAdapterForService(serviceName, context),
@@ -911,16 +912,17 @@ async function bootstrap() {
         if (overdueCards.length === 0 && dueSoonCards.length === 0 && unassignedCards.length === 0) {
           return null;
         }
-        const prompt = [
-          `Hãy tóm tắt ngắn gọn bằng tiếng Việt (tối đa 2 câu, tập trung vào điểm nghẽn quan trọng nhất cần xử lý trước) cho bản tin Trello của các bảng: ${boards.map((b) => b.name).join(', ')}.`,
-          `- Thẻ quá hạn (${overdueCards.length}): ${overdueCards.map((c) => `[${c.boardName}] ${c.name}`).join('; ') || 'không có'}`,
-          `- Thẻ sắp đến hạn trong ${dueSoonHours}h (${dueSoonCards.length}): ${dueSoonCards.map((c) => `[${c.boardName}] ${c.name}`).join('; ') || 'không có'}`,
-          `- Thẻ chưa gán người phụ trách (${unassignedCards.length}): ${unassignedCards.map((c) => `[${c.boardName}] ${c.name}`).join('; ') || 'không có'}`,
-        ].join('\n');
         if (typeof provider?.generateText !== 'function') return null;
+        const { systemPrompt, userPrompt } = buildTrelloAiPromptPayload({
+          boards,
+          overdueCards,
+          dueSoonCards,
+          unassignedCards,
+          dueSoonHours,
+        });
         return provider.generateText(
-          'Bạn là trợ lý quản lý dự án phát hiện điểm nghẽn trên Trello. Chỉ trả lời văn bản thuần túy bằng tiếng Việt, ngắn gọn tối đa 2 câu.',
-          prompt,
+          systemPrompt,
+          userPrompt,
           signal,
         );
       },

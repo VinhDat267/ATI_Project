@@ -195,6 +195,15 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
             dueSoonCards: 1,
             unassignedCards: 1,
           },
+          coverage: expect.objectContaining({
+            perBoardFetchLimit: 50,
+            perCategoryDisplayLimit: 15,
+            scannedCount: 3,
+            uniqueScannedCount: 3,
+            duplicateCountDropped: 0,
+            totalAvailable: 'UNKNOWN',
+            isComplete: false,
+          }),
         });
         expect(outcome.text).toContain('Bản tin Trello tự động của Planora');
         expect(outcome.text).toContain('Nhận xét AI:');
@@ -393,6 +402,15 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
           dueSoonCards: 0,
           unassignedCards: 1,
         },
+        coverage: expect.objectContaining({
+          perBoardFetchLimit: 50,
+          perCategoryDisplayLimit: 15,
+          scannedCount: 1,
+          uniqueScannedCount: 1,
+          duplicateCountDropped: 0,
+          totalAvailable: 'UNKNOWN',
+          isComplete: false,
+        }),
       });
     });
 

@@ -1580,6 +1580,8 @@ export class ChatService {
     ) {
       digestCandidate = await evaluateTrelloDigestCandidate({
         userId: actor.userId,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
         request: proposal.request,
         services,
         recurrence,

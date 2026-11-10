@@ -500,6 +500,8 @@ export interface TelegramDigestDelivery {
   chatTitle: string;
   messageId?: number;
   sentAt?: string;
+  manualConfirmedAt?: string;
+  manualResolution?: SheetsDigestManualResolution;
   sources: Array<{
     service: string;
     label: string;
@@ -524,9 +526,34 @@ export interface TrelloDigestConfig {
   channelId: string;
   channelName: string;
   dueSoonHours: number;
+  destination?: 'slack' | 'telegram';
+  slackCredentialId?: string;
   telegramChatId?: string;
   telegramChatTitle?: string;
+  telegramCredentialId?: string;
   includeAiSummary?: boolean;
+}
+
+export interface TrelloDigestCoverage {
+  perBoardFetchLimit: number;
+  perCategoryDisplayLimit: number;
+  scannedCount: number;
+  uniqueScannedCount: number;
+  duplicateCountDropped: number;
+  totalAvailable: 'UNKNOWN';
+  isComplete: false;
+  truncatedByFetchLimit: boolean;
+  truncatedByDisplayLimit: boolean;
+  matchedCounts: {
+    overdueCards: number;
+    dueSoonCards: number;
+    unassignedCards: number;
+  };
+  displayedCounts: {
+    overdueCards: number;
+    dueSoonCards: number;
+    unassignedCards: number;
+  };
 }
 
 export interface TrelloDigestDelivery {
@@ -534,9 +561,13 @@ export interface TrelloDigestDelivery {
   channelName: string;
   ts: string | null;
   counts: { overdueCards: number; dueSoonCards: number; unassignedCards: number };
+  coverage?: TrelloDigestCoverage;
   telegramChatId?: string;
   telegramChatTitle?: string;
   messageId?: number | null;
+  sentAt?: string;
+  manualConfirmedAt?: string;
+  manualResolution?: SheetsDigestManualResolution;
 }
 
 export interface TrelloDigestCandidate {
