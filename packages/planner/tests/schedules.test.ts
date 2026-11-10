@@ -5,11 +5,11 @@ import { AIPlanner, MockLLMProvider, WorkingMemory } from '../src/index.js';
 
 const now = () => new Date('2026-10-25T01:00:00.000Z'); // Sunday 25/10/2026, 08:00 in Viet Nam
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
-/** System prompt SHA-256 from main before SCHED-02 (7bb752d), for the message below on ALL_TOOLS. */
+/** System prompt SHA-256 baseline with Trello resource ID schema constraints, for the message below on ALL_TOOLS. */
 const BASELINE = {
-  regex: '1cbac372d7c1b1b1a4a8124e070a3c7e2faff7bf7a7a8513bfeca87da938807d',
-  llm: '2be89ef7bddc2521a7d8e78dc17fb3b0a3b009986ed4afdf4fd74abbdb2a11af',
-  llmAnswers: '50ec87b042b22de7fe6ef7b9bcc39ce5576d63f4600d65f268f66b17c4b50d46',
+  regex: '2074e800d9c2ea35fcebe125a3325eb058502b6264df743931f767b2e327e954',
+  llm: '33e4ff11bc9f1f3af9fb5998c7431affe7b0f9607334a2c9cf252985fc0e1373',
+  llmAnswers: '17ae6bc9b3db4e5695cbac41fa3c2b00f550fc5426c2b3a89e2af412376d8cf9',
 };
 const MESSAGE = 'Tạo card Trello sửa lỗi đăng nhập và báo lên Slack';
 const MODES = ['regex', 'llm'] as const;

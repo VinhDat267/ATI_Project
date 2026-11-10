@@ -2,7 +2,7 @@
 
 - **Task card:** [`docs/handoff/tasks/TRELLO-V3-A-resource-adapter-remediation.md`](../tasks/TRELLO-V3-A-resource-adapter-remediation.md)
 - **Baseline:** `2eed8d1d4309e833088d6f1d3fa774189049e283`
-- **Phạm vi thực hiện (Owner A):** `packages/tool-schemas/src/trello.ts`, `packages/tool-schemas/tests/trello-resource-id.test.ts`, `packages/tool-adapters/src/trello/**`, `packages/tool-adapters/src/slack/slack-adapter.ts`, `packages/tool-adapters/tests/trello-audit-remediation.test.ts`, `packages/executor/src/runner.ts`.
+- **Phạm vi thực hiện (Owner A):** `packages/tool-schemas/src/trello.ts`, `packages/tool-schemas/tests/trello-resource-id.test.ts`, `packages/tool-adapters/src/trello/**`, `packages/tool-adapters/src/slack/slack-adapter.ts`, `packages/tool-adapters/tests/trello-audit-remediation.test.ts`, `packages/executor/src/runner.ts`, `packages/planner/tests/read-answers.test.ts`, `packages/planner/tests/schedules.test.ts`.
 
 ## 1. Các phát hiện đã xử lý
 
@@ -35,5 +35,9 @@
 - **GREEN owned & adjacent suites (`D:\ATI-Audits\trello-remediation-20261110\a\green-all-owned.log`):**
   - 42 test files (`packages/tool-adapters/tests/trello-*.test.ts`, `slack-adapter.test.ts`, toàn bộ `packages/tool-schemas/tests/**`, toàn bộ `packages/executor/tests/**`, `apps/chat-api/tests/services/trello-oauth-client.test.ts`, `apps/chat-api/tests/services/trello-planning.test.ts`): **42 passed (42), 744 passed (744)**, exit code `0`.
   - `packages/tool-adapters/tests/sheets-adapter.test.ts`: **42 passed (42)**, exit code `0`.
-- **Typecheck (`D:\ATI-Audits\trello-remediation-20261110\a\typecheck.log`):**
+- **Typecheck (`D:\ATI-Audits\trello-remediation-20261110\a\typecheck.log` & `typecheck-followup.log`):**
   - `npm run typecheck:v3`: **PASS**, exit code `0`.
+- **Follow-up CI Run `42798723829` — Planner System Prompt Hash Regression (`read-answers.test.ts` & `schedules.test.ts`):**
+  - **RED (`D:\ATI-Audits\trello-remediation-20261110\a\red-planner-hashes.log`):** Tái hiện chính xác 9 lỗi so khớp SHA-256 (1 test trong `packages/planner/tests/read-answers.test.ts` và 8 test tham số hóa trong `packages/planner/tests/schedules.test.ts`) khi `@wap/tool-schemas` liên kết tới mã nguồn worktree hiện tại.
+  - **Chứng minh diff (`D:\ATI-Audits\trello-remediation-20261110\a\prompt-diff-proof.log`):** Đối chiếu dòng-đối-dòng `buildSystemPrompt(ALL_TOOLS, ...)` chứng minh chỉ đúng 8 dòng `Input:` của các tool Trello trong `ALL_TOOLS` thay đổi bởi việc thêm `pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"`, `minLength: 1`, `maxLength: 128` vào các trường ID tài nguyên Trello (`boardId`, `listId`, `cardId`, `memberId`, `idList`, `idMembers.items`); khi lược bỏ đúng 3 thuộc tính này, mã băm SHA-256 khớp 100% với baseline cũ (`0d80f095...`, `1cbac372...`, `2be89ef7...`, `50ec87b0...`), và hành vi tắt cờ (`readAnswers: false`, `schedules: false`, `scheduledRun: true`) khớp từng byte với prompt không bật cờ.
+  - **GREEN (`D:\ATI-Audits\trello-remediation-20261110\a\green-planner-full.log` & `green-adjacent-followup.log`):** Toàn bộ `packages/planner/tests` (**40/40 test files, 567/567 tests**) và toàn bộ `packages/tool-schemas/tests` + `packages/tool-adapters/tests` + `packages/executor/tests` (**59/59 test files, 1329/1329 tests**) đều **PASS**, exit code `0`.

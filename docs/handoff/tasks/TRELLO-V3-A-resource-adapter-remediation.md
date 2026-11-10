@@ -25,6 +25,8 @@ Xử lý triệt để các phát hiện kiểm toán thuộc phạm vi `package
 - `packages/tool-adapters/src/slack/slack-adapter.ts`
 - `packages/tool-adapters/tests/trello-audit-remediation.test.ts`
 - `packages/executor/src/runner.ts`
+- `packages/planner/tests/read-answers.test.ts` (cập nhật mã băm SHA-256 baseline của system prompt sau khi bổ sung ràng buộc schema cho các trường ID tài nguyên Trello)
+- `packages/planner/tests/schedules.test.ts` (cập nhật mã băm SHA-256 baseline của system prompt sau khi bổ sung ràng buộc schema cho các trường ID tài nguyên Trello)
 
 ## Kết quả (10/11/2026)
 
@@ -39,3 +41,4 @@ Xử lý triệt để các phát hiện kiểm toán thuộc phạm vi `package
   - `TRELLO-AUDIT-05` (`AUTO-01` / `PROD-03` — phía adapter): `searchCards` khử trùng lặp `card.id` và gắn thuộc tính non-enumerable `scanMetadata` (`available: 'UNKNOWN'`, `prefixLimit: 50`, `scannedCount`, `uniqueScannedCount`, `duplicateCountDropped`, `matchedCount`, `displayedCount`, `prefixCapReached`, `truncatedByLimit`, `isComplete: false`, `perBoard`) cùng `getTrelloSearchScanMetadata` và `searchCardsWithMetadata`.
   - `TRELLO-AUDIT-08` (`AUTO-04` — phía adapter): `SlackAdapter.sendMessage` xác thực `res.ts` là chuỗi khác rỗng và khác `"undefined"`, ném `StepError` (`category: 'UNKNOWN'`, `retryable: false`, `details: { requestSent: true }`) khi phản hồi HTTP 200 thiếu `ts`.
   - `R3`: `TrelloWriteTools.createCard` kiểm tra cú pháp từng phần tử `idMembers` và đối chiếu với `/boards/:idBoard/members` trước khi gửi `POST /cards`.
+  - **Cập nhật hồi quy mã băm System Prompt (`packages/planner/tests/read-answers.test.ts`, `packages/planner/tests/schedules.test.ts`):** Chứng minh dòng-đối-dòng (`D:\ATI-Audits\trello-remediation-20261110\a\prompt-diff-proof.log`) rằng chỉ đúng 8 dòng `Input:` của các tool Trello trong `ALL_TOOLS` thay đổi do bổ sung `pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$"`, `minLength: 1`, `maxLength: 128` trên các trường ID tài nguyên Trello (khi lược bỏ 3 thuộc tính này thì khớp tuyệt đối 100% mã băm lịch sử), đồng thời hành vi tắt cờ (`readAnswers: false`, `schedules: false`, `scheduledRun: true`) giữ nguyên từng byte so với khi lược bỏ cờ; cập nhật mã băm baseline và vượt qua toàn bộ 40/40 file test của `@wap/planner` (567/567 tests).
