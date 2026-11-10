@@ -458,12 +458,19 @@ export interface SheetsAppendLeaseHandle {
   markUnknownOutcome?: (reason: string, meta?: SheetsAppendDispatchMetadata) => Promise<void>;
 }
 
+export type SheetsAppendManualRecoveryDecision =
+  | 'operator_confirm_aborted_allow_retry'
+  | 'operator_acknowledge_duplicate_risk';
+
 export interface SheetsAppendLeaseReconcileInput {
   scopeKey: string;
   leaseId?: string;
   fencingToken?: number;
   reason?: string;
   verify?: (state: SheetsAppendLeaseState) => Promise<boolean>;
+  manualOperatorDecision?: SheetsAppendManualRecoveryDecision;
+  acknowledgeDuplicateRisk?: boolean;
+  confirmDuplicateRisk?: boolean;
 }
 
 export interface SheetsAppendLeaseStore {

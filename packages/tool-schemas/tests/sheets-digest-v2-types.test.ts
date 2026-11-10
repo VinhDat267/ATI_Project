@@ -21,6 +21,7 @@ import {
   type SheetsAppendDispatchMetadata,
   type SheetsAppendLeaseState,
   type SheetsAppendLeaseReconcileInput,
+  type SheetsAppendManualRecoveryDecision,
 } from '../src/index.js';
 
 describe('SheetsDigestConfigV2 & Gate A recovery schema contracts', () => {
@@ -474,11 +475,29 @@ describe('SheetsDigestConfigV2 & Gate A recovery schema contracts', () => {
         dispatchedMeta: dispatchMeta,
       }),
       reconcileUnknownLease: async (input: SheetsAppendLeaseReconcileInput) => {
-        if (input.scopeKey && status === 'unknown_outcome') {
-          status = 'released';
-          return true;
+        if (!input.scopeKey || status !== 'unknown_outcome') {
+          return false;
         }
-        return false;
+        const isManual =
+          (input.manualOperatorDecision === 'operator_confirm_aborted_allow_retry' ||
+            input.manualOperatorDecision === 'operator_acknowledge_duplicate_risk') &&
+          (input.acknowledgeDuplicateRisk === true || input.confirmDuplicateRisk === true);
+        if (!isManual) {
+          if (!input.verify) return false;
+          const ok = await input.verify({
+            scopeKey: input.scopeKey,
+            spreadsheetId: 'sheet-123',
+            sheetTitle: 'Tasks',
+            leaseId: `lease:${input.scopeKey}`,
+            ownerId: 'worker-1',
+            fencingToken: 1,
+            status,
+            dispatchedMeta: dispatchMeta,
+          });
+          if (!ok) return false;
+        }
+        status = 'released';
+        return true;
       },
     };
 
@@ -489,6 +508,9 @@ describe('SheetsDigestConfigV2 & Gate A recovery schema contracts', () => {
       ownerId: 'worker-1',
     });
 
+    const manualDecision: SheetsAppendManualRecoveryDecision =
+      'operator_confirm_aborted_allow_retry';
+    expect(manualDecision).toBe('operator_confirm_aborted_allow_retry');
     expect(preview.includeAiSummary).toBe(false);
     expect(delivery.dispatchedScheduleVersion).toBe(1);
     expect(delivery.dispatchedConfigHash).toBe('hash-v1');
@@ -496,10 +518,24 @@ describe('SheetsDigestConfigV2 & Gate A recovery schema contracts', () => {
     expect(lease.waitedForContention).toBe(false);
     await lease.beginWriteDispatch?.(dispatchMeta);
     expect((await mockStore.getLeaseState?.('sheet-123::Tasks'))?.status).toBe('dispatched');
+    // Live dispatched lease cannot be reconciled
+    expect(
+      await mockStore.reconcileUnknownLease?.({
+        scopeKey: 'sheet-123::Tasks',
+        verify: async () => true,
+      })
+    ).toBe(false);
     await lease.markUnknownOutcome?.('503 after dispatch', dispatchMeta);
     await lease.release();
     expect((await mockStore.getLeaseState?.('sheet-123::Tasks'))?.status).toBe('unknown_outcome');
-    expect(await mockStore.reconcileUnknownLease?.({ scopeKey: 'sheet-123::Tasks' })).toBe(true);
+    // Unverified reconciliation without manual operator decision must fail closed
+    expect(await mockStore.reconcileUnknownLease?.({ scopeKey: 'sheet-123::Tasks' })).toBe(false);
+    expect(
+      await mockStore.reconcileUnknownLease?.({
+        scopeKey: 'sheet-123::Tasks',
+        verify: async () => true,
+      })
+    ).toBe(true);
     expect((await mockStore.getLeaseState?.('sheet-123::Tasks'))?.status).toBe('released');
   });
 });
