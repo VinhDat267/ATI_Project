@@ -43,25 +43,31 @@ export function isUncertainSheetsDeliveryRun(
 
 export function SheetsDeliveryRecoveryControl({
   run,
+  scheduleStatus,
   onResolved,
 }: {
   run: ScheduleRunView;
   isSheetsSchedule?: boolean;
+  scheduleStatus?: ScheduleView['status'];
   onResolved: (res: {
     run: ScheduleRunView;
     followUpRun: ScheduleRunView | null;
     schedule: ScheduleView;
   }) => void;
 }) {
+  const runIdentity = `${run.id}::${run.deliveryResolution ?? ''}`;
+  const [trackedRunIdentity, setTrackedRunIdentity] = useState(runIdentity);
   const [confirmDuplicateRisk, setConfirmDuplicateRisk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [resolveError, setResolveError] = useState('');
   const locked = useRef(false);
+  const isScheduleNotActive = Boolean(scheduleStatus && scheduleStatus !== 'active');
 
-  useEffect(() => {
+  if (trackedRunIdentity !== runIdentity) {
+    setTrackedRunIdentity(runIdentity);
     setConfirmDuplicateRisk(false);
     setResolveError('');
-  }, [run.id, run.deliveryResolution]);
+  }
 
   const resolution = getEffectiveDeliveryResolution(run);
   if (resolution) {
@@ -136,12 +142,21 @@ export function SheetsDeliveryRecoveryControl({
         <p className="text-[#4B5563]">Xác nhận báo cáo đã tới kênh đích (không gửi lại).</p>
       </div>
       <div className="pt-2 border-t border-amber-200/80 v3-space-y-2">
+        {isScheduleNotActive && (
+          <p
+            data-testid="paused-schedule-retry-warning"
+            role="note"
+            className="p-2 rounded-lg bg-amber-100/80 border border-amber-300 text-amber-950 font-medium"
+          >
+            Lịch đang tạm dừng hoặc đã hủy. Vui lòng tiếp tục (Chạy tiếp) hoặc cấp quyền lại lịch trước khi tạo lượt gửi bù mới để lượt chạy bù không bị hủy.
+          </p>
+        )}
         <label className="flex items-start gap-2 cursor-pointer text-[#111827]">
           <input
             type="checkbox"
             data-testid="checkbox-confirm-duplicate-risk"
             checked={confirmDuplicateRisk}
-            disabled={busy}
+            disabled={busy || isScheduleNotActive}
             onChange={e => setConfirmDuplicateRisk(e.target.checked)}
             className="mt-0.5"
           />
@@ -153,7 +168,7 @@ export function SheetsDeliveryRecoveryControl({
           <button
             type="button"
             data-testid="btn-resolve-retry-new-run"
-            disabled={busy || !confirmDuplicateRisk}
+            disabled={busy || !confirmDuplicateRisk || isScheduleNotActive}
             className={primaryScheduleButton}
             onClick={() => void handleResolve('retry_new_run')}
           >

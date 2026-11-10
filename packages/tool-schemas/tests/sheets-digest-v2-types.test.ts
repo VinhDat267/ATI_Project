@@ -15,6 +15,13 @@ import {
   type SheetsDigestPreviewInfo,
   type SheetsDigestSourceConfigV2,
   type SheetsDigestWorkspaceMode,
+  type SheetsAppendLeaseStore,
+  type SheetsAppendLeaseHandle,
+  type SheetsAppendLeaseStatus,
+  type SheetsAppendDispatchMetadata,
+  type SheetsAppendLeaseState,
+  type SheetsAppendLeaseReconcileInput,
+  type SheetsAppendManualRecoveryDecision,
 } from '../src/index.js';
 
 describe('SheetsDigestConfigV2 & Gate A recovery schema contracts', () => {
@@ -397,5 +404,149 @@ describe('SheetsDigestConfigV2 & Gate A recovery schema contracts', () => {
     expect(manualDelivery.providerSentAt).toBeNull();
     expect(manualDelivery.manualConfirmedAt).toBe('2026-11-08T08:05:00.000Z');
     expect(manualDelivery.manualResolution?.manualConfirmedAt).toBe('2026-11-08T08:05:00.000Z');
+  });
+
+  it('supports GAS-02/GAS-08/GAS-10 contracts: preview includeAiSummary, delivery dispatch snapshot metadata, and SheetsAppendLeaseStore', async () => {
+    const preview: SheetsDigestPreviewInfo = {
+      workspaceMode: 'personal',
+      sourceConnectionLabel: 'Google Sheets cá nhân',
+      sourceOwnerLabel: 'alice@gmail.com',
+      spreadsheetTitle: 'KPI',
+      spreadsheetId: 'sheet-123',
+      requestedRangeLabel: 'Tasks!A1:B3',
+      destinationConnectionLabel: 'Slack',
+      destinationTargetLabel: '#kpi',
+      includeAiSummary: false,
+    };
+
+    const delivery: SheetsDigestDelivery = {
+      destination: 'slack',
+      targetId: 'C123',
+      spreadsheetId: 'sheet-123',
+      spreadsheetTitle: 'KPI',
+      rowCount: 2,
+      summaryMode: 'deterministic',
+      sentAt: '2026-11-10T08:00:00.000Z',
+      providerSentAt: '2026-11-10T08:00:00.000Z',
+      slackMessageTs: '1700000000.000100',
+      dispatchedScheduleVersion: 1,
+      dispatchedConfigHash: 'hash-v1',
+    };
+
+    const dispatchMeta: SheetsAppendDispatchMetadata = {
+      operation: 'append',
+      rowCount: 1,
+      candidateKeys: ['GH#321'],
+      keyColumns: [0],
+    };
+    let status: SheetsAppendLeaseStatus = 'active';
+    const mockStore: SheetsAppendLeaseStore = {
+      acquireLease: async (input) => {
+        const handle: SheetsAppendLeaseHandle = {
+          leaseId: `lease:${input.scopeKey}`,
+          fencingToken: 1,
+          waitedForContention: false,
+          beginWriteDispatch: async () => {
+            status = 'dispatched';
+          },
+          completeWrite: async () => {
+            status = 'released';
+          },
+          abortUncommittedWrite: async () => {
+            status = 'active';
+          },
+          markUnknownOutcome: async () => {
+            status = 'unknown_outcome';
+          },
+          release: async () => {
+            if (status === 'active') status = 'released';
+          },
+        };
+        return handle;
+      },
+      getLeaseState: async (scopeKey): Promise<SheetsAppendLeaseState> => ({
+        scopeKey,
+        spreadsheetId: 'sheet-123',
+        sheetTitle: 'Tasks',
+        leaseId: `lease:${scopeKey}`,
+        ownerId: 'worker-1',
+        fencingToken: 1,
+        status,
+        dispatchedMeta: dispatchMeta,
+      }),
+      reconcileUnknownLease: async (input: SheetsAppendLeaseReconcileInput) => {
+        if (!input.scopeKey || status !== 'unknown_outcome') {
+          return false;
+        }
+        if (
+          input.manualOperatorDecision !== undefined ||
+          input.acknowledgeDuplicateRisk !== undefined ||
+          input.confirmDuplicateRisk !== undefined ||
+          input.reason === 'manual_operator_override' ||
+          input.reason === 'aborted'
+        ) {
+          return false;
+        }
+        if (!input.verify) return false;
+        const ok = await input.verify({
+          scopeKey: input.scopeKey,
+          spreadsheetId: 'sheet-123',
+          sheetTitle: 'Tasks',
+          leaseId: `lease:${input.scopeKey}`,
+          ownerId: 'worker-1',
+          fencingToken: 1,
+          status,
+          dispatchedMeta: dispatchMeta,
+        });
+        if (!ok) return false;
+        status = 'released';
+        return true;
+      },
+    };
+
+    const lease = await mockStore.acquireLease({
+      scopeKey: 'sheet-123::Tasks',
+      spreadsheetId: 'sheet-123',
+      sheetTitle: 'Tasks',
+      ownerId: 'worker-1',
+    });
+
+    const manualDecision: SheetsAppendManualRecoveryDecision =
+      'operator_confirm_aborted_allow_retry';
+    expect(manualDecision).toBe('operator_confirm_aborted_allow_retry');
+    expect(preview.includeAiSummary).toBe(false);
+    expect(delivery.dispatchedScheduleVersion).toBe(1);
+    expect(delivery.dispatchedConfigHash).toBe('hash-v1');
+    expect(lease.fencingToken).toBe(1);
+    expect(lease.waitedForContention).toBe(false);
+    await lease.beginWriteDispatch?.(dispatchMeta);
+    expect((await mockStore.getLeaseState?.('sheet-123::Tasks'))?.status).toBe('dispatched');
+    // Live dispatched lease cannot be reconciled
+    expect(
+      await mockStore.reconcileUnknownLease?.({
+        scopeKey: 'sheet-123::Tasks',
+        verify: async () => true,
+      })
+    ).toBe(false);
+    await lease.markUnknownOutcome?.('503 after dispatch', dispatchMeta);
+    await lease.release();
+    expect((await mockStore.getLeaseState?.('sheet-123::Tasks'))?.status).toBe('unknown_outcome');
+    // Unverified reconciliation and unsupported manual operator override must fail closed
+    expect(await mockStore.reconcileUnknownLease?.({ scopeKey: 'sheet-123::Tasks' })).toBe(false);
+    expect(
+      await mockStore.reconcileUnknownLease?.({
+        scopeKey: 'sheet-123::Tasks',
+        manualOperatorDecision: manualDecision,
+        acknowledgeDuplicateRisk: true,
+      })
+    ).toBe(false);
+    expect((await mockStore.getLeaseState?.('sheet-123::Tasks'))?.status).toBe('unknown_outcome');
+    expect(
+      await mockStore.reconcileUnknownLease?.({
+        scopeKey: 'sheet-123::Tasks',
+        verify: async () => true,
+      })
+    ).toBe(true);
+    expect((await mockStore.getLeaseState?.('sheet-123::Tasks'))?.status).toBe('released');
   });
 });

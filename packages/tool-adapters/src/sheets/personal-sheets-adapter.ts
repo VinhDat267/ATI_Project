@@ -1,3 +1,8 @@
+import type {
+  SheetsAppendDispatchMetadata,
+  SheetsAppendLeaseStore,
+  SheetsAppendManualRecoveryDecision,
+} from '@wap/tool-schemas';
 import { BaseAdapter, StepError, type BaseAdapterConfig } from '../base-adapter.js';
 import type { GmailAccessTokenProvider } from '../gmail/token-provider.js';
 import { SHEETS_MAX_CELL_CHARS, SHEETS_MAX_COLUMNS, clipText } from '../bounds.js';
@@ -8,7 +13,9 @@ import {
   bounded,
   buildDeleteRowRequests,
   buildPartialCellUpdates,
+  buildRowDedupSignature,
   computeSheetAggregation,
+  executeAppendLeaseReconciliation,
   executeReadDigestWindow,
   extractTabHeaders,
   filterDuplicateRows,
@@ -20,6 +27,7 @@ import {
   resolveReadRange,
   safeRows,
   sharedLimiter,
+  sharedProcessSheetsAppendLeaseStore,
   SHEETS_API_BASE,
   spreadsheetPattern,
   spreadsheetUrl,
@@ -34,6 +42,11 @@ export interface PersonalSheetsAdapterConfig extends BaseAdapterConfig {
   tokens: GmailAccessTokenProvider;
   apiBaseUrl?: string;
   fetchFn?: typeof fetch;
+  /**
+   * Optional cross-worker lease store for serializing deduplicated append_rows operations.
+   * Defaults to the process-wide shared in-memory lease store when omitted.
+   */
+  appendLeaseStore?: SheetsAppendLeaseStore;
   /**
    * Server-owned Dual Kill-Switch flag for the 4 Drive/Docs write tools:
    * - mysheets.create_drive_folder
@@ -88,6 +101,10 @@ export class PersonalSheetsAdapter extends BaseAdapter {
   private readonly driveUploadBase: string;
   private readonly fetchFn: typeof fetch;
   private readonly enableDriveWriteTools: boolean;
+  private readonly appendLeaseStore: SheetsAppendLeaseStore;
+  private readonly hasCustomAppendLeaseStore: boolean;
+  private readonly spreadsheetLocales = new Map<string, string>();
+  private readonly allowedDriveResources = new Set<string>();
 
   constructor(config: PersonalSheetsAdapterConfig) {
     super(config);
@@ -99,11 +116,23 @@ export class PersonalSheetsAdapter extends BaseAdapter {
     }
     this.userId = config.userId;
     this.tokens = config.tokens;
+    this.appendLeaseStore = config.appendLeaseStore ?? sharedProcessSheetsAppendLeaseStore;
+    this.hasCustomAppendLeaseStore = Boolean(config.appendLeaseStore);
     this.enableDriveWriteTools =
       typeof config.enableDriveWriteTools === 'boolean'
         ? config.enableDriveWriteTools
         : process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS === 'true' ||
           process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS === 'on';
+    for (const key of ['spreadsheets', 'driveFiles', 'docs']) {
+      const list = this.allowedScope?.[key];
+      if (Array.isArray(list)) {
+        for (const id of list) {
+          if (typeof id === 'string' && id.trim()) {
+            this.allowedDriveResources.add(id.trim());
+          }
+        }
+      }
+    }
     const rawBase = config.apiBaseUrl ?? SHEETS_API_BASE;
     this.apiBase = rawBase.includes('/v4/spreadsheets')
       ? rawBase.replace(/\/+$/, '') + '/'
@@ -141,6 +170,23 @@ export class PersonalSheetsAdapter extends BaseAdapter {
       invalid(`${fieldName} is invalid`);
     }
     return value.trim();
+  }
+
+  private assertDriveWriteTargetAllowed(resourceId: string, toolName: string): void {
+    if (!this.allowedDriveResources.has(resourceId)) {
+      throw new StepError({
+        category: 'AUTH_ERROR',
+        statusCode: 403,
+        message: `Google Drive/Docs target '${resourceId}' is outside the authorized resource allowlist for '${toolName}'.`,
+        retryable: false,
+        details: {
+          code: 'MYSHEETS_DRIVE_TARGET_NOT_ALLOWED',
+          tool: toolName,
+          resourceId,
+          requestSent: false,
+        },
+      });
+    }
   }
 
   private async driveRequest(
@@ -266,7 +312,8 @@ export class PersonalSheetsAdapter extends BaseAdapter {
     path: string,
     signal?: AbortSignal,
     body?: unknown,
-    onDispatch?: (dispatched: boolean) => void
+    onDispatch?: (dispatched: boolean) => void,
+    beforeDispatch?: () => Promise<void>
   ): Promise<any> {
     if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
     const writing = body !== undefined;
@@ -292,6 +339,10 @@ export class PersonalSheetsAdapter extends BaseAdapter {
       forceRefresh = false;
 
       if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
+
+      if (writing && beforeDispatch) {
+        await beforeDispatch();
+      }
 
       let response: Response;
       try {
@@ -467,17 +518,20 @@ export class PersonalSheetsAdapter extends BaseAdapter {
         }
         const quotedSheet = /\s|'/.test(sheet) ? "'" + sheet.replaceAll("'", "''") + "'" : sheet;
         const readRange = `${quotedSheet}!A1:Z500`;
-        const value = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
+        const value = await this.request(
+          id + '/values/' + encodeURIComponent(readRange) + '?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING',
+          signal
+        );
         const rawValues: unknown[][] = Array.isArray(value?.values) ? value.values : [];
         const rowTruncated =
           rawValues.length > 500 ||
           rawValues.slice(0, 500).some((r) => Array.isArray(r) && r.length > SHEETS_MAX_COLUMNS);
         const rawRows = rawValues.slice(0, 500).map((row: unknown[]) =>
-          (Array.isArray(row) ? row : []).slice(0, SHEETS_MAX_COLUMNS).map((cell) =>
-            cell == null ? '' : String(cell)
-          )
+          (Array.isArray(row) ? row : []).slice(0, SHEETS_MAX_COLUMNS)
         );
-        return filterSearchedRows(sheet, rawRows, args, limit, rowTruncated);
+        return filterSearchedRows(sheet, rawRows, args, limit, rowTruncated, {
+          locale: this.spreadsheetLocales.get(id),
+        });
       }
 
       if (toolName === 'mysheets.aggregate_rows') {
@@ -493,13 +547,21 @@ export class PersonalSheetsAdapter extends BaseAdapter {
         }
         const quotedSheet = /\s|'/.test(sheet) ? "'" + sheet.replaceAll("'", "''") + "'" : sheet;
         const readRange = `${quotedSheet}!A1:Z500`;
-        const value = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
-        const rawRows = (Array.isArray(value?.values) ? value.values : []).slice(0, 500).map((row: unknown[]) =>
-          (Array.isArray(row) ? row : []).slice(0, SHEETS_MAX_COLUMNS).map((cell) =>
-            cell == null ? '' : String(cell)
-          )
+        const value = await this.request(
+          id + '/values/' + encodeURIComponent(readRange) + '?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING',
+          signal
         );
-        return computeSheetAggregation(sheet, rawRows, args);
+        const rawValues: unknown[][] = Array.isArray(value?.values) ? value.values : [];
+        const rowTruncated =
+          rawValues.length > 500 ||
+          rawValues.slice(0, 500).some((r) => Array.isArray(r) && r.length > SHEETS_MAX_COLUMNS);
+        const rawRows = rawValues.slice(0, 500).map((row: unknown[]) =>
+          (Array.isArray(row) ? row : []).slice(0, SHEETS_MAX_COLUMNS)
+        );
+        return computeSheetAggregation(sheet, rawRows, args, {
+          locale: this.spreadsheetLocales.get(id),
+          rowTruncated,
+        });
       }
 
       if (toolName === 'mysheets.append_rows') {
@@ -507,91 +569,163 @@ export class PersonalSheetsAdapter extends BaseAdapter {
         const sheet = titleText(args.sheet);
         const needsHeaderLookup = args.records !== undefined || args.keyColumn !== undefined;
         let rawRows = needsHeaderLookup ? [] : validateRawRows(args.rows);
-        if (!needsHeaderLookup) {
-          resolveDeduplicationPolicy(rawRows, args);
-        }
+        const preliminaryPolicy = needsHeaderLookup
+          ? { enabled: true, keyColumns: null, onDuplicate: 'skip' as const }
+          : resolveDeduplicationPolicy(rawRows, args);
         const tabs = await this.tabs(id, signal);
         if (!tabs.some(tab => tab.title === sheet)) {
           throw new StepError({ message: 'Sheets tab not found in the allowed spreadsheet', category: 'NOT_FOUND', statusCode: 404 });
         }
         const quotedSheet = /\s|'/.test(sheet) ? "'" + sheet.replaceAll("'", "''") + "'" : sheet;
         const range = "'" + sheet.replaceAll("'", "''") + "'!A1";
-        let existingRows: unknown[][] | undefined;
-        let headers: string[] = [];
-        if (needsHeaderLookup) {
-          const readRange = `${quotedSheet}!A1:Z500`;
-          const existingData = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
-          const fetchedRows: unknown[][] = Array.isArray(existingData?.values) ? existingData.values : [];
-          existingRows = fetchedRows;
-          headers = Array.isArray(fetchedRows[0])
-            ? fetchedRows[0].map((c) => (c == null ? '' : String(c).trim()))
-            : [];
-          rawRows = args.records !== undefined ? mapRecordsToRows(args.records, headers) : validateRawRows(args.rows);
-        }
-        const dedupPolicy = resolveDeduplicationPolicy(rawRows, args, headers);
-        let rowsToWrite = rawRows;
-        let skippedDuplicates = 0;
-        let batchUpdatedRows = 0;
-        let lastUpdatedRange = `${quotedSheet}!A1`;
-        if (dedupPolicy.enabled) {
-          if (!existingRows) {
-            const readRange = `${quotedSheet}!A1:Z500`;
-            const existingData = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
-            existingRows = Array.isArray(existingData?.values) ? (existingData.values as unknown[][]) : [];
-          }
-          const filtered = filterDuplicateRows(rawRows, existingRows ?? [], dedupPolicy.keyColumns, dedupPolicy.onDuplicate);
-          rowsToWrite = filtered.newRows;
-          skippedDuplicates = filtered.skippedDuplicates;
-          if (filtered.updates.length > 0) {
-            const batchData = filtered.updates.map((u) => ({
-              range: `${quotedSheet}!A${u.rowNumber}`,
-              majorDimension: 'ROWS',
-              values: safeRows([u.row]),
-            }));
-            const batchRes = await this.request(
-              id + '/values:batchUpdate',
-              signal,
-              { valueInputOption: 'USER_ENTERED', data: batchData },
-              (dispatched) => { writeDispatched = dispatched; }
-            );
-            const respRange = batchRes?.responses?.[batchRes.responses.length - 1]?.updatedRange;
-            if (typeof respRange === 'string') lastUpdatedRange = respRange;
-            batchUpdatedRows = Number.isInteger(batchRes?.totalUpdatedRows)
-              ? batchRes.totalUpdatedRows
-              : filtered.updates.length;
-          }
-          if (rowsToWrite.length === 0) {
-            return {
+        const readRange = `${quotedSheet}!A1:Z500`;
+
+        const needsSerializedReadWrite =
+          needsHeaderLookup || preliminaryPolicy.enabled || this.hasCustomAppendLeaseStore;
+        const lease = needsSerializedReadWrite
+          ? await this.appendLeaseStore.acquireLease({
+              scopeKey: `${id}::${sheet.trim().toLowerCase()}`,
               spreadsheetId: id,
-              updatedRange: lastUpdatedRange,
-              updatedRows: batchUpdatedRows,
-              skippedDuplicates,
-              url: spreadsheetUrl(id),
-            };
+              sheetTitle: sheet,
+              ownerId: `mysheets:${this.userId}`,
+              signal,
+              onContention: async () => {
+                await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
+              },
+            })
+          : null;
+
+        let batchMutationCommitted = false;
+        let activeDispatchMeta: SheetsAppendDispatchMetadata | undefined;
+
+        try {
+          let existingRows: unknown[][] | undefined;
+          let headers: string[] = [];
+          if (needsHeaderLookup) {
+            const existingData = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
+            const fetchedRows: unknown[][] = Array.isArray(existingData?.values) ? existingData.values : [];
+            existingRows = fetchedRows;
+            headers = Array.isArray(fetchedRows[0])
+              ? fetchedRows[0].map((c) => (c == null ? '' : String(c).trim()))
+              : [];
+            rawRows = args.records !== undefined ? mapRecordsToRows(args.records, headers) : validateRawRows(args.rows);
           }
+          const dedupPolicy = resolveDeduplicationPolicy(rawRows, args, headers);
+          let rowsToWrite = rawRows;
+          let skippedDuplicates = 0;
+          let batchUpdatedRows = 0;
+          let lastUpdatedRange = `${quotedSheet}!A1`;
+          if (dedupPolicy.enabled) {
+            if (!existingRows) {
+              const existingData = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
+              existingRows = Array.isArray(existingData?.values) ? (existingData.values as unknown[][]) : [];
+            }
+            const filtered = filterDuplicateRows(rawRows, existingRows ?? [], dedupPolicy.keyColumns, dedupPolicy.onDuplicate);
+            rowsToWrite = filtered.newRows;
+            skippedDuplicates = filtered.skippedDuplicates;
+            if (filtered.updates.length > 0) {
+              const batchData = filtered.updates.map((u) => ({
+                range: `${quotedSheet}!A${u.rowNumber}`,
+                majorDimension: 'ROWS',
+                values: safeRows([u.row]),
+              }));
+              const allLogicalKeys = [
+                ...filtered.updates.map((u) => buildRowDedupSignature(u.row, null)),
+                ...safeRows(rowsToWrite).map((r) => buildRowDedupSignature(r, null)),
+              ];
+              const batchDispatchMeta: SheetsAppendDispatchMetadata = {
+                operation: 'upsert',
+                rowCount: allLogicalKeys.length,
+                candidateKeys: allLogicalKeys,
+                keyColumns: dedupPolicy.keyColumns,
+              };
+              activeDispatchMeta = batchDispatchMeta;
+              const batchRes = await this.request(
+                id + '/values:batchUpdate',
+                signal,
+                { valueInputOption: 'USER_ENTERED', data: batchData },
+                (dispatched) => { writeDispatched = dispatched; },
+                async () => {
+                  await lease?.beginWriteDispatch?.(batchDispatchMeta);
+                }
+              );
+              const respRange = batchRes?.responses?.[batchRes.responses.length - 1]?.updatedRange;
+              if (typeof respRange === 'string') lastUpdatedRange = respRange;
+              batchUpdatedRows = Number.isInteger(batchRes?.totalUpdatedRows)
+                ? batchRes.totalUpdatedRows
+                : filtered.updates.length;
+              batchMutationCommitted = true;
+              await lease?.completeWrite?.();
+            }
+            if (rowsToWrite.length === 0) {
+              return {
+                spreadsheetId: id,
+                updatedRange: lastUpdatedRange,
+                updatedRows: batchUpdatedRows,
+                skippedDuplicates,
+                url: spreadsheetUrl(id),
+              };
+            }
+          }
+          const rows = safeRows(rowsToWrite);
+          const appendCandidateKeys = activeDispatchMeta?.candidateKeys ?? rows.map((r) => buildRowDedupSignature(r, null));
+          const appendDispatchMeta: SheetsAppendDispatchMetadata = {
+            operation: 'append',
+            rowCount: appendCandidateKeys.length,
+            candidateKeys: appendCandidateKeys,
+            keyColumns: dedupPolicy.keyColumns,
+          };
+          const value = await this.request(
+            id + '/values/' + encodeURIComponent(range) + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS',
+            signal,
+            { majorDimension: 'ROWS', values: rows },
+            (dispatched) => { writeDispatched = dispatched; },
+            async () => {
+              activeDispatchMeta = appendDispatchMeta;
+              await lease?.beginWriteDispatch?.(appendDispatchMeta);
+            }
+          );
+          if (
+            value?.spreadsheetId !== id ||
+            typeof value.updates?.updatedRange !== 'string' ||
+            !Number.isInteger(value.updates?.updatedRows) ||
+            value.updates.updatedRows < 0
+          ) {
+            badResponse(true);
+          }
+          await lease?.completeWrite?.();
+          return {
+            spreadsheetId: id,
+            updatedRange: value.updates.updatedRange,
+            updatedRows: batchUpdatedRows + value.updates.updatedRows,
+            ...(dedupPolicy.enabled ? { skippedDuplicates } : {}),
+            url: spreadsheetUrl(id),
+          };
+        } catch (err) {
+          if (lease) {
+            const isLostLeasePreMutation =
+              !batchMutationCommitted &&
+              err instanceof StepError &&
+              err.details?.code === 'SHEETS_APPEND_LEASE_LOST';
+            if (!isLostLeasePreMutation) {
+              const isAmbiguousWriteOutcome =
+                batchMutationCommitted ||
+                (err instanceof StepError ? err.category === 'UNKNOWN' : writeDispatched);
+              if (isAmbiguousWriteOutcome) {
+                writeDispatched = true;
+                await lease.markUnknownOutcome?.(
+                  err instanceof Error ? err.message : 'Ambiguous Sheets append write outcome',
+                  activeDispatchMeta
+                );
+              } else {
+                await lease.abortUncommittedWrite?.();
+              }
+            }
+          }
+          throw err;
+        } finally {
+          await lease?.release();
         }
-        const rows = safeRows(rowsToWrite);
-        const value = await this.request(
-          id + '/values/' + encodeURIComponent(range) + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS',
-          signal,
-          { majorDimension: 'ROWS', values: rows },
-          (dispatched) => { writeDispatched = dispatched; }
-        );
-        if (
-          value?.spreadsheetId !== id ||
-          typeof value.updates?.updatedRange !== 'string' ||
-          !Number.isInteger(value.updates?.updatedRows) ||
-          value.updates.updatedRows < 0
-        ) {
-          badResponse(true);
-        }
-        return {
-          spreadsheetId: id,
-          updatedRange: value.updates.updatedRange,
-          updatedRows: batchUpdatedRows + value.updates.updatedRows,
-          ...(dedupPolicy.enabled ? { skippedDuplicates } : {}),
-          url: spreadsheetUrl(id),
-        };
       }
 
       if (toolName === 'mysheets.update_rows') {
@@ -850,6 +984,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
           }
         );
         if (typeof res?.id !== 'string' || !res.id) badResponse(true);
+        this.allowedDriveResources.add(res.id);
         return {
           id: res.id,
           title: typeof res.name === 'string' && res.name ? res.name : name,
@@ -901,6 +1036,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
           }
         );
         if (typeof res?.id !== 'string' || !res.id) badResponse(true);
+        this.allowedDriveResources.add(res.id);
         return {
           id: res.id,
           title: typeof res.name === 'string' && res.name ? res.name : title,
@@ -944,6 +1080,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
 
       if (toolName === 'mysheets.append_doc_text') {
         const documentId = this.checkedDriveId(args.documentId, 'documentId');
+        this.assertDriveWriteTargetAllowed(documentId, toolName);
         if (typeof args.text !== 'string' || !args.text.trim() || args.text.length > 8000) {
           invalid('text must be a non-empty string up to 8000 chars');
         }
@@ -985,6 +1122,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
       if (toolName === 'mysheets.move_drive_file') {
         const fileId = this.checkedDriveId(args.fileId, 'fileId');
         const folderId = this.checkedDriveId(args.folderId, 'folderId');
+        this.assertDriveWriteTargetAllowed(fileId, toolName);
         const res = await this.driveRequest(
           {
             url: `${this.driveApiBase}/${encodeURIComponent(fileId)}?addParents=${encodeURIComponent(folderId)}&fields=${encodeURIComponent('id,name,mimeType,webViewLink')}`,
@@ -1055,6 +1193,39 @@ export class PersonalSheetsAdapter extends BaseAdapter {
     );
   }
 
+  async reconcileAppendLease(input: {
+    spreadsheetId: string;
+    sheet: string;
+    leaseId?: string;
+    fencingToken?: number;
+    manualOperatorDecision?: SheetsAppendManualRecoveryDecision;
+    acknowledgeDuplicateRisk?: boolean;
+    confirmDuplicateRisk?: boolean;
+    signal?: AbortSignal;
+  }): Promise<{
+    reconciled: boolean;
+    committedOnProvider: boolean;
+    matchedSignatures: string[];
+    scopeKey: string;
+    inconclusiveReason?: string;
+  }> {
+    const id = this.checkedId(input?.spreadsheetId);
+    const sheet = titleText(input?.sheet);
+    return executeAppendLeaseReconciliation({
+      spreadsheetId: id,
+      sheet,
+      leaseId: input.leaseId,
+      fencingToken: input.fencingToken,
+      manualOperatorDecision: input.manualOperatorDecision,
+      acknowledgeDuplicateRisk: input.acknowledgeDuplicateRisk,
+      confirmDuplicateRisk: input.confirmDuplicateRisk,
+      signal: input.signal,
+      appendLeaseStore: this.appendLeaseStore,
+      fetchSheetValues: (readRange, sig) =>
+        this.request(id + '/values/' + encodeURIComponent(readRange), sig),
+    });
+  }
+
   private async tabs(
     id: string,
     signal?: AbortSignal,
@@ -1065,6 +1236,9 @@ export class PersonalSheetsAdapter extends BaseAdapter {
         encodeURIComponent('sheets.properties(sheetId,title),sheets.data.rowData.values.formattedValue')
       : '?fields=' + encodeURIComponent('sheets.properties(sheetId,title)');
     const value = await this.request(id + query, signal);
+    if (typeof value?.properties?.locale === 'string' && value.properties.locale.trim()) {
+      this.spreadsheetLocales.set(id, value.properties.locale.trim());
+    }
     if (
       !Array.isArray(value?.sheets) ||
       value.sheets.some((tab: any) => !Number.isSafeInteger(tab.properties?.sheetId) || typeof tab.properties?.title !== 'string')

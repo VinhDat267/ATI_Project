@@ -200,15 +200,18 @@ export class SlackAdapter extends BaseAdapter {
     });
 
     const rawTs = typeof res?.ts === 'string' ? res.ts.trim() : '';
-    const rawChannel =
-      typeof res?.channel === 'string' && res.channel.trim()
-        ? res.channel.trim()
-        : typeof args.channel === 'string'
-          ? args.channel.trim()
-          : '';
-    if (!rawTs || rawTs === 'undefined' || !rawChannel || rawChannel === 'undefined') {
+    const rawChannel = typeof res?.channel === 'string' ? res.channel.trim() : '';
+    if (
+      !rawTs ||
+      rawTs === 'undefined' ||
+      rawTs === 'null' ||
+      !rawChannel ||
+      rawChannel === 'undefined' ||
+      rawChannel === 'null'
+    ) {
       throw new StepError({
-        message: 'Slack chat.postMessage returned a malformed receipt without a valid message timestamp (ts)',
+        message:
+          'Slack chat.postMessage returned a malformed receipt without valid string channel and timestamp (ts)',
         category: 'UNKNOWN',
         retryable: false,
         details: { requestSent: true },

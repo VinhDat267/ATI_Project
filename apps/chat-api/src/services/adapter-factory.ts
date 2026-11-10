@@ -16,12 +16,16 @@ import {
   TELEGRAM_CHAT_ID_PATTERN,
   type AllowedScope,
   type PlanConnections,
+  type SheetsAppendLeaseStore,
   type WorkspaceJiraCapabilitiesResponse,
   validateJiraSourceRef,
   type JiraSourceRef,
 } from '@wap/tool-schemas';
 import { isWriteTool, type AdapterExecutor } from '@wap/executor';
 import { getRegisteredService, isServiceAccountService } from './registered-services.js';
+import { PostgresSheetsAppendLeaseStore } from './sheets/sheets-append-lease-store.js';
+
+export { PostgresSheetsAppendLeaseStore };
 import type { GmailTokenManager } from './gmail/token-manager.js';
 import type { TelegramBotClient } from './telegram/bot-client.js';
 import type { NotionConnectionRepo } from '../db/repositories/notion-connection-repo.js';
@@ -56,8 +60,14 @@ export interface AdapterFactoryOptions {
   createMyCalendarAdapter?: (input: { userId: string; tokens: GmailAccessTokenProvider; allowedScope: AllowedScope }) => AdapterExecutor;
   mycalendarTokens?: GmailTokenManager;
   /** Builds the MySheets adapter of one member with explicit scope allowlist. */
-  createMySheetsAdapter?: (input: { userId: string; tokens: GmailAccessTokenProvider; allowedScope: AllowedScope }) => AdapterExecutor;
+  createMySheetsAdapter?: (input: {
+    userId: string;
+    tokens: GmailAccessTokenProvider;
+    allowedScope: AllowedScope;
+    appendLeaseStore?: SheetsAppendLeaseStore;
+  }) => AdapterExecutor;
   mysheetsTokens?: GmailTokenManager;
+  sheetsAppendLeaseStore?: SheetsAppendLeaseStore;
   createTrelloAdapter?: (input: { userId: string; accessToken: string; allowedBoardIds: string[] }) => AdapterExecutor;
   trelloTokens?: any;
   trelloTeamRepo?: any;
@@ -255,7 +265,10 @@ export class AdapterFactory {
     if (!registration.definition.credentialFields.every(({ key }) => typeof decrypted[key] === 'string' && String(decrypted[key]).trim())) {
       throw new Error(`Credentials are incomplete for service '${serviceName}'`);
     }
-    const adapter = registration.transport.createAdapter(decrypted, allowedScope);
+    const adapterConfig = this.options.sheetsAppendLeaseStore
+      ? { ...decrypted, appendLeaseStore: this.options.sheetsAppendLeaseStore }
+      : decrypted;
+    const adapter = registration.transport.createAdapter(adapterConfig, allowedScope);
 
     this.adapterCache.set(cacheKey, adapter);
     return adapter;
@@ -393,6 +406,9 @@ export class AdapterFactory {
       userId,
       tokens: this.options.mysheetsTokens.forConnection(userId, record.id, refreshToken),
       allowedScope: { spreadsheets: allowedSpreadsheets },
+      ...(this.options.sheetsAppendLeaseStore
+        ? { appendLeaseStore: this.options.sheetsAppendLeaseStore }
+        : {}),
     });
     this.personalCache.set(key, { credentialId: record.id, adapter, scopeKey });
     return adapter;

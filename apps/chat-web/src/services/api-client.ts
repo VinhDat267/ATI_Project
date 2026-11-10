@@ -740,22 +740,31 @@ export class ApiClient {
   confirmSchedule(
     convId: string,
     messageId: string,
-    approvalModeOrOptions?: ScheduleApprovalMode | { approvalMode?: ScheduleApprovalMode }
+    approvalModeOrOptions?:
+      | ScheduleApprovalMode
+      | { approvalMode?: ScheduleApprovalMode; includeAiSummary?: boolean }
   ) {
     const approvalMode =
       typeof approvalModeOrOptions === 'string'
         ? approvalModeOrOptions
         : approvalModeOrOptions?.approvalMode;
+    const includeAiSummary =
+      typeof approvalModeOrOptions === 'object' && approvalModeOrOptions !== null
+        ? approvalModeOrOptions.includeAiSummary
+        : undefined;
+    const payload: Record<string, unknown> = {};
+    if (approvalMode) payload.approvalMode = approvalMode;
+    if (typeof includeAiSummary === 'boolean') payload.includeAiSummary = includeAiSummary;
     return this.request<{ schedule: ScheduleView }>(
       `/api/conversations/${encodeURIComponent(convId)}/schedule-proposals/${encodeURIComponent(messageId)}/confirm`,
       {
         method: 'POST',
-        ...(approvalMode ? { body: JSON.stringify({ approvalMode }) } : {}),
+        ...(Object.keys(payload).length > 0 ? { body: JSON.stringify(payload) } : {}),
       }
     );
   }
   changeSchedule(id: string, action: 'pause' | 'resume' | 'cancel', version: number) { return this.request<{ schedule: ScheduleView }>(`/api/schedules/${encodeURIComponent(id)}/${action}`, { method: 'POST', body: JSON.stringify({ version }) }); }
-  reauthorizeSchedulePreview(id: string) {
+  reauthorizeSchedulePreview(id: string, options?: { includeAiSummary?: boolean }) {
     return this.request<{
       proposalMessageId: string;
       convId: string;
@@ -766,6 +775,9 @@ export class ApiClient {
       metadata: ScheduleProposalMetadata;
     }>(`/api/schedules/${encodeURIComponent(id)}/reauthorize-preview`, {
       method: 'POST',
+      ...(typeof options?.includeAiSummary === 'boolean'
+        ? { body: JSON.stringify({ includeAiSummary: options.includeAiSummary }) }
+        : {}),
     });
   }
   runScheduleNow(id: string) { return this.request<{ run: ScheduleRunView }>(`/api/schedules/${encodeURIComponent(id)}/run-now`, { method: 'POST' }); }

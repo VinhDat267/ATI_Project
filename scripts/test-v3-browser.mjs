@@ -74,12 +74,18 @@ export const scenarios = [
     grep: 'TRELLO-E2E:|TELEGRAM-E2E-2:',
     executionMode: 'real_backend_sandbox',
   },
+  {
+    name: 'sheets_digest_v2_recovery',
+    schedulesEnabled: true,
+    grep: 'Browser UI E2E \\(Mocked API\\): Sheets Digest V2 Preview',
+    executionMode: 'mocked_browser_routes',
+  },
 ];
 
 export function resolveActiveScenarios(passArgs = process.argv.slice(2), envVars = process.env) {
   if (passArgs.length > 0) {
     const needsSchedule = passArgs.some((arg) =>
-      /sched-03|github-oauth-and-digest|telegram-oauth-and-digest|trello-oauth|TRELLO:|TRELLO-E2E:|TELEGRAM-E2E-1:|TELEGRAM-E2E-2:/.test(
+      /sched-03|github-oauth-and-digest|telegram-oauth-and-digest|trello-oauth|sheets-digest-v2-recovery|TRELLO:|TRELLO-E2E:|TELEGRAM-E2E-1:|TELEGRAM-E2E-2:/.test(
         arg
       )
     );
@@ -118,7 +124,7 @@ if (isMainModule) {
   if (passArgs.length > 0) {
     process.stdout.write(`Running v3 browser targeting: ${passArgs.join(' ')}\n`);
     const env = { ...process.env, JWT_SECRET: process.env.JWT_SECRET || randomBytes(32).toString('hex') };
-    if (passArgs.some(arg => /sched-03|github-oauth-and-digest|telegram-oauth-and-digest|trello-oauth|TRELLO:|TRELLO-E2E:|TELEGRAM-E2E-1:|TELEGRAM-E2E-2:/.test(arg))) {
+    if (passArgs.some(arg => /sched-03|github-oauth-and-digest|telegram-oauth-and-digest|trello-oauth|sheets-digest-v2-recovery|TRELLO:|TRELLO-E2E:|TELEGRAM-E2E-1:|TELEGRAM-E2E-2:/.test(arg))) {
       env.SANDBOX_SCENARIO = env.SANDBOX_SCENARIO || 'schedule';
       env.SCHEDULES_ENABLED = env.SCHEDULES_ENABLED || 'on';
     }
@@ -159,10 +165,10 @@ if (isMainModule) {
     else env.SANDBOX_SCENARIO = scenario.sandboxScenario ?? scenario.name;
     // Keep every existing group on the old read-only policy regardless of the invoking shell.
     env.PLANNER_READ_ANSWERS = scenario.name === 'answer' ? 'on' : 'off';
-    env.GMAIL_ENABLED = scenario.name === 'gmail' ? 'on' : 'off';
+    env.GMAIL_ENABLED = ['gmail', 'sheets_digest_v2_recovery'].includes(scenario.name) ? 'on' : 'off';
     env.MYCALENDAR_ENABLED = scenario.name === 'mycalendar' ? 'on' : 'off';
-    env.MYSHEETS_ENABLED = scenario.name === 'mysheets' ? 'on' : 'off';
-    env.SCHEDULES_ENABLED = (scenario.name === 'schedule' || scenario.schedulesEnabled) ? 'on' : 'off';
+    env.MYSHEETS_ENABLED = ['mysheets', 'sheets_digest_v2_recovery'].includes(scenario.name) ? 'on' : 'off';
+    env.SCHEDULES_ENABLED = (['schedule', 'sheets_digest_v2_recovery'].includes(scenario.name) || scenario.schedulesEnabled) ? 'on' : 'off';
     env.MYSLACK_ENABLED = ['slack_oauth','slack_read','slack_write','slack_assistant'].includes(scenario.name) ? 'on' : 'off';
     env.MYSLACK_AUTOMATION_ENABLED='off';
     env.MYSLACK_WRITES_ENABLED=scenario.name==='slack_write'?'on':'off';

@@ -691,6 +691,22 @@ export class ScheduleRunner {
         return { ended: unknownErr, changes, assistantMessageId: undefined, text: undefined };
       }
 
+      // GAS-04: Preserve admitted run's confirmed send and receipt even if schedule was paused/cancelled/edited after claim.
+      if (outcome.status === 'digest_sent') {
+        const msg = await this.messages.createMessage(
+          started.convId,
+          'assistant',
+          outcome.text,
+          { type: 'sheets_digest_sent', delivery: outcome.delivery, ...replyTo },
+          client
+        );
+        await client.query(
+          "UPDATE schedule_runs SET status='digest_sent', delivery=$2::jsonb, updated_at=now() WHERE id=$1",
+          [runId, JSON.stringify(outcome.delivery)]
+        );
+        return { ended: 'digest_sent', changes, assistantMessageId: msg.id, text: outcome.text };
+      }
+
       if (stoppedError) {
         await this.messages.createMessage(
           started.convId,
@@ -739,45 +755,30 @@ export class ScheduleRunner {
         return { ended: outcome.pauseReason, changes, assistantMessageId: undefined, text: undefined };
       }
 
-      if (outcome.status === 'digest_failed') {
-        await this.messages.createMessage(
-          started.convId,
-          'system',
-          `Lỗi: ${outcome.error}`,
-          { type: 'planning_error', ...replyTo },
-          client
-        );
-        await client.query(
-          "UPDATE schedule_runs SET status='digest_failed', error=$2, updated_at=now() WHERE id=$1",
-          [runId, outcome.error]
-        );
-        const recent = await client.query(
-          'SELECT status FROM schedule_runs WHERE schedule_id=$1 ORDER BY created_at DESC, id DESC LIMIT 3',
-          [schedule.id]
-        );
-        if (recent.rows.length === 3 && recent.rows.every((r) => r.status === 'digest_failed')) {
-          const paused = await this.pause(
-            client,
-            schedule.id,
-            'Tự dừng sau 3 lần gửi báo cáo tự động liên tiếp thất bại.'
-          );
-          changes.push(await this.options.recordState(client, paused, now));
-        }
-        return { ended: outcome.error, changes, assistantMessageId: undefined, text: undefined };
-      }
-
-      const msg = await this.messages.createMessage(
+      await this.messages.createMessage(
         started.convId,
-        'assistant',
-        outcome.text,
-        { type: 'sheets_digest_sent', delivery: outcome.delivery, ...replyTo },
+        'system',
+        `Lỗi: ${outcome.error}`,
+        { type: 'planning_error', ...replyTo },
         client
       );
       await client.query(
-        "UPDATE schedule_runs SET status='digest_sent', delivery=$2::jsonb, updated_at=now() WHERE id=$1",
-        [runId, JSON.stringify(outcome.delivery)]
+        "UPDATE schedule_runs SET status='digest_failed', error=$2, updated_at=now() WHERE id=$1",
+        [runId, outcome.error]
       );
-      return { ended: 'digest_sent', changes, assistantMessageId: msg.id, text: outcome.text };
+      const recent = await client.query(
+        'SELECT status FROM schedule_runs WHERE schedule_id=$1 ORDER BY created_at DESC, id DESC LIMIT 3',
+        [schedule.id]
+      );
+      if (recent.rows.length === 3 && recent.rows.every((r) => r.status === 'digest_failed')) {
+        const paused = await this.pause(
+          client,
+          schedule.id,
+          'Tự dừng sau 3 lần gửi báo cáo tự động liên tiếp thất bại.'
+        );
+        changes.push(await this.options.recordState(client, paused, now));
+      }
+      return { ended: outcome.error, changes, assistantMessageId: undefined, text: undefined };
     });
 
     this.announce(result.changes);

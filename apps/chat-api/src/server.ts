@@ -28,7 +28,7 @@ import { createCalendarDigestExecutor } from './services/schedules/calendar-dige
 import { createGithubDigestRunner, type RunGithubDigest } from './services/schedules/github-digest-runner.js';
 import { createTrelloDigestRunner, buildTrelloAiPromptPayload, type RunTrelloDigest } from './services/schedules/trello-digest-runner.js';
 import { createNotionDigestRunner, type RunNotionDigest } from './services/schedules/notion-digest-runner.js';
-import { AdapterFactory, type AdapterContext } from './services/adapter-factory.js';
+import { AdapterFactory, PostgresSheetsAppendLeaseStore, type AdapterContext } from './services/adapter-factory.js';
 import { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
 import { SlackConnectionRepo } from './db/repositories/slack-connection-repo.js';
 import { SlackSourceRepo } from './db/repositories/slack-source-repo.js';
@@ -812,6 +812,7 @@ async function bootstrap() {
     createMyCalendarAdapter: mycalendarAvailable ? (input) => runtimeMyCalendarAdapter(env.RUNTIME_MODE, input, env.MYCALENDAR_OAUTH!.apiBaseUrl) : undefined,
     mysheetsTokens,
     createMySheetsAdapter: mysheetsAvailable ? (input) => runtimeMySheetsAdapter(env.RUNTIME_MODE, input, env.MYSHEETS_OAUTH!.apiBaseUrl) : undefined,
+    sheetsAppendLeaseStore: pool ? new PostgresSheetsAppendLeaseStore(pool) : undefined,
     trelloTokens,
     trelloTeamRepo,
     trelloOAuthClient,

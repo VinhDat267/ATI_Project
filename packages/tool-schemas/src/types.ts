@@ -361,10 +361,12 @@ export interface SheetsDigestPreviewInfo {
   spreadsheetTitle: string;
   spreadsheetId: string;
   sheetName?: string;
+  range?: string;
   requestedRangeLabel: string;
   destinationConnectionLabel: string;
   destinationTargetLabel: string;
   crossBoundaryWarning?: string;
+  includeAiSummary?: boolean;
 }
 
 export interface SheetsDigestCandidate {
@@ -402,7 +404,96 @@ export interface SheetsDigestDelivery {
   telegramMessageId?: string | number;
   gmailMessageId?: string;
   skippedEmpty?: boolean;
+  dispatchedScheduleVersion?: number;
+  dispatchedConfigHash?: string;
   manualResolution?: SheetsDigestManualResolution;
+}
+
+export type SheetsAppendLeaseStatus =
+  | 'active'
+  | 'dispatched'
+  | 'unknown_outcome'
+  | 'released';
+
+export interface SheetsAppendDispatchMetadata {
+  operation: 'append' | 'upsert';
+  rowCount: number;
+  candidateKeys?: string[];
+  keyColumns?: number[] | null;
+}
+
+export interface SheetsAppendLeaseState {
+  scopeKey: string;
+  spreadsheetId: string;
+  sheetTitle: string;
+  leaseId: string;
+  ownerId: string;
+  fencingToken: number;
+  status: SheetsAppendLeaseStatus;
+  acquiredAt?: string;
+  expiresAt?: string;
+  dispatchedAt?: string | null;
+  unknownReason?: string | null;
+  dispatchedMeta?: SheetsAppendDispatchMetadata | null;
+}
+
+export interface SheetsAppendLeaseAcquireInput {
+  scopeKey: string;
+  spreadsheetId: string;
+  sheetTitle: string;
+  ownerId: string;
+  ttlMs?: number;
+  signal?: AbortSignal;
+  onContention?: () => Promise<void>;
+}
+
+export interface SheetsAppendLeaseHandle {
+  leaseId: string;
+  fencingToken: number;
+  waitedForContention: boolean;
+  beginWriteDispatch?: (meta?: SheetsAppendDispatchMetadata) => Promise<void>;
+  completeWrite?: () => Promise<void>;
+  abortUncommittedWrite?: () => Promise<void>;
+  release: () => Promise<void>;
+  markUnknownOutcome?: (reason: string, meta?: SheetsAppendDispatchMetadata) => Promise<void>;
+}
+
+/**
+ * @deprecated Unsupported in production primitives. Manual override of `unknown_outcome`
+ * append leases is rejected fail-closed until an authenticated, authorized, and durably
+ * audited operator recovery service is introduced.
+ */
+export type SheetsAppendManualRecoveryDecision =
+  | 'operator_confirm_aborted_allow_retry'
+  | 'operator_acknowledge_duplicate_risk';
+
+export interface SheetsAppendLeaseReconcileInput {
+  scopeKey: string;
+  leaseId?: string;
+  fencingToken?: number;
+  reason?: string;
+  verify?: (state: SheetsAppendLeaseState) => Promise<boolean>;
+  /**
+   * @deprecated Unsupported and rejected fail-closed in production stores/adapters
+   * pending a future authenticated, authorized, and durably audited operator service.
+   */
+  manualOperatorDecision?: SheetsAppendManualRecoveryDecision;
+  /**
+   * @deprecated Unsupported and rejected fail-closed in production stores/adapters
+   * pending a future authenticated, authorized, and durably audited operator service.
+   */
+  acknowledgeDuplicateRisk?: boolean;
+  /**
+   * @deprecated Unsupported and rejected fail-closed in production stores/adapters
+   * pending a future authenticated, authorized, and durably audited operator service.
+   */
+  confirmDuplicateRisk?: boolean;
+}
+
+export interface SheetsAppendLeaseStore {
+  acquireLease(input: SheetsAppendLeaseAcquireInput): Promise<SheetsAppendLeaseHandle>;
+  getLeaseState?(scopeKey: string): Promise<SheetsAppendLeaseState | null>;
+  reconcileUnknownLease?(input: SheetsAppendLeaseReconcileInput): Promise<boolean>;
 }
 
 export interface CalendarDigestConfig {

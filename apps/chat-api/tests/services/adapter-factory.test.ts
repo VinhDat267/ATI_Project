@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { encryptCredentials, NotionAdapter } from '@wap/tool-adapters';
+import { encryptCredentials, NotionAdapter, SheetsAdapter } from '@wap/tool-adapters';
+import type { SheetsAppendLeaseState, SheetsAppendLeaseStore } from '@wap/tool-schemas';
 import { AdapterFactory } from '../../src/services/adapter-factory.js';
+import { runtimeMySheetsAdapter } from '../../src/config/gmail-tools-runtime.js';
 
 const key = 'test-only-encryption-key-with-32bytes';
 
@@ -181,5 +183,111 @@ describe('registered adapter factory', () => {
     expect(result.issues[0]._sourceRef.projectId).toBe('10001');
     expect(result.issues[0]._sourceRef.projectPolicyVersion).toBe(4);
     expect(result.issues[0]._sourceRefs).toHaveLength(1);
+  });
+
+  it('wires the supplied sheetsAppendLeaseStore stub into both shared sheets and personal mysheets runtime adapters and delegates getLeaseState without external network calls', async () => {
+    const validSpreadsheetId = '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms';
+    const sharedSheetsConfig = encryptCredentials(
+      {
+        clientEmail: 'svc-sheets@project.iam.gserviceaccount.com',
+        privateKey: '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7\n-----END PRIVATE KEY-----',
+        allowedScope: { spreadsheets: [validSpreadsheetId] },
+      },
+      key,
+    );
+    const personalSheetsConfig = encryptCredentials(
+      {
+        email: 'owner@example.com',
+        refreshToken: 'refresh-tok-personal-sheets',
+        selectedSpreadsheets: [{ id: validSpreadsheetId, name: 'Revenue' }],
+        allowedScope: { spreadsheets: [validSpreadsheetId] },
+      },
+      key,
+    );
+
+    const nowIso = new Date().toISOString();
+    const expiresIso = new Date(Date.now() + 60_000).toISOString();
+    const getLeaseStateSpy = vi.fn(
+      async (scopeKey: string): Promise<SheetsAppendLeaseState> => ({
+        scopeKey,
+        spreadsheetId: validSpreadsheetId,
+        sheetTitle: 'Sheet1',
+        leaseId: 'supplied-lease-1',
+        ownerId: 'supplied-owner-1',
+        fencingToken: 42,
+        status: 'dispatched',
+        acquiredAt: nowIso,
+        expiresAt: expiresIso,
+        dispatchedAt: nowIso,
+      }),
+    );
+
+    const suppliedLeaseStore: SheetsAppendLeaseStore = {
+      acquireLease: vi.fn(async () => ({
+        leaseId: 'supplied-lease-1',
+        fencingToken: 42,
+        waitedForContention: false,
+        release: vi.fn(async () => {}),
+      })),
+      getLeaseState: getLeaseStateSpy,
+      reconcileUnknownLease: vi.fn(async () => false),
+    };
+
+    const factory = new AdapterFactory({
+      credentialRepo: {
+        getCredentials: vi.fn().mockImplementation(async (service: string) =>
+          service === 'sheets' ? { id: 'cred-shared-sheets', config: sharedSheetsConfig } : null,
+        ),
+        getPersonalCredentials: vi.fn().mockImplementation(async (service: string) =>
+          service === 'mysheets'
+            ? { id: 'cred-personal-sheets', status: 'active', config: personalSheetsConfig }
+            : null,
+        ),
+      } as any,
+      encryptionKey: key,
+      sheetsAppendLeaseStore: suppliedLeaseStore,
+      mysheetsTokens: {
+        forConnection: () => ({ getAccessToken: async () => 'oauth-access-token' }),
+      } as any,
+      createMySheetsAdapter: (input) => runtimeMySheetsAdapter('sandbox', input, 'http://127.0.0.1:59999'),
+    });
+
+    const sharedSheetsAdapter = await factory.getAdapterForService('sheets');
+    const personalSheetsAdapter = await factory.getAdapterForService('mysheets', {
+      userId: 'usr-sheets-1',
+      phase: 'planning',
+    });
+
+    expect(sharedSheetsAdapter).toBeInstanceOf(SheetsAdapter);
+
+    // Wiring delegation check: both runtime adapter paths delegate getLeaseState to the
+    // supplied SheetsAppendLeaseStore stub (rather than an isolated default in-memory store)
+    // and return write_still_in_flight before any external network call.
+    const sharedReconcile = await (sharedSheetsAdapter as any).reconcileAppendLease({
+      spreadsheetId: validSpreadsheetId,
+      sheet: 'Sheet1',
+      manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
+      acknowledgeDuplicateRisk: true,
+    });
+    const personalReconcile = await (personalSheetsAdapter as any).reconcileAppendLease({
+      spreadsheetId: validSpreadsheetId,
+      sheet: 'Sheet1',
+      manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
+      acknowledgeDuplicateRisk: true,
+    });
+
+    expect(getLeaseStateSpy).toHaveBeenCalledTimes(2);
+    expect(getLeaseStateSpy).toHaveBeenNthCalledWith(1, `${validSpreadsheetId}::sheet1`);
+    expect(getLeaseStateSpy).toHaveBeenNthCalledWith(2, `${validSpreadsheetId}::sheet1`);
+    expect(sharedReconcile).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      inconclusiveReason: 'write_still_in_flight',
+    });
+    expect(personalReconcile).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      inconclusiveReason: 'write_still_in_flight',
+    });
   });
 });

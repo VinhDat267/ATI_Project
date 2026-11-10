@@ -102,6 +102,7 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
       <SheetsDeliveryRecoveryControl
         run={primaryRecoveryRun}
         isSheetsSchedule={schedule.kind === 'sheets_digest'}
+        scheduleStatus={schedule.status}
         onResolved={res => {
           setLatestResolvedRun(res.run);
           setRuns(prev => prev.map(row => (row.id === res.run.id ? res.run : row)));
@@ -127,7 +128,7 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
     {schedule.lastRun && <p className="text-xs text-[#4B5563]">Lần trước: <RunLink run={schedule.lastRun} navigate={navigate} /></p>}
     <ScheduleActions schedule={schedule} navigate={navigate} onChanged={onChanged} onConflict={reload} />
     <button type="button" className="text-xs font-semibold underline text-[#4B5563]" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Ẩn các lượt gần nhất' : 'Xem 10 lượt gần nhất'}</button>
-    {open && <div className="text-sm text-[#4B5563] v3-space-y-2">{error && <p role="alert">{error}</p>}{!error && !runs.length && <p>Chưa có lượt chạy.</p>}{runs.map(run => <div key={run.id} className="v3-space-y-1.5"><RunLink run={run} navigate={navigate} />{run.id !== primaryRecoveryRun?.id && <SheetsDeliveryRecoveryControl run={run} isSheetsSchedule={schedule.kind === 'sheets_digest'} onResolved={res => { setLatestResolvedRun(res.run); setRuns(prev => prev.map(row => (row.id === res.run.id ? res.run : row))); onChanged(res.schedule); schedulesChanged(); }} />}</div>)}</div>}
+    {open && <div className="text-sm text-[#4B5563] v3-space-y-2">{error && <p role="alert">{error}</p>}{!error && !runs.length && <p>Chưa có lượt chạy.</p>}{runs.map(run => <div key={run.id} className="v3-space-y-1.5"><RunLink run={run} navigate={navigate} />{run.id !== primaryRecoveryRun?.id && <SheetsDeliveryRecoveryControl run={run} isSheetsSchedule={schedule.kind === 'sheets_digest'} scheduleStatus={schedule.status} onResolved={res => { setLatestResolvedRun(res.run); setRuns(prev => prev.map(row => (row.id === res.run.id ? res.run : row))); onChanged(res.schedule); schedulesChanged(); }} />}</div>)}</div>}
   </article>;
 }
 // PBI-05: chỉ mô tả đúng luồng có thật — lịch được lưu khi người dùng bấm "Xác nhận" trên đề xuất

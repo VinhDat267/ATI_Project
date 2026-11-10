@@ -531,6 +531,199 @@ describe('Task 4 (PR-4): Two-Phase Candidate & Confirmation, Zero-V1-Downgrade F
       expect(orgToPersonalTelegram.canAutoDigest).toBe(false);
       expect(orgToPersonalTelegram.reason).toMatch(/Chính sách bảo mật Tổ chức/i);
     });
+
+    it('GAS-05 parser regressions: extracts tabs with spaces/diacritics/digits, explicit quoted names, Vietnamese from/in/of/to separators, and sheet!A1:B20 variants while failing closed on invalid ranges and preserving explicit unknown tabs without silent fallback', async () => {
+      const { personalA, orgA, credentialRepo, encryptionKey } = fixtures;
+      const fetchOrgSheetsMetadata = vi.fn(async () => [
+        {
+          id: ORG_A_SPREADSHEET_ID,
+          title: 'Báo cáo Doanh thu Tổ chức Alpha',
+          sheets: ['Tổng hợp Q4'],
+        },
+      ]);
+
+      // 1. Unquoted tabs with spaces, diacritics, and digits across Vietnamese from/in/of/to separators
+      const separatorCases: Array<{ prompt: string; expectedSheet: string }> = [
+        {
+          prompt:
+            'Đọc tab Đơn hàng Quý 4 2026 từ bảng Báo cáo Doanh thu Tổ chức Alpha và gửi vào Slack #general',
+          expectedSheet: 'Đơn hàng Quý 4 2026',
+        },
+        {
+          prompt:
+            'Đọc sheet Công nợ & Thu hồi 12-2026 trong bảng Báo cáo Doanh thu Tổ chức Alpha rồi gửi lên Slack #general',
+          expectedSheet: 'Công nợ & Thu hồi 12-2026',
+        },
+        {
+          prompt:
+            'Đọc tab Báo cáo Chi phí 2026 của bảng Báo cáo Doanh thu Tổ chức Alpha vào Slack #general',
+          expectedSheet: 'Báo cáo Chi phí 2026',
+        },
+        {
+          prompt:
+            'Đọc tab Tiến độ Dự án 09 sang Slack #general từ bảng Báo cáo Doanh thu Tổ chức Alpha',
+          expectedSheet: 'Tiến độ Dự án 09',
+        },
+        {
+          prompt:
+            'Đọc tab Doanh số Tháng 10 tới Slack #general từ bảng Báo cáo Doanh thu Tổ chức Alpha',
+          expectedSheet: 'Doanh số Tháng 10',
+        },
+        {
+          prompt:
+            'Đọc tab Tổng kết Năm 2026 đến Slack #general từ bảng Báo cáo Doanh thu Tổ chức Alpha',
+          expectedSheet: 'Tổng kết Năm 2026',
+        },
+        {
+          prompt:
+            'Đọc tab Internal Todo Tổng hợp từ bảng Báo cáo Doanh thu Tổ chức Alpha và gửi vào Slack #general',
+          expectedSheet: 'Internal Todo Tổng hợp',
+        },
+      ];
+
+      for (const tc of separatorCases) {
+        const res = await analyzeSheetsDigestCandidate({
+          userId: personalA.user.id,
+          workspaceMode: 'organization',
+          workspaceId: orgA.workspaceId,
+          request: tc.prompt,
+          recurrence: { type: 'daily', time: '08:00' },
+          services: ['sheets', 'slack'],
+          credentialRepo,
+          encryptionKey,
+          mysheetsEnabled: true,
+          fetchOrgSheetsMetadata,
+          emitV2: true,
+        });
+        expect(res.canAutoDigest, tc.prompt).toBe(true);
+        expect(res.config?.source.sheetName, tc.prompt).toBe(tc.expectedSheet);
+      }
+
+      // 2. Explicit quoted tab names (ASCII quotes, curly quotes, escaped single quotes, and delimiter words inside quotes)
+      const quotedCases: Array<{ prompt: string; expectedSheet: string }> = [
+        {
+          prompt:
+            'Đọc tab "KPI Tháng 11 - Bản 2" từ bảng Báo cáo Doanh thu Tổ chức Alpha và gửi vào Slack #general',
+          expectedSheet: 'KPI Tháng 11 - Bản 2',
+        },
+        {
+          prompt:
+            "Đọc sheet 'Tổng hợp từ Q1 và Q2' trong bảng Báo cáo Doanh thu Tổ chức Alpha và gửi vào Slack #general",
+          expectedSheet: 'Tổng hợp từ Q1 và Q2',
+        },
+        {
+          prompt:
+            'Đọc tab “Đơn hàng Quý 4 (2026)” của bảng Báo cáo Doanh thu Tổ chức Alpha và gửi vào Slack #general',
+          expectedSheet: 'Đơn hàng Quý 4 (2026)',
+        },
+        {
+          prompt:
+            'Đọc tab ‘Báo cáo Công nợ 24/7’ lên Slack #general từ bảng Báo cáo Doanh thu Tổ chức Alpha',
+          expectedSheet: 'Báo cáo Công nợ 24/7',
+        },
+        {
+          prompt:
+            "Đọc tab 'Kế hoạch ''26' từ bảng Báo cáo Doanh thu Tổ chức Alpha và gửi vào Slack #general",
+          expectedSheet: "Kế hoạch '26",
+        },
+      ];
+
+      for (const qc of quotedCases) {
+        const res = await analyzeSheetsDigestCandidate({
+          userId: personalA.user.id,
+          workspaceMode: 'organization',
+          workspaceId: orgA.workspaceId,
+          request: qc.prompt,
+          recurrence: { type: 'daily', time: '08:00' },
+          services: ['sheets', 'slack'],
+          credentialRepo,
+          encryptionKey,
+          mysheetsEnabled: true,
+          fetchOrgSheetsMetadata,
+          emitV2: true,
+        });
+        expect(res.canAutoDigest, qc.prompt).toBe(true);
+        expect(res.config?.source.sheetName, qc.prompt).toBe(qc.expectedSheet);
+      }
+
+      // 3. sheet!A1:B20 variants (quoted, curly-quoted, Unicode unquoted with diacritics, and tab <Name>!A1:B20)
+      const bangRangeCases: Array<{
+        prompt: string;
+        expectedSheet: string;
+        expectedRange: string;
+      }> = [
+        {
+          prompt:
+            "Đọc vùng 'KPI Tháng 11'!$A$2:$F$50 từ bảng Báo cáo KPI Cá nhân A và gửi vào Slack #general",
+          expectedSheet: 'KPI Tháng 11',
+          expectedRange: 'A2:F50',
+        },
+        {
+          prompt:
+            'Đọc vùng “Tổng hợp Q4”!B1:D30 từ bảng Báo cáo KPI Cá nhân A và gửi vào Slack #general',
+          expectedSheet: 'Tổng hợp Q4',
+          expectedRange: 'B1:D30',
+        },
+        {
+          prompt:
+            'Đọc vùng Đơn_hàng_Q4!A1:E25 từ bảng Báo cáo KPI Cá nhân A và gửi vào Slack #general',
+          expectedSheet: 'Đơn_hàng_Q4',
+          expectedRange: 'A1:E25',
+        },
+        {
+          prompt:
+            'Đọc tab KPI Tháng 11!A1:C20 từ bảng Báo cáo KPI Cá nhân A và gửi vào Slack #general',
+          expectedSheet: 'KPI Tháng 11',
+          expectedRange: 'A1:C20',
+        },
+      ];
+
+      for (const bc of bangRangeCases) {
+        const res = await analyzeSheetsDigestCandidate({
+          userId: personalA.user.id,
+          workspaceMode: 'organization',
+          workspaceId: orgA.workspaceId,
+          request: bc.prompt,
+          recurrence: { type: 'daily', time: '08:00' },
+          services: ['mysheets', 'slack'],
+          credentialRepo,
+          encryptionKey,
+          mysheetsEnabled: true,
+          fetchOrgSheetsMetadata,
+          emitV2: true,
+        });
+        expect(res.canAutoDigest, bc.prompt).toBe(true);
+        expect(res.config?.source.sheetName, bc.prompt).toBe(bc.expectedSheet);
+        expect(res.config?.source.range, bc.prompt).toBe(bc.expectedRange);
+        expect(res.preview?.requestedRangeLabel, bc.prompt).toBe(
+          `${bc.expectedSheet}!${bc.expectedRange}`
+        );
+      }
+
+      // 4. Negative cases: invalid sheet!A1 ranges fail closed (no silent fallback to default window)
+      const invalidRangePrompts = [
+        "Đọc vùng 'KPI Tháng 11'!A:C từ bảng Báo cáo KPI Cá nhân A và gửi vào Slack #general",
+        'Đọc vùng Tasks!A1:AA10 từ bảng Báo cáo KPI Cá nhân A và gửi vào Slack #general',
+        'Đọc vùng Tasks!A1:B600 từ bảng Báo cáo KPI Cá nhân A và gửi vào Slack #general',
+      ];
+      for (const badPrompt of invalidRangePrompts) {
+        const badRes = await analyzeSheetsDigestCandidate({
+          userId: personalA.user.id,
+          workspaceMode: 'organization',
+          workspaceId: orgA.workspaceId,
+          request: badPrompt,
+          recurrence: { type: 'daily', time: '08:00' },
+          services: ['mysheets', 'slack'],
+          credentialRepo,
+          encryptionKey,
+          mysheetsEnabled: true,
+          fetchOrgSheetsMetadata,
+          emitV2: true,
+        });
+        expect(badRes.canAutoDigest, badPrompt).toBe(false);
+        expect(badRes.requiresClarification, badPrompt).toBe(true);
+      }
+    });
   });
 
   describe('4. TC-15: Org Metadata Lookup Outside DB Tx, Fail-Closed Error/Collision & Disambiguation', () => {
