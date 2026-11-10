@@ -12,7 +12,7 @@
      - **Phase 3 (`apps/chat-api`):**
        - Khắc phục `GAS-01` & `GAS-06` & `GAS-08` trong `sheets-digest-runner.ts` và `run-state.ts`.
        - Khắc phục `GAS-04` trong `schedule-runner.ts` (bảo toàn kết quả `digest_sent` đã gửi thành công ngay cả khi lịch bị `pause`/`cancel`/đổi `version` sau khi claim).
-       - Khắc phục `GAS-02`, `GAS-05`, `GAS-08`, `GAS-09` trong `sheets-digest-candidate.ts`, `schedule-service.ts`, `schedule-routes.ts`.
+       - Khắc phục `GAS-02`, `GAS-05`, `GAS-08`, `GAS-09` trong `sheets-digest-candidate.ts`, `schedule-service.ts`, `schedule-routes.ts` (bao gồm xử lý ranh giới từ Unicode-aware cho từ khóa tiếng Việt `từ`/`và`/`trong`/`của`/`vào`/`lên`/`qua`/`sang`/`tới`/`đến`, tên tab có dấu ngoặc kép/đơn/cong và `<sheet>!A1:B20` trong `extractSheetTabFromPrompt` & `extractPromptDigestRange`).
        - Củng cố `PostgresSheetsAppendLeaseStore` (`apps/chat-api/src/services/sheets/sheets-append-lease-store.ts`): `fencing_token` tăng đơn điệu (không xóa dòng khi `release()`, tránh reset token về 1 hoặc xóa nhầm chủ lease mới), heartbeat nền cho request chậm, chặn tự động chiếm quyền khi lease đang `'dispatched'` hoặc `'unknown_outcome'`, và nối vào `adapter-factory.ts`, `gmail-tools-runtime.ts`, `transports/sheets.ts`, `server.ts` (`GAS-10`).
      - **Phase 4 (`apps/chat-web` + `scripts/` + Docs/Evidence):**
        - Cập nhật `api-client.ts`, `ScheduleMoment.tsx` (`GAS-02`), `ScheduleRunRecovery.tsx`, `ScheduleSection.tsx` (`GAS-09`), `PrivacyPage.tsx` (`GAS-02`, `GAS-11`).

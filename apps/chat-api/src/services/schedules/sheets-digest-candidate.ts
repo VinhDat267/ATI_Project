@@ -170,18 +170,49 @@ function extractSheetTabFromPrompt(
   reqLower: string,
   availableSheets?: string[]
 ): string | undefined {
-  const sheetBangRangeMatch =
-    /(?:['"“”]([^'"“”!\n]+)['"“”]|(\b[A-Za-z0-9_\u00C0-\u024F\u1E00-\u1EFF-]+))!\$?[A-Za-z]{1,3}\$?\d+\s*:\s*\$?[A-Za-z]{1,3}\$?\d+/u.exec(
+  const quotedBangMatch =
+    /(?:"([^"!\n]+)"|'((?:''|[^'!\n])+)'|[“”]([^“”!\n]+)[“”]|[‘’]([^‘’!\n]+)[‘’])!\$?[A-Za-z]{1,3}\$?\d+\s*:\s*\$?[A-Za-z]{1,3}\$?\d+/u.exec(
       request
     );
-  const bangTabCandidate = (sheetBangRangeMatch?.[1] ?? sheetBangRangeMatch?.[2])?.trim();
+  const quotedBangTabCandidate = (
+    quotedBangMatch?.[1] ??
+    quotedBangMatch?.[2] ??
+    quotedBangMatch?.[3] ??
+    quotedBangMatch?.[4]
+  )
+    ?.replace(/''/g, "'")
+    .trim();
 
-  const tabMatch =
-    /\b(?:tab|sheet)\s+["'“”]?([^"'“”,.!\n]+?)["'“”]?(?=\s+(?:vùng|miền|ô|range|từ|trong|của|và|rồi|vào|lên|\$?[A-Za-z]{1,3}\$?\d+\s*:)\b|$)/iu.exec(
+  const quotedKeywordTabMatch =
+    /(?:^|(?<=[^\p{L}\p{N}_]))(?:tab|sheet)\s+(?:"([^"!\n]+)"|'((?:''|[^'!\n])+)'|[“”]([^“”!\n]+)[“”]|[‘’]([^‘’!\n]+)[‘’])(?=\s|$|[,.;:!?()\[\]])/iu.exec(
       request
     );
-  const explicitKeywordTabCandidate = tabMatch?.[1]?.trim();
-  const explicitTabCandidate = bangTabCandidate ?? explicitKeywordTabCandidate;
+  const quotedKeywordTabCandidate = (
+    quotedKeywordTabMatch?.[1] ??
+    quotedKeywordTabMatch?.[2] ??
+    quotedKeywordTabMatch?.[3] ??
+    quotedKeywordTabMatch?.[4]
+  )
+    ?.replace(/''/g, "'")
+    .trim();
+
+  const unquotedKeywordTabMatch =
+    /(?:^|(?<=[^\p{L}\p{N}_]))(?:tab|sheet)\s+(?![\s"'“”‘’])([^"'“”‘’,.;:!?\n]+?)(?=\s+(?:vùng|miền|ô|range|từ|trong|của|thuộc|và|rồi|vào|lên|qua|sang|tới|đến|gửi|from|in|of|to|into|and|then|\$?[A-Za-z]{1,3}\$?\d+\s*:)(?=\s|$|[,.;:!?\n()\[\]])|!\$?[A-Za-z]{1,3}\$?\d+\s*:|[,.;:\n]|$)/iu.exec(
+      request
+    );
+  const unquotedKeywordTabCandidate = unquotedKeywordTabMatch?.[1]?.trim();
+
+  const unquotedBangMatch =
+    /(?:^|(?<=[\s,;([{"'“”‘’]))([\p{L}\p{N}_-]+)!\$?[A-Za-z]{1,3}\$?\d+\s*:\s*\$?[A-Za-z]{1,3}\$?\d+/u.exec(
+      request
+    );
+  const unquotedBangTabCandidate = unquotedBangMatch?.[1]?.trim();
+
+  const explicitTabCandidate =
+    quotedBangTabCandidate ??
+    quotedKeywordTabCandidate ??
+    unquotedKeywordTabCandidate ??
+    unquotedBangTabCandidate;
 
   if (explicitTabCandidate) {
     if (Array.isArray(availableSheets) && availableSheets.length > 0) {
@@ -223,7 +254,11 @@ export function validateAndCanonicalizeDigestRange(
   let spec = trimmed;
   const bangIdx = trimmed.indexOf('!');
   if (bangIdx !== -1) {
-    const rawSheet = trimmed.slice(0, bangIdx).trim().replace(/^['"“”]+|['"“”]+$/g, '').replace(/''/g, "'");
+    const rawSheet = trimmed
+      .slice(0, bangIdx)
+      .trim()
+      .replace(/^['"“”‘’]+|['"“”‘’]+$/g, '')
+      .replace(/''/g, "'");
     spec = trimmed.slice(bangIdx + 1).trim();
     if (!rawSheet || spec.includes('!')) {
       return {
@@ -299,10 +334,12 @@ function extractPromptDigestRange(
 
   // Check if user explicitly wrote "vùng <token>" / "range <token>" with an invalid range token
   const explicitKeywordMatch =
-    /\b(?:vùng\s+ô|vùng\s+dữ\s+liệu|vùng|range)\s+["'“”]?([^\s"'“”,;]+)["'“”]?/iu.exec(request);
+    /(?:^|(?<=[^\p{L}\p{N}_]))(?:vùng\s+ô|vùng\s+dữ\s+liệu|vùng|range)\s+["'“”‘’]?([^\s"'“”‘’,;]+)["'“”‘’]?/iu.exec(
+      request
+    );
   const cellRangeTokens = Array.from(
     request.matchAll(
-      /(?:(?:['"“”][^'"“”!\n]+['"“”]|[A-Za-z0-9_\u00C0-\u024F\u1E00-\u1EFF-]+)!)?\$?[A-Za-z]{1,3}\$?\d+\s*:\s*\$?[A-Za-z]{1,3}\$?\d*\b/gu
+      /(?:(?:"[^"!\n]+"|'(?:''|[^'!\n])+'|[“”][^“”!\n]+[“”]|[‘’][^‘’!\n]+[‘’]|[\p{L}\p{N}_-]+)!\$?[A-Za-z]{1,3}\$?\d*\s*:\s*\$?[A-Za-z]{1,3}\$?\d*|\$?[A-Za-z]{1,3}\$?\d+\s*:\s*\$?[A-Za-z]{1,3}\$?\d*)(?=$|[^\p{L}\p{N}_])/gu
     ),
     (m) => m[0].trim()
   );
