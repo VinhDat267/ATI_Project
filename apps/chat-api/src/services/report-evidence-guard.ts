@@ -36,7 +36,10 @@ export async function validateReportEvidenceBinding(
   options: ReportEvidenceValidationOptions
 ): Promise<{ valid: boolean; error?: string }> {
   // 1. If plan claims to be or is detected as a report plan
-  const targets = reportOutputTargets(plan.steps);
+  const targets = reportOutputTargets(plan.steps, {
+    userTexts: options.requestTexts,
+    workItemChoice: plan.reportEvidence?.workItemDisposition,
+  });
   const detectedAsReport = !!plan.reportEvidence || (options.requestTexts?.length
     ? requiresReportEvidence(options.requestTexts) : isReportPlan(plan));
 

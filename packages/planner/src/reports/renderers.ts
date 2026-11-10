@@ -43,9 +43,17 @@ export interface SheetSummaryData {
   records?: SheetSummaryRow[];
   headers?: string[];
   values?: (string | number | null | undefined)[][];
-  groups?: Array<{ key: string; count: number; metrics?: Record<string, number> }>;
+  groups?: Array<{ key: string | Record<string, unknown>; count: number; metrics?: Record<string, number> }>;
   totalRowsScanned?: number;
   matchedRows?: number;
+  totalMatched?: number;
+  truncated?: boolean;
+  matches?: Array<{
+    rowNumber?: number;
+    values?: (string | number | null | undefined)[];
+    record?: SheetSummaryRow;
+  }>;
+  totals?: Record<string, number>;
 }
 
 export interface RenderedReport {
@@ -352,8 +360,44 @@ export function renderSheetSummaryReport(
 
   // Case 1: Pre-aggregated groups (from aggregate_rows)
   if (Array.isArray(data.groups)) {
-    const total = data.totalRowsScanned ?? data.matchedRows ?? data.groups.reduce((acc, g) => acc + g.count, 0);
-    if (total === 0) {
+    if (
+      data.totalRowsScanned !== undefined &&
+      (typeof data.totalRowsScanned !== 'number' || !Number.isFinite(data.totalRowsScanned) || data.totalRowsScanned < 0)
+    ) {
+      throw new Error('Inconsistent Sheet aggregation outcome: totalRowsScanned must be a non-negative number');
+    }
+    if (
+      data.matchedRows !== undefined &&
+      (typeof data.matchedRows !== 'number' || !Number.isFinite(data.matchedRows) || data.matchedRows < 0)
+    ) {
+      throw new Error('Inconsistent Sheet aggregation outcome: matchedRows must be a non-negative number');
+    }
+    for (const g of data.groups) {
+      if (!g || typeof g !== 'object' || typeof g.count !== 'number' || !Number.isFinite(g.count) || g.count < 0) {
+        throw new Error('Inconsistent Sheet aggregation outcome: each group must have a non-negative numeric count');
+      }
+    }
+
+    const groupCountSum = data.groups.reduce((acc, g) => acc + g.count, 0);
+    if (
+      data.totalRowsScanned !== undefined &&
+      data.matchedRows !== undefined &&
+      data.matchedRows > data.totalRowsScanned
+    ) {
+      throw new Error('Inconsistent Sheet aggregation outcome: matchedRows exceeds totalRowsScanned');
+    }
+    if (data.matchedRows !== undefined && groupCountSum > data.matchedRows) {
+      throw new Error('Inconsistent Sheet aggregation outcome: sum of group counts exceeds matchedRows');
+    }
+    if (data.totalRowsScanned !== undefined && groupCountSum > data.totalRowsScanned) {
+      throw new Error('Inconsistent Sheet aggregation outcome: sum of group counts exceeds totalRowsScanned');
+    }
+    if ((data.matchedRows ?? 0) > 0 && data.groups.length === 0) {
+      throw new Error('Inconsistent Sheet aggregation outcome: matchedRows > 0 but groups array is empty');
+    }
+
+    const matchedTotal = data.matchedRows ?? groupCountSum;
+    if (matchedTotal === 0) {
       return {
         text: `Báo cáo tổng hợp số liệu Google Sheets${spreadsheetLabel}: Không có dòng dữ liệu nào.`,
         itemCount: 0,
@@ -361,27 +405,89 @@ export function renderSheetSummaryReport(
       };
     }
 
+    const isPartial = Boolean(data.truncated) || groupCountSum < matchedTotal;
+    const countHeader =
+      data.totalRowsScanned !== undefined && data.totalRowsScanned !== matchedTotal
+        ? `Tổng số dòng đã quét: ${data.totalRowsScanned} | Số dòng khớp: ${matchedTotal} | Tổng số dòng đã đối chiếu: ${groupCountSum}${isPartial ? ` (dữ liệu một phần: tổng hợp ${groupCountSum}/${matchedTotal} dòng khớp)` : ''}`
+        : `Tổng số dòng đã đối chiếu: ${matchedTotal}${isPartial ? ` (dữ liệu một phần: tổng hợp ${groupCountSum}/${matchedTotal} dòng khớp)` : ''}`;
+
     const lines = [
       `Báo cáo tổng hợp số liệu Google Sheets${spreadsheetLabel}:`,
-      `Tổng số dòng đã đối chiếu: ${total}`,
+      countHeader,
       ...data.groups.map((g) => {
-        const key = sanitizeReportString(g.key) || 'Khác';
-        const pct = total > 0 ? Math.round((g.count / total) * 100) : 0;
-        return `- ${key}: ${g.count} (${pct}%)`;
+        const rawKey =
+          typeof g.key === 'string'
+            ? g.key
+            : g.key && typeof g.key === 'object'
+              ? Object.values(g.key)
+                  .map((v) => sanitizeReportString(String(v ?? '')))
+                  .filter(Boolean)
+                  .join(' / ')
+              : String(g.key ?? '');
+        const key = sanitizeReportString(rawKey) || 'Khác';
+        const pct = matchedTotal > 0 ? Math.round((g.count / matchedTotal) * 100) : 0;
+        const metricEntries =
+          g.metrics && typeof g.metrics === 'object'
+            ? Object.entries(g.metrics)
+                .filter(([, v]) => typeof v === 'number' && Number.isFinite(v))
+                .map(([k, v]) => `${sanitizeReportString(k)}: ${formatFactualNumber(v, locale)}`)
+            : [];
+        const metricSuffix = metricEntries.length > 0 ? ` [${metricEntries.join(', ')}]` : '';
+        return `- ${key}: ${g.count} (${pct}%)${metricSuffix}`;
       }),
     ];
 
     return {
       text: lines.join('\n'),
-      itemCount: total,
-      coverage: 'complete',
+      itemCount: matchedTotal,
+      coverage: isPartial ? 'partial' : 'complete',
     };
   }
 
-  // Case 2: Array of records or values
+  // Case 2: Array of records, matches (from search_rows), or values
+  if (
+    data.totalMatched !== undefined &&
+    (typeof data.totalMatched !== 'number' || !Number.isFinite(data.totalMatched) || data.totalMatched < 0)
+  ) {
+    throw new Error('Inconsistent Sheet search outcome: totalMatched must be a non-negative number');
+  }
+  if (
+    data.totalRowsScanned !== undefined &&
+    (typeof data.totalRowsScanned !== 'number' || !Number.isFinite(data.totalRowsScanned) || data.totalRowsScanned < 0)
+  ) {
+    throw new Error('Inconsistent Sheet summary outcome: totalRowsScanned must be a non-negative number');
+  }
+
   let rows: SheetSummaryRow[] = [];
   if (Array.isArray(data.records)) {
     rows = data.records;
+  } else if (Array.isArray(data.matches)) {
+    if (data.totalMatched !== undefined && data.totalMatched < data.matches.length) {
+      throw new Error('Inconsistent Sheet search outcome: totalMatched cannot be less than matches.length');
+    }
+    if (data.totalMatched !== undefined && data.totalMatched > 0 && data.matches.length === 0) {
+      throw new Error('Inconsistent Sheet search outcome: totalMatched > 0 but matches array is empty');
+    }
+    if (
+      data.totalRowsScanned !== undefined &&
+      data.totalMatched !== undefined &&
+      data.totalMatched > data.totalRowsScanned
+    ) {
+      throw new Error('Inconsistent Sheet search outcome: totalMatched exceeds totalRowsScanned');
+    }
+    rows = data.matches.map((m) => {
+      if (m && typeof m === 'object' && m.record && typeof m.record === 'object' && !Array.isArray(m.record)) {
+        return m.record;
+      }
+      if (m && typeof m === 'object' && Array.isArray(m.values) && Array.isArray(data.headers)) {
+        const obj: SheetSummaryRow = {};
+        data.headers.forEach((h, idx) => {
+          obj[h] = m.values?.[idx];
+        });
+        return obj;
+      }
+      throw new Error('Inconsistent Sheet search outcome: match item missing both record and header-mapped values');
+    });
   } else if (Array.isArray(data.values) && Array.isArray(data.headers)) {
     const headers = data.headers;
     rows = data.values.map((row) => {
@@ -397,8 +503,15 @@ export function renderSheetSummaryReport(
     throw new Error('Invalid Sheet summary outcome: missing records, values or groups');
   }
 
-  const count = rows.length;
-  if (count === 0) {
+  const returnedCount = rows.length;
+  const matchedCount = data.totalMatched ?? data.matchedRows ?? returnedCount;
+  if (matchedCount < returnedCount) {
+    throw new Error('Inconsistent Sheet summary outcome: matchedCount cannot be less than returned rows length');
+  }
+  if (matchedCount > 0 && returnedCount === 0) {
+    throw new Error('Inconsistent Sheet summary outcome: matchedCount > 0 but no rows were returned');
+  }
+  if (matchedCount === 0) {
     return {
       text: `Báo cáo tổng hợp số liệu Google Sheets${spreadsheetLabel}: Không có dòng dữ liệu nào.`,
       itemCount: 0,
@@ -406,10 +519,27 @@ export function renderSheetSummaryReport(
     };
   }
 
+  const limit = options?.limit ?? 10;
+  const isRowListMode = !options?.groupBy && !options?.metricColumn;
+  const itemsToRender = isRowListMode ? rows.slice(0, limit) : rows;
+  const displayedCount = itemsToRender.length;
+  const isPartial =
+    Boolean(data.truncated) ||
+    matchedCount > returnedCount ||
+    (isRowListMode && returnedCount > displayedCount);
+
   const lines = [
     `Báo cáo tổng hợp số liệu Google Sheets${spreadsheetLabel}:`,
-    `Tổng số dòng đã đối chiếu: ${count}`,
+    `Tổng số dòng đã đối chiếu: ${matchedCount}`,
   ];
+  if (data.totalRowsScanned !== undefined && data.totalRowsScanned !== matchedCount) {
+    lines.push(`Tổng số dòng đã quét: ${data.totalRowsScanned}`);
+  }
+  if (isPartial) {
+    lines.push(
+      `(Phạm vi một phần / partial: khớp ${matchedCount} dòng, trả về ${returnedCount} dòng, hiển thị ${displayedCount} dòng đầu tiên)`,
+    );
+  }
 
   // Grouping by column if requested
   if (options?.groupBy) {
@@ -422,7 +552,7 @@ export function renderSheetSummaryReport(
     }
 
     for (const [k, c] of Object.entries(groupCounts)) {
-      const pct = Math.round((c / count) * 100);
+      const pct = Math.round((c / returnedCount) * 100);
       lines.push(`- ${k}: ${c} (${pct}%)`);
     }
   }
@@ -444,9 +574,25 @@ export function renderSheetSummaryReport(
     }
   }
 
+  // When no grouping or metric column is requested (e.g. search_rows or plain read_range summary), render verified row summaries
+  if (isRowListMode) {
+    for (const r of itemsToRender) {
+      const parts = Object.entries(r)
+        .map(([k, v]) => {
+          const sk = sanitizeReportString(k);
+          const sv = sanitizeReportString(v === null || v === undefined ? '' : String(v));
+          return sk && sv ? `${sk}: ${sv}` : '';
+        })
+        .filter(Boolean);
+      if (parts.length > 0) {
+        lines.push(`- ${parts.join(' | ')}`);
+      }
+    }
+  }
+
   return {
     text: lines.join('\n'),
-    itemCount: count,
-    coverage: 'complete',
+    itemCount: matchedCount,
+    coverage: isPartial ? 'partial' : 'complete',
   };
 }

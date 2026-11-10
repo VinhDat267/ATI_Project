@@ -166,7 +166,7 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
       expect(names).not.toContain('mysheets.create_sheet');
     });
 
-    it('offers Docs and Drive tools when Google is connected and no spreadsheet is selected', async () => {
+    it('offers Docs and Drive read tools by default when Google is connected and no spreadsheet is selected, and requires enableMySheetsDriveWriteTools for the 4 Drive/Docs write tools', async () => {
       await connectMySheets(alice, 'alice@example.com', []);
       const catalog = await getToolCatalogFor(credentials, key, {
         userId: alice.id,
@@ -174,6 +174,28 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
         mysheetsEnabled: true,
       });
       const names = catalog.map((tool) => tool.name);
+      for (const name of ['mysheets.list_drive_files', 'mysheets.get_doc']) {
+        expect(names).toContain(name);
+      }
+      for (const name of [
+        'mysheets.create_drive_folder',
+        'mysheets.create_doc',
+        'mysheets.append_doc_text',
+        'mysheets.move_drive_file',
+        'mysheets.read_range',
+        'mysheets.append_rows',
+        'mysheets.create_sheet',
+      ]) {
+        expect(names).not.toContain(name);
+      }
+
+      const fullCatalog = await getToolCatalogFor(credentials, key, {
+        userId: alice.id,
+        gmailEnabled: false,
+        mysheetsEnabled: true,
+        enableMySheetsDriveWriteTools: true,
+      });
+      const fullNames = fullCatalog.map((tool) => tool.name);
       for (const name of [
         'mysheets.list_drive_files',
         'mysheets.create_drive_folder',
@@ -182,10 +204,7 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
         'mysheets.append_doc_text',
         'mysheets.move_drive_file',
       ]) {
-        expect(names).toContain(name);
-      }
-      for (const name of ['mysheets.read_range', 'mysheets.append_rows', 'mysheets.create_sheet']) {
-        expect(names).not.toContain(name);
+        expect(fullNames).toContain(name);
       }
     });
 
@@ -279,7 +298,7 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
       expect(bobSheets?.email).toBeUndefined();
     });
 
-    it('includes MYSHEETS_TOOLS in getToolCatalogFor when connected', async () => {
+    it('includes spreadsheet and Drive/Docs read tools in getToolCatalogFor when connected while excluding the 4 Drive/Docs write tools by default', async () => {
       await connectMySheets(alice, 'alice@example.com', [
         { id: 'sheet_alice_1', title: 'Bảng tính 1', canEdit: true },
       ]);
@@ -288,9 +307,18 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
         gmailEnabled: false,
         mysheetsEnabled: true,
       });
-      const mysheetsToolNames = MYSHEETS_TOOLS.map((t) => t.name);
-      for (const name of mysheetsToolNames) {
-        expect(catalog.some((t) => t.name === name)).toBe(true);
+      const disabledWriteSet = new Set([
+        'mysheets.create_drive_folder',
+        'mysheets.create_doc',
+        'mysheets.append_doc_text',
+        'mysheets.move_drive_file',
+      ]);
+      for (const tool of MYSHEETS_TOOLS) {
+        if (disabledWriteSet.has(tool.name)) {
+          expect(catalog.some((t) => t.name === tool.name)).toBe(false);
+        } else {
+          expect(catalog.some((t) => t.name === tool.name)).toBe(true);
+        }
       }
     });
 
