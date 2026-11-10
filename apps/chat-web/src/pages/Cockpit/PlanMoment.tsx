@@ -431,13 +431,18 @@ export function PlanMoment({
                             const attendees = Array.isArray(step.args.attendees)
                               ? step.args.attendees.filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
                               : [];
-                            const sendInvites = attendees.length > 0 && step.args.sendInvites !== false;
+                            const sendInvites = attendees.length > 0 && step.args.sendInvites === true;
+                            const suppressInvites = attendees.length > 0 && step.args.sendInvites !== true;
                             const recurrence = formatRecurrenceLabel(step.args.recurrence);
+                            const timeZone =
+                              typeof step.args.timeZone === 'string' && step.args.timeZone.trim().length > 0
+                                ? step.args.timeZone.trim()
+                                : null;
                             const loc =
                               typeof step.args.location === 'string' && step.args.location.trim().length > 0
                                 ? step.args.location.trim()
                                 : null;
-                            if (!hasMeet && attendees.length === 0 && !recurrence && !loc) return null;
+                            if (!hasMeet && attendees.length === 0 && !recurrence && !timeZone && !loc) return null;
                             return (
                               <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
                                 {hasMeet && (
@@ -455,9 +460,19 @@ export function PlanMoment({
                                     📨 Gửi email mời họp
                                   </span>
                                 )}
+                                {suppressInvites && (
+                                  <span className="text-[11px] font-medium px-2 py-0.5 bg-neutral-100 text-neutral-700 border border-neutral-200 rounded-full">
+                                    🔕 Không gửi email mời họp
+                                  </span>
+                                )}
                                 {recurrence && (
                                   <span className="text-[11px] font-semibold px-2 py-0.5 bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-full">
                                     🔁 {recurrence}
+                                  </span>
+                                )}
+                                {timeZone && (
+                                  <span className="text-[11px] font-medium px-2 py-0.5 bg-neutral-100 text-neutral-700 border border-neutral-200 rounded-full">
+                                    🌐 Múi giờ: {timeZone}
                                   </span>
                                 )}
                                 {loc && (

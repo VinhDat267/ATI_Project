@@ -27,7 +27,7 @@ const names: Record<string,string> = {
   dueDate:'Hạn hoàn thành (Due date)', parentKey:'Epic / Issue cha', comment:'Bình luận kèm theo',
   docId:'Tài liệu Google Docs', documentId:'Tài liệu Google Docs', fileId:'Tệp Google Drive',
   folderId:'Thư mục Google Drive đích', parentFolderId:'Thư mục cha trên Drive', mimeType:'Loại tệp Google Drive',
-  sendInvites:'Gửi email mời họp', author:'Tác giả', draft:'Bản nháp (Draft)', channel:'Kênh Slack',
+  sendInvites:'Gửi email mời họp', timeZone:'Múi giờ', author:'Tác giả', draft:'Bản nháp (Draft)', channel:'Kênh Slack',
 };
 const operatorLabels: Record<string,string> = {
   equals:'Bằng (=)',
@@ -134,10 +134,13 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
     const isDelete = step.tool.endsWith('.delete_event');
     const recurrenceLabel = formatRecurrenceLabel(step.args.recurrence);
     const hasMeetLink = step.tool === 'mycalendar.schedule_meet' || step.args.createMeetLink === true;
+    const timeZoneText = typeof step.args.timeZone === 'string' && step.args.timeZone.trim().length > 0 ? step.args.timeZone.trim() : null;
     const locationText = typeof step.args.location === 'string' && step.args.location.trim().length > 0 ? step.args.location.trim() : null;
     const attendees = Array.isArray(step.args.attendees)
       ? step.args.attendees.filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
       : [];
+    const sendInvites = attendees.length > 0 && step.args.sendInvites === true;
+    const suppressInvites = attendees.length > 0 && step.args.sendInvites !== true;
     return <div data-testid="calendar-event-preview" className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 v3-space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-600">
         <span>{'Lịch đích: '}<strong>{destination}</strong></span>
@@ -153,7 +156,7 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
           <div className="text-sm font-bold text-neutral-900 mt-0.5">{text(step.args.summary ?? step.args.title)}</div>
         </div>
       )}
-      {(step.args.start!=null || step.args.end!=null) && (
+      {(step.args.start!=null || step.args.end!=null || timeZoneText!=null) && (
         <div className="p-3 bg-white rounded-lg border border-blue-100 v3-space-y-1">
           <span className="text-[11px] text-blue-700 uppercase font-semibold block">Thời gian sự kiện</span>
           {step.args.start!=null && (
@@ -166,6 +169,11 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
             <div className="text-xs text-neutral-800">
               <span className="font-medium text-neutral-500">Kết thúc: </span>
               <span className="font-semibold">{formatCalendarDateTime(step.args.end)}</span>
+            </div>
+          )}
+          {timeZoneText && (
+            <div className="text-xs text-neutral-800 font-medium">
+              Múi giờ: {timeZoneText}
             </div>
           )}
         </div>
@@ -192,6 +200,16 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
               👤 {email}
             </span>
           ))}
+          {sendInvites && (
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-800 border border-sky-200">
+              📨 Gửi email mời họp cho khách mời
+            </span>
+          )}
+          {suppressInvites && (
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-700 border border-neutral-200">
+              🔕 Không gửi email mời họp
+            </span>
+          )}
         </div>
       )}
       {step.args.description!=null && (
@@ -200,7 +218,7 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
           <div className="text-xs text-neutral-800 bg-white p-2.5 rounded-lg border border-neutral-200 mt-1 leading-relaxed whitespace-pre-wrap break-words">{text(step.args.description)}</div>
         </div>
       )}
-      <OtherArguments step={step} except={['summary','title','start','end','createMeetLink','recurrence','location','description','attendees']}/>
+      <OtherArguments step={step} except={['summary','title','start','end','createMeetLink','recurrence','timeZone','location','description','attendees','sendInvites']}/>
     </div>;
   }
   if(style==='card') {
