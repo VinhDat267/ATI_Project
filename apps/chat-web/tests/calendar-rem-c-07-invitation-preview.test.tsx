@@ -290,6 +290,7 @@ describe('CALENDAR-AUDIT-07 — Invitation preview & optional timeZone parity wi
       end: '2026-11-13T09:30:00+07:00',
       attendees: ['designer@example.com'],
       recurrence: 'WEEKLY',
+      timeZone: 'Asia/Ho_Chi_Minh',
     });
     expect(capturedRequests[0]?.sendUpdates).toBe('none');
     expect(capturedRequests[0]?.conferenceDataVersion).toBe('1');

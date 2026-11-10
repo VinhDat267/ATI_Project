@@ -50,10 +50,10 @@ function extractInlinePreviewRows(step: PlanStep): Array<{ label: string; value:
   }
 
   if ((service === 'mycalendar' || service === 'calendar') && typeof step.args.start === 'string' && step.args.start.trim()) {
-    const startText = formatCalendarDateTime(step.args.start);
+    const startText = formatCalendarDateTime(step.args.start, step.args.timeZone);
     const endText =
       typeof step.args.end === 'string' && step.args.end.trim()
-        ? formatCalendarDateTime(step.args.end)
+        ? formatCalendarDateTime(step.args.end, step.args.timeZone)
         : null;
     rows.push({ label: 'Thời gian', value: endText ? `${startText} → ${endText}` : startText });
   }
@@ -431,7 +431,8 @@ export function PlanMoment({
                             const attendees = Array.isArray(step.args.attendees)
                               ? step.args.attendees.filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
                               : [];
-                            const sendInvites = attendees.length > 0 && step.args.sendInvites === true;
+                            const notifyExisting = step.tool.endsWith('.update_event') && step.args.sendInvites === true;
+                            const sendInvites = (attendees.length > 0 || notifyExisting) && step.args.sendInvites === true;
                             const suppressInvites = attendees.length > 0 && step.args.sendInvites !== true;
                             const recurrence = formatRecurrenceLabel(step.args.recurrence);
                             const timeZone =
@@ -442,7 +443,7 @@ export function PlanMoment({
                               typeof step.args.location === 'string' && step.args.location.trim().length > 0
                                 ? step.args.location.trim()
                                 : null;
-                            if (!hasMeet && attendees.length === 0 && !recurrence && !timeZone && !loc) return null;
+                            if (!hasMeet && attendees.length === 0 && !recurrence && !timeZone && !loc && !notifyExisting) return null;
                             return (
                               <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
                                 {hasMeet && (
@@ -457,7 +458,7 @@ export function PlanMoment({
                                 )}
                                 {sendInvites && (
                                   <span className="text-[11px] font-medium px-2 py-0.5 bg-sky-50 text-sky-800 border border-sky-200 rounded-full">
-                                    📨 Gửi email mời họp
+                                    {notifyExisting ? '📨 Gửi thông báo cập nhật cho khách mời hiện có và danh sách khách mời sau thay đổi' : '📨 Gửi email mời họp'}
                                   </span>
                                 )}
                                 {suppressInvites && (
