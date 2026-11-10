@@ -778,7 +778,12 @@ describe('PersonalCalendarAdapter', () => {
     };
 
     const { adapter } = setup({
-      handler: () => json({ items: [busy1, busy2] }),
+      handler: (url) => {
+        if (!url.pathname.endsWith('/events')) {
+          return json({ id: calendarId, summary: 'Personal', timeZone: 'Asia/Ho_Chi_Minh' });
+        }
+        return json({ items: [busy1, busy2] });
+      },
     });
 
     const result = await adapter.execute('mycalendar.find_free_slots', {

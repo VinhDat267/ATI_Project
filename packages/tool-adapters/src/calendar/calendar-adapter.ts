@@ -62,7 +62,7 @@ export function only(args: Record<string, any>, keys: string[]): void {
 export function plainDescription(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 }
-export function normalizedEvent(value: any, writing = false) {
+export function normalizedEvent(value: any, writing = false, fallbackTimeZone?: string) {
   const start = value?.start?.dateTime ?? value?.start?.date;
   const end = value?.end?.dateTime ?? value?.end?.date;
   if (
@@ -119,6 +119,14 @@ export function normalizedEvent(value: any, writing = false) {
         : undefined;
   const transparency = value?.transparency === 'transparent' ? ('transparent' as const) : undefined;
   const status = value?.status === 'cancelled' ? ('cancelled' as const) : undefined;
+  const timeZone =
+    typeof value?.start?.timeZone === 'string' && isValidIanaTimeZone(value.start.timeZone)
+      ? value.start.timeZone.trim()
+      : typeof value?.end?.timeZone === 'string' && isValidIanaTimeZone(value.end.timeZone)
+        ? value.end.timeZone.trim()
+        : typeof fallbackTimeZone === 'string' && isValidIanaTimeZone(fallbackTimeZone)
+          ? fallbackTimeZone.trim()
+          : undefined;
   return {
     id: value.id,
     title: title.text,
@@ -132,6 +140,7 @@ export function normalizedEvent(value: any, writing = false) {
     ...(recurrence ? { recurrence } : {}),
     ...(transparency ? { transparency } : {}),
     ...(status ? { status } : {}),
+    ...(timeZone ? { timeZone } : {}),
     ...(title.clipped ? { clipped: true } : {}),
   };
 }
@@ -343,12 +352,34 @@ export class CalendarAdapter extends BaseAdapter {
       only(args, ['calendarId', 'timeMin', 'timeMax', 'timeZone', 'query', 'limit', 'onlyConflicts']);
       const id = this.checkedId(args.calendarId);
       const explicitTz = args.timeZone !== undefined ? assertValidIanaTimeZone(args.timeZone) : undefined;
+      let calendarTz = explicitTz;
       let timeMin = args.timeMin;
       let timeMax = args.timeMax;
       if (timeMin === undefined && timeMax === undefined) {
+        if (typeof args.query !== 'string' || !args.query.trim()) {
+          invalid('time requires an explicit ISO timezone');
+        }
+        const preCheck = resolveNaturalTemporalQuery(args.query, {
+          requireTemporalWindow: false,
+        });
+        if (!preCheck.matchedTemporal) {
+          throw new StepError({
+            message:
+              'Calendar query date/time expression is ambiguous or unsupported; please provide explicit timeMin/timeMax or a supported date phrase',
+            category: 'VALIDATION',
+            details: { requestSent: false },
+          });
+        }
+        if (!calendarTz) {
+          const meta = await this.request(encodeURIComponent(id), signal);
+          if (typeof meta?.timeZone !== 'string' || !isValidIanaTimeZone(meta.timeZone)) {
+            badResponse();
+          }
+          calendarTz = meta.timeZone.trim();
+        }
         const resolved = resolveNaturalTemporalQuery(args.query, {
           now: this.nowFn(),
-          timeZone: explicitTz ?? DEFAULT_CALENDAR_TIMEZONE,
+          timeZone: calendarTz,
           requireTemporalWindow: true,
         });
         timeMin = resolved.timeMin!;
@@ -359,7 +390,7 @@ export class CalendarAdapter extends BaseAdapter {
       const maximum = limit(args.limit, 20);
       const parsedQuery = parseCalendarEventQuery(args.query, {
         now: this.nowFn(),
-        timeZone: explicitTz ?? DEFAULT_CALENDAR_TIMEZONE,
+        timeZone: calendarTz,
       });
       const wantOnlyConflicts = parsedQuery.onlyConflicts || args.onlyConflicts === true;
       const params = new URLSearchParams({ timeMin, timeMax, singleEvents: 'true', orderBy: 'startTime', maxResults: String(maximum) });
@@ -375,7 +406,7 @@ export class CalendarAdapter extends BaseAdapter {
               onlyConflicts: true,
               keywordFilter: parsedQuery.keywordFilter,
               annotateConflicts: true,
-              timeZone: explicitTz ?? DEFAULT_CALENDAR_TIMEZONE,
+              timeZone: calendarTz,
             })
           : baseEvents;
         const complete = incompleteReason === undefined;
@@ -391,6 +422,16 @@ export class CalendarAdapter extends BaseAdapter {
       for (let page = 0; page < 20; page++) {
         const value = await this.request(encodeURIComponent(id) + '/events?' + params, signal);
         if (!value || typeof value !== 'object' || (value.items !== undefined && !Array.isArray(value.items))) badResponse();
+        if (
+          value.nextPageToken !== undefined &&
+          (typeof value.nextPageToken !== 'string' ||
+            (value.nextPageToken !== '' && seenPages.has(value.nextPageToken)))
+        ) {
+          badResponse();
+        }
+        if (typeof value.timeZone === 'string' && isValidIanaTimeZone(value.timeZone)) {
+          calendarTz ??= value.timeZone.trim();
+        }
         const items = value.items ?? [];
         let hitMaxWithUnreadItems = false;
         for (let idx = 0; idx < items.length; idx++) {
@@ -400,7 +441,9 @@ export class CalendarAdapter extends BaseAdapter {
             hitMaxWithUnreadItems = true;
             break;
           }
-          events.push(normalizedEvent(item));
+          const rawStart = item?.start?.dateTime ?? item?.start?.date;
+          const isAllDayItem = typeof rawStart === 'string' && !rawStart.includes('T');
+          events.push(normalizedEvent(item, false, isAllDayItem ? calendarTz : explicitTz));
         }
         const hasNextPage = typeof value.nextPageToken === 'string' && value.nextPageToken !== '';
         if (events.length >= maximum) {
@@ -412,7 +455,6 @@ export class CalendarAdapter extends BaseAdapter {
           return done();
         }
         if (value.nextPageToken === undefined || value.nextPageToken === '') return done();
-        if (typeof value.nextPageToken !== 'string' || seenPages.has(value.nextPageToken)) badResponse();
         seenPages.add(value.nextPageToken); params.set('pageToken', value.nextPageToken); params.set('maxResults', String(maximum - events.length));
       }
       throw new StepError({ message: 'Calendar event pagination exceeded its read budget; narrow the time interval', category: 'SERVER_ERROR' });

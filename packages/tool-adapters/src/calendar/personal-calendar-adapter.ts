@@ -13,7 +13,6 @@ import {
   eventBusyIntervalMs,
   eventsOverlap,
   formatInstantInTimeZone,
-  inferTimeZoneFromIsoOffset,
   invalid,
   isValidIanaTimeZone,
   limit,
@@ -269,23 +268,17 @@ export class PersonalCalendarAdapter extends BaseAdapter {
   private async resolveCalendarTimeZone(
     calendarId: string,
     signal?: AbortSignal,
-    options?: { strictForRecurringWrite?: boolean; fallbackIso?: unknown },
+    options?: { strictForRecurringWrite?: boolean },
   ): Promise<string> {
     const cached = this.calendarTimeZoneCache.get(calendarId);
     if (cached && isValidIanaTimeZone(cached)) {
       return cached;
     }
-    try {
-      const meta = await this.request(encodeURIComponent(calendarId), signal);
-      if (typeof meta?.timeZone === 'string' && isValidIanaTimeZone(meta.timeZone)) {
-        const cleanTz = meta.timeZone.trim();
-        this.calendarTimeZoneCache.set(calendarId, cleanTz);
-        return cleanTz;
-      }
-    } catch (err) {
-      if (options?.strictForRecurringWrite) {
-        throw err;
-      }
+    const meta = await this.request(encodeURIComponent(calendarId), signal);
+    if (typeof meta?.timeZone === 'string' && isValidIanaTimeZone(meta.timeZone)) {
+      const cleanTz = meta.timeZone.trim();
+      this.calendarTimeZoneCache.set(calendarId, cleanTz);
+      return cleanTz;
     }
     if (options?.strictForRecurringWrite) {
       throwValidation(
@@ -293,7 +286,7 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         false,
       );
     }
-    return inferTimeZoneFromIsoOffset(options?.fallbackIso);
+    badResponse(false);
   }
 
   async checkConnection(signal?: AbortSignal): Promise<boolean> {
@@ -321,8 +314,7 @@ export class PersonalCalendarAdapter extends BaseAdapter {
       { signal },
     );
     const items: CalendarEventWithConflict[] = Array.isArray(listed?.events) ? listed.events : [];
-    const fallbackTz =
-      this.calendarTimeZoneCache.get(slot.calendarId) ?? inferTimeZoneFromIsoOffset(slot.start);
+    const fallbackTz = this.calendarTimeZoneCache.get(slot.calendarId);
     return items.filter((ev) => eventsOverlap(ev, { start: slot.start, end: slot.end }, fallbackTz));
   }
 
@@ -366,11 +358,15 @@ export class PersonalCalendarAdapter extends BaseAdapter {
             invalid('time requires an explicit ISO timezone');
           }
           // Validate natural query syntax before making any metadata request
-          resolveNaturalTemporalQuery(args.query, {
-            now: this.nowFn(),
-            timeZone: calendarTz ?? DEFAULT_CALENDAR_TIMEZONE,
-            requireTemporalWindow: true,
+          const preCheck = resolveNaturalTemporalQuery(args.query, {
+            requireTemporalWindow: false,
           });
+          if (!preCheck.matchedTemporal) {
+            throwValidation(
+              'Calendar query date/time expression is ambiguous or unsupported; please provide explicit timeMin/timeMax or a supported date phrase',
+              false,
+            );
+          }
           if (!calendarTz) {
             calendarTz = await this.resolveCalendarTimeZone(id, signal);
           }
@@ -384,7 +380,7 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         } else {
           windowSize(timeMin, timeMax, 31);
           if (!calendarTz) {
-            calendarTz = this.calendarTimeZoneCache.get(id) ?? inferTimeZoneFromIsoOffset(timeMin);
+            calendarTz = this.calendarTimeZoneCache.get(id);
           }
         }
         const maximum = limit(args.limit, 20);
@@ -431,6 +427,18 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         for (let page = 0; page < 20; page++) {
           const value = await this.request(encodeURIComponent(id) + '/events?' + params, signal);
           if (!value || typeof value !== 'object' || (value.items !== undefined && !Array.isArray(value.items))) badResponse();
+          if (
+            value.nextPageToken !== undefined &&
+            (typeof value.nextPageToken !== 'string' ||
+              (value.nextPageToken !== '' && seenPages.has(value.nextPageToken)))
+          ) {
+            badResponse();
+          }
+          if (typeof value.timeZone === 'string' && isValidIanaTimeZone(value.timeZone)) {
+            const cleanValTz = value.timeZone.trim();
+            this.calendarTimeZoneCache.set(id, cleanValTz);
+            calendarTz ??= cleanValTz;
+          }
           const items = value.items ?? [];
           let hitMaxWithUnreadItems = false;
           for (let idx = 0; idx < items.length; idx++) {
@@ -440,7 +448,15 @@ export class PersonalCalendarAdapter extends BaseAdapter {
               hitMaxWithUnreadItems = true;
               break;
             }
-            events.push(normalizedEvent(item));
+            const rawStart = item?.start?.dateTime ?? item?.start?.date;
+            const isAllDayItem = typeof rawStart === 'string' && !rawStart.includes('T');
+            const hasItemTz =
+              (typeof item?.start?.timeZone === 'string' && isValidIanaTimeZone(item.start.timeZone)) ||
+              (typeof item?.end?.timeZone === 'string' && isValidIanaTimeZone(item.end.timeZone));
+            if (isAllDayItem && !hasItemTz && !calendarTz) {
+              calendarTz = await this.resolveCalendarTimeZone(id, signal);
+            }
+            events.push(normalizedEvent(item, false, isAllDayItem ? calendarTz : explicitTz));
           }
           const hasNextPage = typeof value.nextPageToken === 'string' && value.nextPageToken !== '';
           if (events.length >= maximum) {
@@ -452,7 +468,6 @@ export class PersonalCalendarAdapter extends BaseAdapter {
             return done();
           }
           if (value.nextPageToken === undefined || value.nextPageToken === '') return done();
-          if (typeof value.nextPageToken !== 'string' || seenPages.has(value.nextPageToken)) badResponse();
           seenPages.add(value.nextPageToken);
           params.set('pageToken', value.nextPageToken);
           params.set('maxResults', String(maximum - events.length));
@@ -471,7 +486,14 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           `${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}`,
           signal,
         );
-        const { clipped: _clipped, ...base } = normalizedEvent(raw, false);
+        const rawStart = raw?.start?.dateTime ?? raw?.start?.date;
+        const isAllDayItem = typeof rawStart === 'string' && !rawStart.includes('T');
+        const hasItemTz =
+          (typeof raw?.start?.timeZone === 'string' && isValidIanaTimeZone(raw.start.timeZone)) ||
+          (typeof raw?.end?.timeZone === 'string' && isValidIanaTimeZone(raw.end.timeZone));
+        const fallbackTz =
+          isAllDayItem && !hasItemTz ? await this.resolveCalendarTimeZone(id, signal) : undefined;
+        const { clipped: _clipped, ...base } = normalizedEvent(raw, false, fallbackTz);
         const description =
           typeof raw?.description === 'string' && raw.description.trim().length > 0
             ? raw.description.trim().slice(0, 4000)
@@ -496,19 +518,21 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         ]);
         const id = this.checkedId(args.calendarId);
         const explicitTz = args.timeZone !== undefined ? assertValidIanaTimeZone(args.timeZone) : undefined;
-        const calendarTz =
-          explicitTz ??
-          (await this.resolveCalendarTimeZone(id, signal, { fallbackIso: args.timeMin }));
         let timeMin = args.timeMin;
         let timeMax = args.timeMax;
         if (timeMin === undefined && timeMax === undefined) {
-          const resolved = resolveNaturalTemporalQuery(args.query, {
-            now: this.nowFn(),
-            timeZone: calendarTz,
-            requireTemporalWindow: true,
+          if (typeof args.query !== 'string' || !args.query.trim()) {
+            invalid('time requires an explicit ISO timezone');
+          }
+          const preCheck = resolveNaturalTemporalQuery(args.query, {
+            requireTemporalWindow: false,
           });
-          timeMin = resolved.timeMin!;
-          timeMax = resolved.timeMax!;
+          if (!preCheck.matchedTemporal) {
+            throwValidation(
+              'Calendar query date/time expression is ambiguous or unsupported; please provide explicit timeMin/timeMax or a supported date phrase',
+              false,
+            );
+          }
         } else {
           windowSize(timeMin, timeMax, 31);
         }
@@ -529,6 +553,16 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           invalid('workday hours are invalid');
         }
         const maxSlots = limit(args.limit, 10);
+        const calendarTz = explicitTz ?? (await this.resolveCalendarTimeZone(id, signal));
+        if (timeMin === undefined && timeMax === undefined) {
+          const resolved = resolveNaturalTemporalQuery(args.query, {
+            now: this.nowFn(),
+            timeZone: calendarTz,
+            requireTemporalWindow: true,
+          });
+          timeMin = resolved.timeMin!;
+          timeMax = resolved.timeMax!;
+        }
 
         // Internal bounded multi-page availability scan (bypasses the 20-event list_events display cap)
         const scanParams = new URLSearchParams({
@@ -549,6 +583,17 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           if (!value || typeof value !== 'object' || (value.items !== undefined && !Array.isArray(value.items))) {
             badResponse();
           }
+          if (value.nextPageToken !== undefined && typeof value.nextPageToken !== 'string') {
+            badResponse();
+          }
+          if (
+            typeof value.nextPageToken === 'string' &&
+            value.nextPageToken !== '' &&
+            seenScanPages.has(value.nextPageToken)
+          ) {
+            scanIncompleteReason = 'pagination_incomplete';
+            break;
+          }
           const items = value.items ?? [];
           let hitMaxWithUnreadItems = false;
           for (let idx = 0; idx < items.length; idx++) {
@@ -558,7 +603,7 @@ export class PersonalCalendarAdapter extends BaseAdapter {
               hitMaxWithUnreadItems = true;
               break;
             }
-            scannedEvents.push(normalizedEvent(item));
+            scannedEvents.push(normalizedEvent(item, false, calendarTz));
           }
           const hasNextPage = typeof value.nextPageToken === 'string' && value.nextPageToken !== '';
           if (scannedEvents.length >= INTERNAL_AVAILABILITY_MAX_EVENTS) {
@@ -570,10 +615,6 @@ export class PersonalCalendarAdapter extends BaseAdapter {
             break;
           }
           if (!hasNextPage) {
-            break;
-          }
-          if (seenScanPages.has(value.nextPageToken)) {
-            scanIncompleteReason = 'pagination_incomplete';
             break;
           }
           if (page === INTERNAL_AVAILABILITY_MAX_PAGES - 1) {

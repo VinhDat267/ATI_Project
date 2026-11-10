@@ -469,6 +469,7 @@ export class ChatService {
               end: string;
               transparency?: 'opaque' | 'transparent';
               status?: 'confirmed' | 'tentative' | 'cancelled';
+              timeZone?: string;
               calendarId: string;
             }> = [];
             let precheckIncompleteOrFailed = false;
@@ -503,16 +504,59 @@ export class ChatService {
                       { signal: conflictSignal }
                     );
                   }
-                  if (rawResult?.coverage?.complete === false) {
+                  const hasValidEventsArray = Array.isArray(rawResult?.events);
+                  const calEvents = hasValidEventsArray ? rawResult.events : [];
+                  const cov = rawResult?.coverage;
+                  const hasTrustworthyCompleteCoverage =
+                    hasValidEventsArray &&
+                    cov !== null &&
+                    typeof cov === 'object' &&
+                    cov.complete === true &&
+                    typeof cov.returned === 'number' &&
+                    Number.isInteger(cov.returned) &&
+                    cov.returned >= 0 &&
+                    cov.returned === calEvents.length &&
+                    cov.totalAvailable === cov.returned &&
+                    (cov.reason === undefined || cov.reason === '');
+                  if (!hasTrustworthyCompleteCoverage) {
                     precheckIncompleteOrFailed = true;
                   }
-                  const calEvents = Array.isArray(rawResult?.events) ? rawResult.events : [];
                   for (const ev of calEvents) {
                     if (typeof ev?.start === 'string' && typeof ev?.end === 'string') {
                       if (selfEventId && ev.id === selfEventId && calId === targetCalId) {
                         continue;
                       }
+                      const isCancelledOrTransparent =
+                        ev.status === 'cancelled' || ev.transparency === 'transparent';
+                      if (!isCancelledOrTransparent) {
+                        const isStartDateOnly = !ev.start.includes('T');
+                        const isEndDateOnly = !ev.end.includes('T');
+                        if (isStartDateOnly !== isEndDateOnly) {
+                          precheckIncompleteOrFailed = true;
+                        } else if (isStartDateOnly) {
+                          let validZone = false;
+                          if (typeof ev.timeZone === 'string' && ev.timeZone.trim().length > 0) {
+                            try {
+                              new Intl.DateTimeFormat('en-US', { timeZone: ev.timeZone.trim() });
+                              validZone = true;
+                            } catch {
+                              validZone = false;
+                            }
+                          }
+                          if (!validZone) {
+                            precheckIncompleteOrFailed = true;
+                          }
+                        } else {
+                          const sMs = Date.parse(ev.start);
+                          const eMs = Date.parse(ev.end);
+                          if (!Number.isFinite(sMs) || !Number.isFinite(eMs) || eMs <= sMs) {
+                            precheckIncompleteOrFailed = true;
+                          }
+                        }
+                      }
                       allEvents.push({ ...ev, calendarId: calId });
+                    } else {
+                      precheckIncompleteOrFailed = true;
                     }
                   }
                 } catch {

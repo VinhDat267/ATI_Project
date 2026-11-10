@@ -216,17 +216,6 @@ export function validateDateTimeMatchesTimeZone(
   }
 }
 
-export function inferTimeZoneFromIsoOffset(isoStr: unknown): string {
-  if (typeof isoStr !== 'string') return DEFAULT_CALENDAR_TIMEZONE;
-  if (isoStr.endsWith('Z') || isoStr.endsWith('+00:00') || isoStr.endsWith('-00:00')) {
-    return 'UTC';
-  }
-  if (isoStr.endsWith('+07:00')) {
-    return DEFAULT_CALENDAR_TIMEZONE;
-  }
-  return DEFAULT_CALENDAR_TIMEZONE;
-}
-
 export function enumerateLocalDates(
   timeMinIso: string,
   timeMaxIso: string,
@@ -342,19 +331,17 @@ export function resolveNaturalTemporalQuery(
     return { matchedTemporal: false, cleanedQuery: '' };
   }
 
-  const timeZone =
-    options?.timeZone && isValidIanaTimeZone(options.timeZone)
-      ? options.timeZone
-      : DEFAULT_CALENDAR_TIMEZONE;
-  const now = options?.now ?? new Date();
-  const todayFmt = formatInstantInTimeZone(now.getTime(), timeZone);
-  const todayDate = todayFmt.date;
-  const todayIsoDow = isoDayOfWeek(todayDate);
-
   let working = rawQuery.trim();
-  let startDate: string | undefined;
-  let endDate: string | undefined;
-  let matchedTemporal = false;
+  let matchedKind:
+    | { kind: 'explicit_date'; date: string }
+    | { kind: 'next_week' }
+    | { kind: 'month_end' }
+    | { kind: 'this_week' }
+    | { kind: 'tomorrow' }
+    | { kind: 'today' }
+    | { kind: 'generic_status' }
+    | { kind: 'weekday'; isoDow: number; forceNext: boolean }
+    | null = null;
 
   const stripPattern = (re: RegExp) => {
     working = working
@@ -371,84 +358,121 @@ export function resolveNaturalTemporalQuery(
     if (!parseStrictCalendarDate(candidateDate)) {
       throwValidation(`Calendar query contains an invalid date "${candidateDate}"`);
     }
-    startDate = candidateDate;
-    endDate = addCalendarDays(candidateDate, 1);
-    matchedTemporal = true;
+    matchedKind = { kind: 'explicit_date', date: candidateDate };
     stripPattern(EXPLICIT_DATE_TOKEN_RE);
   } else if (NEXT_WEEK_RE.test(working)) {
     // 2. Next ISO week: next Monday 00:00 through following Monday 00:00
-    const daysToNextMonday = 8 - todayIsoDow;
-    startDate = addCalendarDays(todayDate, daysToNextMonday);
-    endDate = addCalendarDays(startDate, 7);
-    matchedTemporal = true;
+    matchedKind = { kind: 'next_week' };
     stripPattern(NEXT_WEEK_RE);
   } else if (MONTH_END_RE.test(working)) {
     // 3. Month-end: last calendar day of the current month in timeZone
-    startDate = lastDayOfMonth(todayFmt.year, todayFmt.month);
-    endDate = addCalendarDays(startDate, 1);
-    matchedTemporal = true;
+    matchedKind = { kind: 'month_end' };
     stripPattern(MONTH_END_RE);
   } else if (THIS_WEEK_RE.test(working)) {
     // 4. This week / upcoming: 7 local days starting today
-    startDate = todayDate;
-    endDate = addCalendarDays(todayDate, 7);
-    matchedTemporal = true;
+    matchedKind = { kind: 'this_week' };
     stripPattern(THIS_WEEK_RE);
   } else if (TOMORROW_RE.test(working)) {
     // 5. Tomorrow
-    startDate = addCalendarDays(todayDate, 1);
-    endDate = addCalendarDays(startDate, 1);
-    matchedTemporal = true;
+    matchedKind = { kind: 'tomorrow' };
     stripPattern(TOMORROW_RE);
   } else if (TODAY_RE.test(working)) {
     // 6. Today
-    startDate = todayDate;
-    endDate = addCalendarDays(todayDate, 1);
-    matchedTemporal = true;
+    matchedKind = { kind: 'today' };
     stripPattern(TODAY_RE);
   } else if (GENERIC_STATUS_ONLY_RE.test(working)) {
     // 7. Generic status token ('open', 'busy', 'bận', 'free', 'trống', '*', 'all')
-    startDate = todayDate;
-    endDate = addCalendarDays(todayDate, 1);
-    matchedTemporal = true;
+    matchedKind = { kind: 'generic_status' };
     working = '';
   } else {
     // 8. Weekday names
     for (const wd of WEEKDAY_TOKENS) {
       const m = wd.pattern.exec(working);
       if (m) {
-        let delta = (wd.isoDow - todayIsoDow + 7) % 7;
-        if (delta === 0 && /^next\s+/iu.test(m[0])) {
-          delta = 7;
-        }
-        startDate = addCalendarDays(todayDate, delta);
-        endDate = addCalendarDays(startDate, 1);
-        matchedTemporal = true;
+        matchedKind = {
+          kind: 'weekday',
+          isoDow: wd.isoDow,
+          forceNext: /^next\s+/iu.test(m[0]),
+        };
         stripPattern(wd.pattern);
         break;
       }
     }
   }
 
-  if (requireWindow && (!matchedTemporal || !startDate || !endDate)) {
-    throwValidation(
-      'Calendar query date/time expression is ambiguous or unsupported; please provide explicit timeMin/timeMax or a supported date phrase',
-    );
-  }
-
-  if (matchedTemporal && startDate && endDate) {
-    const startZoned = zonedWallTimeToInstant(startDate, 0, 0, 0, timeZone);
-    const endZoned = zonedWallTimeToInstant(endDate, 0, 0, 0, timeZone);
+  if (!matchedKind) {
+    if (requireWindow) {
+      throwValidation(
+        'Calendar query date/time expression is ambiguous or unsupported; please provide explicit timeMin/timeMax or a supported date phrase',
+      );
+    }
     return {
-      matchedTemporal: true,
-      timeMin: startZoned.iso,
-      timeMax: endZoned.iso,
+      matchedTemporal: false,
       cleanedQuery: working,
     };
   }
 
+  if (!requireWindow && !isValidIanaTimeZone(options?.timeZone)) {
+    return {
+      matchedTemporal: true,
+      cleanedQuery: working,
+    };
+  }
+
+  const timeZone = assertValidIanaTimeZone(options?.timeZone);
+  const now = options?.now ?? new Date();
+  const todayFmt = formatInstantInTimeZone(now.getTime(), timeZone);
+  const todayDate = todayFmt.date;
+  const todayIsoDow = isoDayOfWeek(todayDate);
+
+  let startDate: string;
+  let endDate: string;
+
+  switch (matchedKind.kind) {
+    case 'explicit_date':
+      startDate = matchedKind.date;
+      endDate = addCalendarDays(matchedKind.date, 1);
+      break;
+    case 'next_week': {
+      const daysToNextMonday = 8 - todayIsoDow;
+      startDate = addCalendarDays(todayDate, daysToNextMonday);
+      endDate = addCalendarDays(startDate, 7);
+      break;
+    }
+    case 'month_end':
+      startDate = lastDayOfMonth(todayFmt.year, todayFmt.month);
+      endDate = addCalendarDays(startDate, 1);
+      break;
+    case 'this_week':
+      startDate = todayDate;
+      endDate = addCalendarDays(todayDate, 7);
+      break;
+    case 'tomorrow':
+      startDate = addCalendarDays(todayDate, 1);
+      endDate = addCalendarDays(startDate, 1);
+      break;
+    case 'today':
+    case 'generic_status':
+      startDate = todayDate;
+      endDate = addCalendarDays(todayDate, 1);
+      break;
+    case 'weekday': {
+      let delta = (matchedKind.isoDow - todayIsoDow + 7) % 7;
+      if (delta === 0 && matchedKind.forceNext) {
+        delta = 7;
+      }
+      startDate = addCalendarDays(todayDate, delta);
+      endDate = addCalendarDays(startDate, 1);
+      break;
+    }
+  }
+
+  const startZoned = zonedWallTimeToInstant(startDate, 0, 0, 0, timeZone);
+  const endZoned = zonedWallTimeToInstant(endDate, 0, 0, 0, timeZone);
   return {
-    matchedTemporal: false,
+    matchedTemporal: true,
+    timeMin: startZoned.iso,
+    timeMax: endZoned.iso,
     cleanedQuery: working,
   };
 }
