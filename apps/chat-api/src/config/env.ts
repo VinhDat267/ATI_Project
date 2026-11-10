@@ -128,6 +128,11 @@ export interface EnvConfig {
   MYCALENDAR_OAUTH?: GmailOAuthConfig;
   /** The MYSHEETS_ENABLED flag (default off). Personal Sheets is usable only with MYSHEETS_OAUTH and PostgreSQL as well. */
   MYSHEETS_ENABLED: boolean;
+  /**
+   * Server-owned Dual Kill-Switch for MySheets Drive/Docs write tools (default false).
+   * Temporarily blocks mysheets.create_drive_folder, mysheets.create_doc, mysheets.append_doc_text, and mysheets.move_drive_file.
+   */
+  ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS: boolean;
   /** Complete only when the flag is on; sandbox also needs every fake endpoint. Missing in sandbox means 503. */
   MYSHEETS_OAUTH?: GmailOAuthConfig;
   MYSHEETS_PICKER?: { apiKey: string; appId: string };
@@ -273,6 +278,8 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   const MYCALENDAR_OAUTH = MYCALENDAR_ENABLED ? mycalendarOAuth(env, isLive) : undefined;
   if (env.MYSHEETS_ENABLED && !['on', 'off'].includes(env.MYSHEETS_ENABLED)) throw new Error('MYSHEETS_ENABLED must be on or off');
   const MYSHEETS_ENABLED = env.MYSHEETS_ENABLED === 'on';
+  const ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS =
+    env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS === 'true' || env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS === 'on';
   const MYSHEETS_OAUTH = MYSHEETS_ENABLED ? mysheetsOAuth(env, isLive) : undefined;
   const MYSHEETS_PICKER = MYSHEETS_ENABLED ? mysheetsPicker(env, isLive) : undefined;
   if (isLive && (GMAIL_ENABLED || MYCALENDAR_ENABLED || MYSHEETS_ENABLED)) validatePersonalGoogleProjects(env);
@@ -344,6 +351,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     MYCALENDAR_ENABLED,
     MYCALENDAR_OAUTH,
     MYSHEETS_ENABLED,
+    ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS,
     MYSHEETS_OAUTH,
     MYSHEETS_PICKER,
     TRELLO_OAUTH,

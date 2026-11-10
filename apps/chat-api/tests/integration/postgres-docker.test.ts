@@ -124,6 +124,8 @@ describe('Real PostgreSQL Docker Container Integration (configured test database
       name: 'Concurrency Tester',
       password: 'pass',
     });
+    // Fixture represents a legitimate approved account (createUser defaults to status='pending').
+    await pool.query("UPDATE users SET status = 'active' WHERE id = $1", [user.id]);
     const conv = await convRepo.createConversation(user.id);
 
     const plan = await planRepo.createPlan({
