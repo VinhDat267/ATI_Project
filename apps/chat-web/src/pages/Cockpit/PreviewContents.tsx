@@ -100,7 +100,7 @@ export function formatRecurrenceLabel(recurrence: unknown): string | null {
   return recurrence.trim();
 }
 
-export function formatCalendarDateTime(raw: unknown): string {
+export function formatCalendarDateTime(raw: unknown, timeZone?: unknown): string {
   if (typeof raw !== 'string' || !raw.trim()) return text(raw);
   const trimmed = raw.trim();
   if (trimmed.startsWith('$')) return text(raw);
@@ -110,14 +110,19 @@ export function formatCalendarDateTime(raw: unknown): string {
   }
   const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) return trimmed;
-  return parsed.toLocaleString('vi-VN', {
+  try {
+    return parsed.toLocaleString('vi-VN', {
     weekday: 'short',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  });
+    ...(typeof timeZone === 'string' && timeZone.trim() ? { timeZone: timeZone.trim() } : {}),
+    });
+  } catch {
+    return `${trimmed} (Múi giờ không hợp lệ)`;
+  }
 }
 
 function OtherArguments({step,except}:{step:PlanStep;except:string[]}) {
@@ -139,7 +144,8 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
     const attendees = Array.isArray(step.args.attendees)
       ? step.args.attendees.filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
       : [];
-    const sendInvites = attendees.length > 0 && step.args.sendInvites === true;
+    const notifyExisting = step.tool.endsWith('.update_event') && step.args.sendInvites === true;
+    const sendInvites = (attendees.length > 0 || notifyExisting) && step.args.sendInvites === true;
     const suppressInvites = attendees.length > 0 && step.args.sendInvites !== true;
     return <div data-testid="calendar-event-preview" className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 v3-space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-600">
@@ -162,13 +168,13 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
           {step.args.start!=null && (
             <div className="text-xs text-neutral-800">
               <span className="font-medium text-neutral-500">Bắt đầu: </span>
-              <span className="font-semibold">{formatCalendarDateTime(step.args.start)}</span>
+              <span className="font-semibold">{formatCalendarDateTime(step.args.start, step.args.timeZone)}</span>
             </div>
           )}
           {step.args.end!=null && (
             <div className="text-xs text-neutral-800">
               <span className="font-medium text-neutral-500">Kết thúc: </span>
-              <span className="font-semibold">{formatCalendarDateTime(step.args.end)}</span>
+              <span className="font-semibold">{formatCalendarDateTime(step.args.end, step.args.timeZone)}</span>
             </div>
           )}
           {timeZoneText && (
@@ -178,7 +184,7 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
           )}
         </div>
       )}
-      {(hasMeetLink || recurrenceLabel || locationText || attendees.length > 0) && (
+      {(hasMeetLink || recurrenceLabel || locationText || attendees.length > 0 || notifyExisting) && (
         <div className="flex flex-wrap items-center gap-1.5">
           {hasMeetLink && (
             <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
@@ -202,7 +208,7 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
           ))}
           {sendInvites && (
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-800 border border-sky-200">
-              📨 Gửi email mời họp cho khách mời
+              {notifyExisting ? '📨 Gửi thông báo cập nhật cho khách mời hiện có và danh sách khách mời sau thay đổi' : '📨 Gửi email mời họp cho khách mời'}
             </span>
           )}
           {suppressInvites && (
