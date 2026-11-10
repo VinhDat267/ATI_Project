@@ -74,4 +74,9 @@ Khắc phục 13 phát hiện chuẩn tắc thuộc phạm vi Backend (`apps/cha
   - Kết quả: `5 passed (5)`, `55 passed (55)`, exit code `0` (`D:/ATI-Audits/trello-remediation-20261110/owner-b/adjacent-sheets-calendar-recovery.log`).
 - **Typecheck toàn bộ v3 (`npm run typecheck:v3`):**
   - Kết quả: PASS, exit code `0` (`D:/ATI-Audits/trello-remediation-20261110/owner-b/typecheck.log`).
+- **Kiểm thử Generic Plumbing & Evaluations (`evaluations/generic-plumbing/static-guard.test.ts` & `npx vitest run evaluations --testTimeout=30000`):**
+  - **RED (`static-guard.test.ts` trên `905695a6`):** `1 failed | 1 passed (2)` do nhánh `'slack'` trong `schedule-service.ts` (`D:/ATI-Audits/trello-remediation-20261110/owner-b/red-static-guard.log`).
+  - **Khắc phục:** Di chuyển logic tạo biên nhận xác nhận gửi (`buildConfirmedTrelloDigestDelivery`) và trích xuất credential đã ghim (`getTrelloDigestPinnedCredentialIds`) sang `apps/chat-api/src/services/schedules/trello-digest-candidate.ts`, giữ nguyên kiến trúc generic của `schedule-service.ts` mà không sửa hay nới lỏng `static-guard.test.ts`.
+  - **GREEN (`static-guard.test.ts`):** `2 passed (2)`, exit code `0` (`D:/ATI-Audits/trello-remediation-20261110/owner-b/green-static-guard.log`).
+  - **GREEN toàn bộ Evaluations (`npx vitest run evaluations --testTimeout=30000`):** `31 passed (31)`, `500 passed | 1 skipped (501)`, exit code `0` (`D:/ATI-Audits/trello-remediation-20261110/owner-b/green-eval-v3.log`).
 - Container Docker kiểm thử tạm thời `ati-trello-remed-b-20261110` đã được dọn sạch (`docker rm -f ati-trello-remed-b-20261110`).

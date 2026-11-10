@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  evaluateTrelloDigestCandidate,
+  buildConfirmedTrelloDigestDelivery,
   computeTrelloDigestConfigHash,
+  evaluateTrelloDigestCandidate,
+  getTrelloDigestPinnedCredentialIds,
 } from '../../../src/services/schedules/trello-digest-candidate.js';
 import {
   createTrelloDigestRunner,
@@ -566,5 +568,44 @@ describe('Trello Digest Accuracy, Candidate Admission, Coverage Accounting & AI 
       expect(aiLine).toContain('Nhận xét AI:');
       expect(aiLine).toContain('1 thẻ quá hạn');
     }
+  });
+
+  it('TRELLO-AUDIT-10 (Policy Helper Boundary): buildConfirmedTrelloDigestDelivery and getTrelloDigestPinnedCredentialIds encapsulate destination receipt policy outside ScheduleService', () => {
+    const slackConfig = {
+      credentialId: TRELLO_CRED_ID,
+      trelloMemberId: 'mem-1',
+      username: 'alice_trello',
+      boards: [{ id: 'b1', name: 'Board 1' }],
+      channelId: 'C_DEV',
+      channelName: 'dev',
+      slackCredentialId: '1b5c1f0e-7a6d-4c1e-9d2a-1a2b3c4d5e04',
+      dueSoonHours: 24,
+      includeAiSummary: false,
+    };
+    expect(getTrelloDigestPinnedCredentialIds(slackConfig)).toEqual([
+      TRELLO_CRED_ID,
+      '1b5c1f0e-7a6d-4c1e-9d2a-1a2b3c4d5e04',
+    ]);
+
+    const confirmed = buildConfirmedTrelloDigestDelivery({
+      config: slackConfig,
+      previousDelivery: {},
+      resolvedAtIso: '2026-11-10T10:00:00.000Z',
+      resolvedBy: userId,
+    });
+    expect(confirmed).toMatchObject({
+      destination: 'slack',
+      targetId: 'C_DEV',
+      targetLabel: 'dev',
+      boardCount: 1,
+      summaryMode: 'deterministic',
+      manualConfirmedAt: '2026-11-10T10:00:00.000Z',
+      manualResolution: {
+        status: 'confirmed_sent',
+        resolvedAt: '2026-11-10T10:00:00.000Z',
+        manualConfirmedAt: '2026-11-10T10:00:00.000Z',
+        resolvedBy: userId,
+      },
+    });
   });
 });

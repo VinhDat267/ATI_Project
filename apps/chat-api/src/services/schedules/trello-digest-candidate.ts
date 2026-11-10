@@ -35,6 +35,62 @@ export function computeTrelloDigestConfigHash(input: {
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
 
+export function getTrelloDigestPinnedCredentialIds(config: TrelloDigestConfig): string[] {
+  const ids: string[] = [];
+  if (config.credentialId) ids.push(config.credentialId);
+  const destCredId =
+    config.destination === 'telegram' ? config.telegramCredentialId : config.slackCredentialId;
+  if (destCredId) ids.push(destCredId);
+  return ids;
+}
+
+export function buildConfirmedTrelloDigestDelivery(input: {
+  config: TrelloDigestConfig | null;
+  previousDelivery: Record<string, unknown>;
+  resolvedAtIso: string;
+  resolvedBy: string;
+}): Record<string, unknown> {
+  const { config: cfg, previousDelivery: prevDelivery, resolvedAtIso, resolvedBy } = input;
+  return {
+    ...prevDelivery,
+    destination: prevDelivery.destination ?? cfg?.destination ?? 'slack',
+    targetId:
+      prevDelivery.targetId ??
+      (cfg?.destination === 'telegram' ? cfg?.telegramChatId : cfg?.channelId) ??
+      'unknown',
+    ...(cfg?.destination === 'telegram' && cfg?.telegramChatTitle
+      ? { targetLabel: prevDelivery.targetLabel ?? cfg.telegramChatTitle }
+      : cfg?.channelName
+        ? { targetLabel: prevDelivery.targetLabel ?? cfg.channelName }
+        : {}),
+    boardCount:
+      typeof prevDelivery.boardCount === 'number'
+        ? prevDelivery.boardCount
+        : Array.isArray(cfg?.boards)
+          ? cfg.boards.length
+          : 0,
+    cardCount: typeof prevDelivery.cardCount === 'number' ? prevDelivery.cardCount : 0,
+    overdueCount: typeof prevDelivery.overdueCount === 'number' ? prevDelivery.overdueCount : 0,
+    dueSoonCount: typeof prevDelivery.dueSoonCount === 'number' ? prevDelivery.dueSoonCount : 0,
+    unassignedCount:
+      typeof prevDelivery.unassignedCount === 'number' ? prevDelivery.unassignedCount : 0,
+    summaryMode:
+      prevDelivery.summaryMode === 'ai' || prevDelivery.summaryMode === 'deterministic'
+        ? prevDelivery.summaryMode
+        : cfg?.includeAiSummary
+          ? 'ai'
+          : 'deterministic',
+    sentAt: typeof prevDelivery.sentAt === 'string' ? prevDelivery.sentAt : resolvedAtIso,
+    manualConfirmedAt: resolvedAtIso,
+    manualResolution: {
+      status: 'confirmed_sent',
+      resolvedAt: resolvedAtIso,
+      manualConfirmedAt: resolvedAtIso,
+      resolvedBy,
+    },
+  };
+}
+
 const WRITE_INTENT_REGEX =
   /(?:^|\s)(tạo\s+thẻ|tạo\s+card|thêm\s+thẻ|thêm\s+card|sửa\s+thẻ|cập\s+nhật\s+thẻ|đóng\s+thẻ|lưu\s+trữ\s+thẻ|di\s+chuyển\s+thẻ|gán\s+thành\s+viên|create\s+card|update\s+card|archive\s+card|move\s+card|add\s+checklist)(?=$|\s|[.,;!?])/i;
 

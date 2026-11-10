@@ -41,7 +41,12 @@ import {
 } from './sheets-digest-candidate.js';
 import { canonicalizeDigestConfig, computeDigestConfigHash } from './github-digest-candidate.js';
 import { computeTelegramDigestConfigHash } from './telegram-digest-candidate.js';
-import { canonicalizeTrelloDigestConfig, computeTrelloDigestConfigHash } from './trello-digest-candidate.js';
+import {
+  buildConfirmedTrelloDigestDelivery,
+  canonicalizeTrelloDigestConfig,
+  computeTrelloDigestConfigHash,
+  getTrelloDigestPinnedCredentialIds,
+} from './trello-digest-candidate.js';
 import { canonicalizeNotionDigestConfig, computeNotionDigestConfigHash } from './notion-digest-candidate.js';
 import { canonicalizeJiraDigestConfig, computeJiraDigestConfigHash, type JiraDigestCandidate, type JiraDigestConfig } from './jira-digest-candidate.js';
 
@@ -1713,45 +1718,12 @@ export class ScheduleService {
             run.delivery && typeof run.delivery === 'object'
               ? (run.delivery as unknown as Record<string, unknown>)
               : {};
-          deliveryPayload = {
-            ...prevDelivery,
-            destination:
-              prevDelivery.destination ?? cfg?.destination ?? 'slack',
-            targetId:
-              prevDelivery.targetId ??
-              (cfg?.destination === 'telegram' ? cfg?.telegramChatId : cfg?.channelId) ??
-              'unknown',
-            ...(cfg?.destination === 'telegram' && cfg?.telegramChatTitle
-              ? { targetLabel: prevDelivery.targetLabel ?? cfg.telegramChatTitle }
-              : cfg?.channelName
-                ? { targetLabel: prevDelivery.targetLabel ?? cfg.channelName }
-                : {}),
-            boardCount:
-              typeof prevDelivery.boardCount === 'number'
-                ? prevDelivery.boardCount
-                : Array.isArray(cfg?.boards)
-                  ? cfg.boards.length
-                  : 0,
-            cardCount: typeof prevDelivery.cardCount === 'number' ? prevDelivery.cardCount : 0,
-            overdueCount: typeof prevDelivery.overdueCount === 'number' ? prevDelivery.overdueCount : 0,
-            dueSoonCount: typeof prevDelivery.dueSoonCount === 'number' ? prevDelivery.dueSoonCount : 0,
-            unassignedCount:
-              typeof prevDelivery.unassignedCount === 'number' ? prevDelivery.unassignedCount : 0,
-            summaryMode:
-              prevDelivery.summaryMode === 'ai' || prevDelivery.summaryMode === 'deterministic'
-                ? prevDelivery.summaryMode
-                : cfg?.includeAiSummary
-                  ? 'ai'
-                  : 'deterministic',
-            sentAt: typeof prevDelivery.sentAt === 'string' ? prevDelivery.sentAt : resolvedAtIso,
-            manualConfirmedAt: resolvedAtIso,
-            manualResolution: {
-              status: 'confirmed_sent',
-              resolvedAt: resolvedAtIso,
-              manualConfirmedAt: resolvedAtIso,
-              resolvedBy: userId,
-            },
-          };
+          deliveryPayload = buildConfirmedTrelloDigestDelivery({
+            config: cfg,
+            previousDelivery: prevDelivery,
+            resolvedAtIso,
+            resolvedBy: userId,
+          });
         } else {
           const cfg =
             schedule.digest_config && typeof schedule.digest_config === 'object'
@@ -1856,24 +1828,15 @@ export class ScheduleService {
           if (expectedHash !== schedule.digest_config_hash) {
             throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
           }
-          if (cfg.credentialId && isUuid(cfg.credentialId)) {
-            const trelloCredRes = await client.query<{ status: string }>(
-              'SELECT status FROM service_credentials WHERE id = $1',
-              [cfg.credentialId],
-            );
-            if (trelloCredRes.rows[0]?.status !== 'active') {
-              throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
-            }
-          }
-          const destCredId =
-            cfg.destination === 'telegram' ? cfg.telegramCredentialId : cfg.slackCredentialId;
-          if (destCredId && isUuid(destCredId)) {
-            const destCredRes = await client.query<{ status: string }>(
-              'SELECT status FROM service_credentials WHERE id = $1',
-              [destCredId],
-            );
-            if (destCredRes.rows[0]?.status !== 'active') {
-              throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+          for (const credId of getTrelloDigestPinnedCredentialIds(cfg)) {
+            if (isUuid(credId)) {
+              const credRes = await client.query<{ status: string }>(
+                'SELECT status FROM service_credentials WHERE id = $1',
+                [credId],
+              );
+              if (credRes.rows[0]?.status !== 'active') {
+                throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+              }
             }
           }
         } else if (schedule.kind === 'telegram_digest') {
