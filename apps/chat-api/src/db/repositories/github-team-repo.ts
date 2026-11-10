@@ -13,11 +13,21 @@ export interface GitHubTeamScope {
 }
 
 export interface ReplaceGitHubTeamScopeInput {
+  scopeId: string;
   chosenBy: string;
   repos: GitHubTeamRepoItem[];
 }
 
 const REPO_FULL_NAME_RE = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const VALID_GITHUB_SCOPE_ID_RE =
+  /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|personal:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+export function isValidGitHubScopeId(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'default') return false;
+  return VALID_GITHUB_SCOPE_ID_RE.test(trimmed);
+}
 
 export function isValidGitHubRepoFullName(value: string): boolean {
   if (!REPO_FULL_NAME_RE.test(value)) return false;
@@ -30,15 +40,21 @@ export function isValidGitHubRepoFullName(value: string): boolean {
 export class GitHubTeamRepo {
   constructor(private pool: pg.Pool) {}
 
-  async get(): Promise<GitHubTeamScope | null> {
+  async get(scopeId?: string): Promise<GitHubTeamScope | null> {
+    if (!isValidGitHubScopeId(scopeId)) {
+      return null;
+    }
+    const normalizedScopeId = scopeId.trim();
     const scopeRes = await this.pool.query<{ chosen_by: string; updated_at: Date | string }>(
-      "SELECT chosen_by, updated_at FROM github_team_scope WHERE id = 'default'"
+      'SELECT chosen_by, updated_at FROM github_team_scope WHERE id = $1',
+      [normalizedScopeId]
     );
     const scope = scopeRes.rows[0];
     if (!scope) return null;
 
     const reposRes = await this.pool.query<{ repo_id: string; full_name: string; name: string }>(
-      "SELECT repo_id, full_name, name FROM github_team_repos WHERE scope_id = 'default' ORDER BY position ASC, created_at ASC"
+      'SELECT repo_id, full_name, name FROM github_team_repos WHERE scope_id = $1 ORDER BY position ASC, created_at ASC',
+      [normalizedScopeId]
     );
 
     const updatedAt = scope.updated_at instanceof Date ? scope.updated_at.toISOString() : new Date(scope.updated_at).toISOString();
@@ -54,6 +70,10 @@ export class GitHubTeamRepo {
   }
 
   async replace(input: ReplaceGitHubTeamScopeInput): Promise<GitHubTeamScope> {
+    if (!isValidGitHubScopeId(input?.scopeId)) {
+      throw new Error('Valid workspace scopeId is required (default scope is prohibited)');
+    }
+    const normalizedScopeId = input.scopeId.trim();
     if (!input.chosenBy?.trim()) {
       throw new Error('chosenBy is required');
     }
@@ -82,24 +102,24 @@ export class GitHubTeamRepo {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query("DELETE FROM github_team_repos WHERE scope_id = 'default'");
+      await client.query('DELETE FROM github_team_repos WHERE scope_id = $1', [normalizedScopeId]);
 
       const scopeRes = await client.query<{ chosen_by: string; updated_at: Date | string }>(
         `INSERT INTO github_team_scope (id, chosen_by, updated_at)
-         VALUES ('default', $1, now())
+         VALUES ($1, $2, now())
          ON CONFLICT (id) DO UPDATE SET
            chosen_by = EXCLUDED.chosen_by,
            updated_at = now()
          RETURNING chosen_by, updated_at`,
-        [input.chosenBy.trim()]
+        [normalizedScopeId, input.chosenBy.trim()]
       );
 
       for (let i = 0; i < deduped.length; i++) {
         const repo = deduped[i]!;
         await client.query(
           `INSERT INTO github_team_repos (scope_id, repo_id, full_name, name, position)
-           VALUES ('default', $1, $2, $3, $4)`,
-          [repo.repoId, repo.fullName, repo.name, i + 1]
+           VALUES ($1, $2, $3, $4, $5)`,
+          [normalizedScopeId, repo.repoId, repo.fullName, repo.name, i + 1]
         );
       }
 

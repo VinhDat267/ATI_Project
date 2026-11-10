@@ -578,6 +578,7 @@ describe('SLACK-06A protected inbox, refine/prepare/reject CAS, and cross-servic
   });
   const ghTeam=new GitHubTeamRepo(env.db.pool);
   await ghTeam.replace({
+   scopeId:`personal:${f.owner.person.id}`,
    chosenBy:f.owner.person.id,
    repos:[{repoId:'R_1',fullName:'acme/repo',name:'repo'}],
   });

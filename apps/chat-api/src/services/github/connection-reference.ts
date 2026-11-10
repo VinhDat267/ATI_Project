@@ -26,8 +26,16 @@ export function createGitHubConnectionLookup(deps: {
   tokens: GitHubTokenManager;
   client: GitHubOAuthClient;
 }) {
-  return async (userId: string): Promise<GitHubConnectionLookupResult> => {
-    const scope = await deps.teamRepo.get();
+  return async (userId: string, scopeId?: string): Promise<GitHubConnectionLookupResult> => {
+    const resolvedScopeId =
+      scopeId === undefined
+        ? userId
+          ? `personal:${userId}`
+          : undefined
+        : typeof scopeId === 'string' && scopeId.trim() && scopeId.trim().toLowerCase() !== 'default'
+          ? scopeId.trim()
+          : undefined;
+    const scope = resolvedScopeId ? await deps.teamRepo.get(resolvedScopeId) : null;
     const teamRepos = scope?.repos ?? [];
 
     const record = await deps.credentialRepo.getPersonalConnectionStatus('github', userId);

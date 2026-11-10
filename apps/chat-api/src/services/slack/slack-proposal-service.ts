@@ -202,7 +202,8 @@ export class SlackProposalService {
       );
       const githubRepoRows = (
         await c.query<{ full_name: string }>(
-          "SELECT full_name FROM github_team_repos WHERE scope_id = 'default' ORDER BY position ASC, created_at ASC",
+          'SELECT full_name FROM github_team_repos WHERE scope_id = $1 ORDER BY position ASC, created_at ASC',
+          [`personal:${owner}`],
         )
       ).rows;
       const registeredRepos = Array.from(

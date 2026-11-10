@@ -11,6 +11,8 @@ import {
   type GitHubTeamRepo,
   type GitHubTeamRepoItem,
 } from '../../db/repositories/github-team-repo.js';
+import { WorkspaceRepo } from '../../db/repositories/workspace-repo.js';
+import { createWorkspaceContextMiddleware } from '../../middleware/workspace-context.js';
 import {
   GitHubOAuthClient,
   GitHubOAuthError,
@@ -49,6 +51,27 @@ export interface GitHubConnectionsOptions {
   conversationOwner?: (conversationId: string) => Promise<string | null>;
   tokens?: Pick<GitHubTokenManager, 'forConnection'>;
   adminUserIds?: string[];
+  workspaceRepo?: WorkspaceRepo;
+}
+
+function githubScopeId(req: Request): string | null {
+  if (req.workspace?.mode === 'organization' && req.workspace.workspaceId) {
+    return req.workspace.workspaceId;
+  }
+  if (req.workspace?.mode === 'personal' && (req as any).user?.id) {
+    return `personal:${(req as any).user.id}`;
+  }
+  return null;
+}
+
+function canSelectRepos(req: Request, adminUserIds?: string[]): boolean {
+  if (req.workspace?.mode === 'organization') {
+    return req.workspace.role === 'admin';
+  }
+  if (req.workspace?.mode === 'personal') {
+    return isAdmin((req as any).user, adminUserIds) || Boolean((req as any).user?.id);
+  }
+  return false;
 }
 
 export function isGitHubConnectAvailable(
@@ -75,6 +98,11 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
   const githubTimeoutMs = options.githubTimeoutMs ?? 10_000;
   const client = options.oauth ? new GitHubOAuthClient(options.oauth, options.fetchFn) : undefined;
   const auth = createAuthMiddleware(options.jwtSecret, { sessionRepo: options.sessionRepo, clock });
+  const pool =
+    (options.teamRepo as any)?.pool ??
+    (options.credentialRepo as any)?.pool ??
+    (options.sessionRepo as any)?.pool;
+  const workspaceRepo = options.workspaceRepo ?? (pool ? new WorkspaceRepo(pool) : undefined);
 
   router.use((_req, res, next) => {
     const json = res.json.bind(res);
@@ -88,6 +116,7 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
   });
 
   router.use(auth);
+  router.use(createWorkspaceContextMiddleware(workspaceRepo));
   router.use((req, res, next) => {
     if (!isGitHubConnectAvailable(options)) {
       if (req.method === 'GET' && (req.path === '/' || req.path === '')) {
@@ -273,8 +302,19 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
 
   router.get('/candidate-repos', async (req, res) => {
     const user = (req as any).user as AuthUser;
-    if (!isAdmin(user, options.adminUserIds)) {
-      res.status(403).json({ error: 'Chỉ quản trị viên mới có quyền chọn repository GitHub cho nhóm.' });
+    const scopeId = githubScopeId(req);
+    if (!scopeId) {
+      res.status(400).json({
+        error: 'Vui lòng chọn không gian làm việc trước khi cấu hình phạm vi repository GitHub.',
+        code: 'GITHUB_WORKSPACE_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    if (!canSelectRepos(req, options.adminUserIds)) {
+      res.status(403).json({
+        error: 'Chỉ quản trị viên mới có quyền chọn repository GitHub cho nhóm.',
+        code: 'GITHUB_WORKSPACE_ADMIN_REQUIRED',
+      });
       return;
     }
 
@@ -315,8 +355,19 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
 
   router.put('/scope', async (req, res) => {
     const user = (req as any).user as AuthUser;
-    if (!isAdmin(user, options.adminUserIds)) {
-      res.status(403).json({ error: 'Chỉ quản trị viên mới có quyền chọn repository GitHub cho nhóm.' });
+    const scopeId = githubScopeId(req);
+    if (!scopeId) {
+      res.status(400).json({
+        error: 'Vui lòng chọn không gian làm việc trước khi cấu hình phạm vi repository GitHub.',
+        code: 'GITHUB_WORKSPACE_SCOPE_REQUIRED',
+      });
+      return;
+    }
+    if (!canSelectRepos(req, options.adminUserIds)) {
+      res.status(403).json({
+        error: 'Chỉ quản trị viên mới có quyền chọn repository GitHub cho nhóm.',
+        code: 'GITHUB_WORKSPACE_ADMIN_REQUIRED',
+      });
       return;
     }
 
@@ -369,6 +420,7 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
       }
 
       const saved = await options.teamRepo.replace({
+        scopeId,
         chosenBy: user.id,
         repos: selected,
       });
@@ -410,7 +462,18 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
       }
       const login = typeof dec.login === 'string' ? dec.login : undefined;
 
-      const scope = options.teamRepo ? await options.teamRepo.get() : null;
+      const scopeId = githubScopeId(req);
+      if (!scopeId) {
+        res.json({
+          status: 'needs_scope',
+          code: 'GITHUB_WORKSPACE_SCOPE_REQUIRED',
+          ...(login ? { login } : {}),
+          repos: [],
+        });
+        return;
+      }
+
+      const scope = options.teamRepo ? await options.teamRepo.get(scopeId) : null;
       if (!scope || !scope.repos || scope.repos.length === 0) {
         res.json({
           status: 'needs_scope',
