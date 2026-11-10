@@ -1,5 +1,7 @@
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { describe, it, expect, vi } from 'vitest';
-import { SlackAdapter } from '../src/index.js';
+import { GlobalRateLimiter, SlackAdapter, StepError } from '../src/index.js';
 
 describe('packages/tool-adapters (Task 5: Slack Adapter & Allowed Channels Filtering)', () => {
   const mockFetch = vi.fn().mockImplementation(async (url: string | URL, options?: RequestInit) => {
@@ -180,7 +182,87 @@ describe('packages/tool-adapters (Task 5: Slack Adapter & Allowed Channels Filte
       ).rejects.toMatchObject({
         category: 'UNKNOWN',
         retryable: false,
+        details: { requestSent: true },
       });
+    }
+  });
+
+  it('XSVC-B (GAS-01 ∩ TRELLO-AUDIT-08): enforces strict string channel and ts receipt validation over real HTTP loopback with requestSent: true', async () => {
+    let nextResponsePayload: unknown = { ok: true };
+    let postCount = 0;
+
+    const server: Server = createServer((req, res) => {
+      if (req.method === 'POST' && req.url === '/api/chat.postMessage') {
+        postCount += 1;
+        req.resume();
+        req.on('end', () => {
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify(nextResponsePayload));
+        });
+        return;
+      }
+      res.writeHead(404);
+      res.end('not found');
+    });
+
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+    const { port } = server.address() as AddressInfo;
+
+    try {
+      const adapter = new SlackAdapter({
+        credentials: { botToken: 'xoxb-loopback-test' },
+        allowedScope: { channels: ['C2'] },
+        baseUrl: `http://127.0.0.1:${port}/api`,
+        rateLimiter: new GlobalRateLimiter({ maxRequests: 100, windowMs: 10 }),
+      });
+
+      const malformedReceipts: unknown[] = [
+        { ok: true, channel: 'C2' },
+        { ok: true, channel: 'C2', ts: '' },
+        { ok: true, channel: 'C2', ts: '   ' },
+        { ok: true, channel: 'C2', ts: { bad: 1 } },
+        { ok: true, channel: 'C2', ts: 12345 },
+        { ok: true, channel: 'C2', ts: 'undefined' },
+        { ok: true, channel: 'C2', ts: 'null' },
+        { ok: true, ts: '1700000000.000100' },
+        { ok: true, channel: '', ts: '1700000000.000100' },
+        { ok: true, channel: { id: 'C2' }, ts: '1700000000.000100' },
+        { ok: true, channel: 'undefined', ts: '1700000000.000100' },
+        { ok: true, channel: 'null', ts: '1700000000.000100' },
+      ];
+
+      let expectedPosts = 0;
+      for (const payload of malformedReceipts) {
+        nextResponsePayload = payload;
+        expectedPosts += 1;
+        let caught: unknown;
+        try {
+          await adapter.sendMessage({ channel: 'C2', text: 'Loopback digest' });
+        } catch (err) {
+          caught = err;
+        }
+        expect(caught, `Expected malformed receipt ${JSON.stringify(payload)} to throw StepError`).toBeInstanceOf(
+          StepError
+        );
+        expect(caught).toMatchObject({
+          category: 'UNKNOWN',
+          retryable: false,
+          details: { requestSent: true },
+        });
+        expect(postCount).toBe(expectedPosts);
+      }
+
+      nextResponsePayload = { ok: true, channel: '  C2  ', ts: '  1700000000.000100  ' };
+      const validReceipt = await adapter.sendMessage({ channel: 'C2', text: 'Loopback digest' });
+      expect(validReceipt).toEqual({
+        channel: 'C2',
+        ts: '1700000000.000100',
+      });
+      expect(postCount).toBe(expectedPosts + 1);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.close((err) => (err ? reject(err) : resolve()))
+      );
     }
   });
 });

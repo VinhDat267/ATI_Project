@@ -456,7 +456,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-[#374151] leading-relaxed">
-                Đăng nhập Google chỉ dùng để xác định bạn là ai. Planora chỉ đọc hộp thư bạn tự kết nối, và chỉ hộp thư đó. Khi chưa kết nối dịch vụ cá nhân, Planora không truy cập Drive hay lịch cá nhân; khi bạn kết nối Google Sheets cá nhân (phạm vi OAuth drive.file và spreadsheets), quyền truy cập chỉ giới hạn ở các tệp đã cấp quyền cho ứng dụng và danh sách bảng tính bạn đã chọn. Google Sheets và Google Calendar của nhóm được kết nối riêng bằng tài khoản dịch vụ do quản trị viên cấu hình.
+                Đăng nhập Google chỉ dùng để xác định bạn là ai. Planora chỉ đọc hộp thư bạn tự kết nối, và chỉ hộp thư đó. Khi chưa kết nối dịch vụ cá nhân, Planora không truy cập Drive hay lịch cá nhân; khi bạn kết nối Google Sheets cá nhân (phạm vi OAuth drive.file và spreadsheets), quyền truy cập chỉ giới hạn ở các tệp đã cấp quyền cho ứng dụng và danh sách bảng tính bạn đã chọn; khi bạn kết nối Google Calendar cá nhân (phạm vi OAuth calendar.readonly và calendar.events), Planora kiểm soát danh sách cho phép ở tầng ứng dụng và chỉ truy cập trên các lịch bạn đã chọn. Google Sheets và Google Calendar của nhóm được kết nối riêng bằng tài khoản dịch vụ do quản trị viên cấu hình.
               </p>
             </div>
           </div>

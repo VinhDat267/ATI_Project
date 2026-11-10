@@ -1115,4 +1115,110 @@ describe('Trello & Telegram Digest Delivery, Scope, Preflight & Recovery Invaria
       pausedStepId: 'step_1',
     });
   });
+
+  it('XSVC-B (GAS-08 ∩ TRELLO-AUDIT-10): trello_digest and telegram_digest preserve dispatched_config on retry_new_run and never leak post-run mutated schedule.digest_config during mark_sent', async () => {
+    const service = new ScheduleService({ pool: db.pool, timeZone: TZ });
+
+    // 1. Trello digest with persisted dispatched_config snapshot: mutate schedule version + channel afterwards -> mark_sent MUST use dispatched_config ('C_OPS'), not mutated 'C_MUTATED_WRONG'
+    const sTrelloSnap = await seedTrelloSchedule({ destination: 'slack' });
+    await db.pool.query(
+      `UPDATE schedule_runs
+       SET status = 'needs_attention',
+           delivery_started_at = now(),
+           error = 'TRELLO_DELIVERY_UNKNOWN: Timeout.',
+           dispatched_config = $2::jsonb,
+           dispatched_config_hash = $3
+       WHERE id = $1`,
+      [sTrelloSnap.runId, JSON.stringify(sTrelloSnap.config), sTrelloSnap.hash],
+    );
+    const mutatedTrelloCfg: TrelloDigestConfig = {
+      ...sTrelloSnap.config,
+      channelId: 'C_MUTATED_WRONG',
+      channelName: 'mutated-wrong',
+    };
+    await db.pool.query(
+      `UPDATE schedules
+       SET version = 2,
+           digest_config = $2::jsonb
+       WHERE id = $1`,
+      [sTrelloSnap.schedule.id, JSON.stringify(mutatedTrelloCfg)],
+    );
+
+    const resolvedTrelloSnap = await service.resolveRunDelivery({
+      userId: sTrelloSnap.owner.id,
+      runId: sTrelloSnap.runId,
+      resolution: 'mark_sent',
+      now: NOW,
+    });
+    expect(resolvedTrelloSnap.run.state).toBe('digest_sent');
+    expect(resolvedTrelloSnap.run.delivery).toMatchObject({
+      destination: 'slack',
+      targetId: 'C_OPS',
+      targetLabel: 'ops',
+    });
+
+    // 2. Legacy/un-snapshotted Telegram digest run where schedule version advanced after run: mark_sent MUST NOT read mutated chatId ('999999_WRONG'), falling back safely to 'unknown'
+    const sTgLegacy = await seedTelegramSchedule('777088');
+    await db.pool.query(
+      `UPDATE schedule_runs
+       SET status = 'needs_attention',
+           delivery_started_at = now(),
+           error = 'TELEGRAM_DELIVERY_UNKNOWN: Timeout.',
+           dispatched_config = NULL,
+           dispatched_config_hash = NULL
+       WHERE id = $1`,
+      [sTgLegacy.runId],
+    );
+    await db.pool.query(
+      `UPDATE schedules
+       SET version = 2,
+           digest_config = $2::jsonb
+       WHERE id = $1`,
+      [
+        sTgLegacy.schedule.id,
+        JSON.stringify({ ...sTgLegacy.config, chatId: '999999_WRONG', chatTitle: 'Wrong Chat' }),
+      ],
+    );
+
+    const resolvedTgLegacy = await service.resolveRunDelivery({
+      userId: sTgLegacy.owner.id,
+      runId: sTgLegacy.runId,
+      resolution: 'mark_sent',
+      now: NOW,
+    });
+    expect(resolvedTgLegacy.run.state).toBe('digest_sent');
+    expect(resolvedTgLegacy.run.delivery).toMatchObject({
+      chatId: 'unknown',
+    });
+    expect((resolvedTgLegacy.run.delivery as any)?.chatTitle).toBeUndefined();
+
+    // 3. retry_new_run on active trello_digest persists dispatched_config and dispatched_config_hash on the manual replacement run
+    const sTrelloRetry = await seedTrelloSchedule({ destination: 'slack' });
+    await db.pool.query(
+      `UPDATE schedule_runs
+       SET status = 'needs_attention',
+           delivery_started_at = now(),
+           error = 'TRELLO_DELIVERY_UNKNOWN: Timeout.'
+       WHERE id = $1`,
+      [sTrelloRetry.runId],
+    );
+    const retried = await service.resolveRunDelivery({
+      userId: sTrelloRetry.owner.id,
+      runId: sTrelloRetry.runId,
+      resolution: 'retry_new_run',
+      confirmDuplicateRisk: true,
+      now: NOW,
+    });
+    const followUpRow = (
+      await db.pool.query(
+        'SELECT dispatched_config, dispatched_config_hash FROM schedule_runs WHERE id = $1',
+        [retried.followUpRun!.id],
+      )
+    ).rows[0];
+    expect(followUpRow.dispatched_config).toMatchObject({
+      channelId: 'C_OPS',
+      destination: 'slack',
+    });
+    expect(followUpRow.dispatched_config_hash).toBe(sTrelloRetry.hash);
+  });
 });

@@ -170,4 +170,40 @@ describe('CI Browser Scenario Selector (TRELLO-AUDIT-13 / AUTO-09)', () => {
       expect(cliActive[0]?.schedulesEnabled).toBe(true);
     }
   });
+
+  it('XSVC-B (TRELLO-AUDIT-13 ∩ GAS-12): preserves all 25 scenario groups including sheets_digest_v2_recovery alongside Trello/Telegram groups', async () => {
+    const mod = await loadBrowserScenarioModule();
+    expect(mod.scenarios).toHaveLength(25);
+
+    const sheetsRecovery = mod.scenarios.find((s) => s.name === 'sheets_digest_v2_recovery');
+    expect(sheetsRecovery).toBeDefined();
+    expect(sheetsRecovery?.schedulesEnabled).toBe(true);
+    expect(
+      new RegExp(sheetsRecovery!.grep).test(
+        'Browser UI E2E (Mocked API): Sheets Digest V2 Preview, Uncertain Delivery Recovery, and Reauthorization'
+      )
+    ).toBe(true);
+
+    const filteredByEnv = mod.resolveActiveScenarios!([], { SCENARIO: 'sheets_digest_v2_recovery' });
+    expect(filteredByEnv).toHaveLength(1);
+    expect(filteredByEnv[0]?.name).toBe('sheets_digest_v2_recovery');
+
+    const cliSheetsSpec = mod.resolveActiveScenarios!(
+      ['apps/chat-web/tests/browser/sheets-digest-v2-recovery.spec.ts'],
+      {}
+    );
+    expect(cliSheetsSpec).toHaveLength(1);
+    expect(cliSheetsSpec[0]).toMatchObject({
+      name: 'schedule',
+      sandboxScenario: 'schedule',
+      schedulesEnabled: true,
+    });
+
+    const scriptSource = readFileSync(SCRIPT_PATH, 'utf8');
+    expect(scriptSource).toMatch(/GMAIL_ENABLED\s*=\s*\['gmail',\s*'sheets_digest_v2_recovery'\]\.includes\(scenario\.name\)/);
+    expect(scriptSource).toMatch(/MYSHEETS_ENABLED\s*=\s*\['mysheets',\s*'sheets_digest_v2_recovery'\]\.includes\(scenario\.name\)/);
+    expect(scriptSource).toMatch(
+      /SCHEDULES_ENABLED\s*=\s*\(\['schedule',\s*'sheets_digest_v2_recovery'\]\.includes\(scenario\.name\)\s*\|\|\s*scenario\.schedulesEnabled\)/
+    );
+  });
 });
