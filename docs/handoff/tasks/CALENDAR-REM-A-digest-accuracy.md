@@ -18,10 +18,11 @@ Khắc phục triệt để hai lỗi đã xác nhận trong báo cáo kiểm to
 
 ## 2. Ranh giới Sở hữu File (Ownership)
 
-Chỉ chỉnh sửa các file thuộc quyền sở hữu của Worker A:
+Chỉ chỉnh sửa các file thuộc quyền sở hữu của Worker A / Worker A-ci:
 - [`apps/chat-api/src/services/schedules/calendar-digest-runner.ts`](../../../apps/chat-api/src/services/schedules/calendar-digest-runner.ts)
 - [`apps/chat-api/tests/services/calendar-digest-runner.test.ts`](../../../apps/chat-api/tests/services/calendar-digest-runner.test.ts)
 - [`apps/chat-api/tests/services/calendar-rem-a-digest-accuracy.test.ts`](../../../apps/chat-api/tests/services/calendar-rem-a-digest-accuracy.test.ts)
+- [`apps/chat-api/tests/routes/workspace-isolation.test.ts`](../../../apps/chat-api/tests/routes/workspace-isolation.test.ts)
 - [`docs/handoff/tasks/CALENDAR-REM-A-digest-accuracy.md`](CALENDAR-REM-A-digest-accuracy.md)
 - [`docs/handoff/log/2026-11-10-calendar-rem-a-digest-accuracy.md`](../log/2026-11-10-calendar-rem-a-digest-accuracy.md)
 
@@ -57,6 +58,16 @@ Không chạm vào `apps/chat-api/src/server.ts`, `schedule-runner.ts`, `schedul
   npm run typecheck:v3
   ```
   - **Kết quả:** **PASS (`exit code 0`)**. Log lưu tại `C:\Users\VinhDat\orca\workspaces\ATI_Project\calendar-remediation-v2-evidence-20261110\workers\A\logs\typecheck.log`.
+
+### 3.3. Khắc phục lỗi CI Deadlock trên PR #308 (`Worker A-ci` — `workspace-isolation.test.ts:153`)
+- **Nguyên nhân gốc rễ (Root Cause từ CI run `42797184204`):**
+  - Trong `apps/chat-api/tests/routes/workspace-isolation.test.ts`, bài kiểm thử `'allows active org member to approve plan, and blocks disabled member with 403'` gọi `POST /api/plans/${plan.id}/approve` (`ExecutionService.approveAndStart`), kích hoạt tiến trình chạy nền `setImmediate(() => this.executePlan(...))` nhưng kết thúc bài kiểm thử mà không chờ tiến trình chạy nền hoàn tất.
+  - Khi bài kiểm thử kế tiếp (`[AUDIT-A]`) chạy `beforeEach`, câu lệnh `TRUNCATE workspaces, workspace_members, conversations, messages, plans, execution_steps, ... CASCADE` khóa bảng theo thứ tự khai báo (`conversations` trước, `plans` sau bằng `AccessExclusiveLock`), trong khi tiến trình `executePlan` chạy nền từ bài kiểm thử trước đang thực thi `guardPlanInTransaction` (`SELECT p.*, p.xmin::text AS revision, v.user_id FROM plans p JOIN conversations v ON v.id=p.conv_id WHERE p.id=$1`) khóa `plans` trước rồi chờ `AccessShareLock` trên `conversations`, tạo chu trình khóa AB-BA (`40P01: deadlock detected`).
+- **Pha `RED` (Tái hiện tất định trên PostgreSQL 16 độc lập `127.0.0.1:56651`):**
+  - Bài kiểm thử hồi quy `[AUDIT-CI-308]` tái hiện chính xác tiến trình chạy nền `executePlan` giữ `AccessShareLock` trên `plans` rồi thực thi `SELECT p.*, p.xmin::text AS revision, v.user_id FROM plans p JOIN conversations v ON v.id=p.conv_id WHERE p.id=$1` đồng thời với `beforeEach` `TRUNCATE`, làm phát sinh lỗi `error: deadlock detected` (`code: '40P01'`) đúng như CI run `42797184204` (log tại `workers/A-ci/logs/red-deadlock-repro.log` và `workers/A-ci/logs/red-postgres-detail.log`).
+- **Pha `GREEN`:**
+  - Bổ sung `drainExecutionService()` trong `workspace-isolation.test.ts` để chờ toàn bộ `queuedStarts` và `activeRuns` của `ExecutionService` kết thúc trước khi kết thúc bài kiểm thử duyệt kế hoạch, trước khi chạy `TRUNCATE` trong `beforeEach` và trước `db.close()` trong `afterAll`; đồng thời sắp xếp lại thứ tự bảng trong `TRUNCATE` (`execution_steps, plans, messages, conversations, ...`) đồng nhất với chiều khóa truy vấn.
+  - Kết quả chạy `npm test -w @wap/chat-api -- tests/routes/workspace-isolation.test.ts --maxWorkers=1`: **PASS (`15/15` tests passed, `exit code 0`)** (log tại `workers/A-ci/logs/green-workspace-isolation.log`).
 
 ## 4. Kết quả
 

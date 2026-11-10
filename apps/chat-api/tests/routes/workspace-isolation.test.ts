@@ -45,6 +45,7 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
   let alice: Person;
   let bob: Person;
   let charlie: Person;
+  let onAdapterExecute: (() => Promise<void>) | undefined;
 
   const mockOAuthConfig = {
     clientId: 'fake-trello-client-id',
@@ -115,7 +116,10 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
       workspaceRepo,
       adapterFactory: {
         getAdapterForService: () => ({
-          execute: async () => ({ success: true }),
+          execute: async () => {
+            await onAdapterExecute?.();
+            return { success: true };
+          },
         }),
       },
     });
@@ -149,14 +153,39 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
     });
   });
 
-  beforeEach(async () => {
-    await db.pool.query('TRUNCATE workspaces, workspace_members, conversations, messages, plans, execution_steps, service_credentials, trello_team_scope, trello_team_boards, schedules CASCADE');
+  const drainExecutionService = async () => {
+    for (let i = 0; i < 100; i++) {
+      const queued = (executionService as any)?.queuedStarts as Set<string> | undefined;
+      const active = (executionService as any)?.activeRuns as Map<string, Promise<unknown>> | undefined;
+      if ((!queued || queued.size === 0) && (!active || active.size === 0)) {
+        return;
+      }
+      if (active && active.size > 0) {
+        await Promise.allSettled([...active.values()]);
+      } else {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      }
+    }
+    throw new Error('Timed out waiting for background ExecutionService runs to settle');
+  };
+
+  const resetWorkspaceIsolationFixture = async () => {
+    await drainExecutionService();
+    await db.pool.query(
+      'TRUNCATE execution_steps, plans, messages, conversations, trello_team_boards, trello_team_scope, schedules, service_credentials, workspace_members, workspaces CASCADE'
+    );
     alice = await db.person('Alice');
     bob = await db.person('Bob');
     charlie = await db.person('Charlie');
+  };
+
+  beforeEach(async () => {
+    onAdapterExecute = undefined;
+    await resetWorkspaceIsolationFixture();
   });
 
   afterAll(async () => {
+    await drainExecutionService();
     await db.close();
   });
 
@@ -666,6 +695,8 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
         .set('X-Workspace-Id', org.id);
       expect(approveRes.status).toBe(200);
       expect(approveRes.body.success).toBe(true);
+      await drainExecutionService();
+      expect(executionService.getExecutionStatus(plan.id)?.status).toBe('completed');
 
       // Create a second plan for Bob
       const plan2 = await planRepo.createPlan({
@@ -692,6 +723,71 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
         .set('Authorization', `Bearer ${bobToken}`);
       expect(blockedRes2.status).toBe(403);
       expect(blockedRes2.body.error).toBe('WORKSPACE_ACCESS_DENIED');
+    });
+
+    it('[AUDIT-CI-308] drains in-flight background plan execution before beforeEach TRUNCATE so guardPlanInTransaction cannot deadlock (40P01)', async () => {
+      const bobToken = tokenFor(bob);
+      const org = await workspaceRepo.create(alice.id, 'Deadlock Guard Org', false);
+      await workspaceRepo.joinByInviteCode(bob.id, org.inviteCode!);
+
+      const conv = await convRepo.createConversation(bob.id, {
+        workspaceMode: 'organization',
+        workspaceId: org.id,
+      });
+
+      const planPayload = { steps: [{ id: 's1', tool: 'slack.send_message', args: {} }] };
+      const plan = await planRepo.createPlan({
+        convId: conv.id,
+        planJson: planPayload,
+        planText: JSON.stringify(planPayload),
+        planHash: hash(planPayload),
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      });
+
+      let resolvePlanLockHeld!: () => void;
+      const planLockHeld = new Promise<void>((resolve) => {
+        resolvePlanLockHeld = resolve;
+      });
+
+      let adapterDeadlockError: unknown;
+      onAdapterExecute = async () => {
+        const client = await db.pool.connect();
+        try {
+          await client.query('BEGIN');
+          // Hold AccessShareLock on plans first, then join conversations (exact lock order of PlanRepo.getPlan / guardPlanInTransaction)
+          await client.query('SELECT id FROM plans WHERE id = $1', [plan.id]);
+          resolvePlanLockHeld();
+          await new Promise((resolve) => setTimeout(resolve, 60));
+          await client.query(
+            'SELECT p.*,p.xmin::text AS revision,v.user_id FROM plans p JOIN conversations v ON v.id=p.conv_id WHERE p.id=$1',
+            [plan.id]
+          );
+          await client.query('COMMIT');
+        } catch (err) {
+          adapterDeadlockError = err;
+          await client.query('ROLLBACK').catch(() => {});
+          throw err;
+        } finally {
+          client.release();
+        }
+      };
+
+      const approveRes = await request(app)
+        .post(`/api/plans/${plan.id}/approve`)
+        .set('Authorization', `Bearer ${bobToken}`)
+        .set('X-Workspace-Id', org.id);
+      expect(approveRes.status).toBe(200);
+      expect(approveRes.body.success).toBe(true);
+
+      // Wait until the detached background executePlan holds AccessShareLock on plans
+      await planLockHeld;
+
+      // Immediately running the next test's beforeEach reset must drain background execution first and never deadlock with 40P01
+      await expect(resetWorkspaceIsolationFixture()).resolves.toBeUndefined();
+      expect(adapterDeadlockError).toBeUndefined();
+      expect((executionService as any).queuedStarts.size).toBe(0);
+      expect((executionService as any).activeRuns.size).toBe(0);
+      expect(executionService.getExecutionStatus(plan.id)?.status).toBe('completed');
     });
 
     it('[AUDIT-A] personal workspace mode never exposes legacy shared credentials (user_id IS NULL, workspace_id IS NULL)', async () => {
