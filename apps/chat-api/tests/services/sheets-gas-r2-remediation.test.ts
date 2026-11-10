@@ -1,9 +1,11 @@
+import crypto from 'node:crypto';
 import http from 'node:http';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import {
   SlackAdapter,
   createPersonalSheetsAdapter,
+  createSheetsAdapter,
   type ReadDigestWindowResult,
 } from '@wap/tool-adapters';
 import type {
@@ -973,6 +975,651 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
         expect(res1.updatedRows + res2.updatedRows).toBe(1);
         expect(res1.skippedDuplicates + res2.skippedDuplicates).toBe(1);
         expect(rowsInSheet.filter((r) => r[0] === 'GH#321')).toHaveLength(1);
+      } finally {
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
+    });
+
+    it('reproduces and defeats all coordinator probe interleavings on real PostgreSQL: monotonic fencing tokens, stale release protection, unknown_outcome surviving release() and expiry, and dispatched expiry converting to unknown_outcome', async () => {
+      const store = new PostgresSheetsAppendLeaseStore(db.pool, {
+        pollIntervalMs: 15,
+        defaultTtlMs: 5_000,
+      });
+
+      // 1. Stale owner release & monotonic fencing tokens (never resetting to 1)
+      const a = await store.acquireLease({
+        scopeKey: 'scope-stale::tab',
+        spreadsheetId: 'sheet-stale',
+        sheetTitle: 'tab',
+        ownerId: 'owner-A',
+        ttlMs: 5_000,
+      });
+      expect(a.fencingToken).toBe(1);
+
+      // Force pre-dispatch ('active') lease A to expire in PostgreSQL
+      await db.pool.query(
+        "UPDATE sheets_append_leases SET expires_at = clock_timestamp() - interval '1 second' WHERE scope_key = 'scope-stale::tab'"
+      );
+
+      // B takes over expired pre-dispatch lease A -> fencingToken 2, then releases ('released' row retained)
+      const b = await store.acquireLease({
+        scopeKey: 'scope-stale::tab',
+        spreadsheetId: 'sheet-stale',
+        sheetTitle: 'tab',
+        ownerId: 'owner-B',
+        ttlMs: 5_000,
+      });
+      expect(b.fencingToken).toBe(2);
+      await b.release();
+
+      const afterBRelease = (
+        await db.pool.query(
+          "SELECT status, fencing_token FROM sheets_append_leases WHERE scope_key = 'scope-stale::tab'"
+        )
+      ).rows[0]!;
+      expect(afterBRelease.status).toBe('released');
+      expect(Number(afterBRelease.fencing_token)).toBe(2);
+
+      // C acquires -> fencingToken 3 (monotonic, does NOT reset to 1!)
+      const c = await store.acquireLease({
+        scopeKey: 'scope-stale::tab',
+        spreadsheetId: 'sheet-stale',
+        sheetTitle: 'tab',
+        ownerId: 'owner-C',
+        ttlMs: 5_000,
+      });
+      expect(c.fencingToken).toBe(3);
+      expect(c.leaseId).not.toBe(a.leaseId);
+
+      // Stale A.release() executes late -> must NOT delete or release C!
+      await a.release();
+      const rowsAfterStaleRelease = (
+        await db.pool.query(
+          "SELECT status, fencing_token, lease_id, owner_id FROM sheets_append_leases WHERE scope_key = 'scope-stale::tab'"
+        )
+      ).rows;
+      expect(rowsAfterStaleRelease).toHaveLength(1);
+      expect(rowsAfterStaleRelease[0]).toMatchObject({
+        status: 'active',
+        lease_id: c.leaseId,
+        owner_id: 'owner-C',
+      });
+      expect(Number(rowsAfterStaleRelease[0].fencing_token)).toBe(3);
+      await c.release();
+
+      // 2. unknown_then_release: markUnknownOutcome followed by release() preserves unknown_outcome
+      const d = await store.acquireLease({
+        scopeKey: 'scope-unknown-release::tab',
+        spreadsheetId: 'sheet-unk-1',
+        sheetTitle: 'tab',
+        ownerId: 'owner-D',
+        ttlMs: 5_000,
+      });
+      await d.markUnknownOutcome?.('provider timeout after POST', {
+        operation: 'append',
+        rowCount: 1,
+        candidateKeys: ['GH#401\u001fTimeout'],
+      });
+      await d.release();
+
+      const rowsAfterUnknownRelease = (
+        await db.pool.query(
+          "SELECT status, unknown_reason, fencing_token FROM sheets_append_leases WHERE scope_key = 'scope-unknown-release::tab'"
+        )
+      ).rows;
+      expect(rowsAfterUnknownRelease).toHaveLength(1);
+      expect(rowsAfterUnknownRelease[0]).toMatchObject({
+        status: 'unknown_outcome',
+        unknown_reason: 'provider timeout after POST',
+      });
+
+      // 3. unknown_after_expiry: expired unknown_outcome lease blocks takeover and stays unknown_outcome
+      const e = await store.acquireLease({
+        scopeKey: 'scope-unknown-expiry::tab',
+        spreadsheetId: 'sheet-unk-2',
+        sheetTitle: 'tab',
+        ownerId: 'owner-E',
+        ttlMs: 5_000,
+      });
+      await e.markUnknownOutcome?.('503 after POST');
+      await db.pool.query(
+        "UPDATE sheets_append_leases SET expires_at = clock_timestamp() - interval '1 second' WHERE scope_key = 'scope-unknown-expiry::tab'"
+      );
+
+      await expect(
+        store.acquireLease({
+          scopeKey: 'scope-unknown-expiry::tab',
+          spreadsheetId: 'sheet-unk-2',
+          sheetTitle: 'tab',
+          ownerId: 'owner-F',
+          ttlMs: 1_000,
+        })
+      ).rejects.toMatchObject({
+        category: 'UNKNOWN',
+        details: {
+          code: 'SHEETS_APPEND_UNKNOWN_OUTCOME_UNRECONCILED',
+          requestSent: false,
+          scopeKey: 'scope-unknown-expiry::tab',
+        },
+      });
+
+      const rowStillUnknown = (
+        await db.pool.query(
+          "SELECT status, owner_id, fencing_token FROM sheets_append_leases WHERE scope_key = 'scope-unknown-expiry::tab'"
+        )
+      ).rows[0]!;
+      expect(rowStillUnknown.status).toBe('unknown_outcome');
+      expect(rowStillUnknown.owner_id).toBe('owner-E');
+      expect(Number(rowStillUnknown.fencing_token)).toBe(1);
+
+      // 4. Dispatched lease expiring without release (simulated crash mid-HTTP POST) converts to unknown_outcome and blocks takeover
+      const g = await store.acquireLease({
+        scopeKey: 'scope-dispatched-expiry::tab',
+        spreadsheetId: 'sheet-disp-1',
+        sheetTitle: 'tab',
+        ownerId: 'owner-G',
+        ttlMs: 5_000,
+      });
+      await g.beginWriteDispatch?.({
+        operation: 'append',
+        rowCount: 1,
+        candidateKeys: ['GH#500\u001fInFlight'],
+      });
+      await db.pool.query(
+        "UPDATE sheets_append_leases SET expires_at = clock_timestamp() - interval '1 second' WHERE scope_key = 'scope-dispatched-expiry::tab'"
+      );
+
+      await expect(
+        store.acquireLease({
+          scopeKey: 'scope-dispatched-expiry::tab',
+          spreadsheetId: 'sheet-disp-1',
+          sheetTitle: 'tab',
+          ownerId: 'owner-H',
+          ttlMs: 1_000,
+        })
+      ).rejects.toMatchObject({
+        category: 'UNKNOWN',
+        details: {
+          code: 'SHEETS_APPEND_UNKNOWN_OUTCOME_UNRECONCILED',
+          requestSent: false,
+          scopeKey: 'scope-dispatched-expiry::tab',
+        },
+      });
+
+      const convertedRow = (
+        await db.pool.query(
+          "SELECT status, owner_id, fencing_token FROM sheets_append_leases WHERE scope_key = 'scope-dispatched-expiry::tab'"
+        )
+      ).rows[0]!;
+      expect(convertedRow.status).toBe('unknown_outcome');
+      expect(convertedRow.owner_id).toBe('owner-G');
+    });
+
+    it('fences off stale pre-dispatch lease owner before Google HTTP POST (0 POSTs from stale owner) and keeps slow active requests alive via background heartbeat on real PostgreSQL', async () => {
+      const spreadsheetId = '1Gas10FenceAndHeartbeatSpreadsheet01';
+      const rowsInSheet: string[][] = [['IssueKey', 'Title']];
+      const postAuthHeaders: string[] = [];
+      let pauseWorkerARead = true;
+      let slowMode = false;
+      const workerAReadBarrier = createBarrier();
+
+      const server = http.createServer(async (req, res) => {
+        const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+        const auth = String(req.headers.authorization ?? '');
+        if (req.method === 'GET' && url.pathname === `/v4/spreadsheets/${spreadsheetId}`) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              spreadsheetId,
+              properties: { title: 'Issues', locale: 'en_US' },
+              sheets: [
+                {
+                  properties: {
+                    sheetId: 0,
+                    title: 'Tasks',
+                    gridProperties: { rowCount: 100, columnCount: 10 },
+                  },
+                },
+              ],
+            })
+          );
+          return;
+        }
+        if (req.method === 'GET' && url.pathname.includes('/values/')) {
+          if (pauseWorkerARead && auth === 'Bearer tok-stale-A') {
+            pauseWorkerARead = false;
+            await workerAReadBarrier.wait();
+          } else if (slowMode) {
+            await new Promise((r) => setTimeout(r, 180));
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              range: 'Tasks!A1:Z500',
+              majorDimension: 'ROWS',
+              values: rowsInSheet.map((r) => [...r]),
+            })
+          );
+          return;
+        }
+        if (req.method === 'POST' && url.pathname.endsWith(':append')) {
+          postAuthHeaders.push(auth);
+          const chunks: Buffer[] = [];
+          for await (const c of req) chunks.push(c as Buffer);
+          const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+          const incoming: string[][] = body.values ?? [];
+          if (slowMode) {
+            await new Promise((r) => setTimeout(r, 180));
+          }
+          for (const row of incoming) {
+            rowsInSheet.push(row.map(String));
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              spreadsheetId,
+              updates: {
+                updatedRange: `Tasks!A${rowsInSheet.length}:B${rowsInSheet.length}`,
+                updatedRows: incoming.length,
+              },
+            })
+          );
+          return;
+        }
+        res.writeHead(404);
+        res.end();
+      });
+
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const port = (server.address() as { port: number }).port;
+      const apiBaseUrl = `http://127.0.0.1:${port}/v4/spreadsheets`;
+
+      try {
+        // Part 1: Stale pre-dispatch owner A is fenced off at beginWriteDispatch before sending HTTP POST
+        const storeA = new PostgresSheetsAppendLeaseStore(db.pool, {
+          pollIntervalMs: 15,
+          defaultTtlMs: 5_000,
+          heartbeatIntervalMs: 10_000,
+        });
+        const storeB = new PostgresSheetsAppendLeaseStore(db.pool, {
+          pollIntervalMs: 15,
+          defaultTtlMs: 5_000,
+          heartbeatIntervalMs: 10_000,
+        });
+
+        const adapterA = createPersonalSheetsAdapter({
+          userId: 'user-stale-A',
+          tokens: { getAccessToken: async () => 'tok-stale-A' },
+          allowedScope: { spreadsheets: [spreadsheetId] },
+          apiBaseUrl,
+          appendLeaseStore: storeA,
+        });
+        const adapterB = createPersonalSheetsAdapter({
+          userId: 'user-fresh-B',
+          tokens: { getAccessToken: async () => 'tok-fresh-B' },
+          allowedScope: { spreadsheets: [spreadsheetId] },
+          apiBaseUrl,
+          appendLeaseStore: storeB,
+        });
+
+        const promiseA = adapterA.execute('mysheets.append_rows', {
+          spreadsheetId,
+          sheet: 'Tasks',
+          deduplicate: true,
+          rows: [['GH#601', 'Stale owner row']],
+        });
+
+        await workerAReadBarrier.reached;
+        const scopeKey = `${spreadsheetId}::tasks`;
+        // Force A's pre-dispatch lease to expire in PostgreSQL while A is paused in GET /values
+        await db.pool.query(
+          "UPDATE sheets_append_leases SET expires_at = clock_timestamp() - interval '1 second' WHERE scope_key = $1",
+          [scopeKey]
+        );
+
+        // B takes over expired pre-dispatch lease and completes its append
+        const resB = await adapterB.execute('mysheets.append_rows', {
+          spreadsheetId,
+          sheet: 'Tasks',
+          deduplicate: true,
+          rows: [['GH#601', 'Fresh owner row']],
+        });
+        expect(resB.updatedRows).toBe(1);
+        expect(postAuthHeaders).toEqual(['Bearer tok-fresh-B']);
+
+        // Now release A from GET /values; A tries to call beginWriteDispatch before POST and MUST be fenced off!
+        workerAReadBarrier.release();
+        await expect(promiseA).rejects.toMatchObject({
+          category: 'NETWORK',
+          details: {
+            code: 'SHEETS_APPEND_LEASE_LOST',
+            requestSent: false,
+          },
+        });
+        // Zero POSTs from stale owner A!
+        expect(postAuthHeaders).toEqual(['Bearer tok-fresh-B']);
+        expect(rowsInSheet.filter((r) => r[0] === 'GH#601')).toHaveLength(1);
+
+        // Part 2: Slow request (~360ms across GET + POST) with short TTL (160ms) stays alive via active heartbeat (35ms)
+        slowMode = true;
+        const fastHeartbeatStore1 = new PostgresSheetsAppendLeaseStore(db.pool, {
+          pollIntervalMs: 15,
+          defaultTtlMs: 160,
+          heartbeatIntervalMs: 35,
+        });
+        const fastHeartbeatStore2 = new PostgresSheetsAppendLeaseStore(db.pool, {
+          pollIntervalMs: 15,
+          defaultTtlMs: 160,
+          heartbeatIntervalMs: 35,
+        });
+
+        const slowAdapter1 = createPersonalSheetsAdapter({
+          userId: 'user-slow-1',
+          tokens: { getAccessToken: async () => 'tok-slow-1' },
+          allowedScope: { spreadsheets: [spreadsheetId] },
+          apiBaseUrl,
+          appendLeaseStore: fastHeartbeatStore1,
+        });
+        const slowAdapter2 = createPersonalSheetsAdapter({
+          userId: 'user-slow-2',
+          tokens: { getAccessToken: async () => 'tok-slow-2' },
+          allowedScope: { spreadsheets: [spreadsheetId] },
+          apiBaseUrl,
+          appendLeaseStore: fastHeartbeatStore2,
+        });
+
+        const [slowRes1, slowRes2] = await Promise.all([
+          slowAdapter1.execute('mysheets.append_rows', {
+            spreadsheetId,
+            sheet: 'Tasks',
+            deduplicate: true,
+            rows: [['GH#700', 'Slow heartbeat row']],
+          }),
+          slowAdapter2.execute('mysheets.append_rows', {
+            spreadsheetId,
+            sheet: 'Tasks',
+            deduplicate: true,
+            rows: [['GH#700', 'Slow heartbeat row']],
+          }),
+        ]);
+
+        expect(slowRes1.updatedRows + slowRes2.updatedRows).toBe(1);
+        expect(slowRes1.skippedDuplicates + slowRes2.skippedDuplicates).toBe(1);
+        expect(rowsInSheet.filter((r) => r[0] === 'GH#700')).toHaveLength(1);
+      } finally {
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
+    });
+
+    it('preserves durable unknown_outcome across PostgresSheetsAppendLeaseStore instances after delayed/ambiguous loopback HTTP writes for BOTH PersonalSheetsAdapter and SheetsAdapter, blocks un-reconciled retries after TTL expiry, and recovers safely via reconcileAppendLease', async () => {
+      const spreadsheetId = '1Gas10AmbiguousRecoverySpreadsheet001';
+      const rowsInSheet: string[][] = [['IssueKey', 'Title']];
+      let appendBehavior: 'delayed_commit_503' | 'dropped_503' | 'normal_200' = 'delayed_commit_503';
+      let appendPostCount = 0;
+
+      const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+      const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
+
+      const server = http.createServer(async (req, res) => {
+        const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+        if (req.method === 'POST' && url.pathname === '/token') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ access_token: 'sa-access-token', expires_in: 3600, token_type: 'Bearer' }));
+          return;
+        }
+        if (req.method === 'GET' && url.pathname === `/v4/spreadsheets/${spreadsheetId}`) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              spreadsheetId,
+              properties: { title: 'Issues', locale: 'en_US' },
+              sheets: [
+                {
+                  properties: {
+                    sheetId: 0,
+                    title: 'Tasks',
+                    gridProperties: { rowCount: 100, columnCount: 10 },
+                  },
+                },
+              ],
+            })
+          );
+          return;
+        }
+        if (req.method === 'GET' && url.pathname.includes('/values/')) {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              range: 'Tasks!A1:Z500',
+              majorDimension: 'ROWS',
+              values: rowsInSheet.map((r) => [...r]),
+            })
+          );
+          return;
+        }
+        if (req.method === 'POST' && url.pathname.endsWith(':append')) {
+          appendPostCount++;
+          const chunks: Buffer[] = [];
+          for await (const c of req) chunks.push(c as Buffer);
+          const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+          const incoming: string[][] = body.values ?? [];
+
+          if (appendBehavior === 'delayed_commit_503') {
+            // Provider commits row asynchronously 40ms after returning HTTP 503
+            setTimeout(() => {
+              for (const row of incoming) {
+                rowsInSheet.push(row.map(String));
+              }
+            }, 40);
+            res.writeHead(503, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: { message: 'Backend unavailable after write dispatch' } }));
+            return;
+          }
+
+          if (appendBehavior === 'dropped_503') {
+            res.writeHead(503, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: { message: 'Backend failed before commit' } }));
+            return;
+          }
+
+          for (const row of incoming) {
+            rowsInSheet.push(row.map(String));
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              spreadsheetId,
+              updates: {
+                updatedRange: `Tasks!A${rowsInSheet.length}:B${rowsInSheet.length}`,
+                updatedRows: incoming.length,
+              },
+            })
+          );
+          return;
+        }
+        res.writeHead(404);
+        res.end();
+      });
+
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+      const port = (server.address() as { port: number }).port;
+      const apiBaseUrl = `http://127.0.0.1:${port}/v4/spreadsheets`;
+      const scopeKey = `${spreadsheetId}::tasks`;
+
+      try {
+        // --- CASE A: PersonalSheetsAdapter (mysheets.append_rows) where ambiguous write LANDED on provider ---
+        const personalStore1 = new PostgresSheetsAppendLeaseStore(db.pool, { pollIntervalMs: 15 });
+        const personalAdapter1 = createPersonalSheetsAdapter({
+          userId: 'user-rec-1',
+          tokens: { getAccessToken: async () => 'tok-rec-1' },
+          allowedScope: { spreadsheets: [spreadsheetId] },
+          apiBaseUrl,
+          appendLeaseStore: personalStore1,
+        });
+
+        await expect(
+          personalAdapter1.execute('mysheets.append_rows', {
+            spreadsheetId,
+            sheet: 'Tasks',
+            deduplicate: true,
+            rows: [['GH#801', 'Delayed personal row']],
+          })
+        ).rejects.toMatchObject({
+          category: 'UNKNOWN',
+        });
+        expect(appendPostCount).toBe(1);
+
+        // Simulate worker restart + lease TTL expiry in PostgreSQL
+        await db.pool.query(
+          "UPDATE sheets_append_leases SET expires_at = clock_timestamp() - interval '5 seconds' WHERE scope_key = $1",
+          [scopeKey]
+        );
+        const personalStore2 = new PostgresSheetsAppendLeaseStore(db.pool, { pollIntervalMs: 15 });
+        const persistedStateA = await personalStore2.getLeaseState(scopeKey);
+        expect(persistedStateA?.status).toBe('unknown_outcome');
+
+        const personalAdapter2 = createPersonalSheetsAdapter({
+          userId: 'user-rec-1',
+          tokens: { getAccessToken: async () => 'tok-rec-2' },
+          allowedScope: { spreadsheets: [spreadsheetId] },
+          apiBaseUrl,
+          appendLeaseStore: personalStore2,
+        });
+
+        // Un-reconciled retry on personalAdapter2 MUST be blocked before sending any POST
+        await expect(
+          personalAdapter2.execute('mysheets.append_rows', {
+            spreadsheetId,
+            sheet: 'Tasks',
+            deduplicate: true,
+            rows: [['GH#801', 'Delayed personal row']],
+          })
+        ).rejects.toMatchObject({
+          category: 'UNKNOWN',
+          details: {
+            code: 'SHEETS_APPEND_UNKNOWN_OUTCOME_UNRECONCILED',
+            requestSent: false,
+          },
+        });
+        expect(appendPostCount).toBe(1);
+
+        // Wait for delayed provider commit to settle, then reconcile
+        await new Promise((r) => setTimeout(r, 60));
+        appendBehavior = 'normal_200';
+        const recA = await personalAdapter2.reconcileAppendLease({
+          spreadsheetId,
+          sheet: 'Tasks',
+        });
+        expect(recA).toMatchObject({
+          reconciled: true,
+          committedOnProvider: true,
+          scopeKey,
+        });
+
+        // Subsequent retry after reconciliation sees GH#801 already on sheet and skips duplicate without POST
+        const retryResA = await personalAdapter2.execute('mysheets.append_rows', {
+          spreadsheetId,
+          sheet: 'Tasks',
+          deduplicate: true,
+          rows: [['GH#801', 'Delayed personal row']],
+        });
+        expect(retryResA.updatedRows).toBe(0);
+        expect(retryResA.skippedDuplicates).toBe(1);
+        expect(appendPostCount).toBe(1);
+        expect(rowsInSheet.filter((r) => r[0] === 'GH#801')).toHaveLength(1);
+
+        // --- CASE B: Shared SheetsAdapter (sheets.append_rows) where ambiguous 503 did NOT land on provider ---
+        appendBehavior = 'dropped_503';
+        const loopbackFetchForShared: typeof fetch = (input, init) => {
+          const rawUrl = String(input);
+          const rewritten = rawUrl
+            .replace('https://oauth2.googleapis.com/token', `http://127.0.0.1:${port}/token`)
+            .replace('https://sheets.googleapis.com/v4/spreadsheets', apiBaseUrl);
+          return fetch(rewritten, init);
+        };
+
+        const sharedStore1 = new PostgresSheetsAppendLeaseStore(db.pool, { pollIntervalMs: 15 });
+        const sharedAdapter1 = createSheetsAdapter({
+          credentials: {
+            clientEmail: 'sheets-bot@project.iam.gserviceaccount.com',
+            privateKey: privateKeyPem,
+          },
+          allowedScope: { spreadsheets: [spreadsheetId] },
+          fetchFn: loopbackFetchForShared,
+          appendLeaseStore: sharedStore1,
+        });
+
+        await expect(
+          sharedAdapter1.execute('sheets.append_rows', {
+            spreadsheetId,
+            sheet: 'Tasks',
+            deduplicate: true,
+            rows: [['GH#802', 'Shared adapter row']],
+          })
+        ).rejects.toMatchObject({
+          category: 'UNKNOWN',
+        });
+        expect(appendPostCount).toBe(2);
+
+        // Simulate worker restart + lease TTL expiry in PostgreSQL
+        await db.pool.query(
+          "UPDATE sheets_append_leases SET expires_at = clock_timestamp() - interval '5 seconds' WHERE scope_key = $1",
+          [scopeKey]
+        );
+        const sharedStore2 = new PostgresSheetsAppendLeaseStore(db.pool, { pollIntervalMs: 15 });
+        const persistedStateB = await sharedStore2.getLeaseState(scopeKey);
+        expect(persistedStateB?.status).toBe('unknown_outcome');
+
+        const sharedAdapter2 = createSheetsAdapter({
+          credentials: {
+            clientEmail: 'sheets-bot@project.iam.gserviceaccount.com',
+            privateKey: privateKeyPem,
+          },
+          allowedScope: { spreadsheets: [spreadsheetId] },
+          fetchFn: loopbackFetchForShared,
+          appendLeaseStore: sharedStore2,
+        });
+
+        // Un-reconciled retry on sharedAdapter2 MUST be blocked before sending any POST
+        await expect(
+          sharedAdapter2.execute('sheets.append_rows', {
+            spreadsheetId,
+            sheet: 'Tasks',
+            deduplicate: true,
+            rows: [['GH#802', 'Shared adapter row']],
+          })
+        ).rejects.toMatchObject({
+          category: 'UNKNOWN',
+          details: {
+            code: 'SHEETS_APPEND_UNKNOWN_OUTCOME_UNRECONCILED',
+            requestSent: false,
+          },
+        });
+        expect(appendPostCount).toBe(2);
+
+        // Reconcile via sharedAdapter2 -> detects GH#802 was NOT committed on provider and releases lease
+        appendBehavior = 'normal_200';
+        const recB = await sharedAdapter2.reconcileAppendLease({
+          spreadsheetId,
+          sheet: 'Tasks',
+        });
+        expect(recB).toMatchObject({
+          reconciled: true,
+          committedOnProvider: false,
+          scopeKey,
+        });
+
+        // Retry after reconciliation appends GH#802 cleanly once
+        const retryResB = await sharedAdapter2.execute('sheets.append_rows', {
+          spreadsheetId,
+          sheet: 'Tasks',
+          deduplicate: true,
+          rows: [['GH#802', 'Shared adapter row']],
+        });
+        expect(retryResB.updatedRows).toBe(1);
+        expect(retryResB.skippedDuplicates).toBe(0);
+        expect(appendPostCount).toBe(3);
+        expect(rowsInSheet.filter((r) => r[0] === 'GH#802')).toHaveLength(1);
       } finally {
         await new Promise<void>((resolve) => server.close(() => resolve()));
       }
