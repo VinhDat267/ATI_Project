@@ -1351,11 +1351,20 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
       }
     });
 
-    it('preserves durable unknown_outcome across PostgresSheetsAppendLeaseStore instances after delayed/ambiguous loopback HTTP writes for BOTH PersonalSheetsAdapter and SheetsAdapter, blocks un-reconciled retries after TTL expiry, and recovers safely via reconcileAppendLease', async () => {
+    it('preserves durable unknown_outcome across PostgresSheetsAppendLeaseStore instances after delayed/ambiguous loopback HTTP writes for BOTH PersonalSheetsAdapter and SheetsAdapter, fails closed when first commit lands AFTER reconciliation attempt and retry (0 duplicate writes), covers partial batch and >500-row boundaries, and enforces status/generation CAS', async () => {
       const spreadsheetId = '1Gas10AmbiguousRecoverySpreadsheet001';
       const rowsInSheet: string[][] = [['IssueKey', 'Title']];
       let appendBehavior: 'delayed_commit_503' | 'dropped_503' | 'normal_200' = 'delayed_commit_503';
       let appendPostCount = 0;
+      let delayedPendingRows: string[][] = [];
+      let returnMalformedValues = false;
+
+      const flushDelayedProviderCommit = () => {
+        for (const row of delayedPendingRows) {
+          rowsInSheet.push(row.map(String));
+        }
+        delayedPendingRows = [];
+      };
 
       const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
       const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
@@ -1378,7 +1387,7 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
                   properties: {
                     sheetId: 0,
                     title: 'Tasks',
-                    gridProperties: { rowCount: 100, columnCount: 10 },
+                    gridProperties: { rowCount: 1000, columnCount: 10 },
                   },
                 },
               ],
@@ -1388,11 +1397,15 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
         }
         if (req.method === 'GET' && url.pathname.includes('/values/')) {
           res.writeHead(200, { 'Content-Type': 'application/json' });
+          if (returnMalformedValues) {
+            res.end(JSON.stringify({ values: 'corrupted-payload' }));
+            return;
+          }
           res.end(
             JSON.stringify({
               range: 'Tasks!A1:Z500',
               majorDimension: 'ROWS',
-              values: rowsInSheet.map((r) => [...r]),
+              values: rowsInSheet.slice(0, 500).map((r) => [...r]),
             })
           );
           return;
@@ -1405,12 +1418,8 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
           const incoming: string[][] = body.values ?? [];
 
           if (appendBehavior === 'delayed_commit_503') {
-            // Provider commits row asynchronously 40ms after returning HTTP 503
-            setTimeout(() => {
-              for (const row of incoming) {
-                rowsInSheet.push(row.map(String));
-              }
-            }, 40);
+            // Hold provider commit behind deterministic barrier (not committed yet when 503 returns)
+            delayedPendingRows.push(...incoming.map((r) => r.map(String)));
             res.writeHead(503, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: { message: 'Backend unavailable after write dispatch' } }));
             return;
@@ -1447,7 +1456,7 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
       const scopeKey = `${spreadsheetId}::tasks`;
 
       try {
-        // --- CASE A: PersonalSheetsAdapter (mysheets.append_rows) where ambiguous write LANDED on provider ---
+        // --- CASE A: PersonalSheetsAdapter (mysheets.append_rows) where first provider commit is released AFTER reconciliation attempt and retry ---
         const personalStore1 = new PostgresSheetsAppendLeaseStore(db.pool, { pollIntervalMs: 15 });
         const personalAdapter1 = createPersonalSheetsAdapter({
           userId: 'user-rec-1',
@@ -1486,7 +1495,30 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
           appendLeaseStore: personalStore2,
         });
 
-        // Un-reconciled retry on personalAdapter2 MUST be blocked before sending any POST
+        // 1. Reconcile BEFORE the delayed provider commit is released -> MUST fail closed!
+        const prematureRecA = await personalAdapter2.reconcileAppendLease({
+          spreadsheetId,
+          sheet: 'Tasks',
+        });
+        expect(prematureRecA).toMatchObject({
+          reconciled: false,
+          committedOnProvider: false,
+          matchedSignatures: [],
+          scopeKey,
+          inconclusiveReason: 'absent_on_readback',
+        });
+        expect((await personalStore2.getLeaseState(scopeKey))?.status).toBe('unknown_outcome');
+
+        // Direct store.reconcileUnknownLease without verify or manual operator decision MUST also fail closed
+        expect(
+          await personalStore2.reconcileUnknownLease({
+            scopeKey,
+            reason: 'aborted',
+          })
+        ).toBe(false);
+        expect((await personalStore2.getLeaseState(scopeKey))?.status).toBe('unknown_outcome');
+
+        // 2. Retry AFTER premature reconciliation attempt MUST still be blocked (0 second automatic write!)
         await expect(
           personalAdapter2.execute('mysheets.append_rows', {
             spreadsheetId,
@@ -1503,8 +1535,24 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
         });
         expect(appendPostCount).toBe(1);
 
-        // Wait for delayed provider commit to settle, then reconcile
-        await new Promise((r) => setTimeout(r, 60));
+        // 3. Now release the delayed first provider commit AFTER reconciliation attempt and retry
+        flushDelayedProviderCommit();
+        expect(rowsInSheet.filter((r) => r[0] === 'GH#801')).toHaveLength(1);
+
+        // Malformed readback MUST fail closed even when row is on provider
+        returnMalformedValues = true;
+        const malformedRecA = await personalAdapter2.reconcileAppendLease({
+          spreadsheetId,
+          sheet: 'Tasks',
+        });
+        expect(malformedRecA).toMatchObject({
+          reconciled: false,
+          committedOnProvider: false,
+          inconclusiveReason: 'malformed_readback',
+        });
+        returnMalformedValues = false;
+
+        // 4. Reconcile now succeeds because terminal provider commit evidence is present in A1:Z500
         appendBehavior = 'normal_200';
         const recA = await personalAdapter2.reconcileAppendLease({
           spreadsheetId,
@@ -1516,7 +1564,7 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
           scopeKey,
         });
 
-        // Subsequent retry after reconciliation sees GH#801 already on sheet and skips duplicate without POST
+        // 5. Subsequent retry after reconciliation sees GH#801 already on sheet and skips duplicate without POST
         const retryResA = await personalAdapter2.execute('mysheets.append_rows', {
           spreadsheetId,
           sheet: 'Tasks',
@@ -1528,8 +1576,8 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
         expect(appendPostCount).toBe(1);
         expect(rowsInSheet.filter((r) => r[0] === 'GH#801')).toHaveLength(1);
 
-        // --- CASE B: Shared SheetsAdapter (sheets.append_rows) where ambiguous 503 did NOT land on provider ---
-        appendBehavior = 'dropped_503';
+        // --- CASE B: Shared SheetsAdapter (sheets.append_rows) where first provider commit is released AFTER reconciliation attempt and retry ---
+        appendBehavior = 'delayed_commit_503';
         const loopbackFetchForShared: typeof fetch = (input, init) => {
           const rawUrl = String(input);
           const rewritten = rawUrl
@@ -1554,22 +1602,14 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
             spreadsheetId,
             sheet: 'Tasks',
             deduplicate: true,
-            rows: [['GH#802', 'Shared adapter row']],
+            rows: [['GH#802', 'Shared adapter delayed row']],
           })
         ).rejects.toMatchObject({
           category: 'UNKNOWN',
         });
         expect(appendPostCount).toBe(2);
 
-        // Simulate worker restart + lease TTL expiry in PostgreSQL
-        await db.pool.query(
-          "UPDATE sheets_append_leases SET expires_at = clock_timestamp() - interval '5 seconds' WHERE scope_key = $1",
-          [scopeKey]
-        );
         const sharedStore2 = new PostgresSheetsAppendLeaseStore(db.pool, { pollIntervalMs: 15 });
-        const persistedStateB = await sharedStore2.getLeaseState(scopeKey);
-        expect(persistedStateB?.status).toBe('unknown_outcome');
-
         const sharedAdapter2 = createSheetsAdapter({
           credentials: {
             clientEmail: 'sheets-bot@project.iam.gserviceaccount.com',
@@ -1580,13 +1620,27 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
           appendLeaseStore: sharedStore2,
         });
 
-        // Un-reconciled retry on sharedAdapter2 MUST be blocked before sending any POST
+        // Reconcile on sharedAdapter2 BEFORE delayed provider commit lands -> MUST fail closed
+        const prematureRecB = await sharedAdapter2.reconcileAppendLease({
+          spreadsheetId,
+          sheet: 'Tasks',
+        });
+        expect(prematureRecB).toMatchObject({
+          reconciled: false,
+          committedOnProvider: false,
+          matchedSignatures: [],
+          scopeKey,
+          inconclusiveReason: 'absent_on_readback',
+        });
+        expect((await sharedStore2.getLeaseState(scopeKey))?.status).toBe('unknown_outcome');
+
+        // Retry on sharedAdapter2 MUST be blocked before sending any POST
         await expect(
           sharedAdapter2.execute('sheets.append_rows', {
             spreadsheetId,
             sheet: 'Tasks',
             deduplicate: true,
-            rows: [['GH#802', 'Shared adapter row']],
+            rows: [['GH#802', 'Shared adapter delayed row']],
           })
         ).rejects.toMatchObject({
           category: 'UNKNOWN',
@@ -1597,7 +1651,10 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
         });
         expect(appendPostCount).toBe(2);
 
-        // Reconcile via sharedAdapter2 -> detects GH#802 was NOT committed on provider and releases lease
+        // Release delayed provider commit for GH#802 AFTER reconciliation attempt and retry
+        flushDelayedProviderCommit();
+        expect(rowsInSheet.filter((r) => r[0] === 'GH#802')).toHaveLength(1);
+
         appendBehavior = 'normal_200';
         const recB = await sharedAdapter2.reconcileAppendLease({
           spreadsheetId,
@@ -1605,21 +1662,152 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
         });
         expect(recB).toMatchObject({
           reconciled: true,
-          committedOnProvider: false,
+          committedOnProvider: true,
           scopeKey,
         });
 
-        // Retry after reconciliation appends GH#802 cleanly once
         const retryResB = await sharedAdapter2.execute('sheets.append_rows', {
           spreadsheetId,
           sheet: 'Tasks',
           deduplicate: true,
-          rows: [['GH#802', 'Shared adapter row']],
+          rows: [['GH#802', 'Shared adapter delayed row']],
         });
-        expect(retryResB.updatedRows).toBe(1);
-        expect(retryResB.skippedDuplicates).toBe(0);
-        expect(appendPostCount).toBe(3);
+        expect(retryResB.updatedRows).toBe(0);
+        expect(retryResB.skippedDuplicates).toBe(1);
+        expect(appendPostCount).toBe(2);
         expect(rowsInSheet.filter((r) => r[0] === 'GH#802')).toHaveLength(1);
+
+        // --- CASE C: Live dispatched protection, partial batch, >500-row boundary, CAS protection, and explicit manual operator decision on real PostgreSQL ---
+        // C1. Live dispatched lease cannot be cleared by reconcileUnknownLease or reconcileAppendLease
+        const liveHandle = await sharedStore2.acquireLease({
+          scopeKey,
+          spreadsheetId,
+          sheetTitle: 'Tasks',
+          ownerId: 'worker-live',
+          ttlMs: 10_000,
+        });
+        await liveHandle.beginWriteDispatch?.({
+          operation: 'append',
+          rowCount: 1,
+          candidateKeys: ['GH#801\u001fDelayed personal row'],
+        });
+        expect(
+          await sharedStore2.reconcileUnknownLease({
+            scopeKey,
+            manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
+            acknowledgeDuplicateRisk: true,
+          })
+        ).toBe(false);
+        expect(
+          await sharedAdapter2.reconcileAppendLease({
+            spreadsheetId,
+            sheet: 'Tasks',
+            manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
+            acknowledgeDuplicateRisk: true,
+          })
+        ).toMatchObject({
+          reconciled: false,
+          committedOnProvider: false,
+          inconclusiveReason: 'write_still_in_flight',
+        });
+        expect((await sharedStore2.getLeaseState(scopeKey))?.status).toBe('dispatched');
+
+        // C2. Partial multi-row batch on PostgreSQL fails closed
+        await liveHandle.markUnknownOutcome?.('503 mid-batch', {
+          operation: 'append',
+          rowCount: 2,
+          candidateKeys: ['GH#801\u001fDelayed personal row', 'GH#803\u001fMissing second row'],
+        });
+        await liveHandle.release();
+
+        const partialRecPg = await sharedAdapter2.reconcileAppendLease({
+          spreadsheetId,
+          sheet: 'Tasks',
+        });
+        expect(partialRecPg).toMatchObject({
+          reconciled: false,
+          committedOnProvider: false,
+          matchedSignatures: ['GH#801\u001fDelayed personal row'],
+          inconclusiveReason: 'partial_batch',
+        });
+        expect((await sharedStore2.getLeaseState(scopeKey))?.status).toBe('unknown_outcome');
+
+        // C3. Status/generation CAS protects a new owner if state advances while verify() is running
+        const stateBeforeCas = (await sharedStore2.getLeaseState(scopeKey))!;
+        let newOwnerHandle: any;
+        const staleConcurrentReconcile = await sharedStore2.reconcileUnknownLease({
+          scopeKey,
+          leaseId: stateBeforeCas.leaseId,
+          fencingToken: stateBeforeCas.fencingToken,
+          verify: async () => {
+            // Simulate concurrent operator override + new owner acquiring lease (fencingToken + 1, status = 'active')
+            await sharedStore2.reconcileUnknownLease({
+              scopeKey,
+              leaseId: stateBeforeCas.leaseId,
+              fencingToken: stateBeforeCas.fencingToken,
+              manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
+              acknowledgeDuplicateRisk: true,
+            });
+            newOwnerHandle = await sharedStore2.acquireLease({
+              scopeKey,
+              spreadsheetId,
+              sheetTitle: 'Tasks',
+              ownerId: 'new-owner-cas',
+              ttlMs: 10_000,
+            });
+            return true;
+          },
+        });
+        expect(staleConcurrentReconcile).toBe(false);
+        const stateAfterCasRace = await sharedStore2.getLeaseState(scopeKey);
+        expect(stateAfterCasRace?.status).toBe('active');
+        expect(stateAfterCasRace?.leaseId).toBe(newOwnerHandle.leaseId);
+        expect(stateAfterCasRace?.fencingToken).toBe(newOwnerHandle.fencingToken);
+        await newOwnerHandle.release();
+
+        // C4. >500-row absence / out-of-window boundary on PostgreSQL fails closed, then manual operator override releases when confirmed
+        while (rowsInSheet.length <= 500) {
+          rowsInSheet.push([`GH#FILL_${rowsInSheet.length}`, `Row ${rowsInSheet.length}`]);
+        }
+        rowsInSheet.push(['GH#999', 'Row at 502 beyond A1:Z500 window']);
+        const outOfWinHandle = await sharedStore2.acquireLease({
+          scopeKey,
+          spreadsheetId,
+          sheetTitle: 'Tasks',
+          ownerId: 'worker-out-of-win',
+          ttlMs: 10_000,
+        });
+        await outOfWinHandle.markUnknownOutcome?.('503 at row 502', {
+          operation: 'append',
+          rowCount: 1,
+          candidateKeys: ['GH#999\u001fRow at 502 beyond A1:Z500 window'],
+        });
+        await outOfWinHandle.release();
+
+        const outOfWinRec = await personalAdapter2.reconcileAppendLease({
+          spreadsheetId,
+          sheet: 'Tasks',
+        });
+        expect(outOfWinRec).toMatchObject({
+          reconciled: false,
+          committedOnProvider: false,
+          matchedSignatures: [],
+          inconclusiveReason: 'out_of_window',
+        });
+        expect((await sharedStore2.getLeaseState(scopeKey))?.status).toBe('unknown_outcome');
+
+        // Explicit manual operator decision acknowledging duplicate risk releases the unknown_outcome lease
+        const manualOverrideRec = await personalAdapter2.reconcileAppendLease({
+          spreadsheetId,
+          sheet: 'Tasks',
+          manualOperatorDecision: 'operator_confirm_aborted_allow_retry',
+          acknowledgeDuplicateRisk: true,
+        });
+        expect(manualOverrideRec).toMatchObject({
+          reconciled: true,
+          committedOnProvider: false,
+        });
+        expect((await sharedStore2.getLeaseState(scopeKey))?.status).toBe('released');
       } finally {
         await new Promise<void>((resolve) => server.close(() => resolve()));
       }

@@ -159,7 +159,9 @@ export class PostgresSheetsAppendLeaseStore implements SheetsAppendLeaseStore {
     if (!current) {
       return false;
     }
-    if (current.status !== 'unknown_outcome' && current.status !== 'dispatched') {
+    // Never reconcile a live 'dispatched', 'active', or 'released' lease.
+    // Expired 'dispatched' rows are promoted to 'unknown_outcome' by getLeaseState().
+    if (current.status !== 'unknown_outcome') {
       return false;
     }
     if (input.leaseId !== undefined && current.leaseId !== input.leaseId) {
@@ -168,7 +170,38 @@ export class PostgresSheetsAppendLeaseStore implements SheetsAppendLeaseStore {
     if (input.fencingToken !== undefined && current.fencingToken !== input.fencingToken) {
       return false;
     }
-    if (input.verify) {
+    const targetLeaseId = input.leaseId ?? current.leaseId;
+    const targetFencingToken = input.fencingToken ?? current.fencingToken;
+
+    const isExplicitManualOverride =
+      (input.manualOperatorDecision === 'operator_confirm_aborted_allow_retry' ||
+        input.manualOperatorDecision === 'operator_acknowledge_duplicate_risk') &&
+      (input.acknowledgeDuplicateRisk === true || input.confirmDuplicateRisk === true);
+
+    if (!isExplicitManualOverride) {
+      if (input.reason === 'aborted') {
+        return false;
+      }
+      if (typeof input.verify !== 'function') {
+        return false;
+      }
+      const meta = current.dispatchedMeta;
+      if (
+        !meta ||
+        !Array.isArray(meta.candidateKeys) ||
+        meta.candidateKeys.length === 0 ||
+        !Number.isInteger(meta.rowCount) ||
+        meta.rowCount < 1 ||
+        meta.candidateKeys.length !== meta.rowCount ||
+        meta.candidateKeys.some((sig) => typeof sig !== 'string' || sig.trim().length === 0)
+      ) {
+        return false;
+      }
+      const verified = await input.verify(current);
+      if (!verified) {
+        return false;
+      }
+    } else if (typeof input.verify === 'function') {
       const verified = await input.verify(current);
       if (!verified) {
         return false;
@@ -185,8 +218,8 @@ export class PostgresSheetsAppendLeaseStore implements SheetsAppendLeaseStore {
         WHERE scope_key = $1
           AND lease_id = $2
           AND fencing_token = $3
-          AND status IN ('unknown_outcome', 'dispatched')`,
-      [input.scopeKey, current.leaseId, current.fencingToken]
+          AND status = 'unknown_outcome'`,
+      [input.scopeKey, targetLeaseId, targetFencingToken]
     );
     return Boolean(res.rowCount && res.rowCount > 0);
   }
