@@ -223,7 +223,10 @@ export class AdapterFactory {
       }
       record = await this.credentialRepo.getPersonalCredentials(serviceName, context.userId);
     } else if (context?.workspaceMode === 'organization') {
-      record = await this.credentialRepo.getCredentials(serviceName, context.workspaceId ?? null);
+      if (!context.workspaceId || !String(context.workspaceId).trim()) {
+        throw new Error(`Organization credentials require workspace id for service '${serviceName}'`);
+      }
+      record = await this.credentialRepo.getCredentials(serviceName, context.workspaceId);
     } else {
       record = await this.credentialRepo.getCredentials(serviceName);
     }
@@ -409,6 +412,9 @@ export class AdapterFactory {
       }
     }
 
+    if (context?.workspaceMode === 'organization' && (!context.workspaceId || !String(context.workspaceId).trim())) {
+      throw trelloError('AUTH_ERROR', 'Không gian làm việc Tổ chức không hợp lệ.');
+    }
     const scopeId =
       context?.workspaceMode === 'personal' && context.userId
         ? `personal:${context.userId}`

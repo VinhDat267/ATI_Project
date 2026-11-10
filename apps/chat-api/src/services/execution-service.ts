@@ -727,7 +727,11 @@ export class ExecutionService {
     }
     const states = controller.getAllStepStates();
     const allSteps = Object.values(states);
-    const failed = allSteps.find((s) => s.status === 'failed' || s.status === 'unknown');
+    const uncertain = allSteps.find((s) => s.status === 'unknown');
+    if (uncertain) {
+      return { status: 'reconciliation_required', pausedStepId: uncertain.stepId };
+    }
+    const failed = allSteps.find((s) => s.status === 'failed');
     if (failed) {
       return { status: 'partial', pausedStepId: failed.stepId };
     }
