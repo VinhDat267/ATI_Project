@@ -1,4 +1,4 @@
-import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, MYCALENDAR_SERVICE, MYJIRA_SERVICE, MYSHEETS_SERVICE, NOTION_OAUTH_TOOLS, SERVICE_REGISTRY, SHEETS_EXTENDED_TOOLS, SLACK_EXTENDED_TOOLS, type AllowedScope } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, MYCALENDAR_SERVICE, MYJIRA_SERVICE, MYSHEETS_SERVICE, NOTION_OAUTH_TOOLS, SERVICE_REGISTRY, SHEETS_EXTENDED_TOOLS, SLACK_EXTENDED_TOOLS, type AllowedScope, type SheetsAppendLeaseStore } from '@wap/tool-schemas';
 import { createGmailToolAdapter, createPersonalCalendarAdapter, createPersonalSheetsAdapter, type GmailAccessTokenProvider } from '@wap/tool-adapters';
 import { routeIntent, type ProcessMessageInput } from '@wap/planner';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
@@ -150,7 +150,12 @@ export function runtimeMyCalendarAdapter(
 
 export function runtimeMySheetsAdapter(
   _mode: RuntimeMode,
-  input: { userId: string; tokens: GmailAccessTokenProvider; allowedScope: AllowedScope },
+  input: {
+    userId: string;
+    tokens: GmailAccessTokenProvider;
+    allowedScope: AllowedScope;
+    appendLeaseStore?: SheetsAppendLeaseStore;
+  },
   baseUrl?: string,
 ) {
   return createPersonalSheetsAdapter({
@@ -158,6 +163,7 @@ export function runtimeMySheetsAdapter(
     tokens: input.tokens,
     allowedScope: input.allowedScope,
     apiBaseUrl: baseUrl,
+    appendLeaseStore: input.appendLeaseStore,
   });
 }
 

@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { decryptCredentials, type ReadDigestWindowResult } from '@wap/tool-adapters';
+import { decryptCredentials, parseSheetNumber, type ReadDigestWindowResult } from '@wap/tool-adapters';
 import {
   isSheetsDigestConfigV2,
   type SheetsDigestConfig,
@@ -81,26 +81,11 @@ export function sanitizeSlackDigestText(text: string): string {
     .replace(/@(channel|here|everyone)\b/gi, '@\u200b$1');
 }
 
-export function parseSheetNumericCell(raw: string): number | null {
-  const cleaned = raw
-    .replace(/(?:vnđ|vnd|usd|đ|₫|\$|€)/giu, '')
-    .trim();
-  if (!cleaned) return null;
-  if (/^-?\d{1,3}(?:\.\d{3})+(?:,\d+)?$/.test(cleaned)) {
-    const normalized = cleaned.replaceAll('.', '').replace(',', '.');
-    const n = Number(normalized);
-    return Number.isFinite(n) ? n : null;
-  }
-  if (/^-?\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(cleaned)) {
-    const normalized = cleaned.replaceAll(',', '');
-    const n = Number(normalized);
-    return Number.isFinite(n) ? n : null;
-  }
-  if (/^-?\d+(?:\.\d+)?$/.test(cleaned)) {
-    const n = Number(cleaned);
-    return Number.isFinite(n) ? n : null;
-  }
-  return null;
+export function parseSheetNumericCell(
+  raw: string | number,
+  options?: { locale?: string }
+): number | null {
+  return parseSheetNumber(raw, options);
 }
 
 export function parseSheetDeadlineCell(raw: string): number | null {
@@ -129,7 +114,8 @@ export function analyzeSheetKpiMetrics(
   headers: string[],
   records: Array<Record<string, string>>,
   values: string[][],
-  now: Date = new Date()
+  now: Date = new Date(),
+  options?: { locale?: string; unformattedValues?: unknown[][] }
 ): {
   totalRows: number;
   doneCount: number;
@@ -194,7 +180,16 @@ export function analyzeSheetKpiMetrics(
     }
 
     for (const col of numericColumns) {
-      const parsed = parseSheetNumericCell(row[col] ?? '');
+      const colIdx = headers.indexOf(col);
+      const unformattedCell =
+        colIdx >= 0 ? options?.unformattedValues?.[index + 1]?.[colIdx] : undefined;
+      const parsed =
+        typeof unformattedCell === 'number'
+          ? parseSheetNumericCell(unformattedCell)
+          : parseSheetNumericCell(
+              row[col] ?? '',
+              options?.locale ? { locale: options.locale } : undefined
+            );
       if (parsed !== null) {
         const prev = numericSums.get(col) ?? { sum: 0, count: 0 };
         numericSums.set(col, { sum: prev.sum + parsed, count: prev.count + 1 });
@@ -881,13 +876,22 @@ export class SheetsDigestRunner {
 
         const claimUpdate = await client.query(
           `UPDATE schedule_runs
-           SET delivery_started_at = now(), updated_at = now()
+           SET delivery_started_at = now(),
+               dispatched_config = COALESCE(dispatched_config, $4::jsonb),
+               dispatched_config_hash = COALESCE(dispatched_config_hash, $5),
+               updated_at = now()
            WHERE id = $1
              AND schedule_id = $2
              AND schedule_version = $3
              AND status = 'planning'
              AND delivery_started_at IS NULL`,
-          [runId, s.id, runVersion]
+          [
+            runId,
+            s.id,
+            runVersion,
+            JSON.stringify(scopeCheck.config),
+            s.digest_config_hash ?? null,
+          ]
         );
         if (claimUpdate.rowCount !== 1) {
           await client.query('ROLLBACK');
@@ -986,6 +990,8 @@ export class SheetsDigestRunner {
     let scannedRange: string | undefined;
     let windowClipped: boolean | undefined;
     let populatedRowCountInWindow: number | undefined;
+    let spreadsheetLocale: string | undefined;
+    let unformattedValues: unknown[][] | undefined;
 
     try {
       const sheetsAdapter = await this.options.createAdapter(
@@ -1014,12 +1020,16 @@ export class SheetsDigestRunner {
         scannedRange = windowRes.scannedRange;
         windowClipped = windowRes.windowClipped;
         populatedRowCountInWindow = windowRes.populatedRowCountInWindow;
+        spreadsheetLocale = windowRes.locale;
+        unformattedValues = windowRes.unformattedValues;
       } else {
         const readTool =
           config.source.service === 'mysheets' ? 'mysheets.read_range' : 'sheets.read_range';
         const tailRows = config.source.tailRows || 20;
         const range = config.source.range
-          ? config.source.range
+          ? config.source.sheetName && !config.source.range.includes('!')
+            ? `${config.source.sheetName}!${config.source.range}`
+            : config.source.range
           : config.source.sheetName
             ? `${config.source.sheetName}!tail:${tailRows}`
             : `tail:${tailRows}`;
@@ -1049,7 +1059,10 @@ export class SheetsDigestRunner {
     }
 
     // Step D: Compute KPI metrics, optional AI summary, and honest 3-tier dataScope copy
-    const metrics = analyzeSheetKpiMetrics(headers, records, values);
+    const metrics = analyzeSheetKpiMetrics(headers, records, values, new Date(), {
+      locale: spreadsheetLocale,
+      unformattedValues,
+    });
     const effectiveRowCount = populatedRowCountInWindow ?? metrics.totalRows;
 
     let aiSummaryText = '';
@@ -1138,7 +1151,11 @@ export class SheetsDigestRunner {
       return claim;
     }
 
-    // Step G: Single Non-Retried Outbound Send + Post-Claim Error Classification
+    // Step G: Single Non-Retried Outbound Send + Unconditional Service-Specific Receipt Verification (GAS-01)
+    let slackMessageTs: string | undefined;
+    let gmailMessageId: string | undefined;
+    let telegramMessageId: string | number | undefined;
+
     try {
       let sendRes: any;
       if (config.destination.service === 'slack') {
@@ -1147,15 +1164,20 @@ export class SheetsDigestRunner {
           { channel: config.destination.channelId, text: finalMessage },
           { signal: outerSignal }
         );
+        const ts = typeof sendRes?.ts === 'string' ? sendRes.ts.trim() : '';
+        const returnedChannel = typeof sendRes?.channel === 'string' ? sendRes.channel.trim() : '';
         if (
-          sendRes !== undefined &&
-          (typeof sendRes?.ts !== 'string' ||
-            !sendRes.ts.trim() ||
-            sendRes.ts === 'undefined' ||
-            sendRes.ts === 'null')
+          !sendRes ||
+          typeof sendRes !== 'object' ||
+          !ts ||
+          ts === 'undefined' ||
+          ts === 'null' ||
+          ts.startsWith('[object') ||
+          (returnedChannel && returnedChannel !== config.destination.channelId)
         ) {
           return { status: 'delivery_unknown', error: SHEETS_DELIVERY_UNKNOWN };
         }
+        slackMessageTs = ts;
       } else if (config.destination.service === 'gmail') {
         sendRes = await destAdapter.execute(
           'gmail.send_message',
@@ -1166,15 +1188,27 @@ export class SheetsDigestRunner {
           },
           { signal: outerSignal }
         );
+        const id = typeof sendRes?.id === 'string' ? sendRes.id.trim() : '';
+        const threadId = sendRes?.threadId;
+        const threadIdValid =
+          threadId === undefined ||
+          (typeof threadId === 'string' &&
+            threadId.trim().length > 0 &&
+            threadId !== 'undefined' &&
+            threadId !== 'null' &&
+            !threadId.startsWith('[object'));
         if (
-          sendRes !== undefined &&
-          (typeof sendRes?.id !== 'string' ||
-            !sendRes.id.trim() ||
-            sendRes.id === 'undefined' ||
-            sendRes.id === 'null')
+          !sendRes ||
+          typeof sendRes !== 'object' ||
+          !id ||
+          id === 'undefined' ||
+          id === 'null' ||
+          id.startsWith('[object') ||
+          !threadIdValid
         ) {
           return { status: 'delivery_unknown', error: SHEETS_DELIVERY_UNKNOWN };
         }
+        gmailMessageId = id;
       } else {
         sendRes = await destAdapter.execute(
           'telegram.send_message',
@@ -1183,12 +1217,18 @@ export class SheetsDigestRunner {
         );
         const msgId = sendRes?.messageId ?? sendRes?.message_id ?? sendRes?.result?.message_id;
         const msgIdStr = msgId !== undefined && msgId !== null ? String(msgId).trim() : '';
-        if (
-          sendRes !== undefined &&
-          (!msgIdStr || msgIdStr === 'undefined' || msgIdStr === 'null')
-        ) {
+        const isNumericMsgId =
+          (typeof msgId === 'number' && Number.isInteger(msgId) && msgId > 0) ||
+          (typeof msgId === 'string' && /^\d+$/.test(msgIdStr));
+        const returnedChatId = sendRes?.chatId ?? sendRes?.result?.chat?.id;
+        const chatMatches =
+          returnedChatId === undefined ||
+          returnedChatId === null ||
+          String(returnedChatId).trim() === String(config.destination.chatId).trim();
+        if (!sendRes || typeof sendRes !== 'object' || !isNumericMsgId || !chatMatches) {
           return { status: 'delivery_unknown', error: SHEETS_DELIVERY_UNKNOWN };
         }
+        telegramMessageId = typeof msgId === 'number' ? msgId : msgIdStr;
       }
     } catch (err) {
       if (isDefinitePreAcceptanceRejection(err)) {
@@ -1203,6 +1243,7 @@ export class SheetsDigestRunner {
       };
     }
 
+    const sentAtIso = new Date().toISOString();
     const delivery: SheetsDigestDelivery = {
       destination: config.destination.service,
       targetId:
@@ -1228,7 +1269,13 @@ export class SheetsDigestRunner {
       ...(scannedRange ? { scannedRange } : {}),
       ...(windowClipped !== undefined ? { windowClipped } : {}),
       summaryMode,
-      sentAt: new Date().toISOString(),
+      sentAt: sentAtIso,
+      providerSentAt: sentAtIso,
+      ...(slackMessageTs ? { slackMessageTs } : {}),
+      ...(gmailMessageId ? { gmailMessageId } : {}),
+      ...(telegramMessageId !== undefined ? { telegramMessageId } : {}),
+      dispatchedScheduleVersion: runVersion,
+      ...(schedule.digest_config_hash ? { dispatchedConfigHash: schedule.digest_config_hash } : {}),
     };
 
     return {

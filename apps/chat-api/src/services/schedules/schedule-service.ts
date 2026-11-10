@@ -36,6 +36,7 @@ import {
   analyzeSheetsDigestCandidate,
   computeSheetsDigestHash,
   resolveTrustedScheduleScope,
+  validateAndCanonicalizeDigestRange,
   verifySheetsDigestCandidateInTx,
   type FetchOrgSheetsMetadataFn,
 } from './sheets-digest-candidate.js';
@@ -71,6 +72,10 @@ export const SCHEDULE_CONFLICTS = {
     'Lượt chạy này đã được xử lý trạng thái gửi trước đó.',
   RUN_NOT_AWAITING_DELIVERY_RESOLUTION:
     'Lượt chạy này không ở trạng thái chờ xác nhận kết quả gửi.',
+  SCHEDULE_PAUSED:
+    'Lịch đang tạm dừng. Vui lòng tiếp tục (Chạy tiếp) hoặc cấp quyền lại lịch trước khi tạo lượt gửi bù mới.',
+  MISSING_DISPATCH_SNAPSHOT:
+    'Không tìm thấy bản chụp cấu hình tại thời điểm gửi của lượt chạy này sau khi lịch đã thay đổi.',
 } as const;
 export type ScheduleConflictCode = keyof typeof SCHEDULE_CONFLICTS;
 
@@ -322,8 +327,9 @@ export class ScheduleService {
     now: Date;
     scope?: ScheduleScope;
     approvalMode?: ScheduleApprovalMode;
+    includeAiSummary?: boolean;
   }): Promise<ScheduleChange> {
-    const { userId, convId, messageId, now, scope, approvalMode } = input;
+    const { userId, convId, messageId, now, scope, approvalMode, includeAiSummary } = input;
     if (!isUuid(convId) || !isUuid(messageId)) throw new ScheduleNotFound();
     return this.transaction(async (client) => {
       const proposed = await captureScheduleArtifact(client, this.registry, 'messages', messageId);
@@ -579,11 +585,31 @@ export class ScheduleService {
           if (!isSheetsDigestConfigV2(sheetsCandidate.config)) {
             throw new ScheduleConflict('LEGACY_V1_PROPOSAL_STALE');
           }
-          const verified = await verifySheetsDigestCandidateInTx(client, {
+          const originalCandidateHash = computeSheetsDigestHash({
             userId,
             recurrence: proposal.recurrence!,
             config: sheetsCandidate.config,
-            expectedHash: sheetsCandidate.configHash,
+          });
+          if (sheetsCandidate.configHash && sheetsCandidate.configHash !== originalCandidateHash) {
+            throw new ScheduleConflict(
+              'DIGEST_PREVIEW_CHANGED',
+              'Mã băm xác nhận của cấu hình lịch không khớp với bản xem trước.',
+            );
+          }
+          const effectiveCandidateConfig: SheetsDigestConfig =
+            typeof includeAiSummary === 'boolean'
+              ? { ...sheetsCandidate.config, includeAiSummary }
+              : sheetsCandidate.config;
+          const effectiveExpectedHash = computeSheetsDigestHash({
+            userId,
+            recurrence: proposal.recurrence!,
+            config: effectiveCandidateConfig,
+          });
+          const verified = await verifySheetsDigestCandidateInTx(client, {
+            userId,
+            recurrence: proposal.recurrence!,
+            config: effectiveCandidateConfig,
+            expectedHash: effectiveExpectedHash,
             trustedScope,
             encryptionKey: this.options.encryptionKey,
             mysheetsEnabled: this.options.mysheetsEnabled,
@@ -1048,6 +1074,7 @@ export class ScheduleService {
     scheduleId: string;
     now?: Date;
     scope?: ScheduleScope;
+    includeAiSummary?: boolean;
   }): Promise<{
     proposalMessageId: string;
     convId: string;
@@ -1196,6 +1223,13 @@ export class ScheduleService {
       mysheetsEnabled: this.options.mysheetsEnabled,
       fetchOrgSheetsMetadata: this.options.fetchOrgSheetsMetadata,
       emitV2: true,
+      explicitRange: prevSource?.range,
+      includeAiSummary:
+        typeof input.includeAiSummary === 'boolean'
+          ? input.includeAiSummary
+          : typeof prevConfig?.includeAiSummary === 'boolean'
+            ? prevConfig.includeAiSummary
+            : undefined,
     });
 
     if (
@@ -1255,20 +1289,36 @@ export class ScheduleService {
         candidate.config.source.sheetName = prevSource.sheetName;
       }
       if (prevSource.range && !candidate.config.source.range) {
-        candidate.config.source.range = prevSource.range;
+        const rangeCheck = validateAndCanonicalizeDigestRange(prevSource.range);
+        if (!rangeCheck.ok) {
+          throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', rangeCheck.reason);
+        }
+        candidate.config.source.range = rangeCheck.canonicalRange;
       }
       if (typeof prevSource.tailRows === 'number' && prevSource.tailRows > 0) {
         candidate.config.source.tailRows = prevSource.tailRows;
       }
-      if (prevConfig && typeof prevConfig.includeAiSummary === 'boolean') {
-        candidate.config.includeAiSummary = prevConfig.includeAiSummary;
-      }
-      candidate.configHash = computeSheetsDigestHash({
-        userId,
-        recurrence: snap.recurrence,
-        config: candidate.config,
-      });
     }
+    const effectiveIncludeAi =
+      typeof input.includeAiSummary === 'boolean'
+        ? input.includeAiSummary
+        : typeof prevConfig?.includeAiSummary === 'boolean'
+          ? prevConfig.includeAiSummary
+          : candidate.config.includeAiSummary;
+    candidate.config.includeAiSummary = effectiveIncludeAi;
+    if (candidate.preview) {
+      candidate.preview = {
+        ...candidate.preview,
+        ...(candidate.config.source.sheetName ? { sheetName: candidate.config.source.sheetName } : {}),
+        ...(candidate.config.source.range ? { range: candidate.config.source.range } : {}),
+        includeAiSummary: effectiveIncludeAi,
+      };
+    }
+    candidate.configHash = computeSheetsDigestHash({
+      userId,
+      recurrence: snap.recurrence,
+      config: candidate.config,
+    });
 
     // Phase B (Inside DB Transaction): Lock, Verify & Persist Sealed Proposal Message
     return this.transaction(async (client) => {
@@ -1611,16 +1661,26 @@ export class ScheduleService {
       const targetConvId = run.conv_id ?? schedule.conv_id;
 
       if (resolution === 'mark_sent') {
-        const cfg =
-          schedule.digest_config && typeof schedule.digest_config === 'object'
-            ? (schedule.digest_config as SheetsDigestConfig)
-            : null;
-        const src = cfg?.source;
-        const dest = cfg?.destination;
         const prevDelivery =
           run.delivery && typeof run.delivery === 'object'
             ? (run.delivery as Partial<SheetsDigestDelivery>)
             : null;
+        const dispatchedCfg =
+          run.dispatched_config && typeof run.dispatched_config === 'object'
+            ? (run.dispatched_config as SheetsDigestConfig)
+            : schedule.version === run.schedule_version &&
+                schedule.digest_config &&
+                typeof schedule.digest_config === 'object'
+              ? (schedule.digest_config as SheetsDigestConfig)
+              : null;
+        if (!dispatchedCfg && (!prevDelivery?.targetId || !prevDelivery?.spreadsheetId)) {
+          throw new ScheduleConflict(
+            'MISSING_DISPATCH_SNAPSHOT',
+            'Không tìm thấy bản chụp cấu hình tại thời điểm gửi của lượt chạy cũ này sau khi lịch đã thay đổi.',
+          );
+        }
+        const src = dispatchedCfg?.source;
+        const dest = dispatchedCfg?.destination;
         const fallbackTargetId =
           dest && 'channelId' in dest
             ? dest.channelId
@@ -1656,7 +1716,7 @@ export class ScheduleService {
           summaryMode:
             prevDelivery?.summaryMode === 'ai' || prevDelivery?.summaryMode === 'deterministic'
               ? prevDelivery.summaryMode
-              : cfg?.includeAiSummary
+              : dispatchedCfg?.includeAiSummary
                 ? 'ai'
                 : 'deterministic',
           sentAt: typeof prevDelivery?.sentAt === 'string' ? prevDelivery.sentAt : null,
@@ -1736,6 +1796,12 @@ export class ScheduleService {
 
       // Branch B: resolution === 'retry_new_run' with confirmDuplicateRisk === true
       await this.assertSheetsDigestCanResumeInTx(client, schedule);
+      if (schedule.status !== 'active') {
+        throw new ScheduleConflict(
+          'SCHEDULE_PAUSED',
+          'Lịch đang tạm dừng. Vui lòng tiếp tục (Chạy tiếp) lịch trước khi tạo lượt gửi bù mới để lượt chạy bù không bị hủy.',
+        );
+      }
       const busy = await client.query(
         "SELECT 1 FROM schedule_runs WHERE schedule_id = $1 AND status = 'planning'",
         [schedule.id],
@@ -1745,10 +1811,19 @@ export class ScheduleService {
       }
 
       const newRunRes = await client.query(
-        `INSERT INTO schedule_runs (schedule_id, schedule_version, trigger, due_at, status)
-         VALUES ($1, $2, 'manual', $3, 'planning')
+        `INSERT INTO schedule_runs (
+           schedule_id, schedule_version, trigger, due_at, status,
+           dispatched_config, dispatched_config_hash
+         )
+         VALUES ($1, $2, 'manual', $3, 'planning', $4::jsonb, $5)
          RETURNING *`,
-        [schedule.id, schedule.version, now],
+        [
+          schedule.id,
+          schedule.version,
+          now,
+          schedule.digest_config ? JSON.stringify(schedule.digest_config) : null,
+          schedule.digest_config_hash ?? null,
+        ],
       );
       const newRunRow = newRunRes.rows[0]!;
 

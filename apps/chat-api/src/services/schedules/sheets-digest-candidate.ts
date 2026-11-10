@@ -170,24 +170,185 @@ function extractSheetTabFromPrompt(
   reqLower: string,
   availableSheets?: string[]
 ): string | undefined {
+  const sheetBangRangeMatch =
+    /(?:['"“”]([^'"“”!\n]+)['"“”]|(\b[A-Za-z0-9_\u00C0-\u024F\u1E00-\u1EFF-]+))!\$?[A-Za-z]{1,3}\$?\d+\s*:\s*\$?[A-Za-z]{1,3}\$?\d+/u.exec(
+      request
+    );
+  const bangTabCandidate = (sheetBangRangeMatch?.[1] ?? sheetBangRangeMatch?.[2])?.trim();
+
+  const tabMatch =
+    /\b(?:tab|sheet)\s+["'“”]?([^"'“”,.!\n]+?)["'“”]?(?=\s+(?:vùng|miền|ô|range|từ|trong|của|và|rồi|vào|lên|\$?[A-Za-z]{1,3}\$?\d+\s*:)\b|$)/iu.exec(
+      request
+    );
+  const explicitKeywordTabCandidate = tabMatch?.[1]?.trim();
+  const explicitTabCandidate = bangTabCandidate ?? explicitKeywordTabCandidate;
+
+  if (explicitTabCandidate) {
+    if (Array.isArray(availableSheets) && availableSheets.length > 0) {
+      const matchedExplicit = availableSheets.find(
+        (t) => t.toLowerCase() === explicitTabCandidate.toLowerCase()
+      );
+      if (matchedExplicit) return matchedExplicit;
+    }
+    return explicitTabCandidate;
+  }
+
   if (Array.isArray(availableSheets) && availableSheets.length > 0) {
     const matchedTab = availableSheets.find((t) => reqLower.includes(t.toLowerCase()));
     if (matchedTab) return matchedTab;
     if (availableSheets.length === 1) return availableSheets[0];
   }
-  const tabMatch = /\b(?:tab|sheet)\s+["'“”]?([^"'“”,.\n]+?)["'“”]?(?=\s+(?:từ|trong|của|và|rồi|vào|lên)\b|$)/iu.exec(
-    request
-  );
-  if (tabMatch?.[1]?.trim()) {
-    return tabMatch[1].trim();
-  }
   return undefined;
+}
+
+function colLettersToIndex(letters: string): number {
+  let idx = 0;
+  for (const ch of letters.toUpperCase()) {
+    idx = idx * 26 + (ch.charCodeAt(0) - 64);
+  }
+  return idx;
+}
+
+export function validateAndCanonicalizeDigestRange(
+  rawRange: string
+): { ok: true; canonicalRange: string; sheetFromRange?: string } | { ok: false; reason: string } {
+  const trimmed = rawRange.trim();
+  if (!trimmed || trimmed.length > 200 || /[\[\]\/\\?#\u0000-\u001f]/.test(trimmed)) {
+    return {
+      ok: false,
+      reason: 'Vùng ô (A1 range) không hợp lệ. Vui lòng chỉ định vùng hợp lệ như A1:F50 (tối đa 500 dòng dữ liệu và 26 cột A..Z).',
+    };
+  }
+  let sheetFromRange: string | undefined;
+  let spec = trimmed;
+  const bangIdx = trimmed.indexOf('!');
+  if (bangIdx !== -1) {
+    const rawSheet = trimmed.slice(0, bangIdx).trim().replace(/^['"“”]+|['"“”]+$/g, '').replace(/''/g, "'");
+    spec = trimmed.slice(bangIdx + 1).trim();
+    if (!rawSheet || spec.includes('!')) {
+      return {
+        ok: false,
+        reason: 'Cú pháp vùng ô kèm tên tab không hợp lệ. Vui lòng dùng dạng Tasks!A1:B20.',
+      };
+    }
+    sheetFromRange = rawSheet;
+  }
+
+  const m = /^\$?([A-Za-z]{1,3})\$?(\d+)\s*:\s*\$?([A-Za-z]{1,3})\$?(\d+)$/.exec(spec);
+  if (!m) {
+    return {
+      ok: false,
+      reason:
+        'Vùng ô yêu cầu không đúng định dạng A1 hai chiều (ví dụ A1:B20). Báo cáo tự động không mở rộng ngầm các vùng mơ hồ.',
+    };
+  }
+  const colStartLetters = m[1]!.toUpperCase();
+  const rowStart = Number(m[2]);
+  const colEndLetters = m[3]!.toUpperCase();
+  const rowEnd = Number(m[4]);
+  const colStart = colLettersToIndex(colStartLetters);
+  const colEnd = colLettersToIndex(colEndLetters);
+
+  if (
+    !Number.isInteger(rowStart) ||
+    !Number.isInteger(rowEnd) ||
+    rowStart < 1 ||
+    rowEnd < rowStart ||
+    colStart < 1 ||
+    colEnd < colStart
+  ) {
+    return {
+      ok: false,
+      reason: 'Vùng ô A1 có thứ tự dòng hoặc cột không hợp lệ (ví dụ dòng/cột kết thúc nhỏ hơn bắt đầu).',
+    };
+  }
+  if (colEnd > 26) {
+    return {
+      ok: false,
+      reason: `Vùng ô ${colStartLetters}${rowStart}:${colEndLetters}${rowEnd} vượt quá giới hạn tối đa 26 cột (A..Z) của báo cáo tự động.`,
+    };
+  }
+  const dataRowsSpan = rowEnd - rowStart;
+  if (dataRowsSpan > 500) {
+    return {
+      ok: false,
+      reason: `Vùng ô ${colStartLetters}${rowStart}:${colEndLetters}${rowEnd} vượt quá giới hạn tối đa 500 dòng dữ liệu của báo cáo tự động.`,
+    };
+  }
+
+  return {
+    ok: true,
+    canonicalRange: `${colStartLetters}${rowStart}:${colEndLetters}${rowEnd}`,
+    ...(sheetFromRange ? { sheetFromRange } : {}),
+  };
+}
+
+function extractPromptDigestRange(
+  request: string,
+  explicitRangeInput?: string
+): { ok: true; canonicalRange?: string; sheetFromRange?: string } | { ok: false; reason: string } {
+  if (typeof explicitRangeInput === 'string' && explicitRangeInput.trim()) {
+    const validated = validateAndCanonicalizeDigestRange(explicitRangeInput);
+    if (!validated.ok) return validated;
+    return {
+      ok: true,
+      canonicalRange: validated.canonicalRange,
+      ...(validated.sheetFromRange ? { sheetFromRange: validated.sheetFromRange } : {}),
+    };
+  }
+
+  // Check if user explicitly wrote "vùng <token>" / "range <token>" with an invalid range token
+  const explicitKeywordMatch =
+    /\b(?:vùng\s+ô|vùng\s+dữ\s+liệu|vùng|range)\s+["'“”]?([^\s"'“”,;]+)["'“”]?/iu.exec(request);
+  const cellRangeTokens = Array.from(
+    request.matchAll(
+      /(?:(?:['"“”][^'"“”!\n]+['"“”]|[A-Za-z0-9_\u00C0-\u024F\u1E00-\u1EFF-]+)!)?\$?[A-Za-z]{1,3}\$?\d+\s*:\s*\$?[A-Za-z]{1,3}\$?\d*\b/gu
+    ),
+    (m) => m[0].trim()
+  );
+
+  if (cellRangeTokens.length > 1) {
+    const distinct = new Set(cellRangeTokens.map((t) => t.toUpperCase().replace(/\s+/g, '')));
+    if (distinct.size > 1) {
+      return {
+        ok: false,
+        reason:
+          'Chỉ hỗ trợ khóa một vùng ô A1 duy nhất cho mỗi lịch báo cáo tự động. Vui lòng chỉ định một vùng dữ liệu duy nhất.',
+      };
+    }
+  }
+
+  if (cellRangeTokens.length === 1) {
+    const validated = validateAndCanonicalizeDigestRange(cellRangeTokens[0]!);
+    if (!validated.ok) return validated;
+    return {
+      ok: true,
+      canonicalRange: validated.canonicalRange,
+      ...(validated.sheetFromRange ? { sheetFromRange: validated.sheetFromRange } : {}),
+    };
+  }
+
+  if (explicitKeywordMatch?.[1]) {
+    const token = explicitKeywordMatch[1].trim();
+    if (/[A-Za-z]/.test(token) && (token.includes(':') || /\d/.test(token))) {
+      const validated = validateAndCanonicalizeDigestRange(token);
+      if (!validated.ok) return validated;
+      return {
+        ok: true,
+        canonicalRange: validated.canonicalRange,
+        ...(validated.sheetFromRange ? { sheetFromRange: validated.sheetFromRange } : {}),
+      };
+    }
+  }
+
+  return { ok: true };
 }
 
 function buildSheetsDigestPreviewInfo(
   workspaceMode: SheetsDigestWorkspaceMode,
   sourceConfig: SheetsDigestSourceConfigV2,
-  destinationConfig: SheetsDigestDestinationConfigV2
+  destinationConfig: SheetsDigestDestinationConfigV2,
+  includeAiSummary = true
 ): SheetsDigestPreviewInfo {
   const sourceConnectionLabel =
     sourceConfig.service === 'mysheets'
@@ -252,10 +413,12 @@ function buildSheetsDigestPreviewInfo(
     spreadsheetTitle: sourceConfig.spreadsheetTitle,
     spreadsheetId: sourceConfig.spreadsheetId,
     ...(sourceConfig.sheetName ? { sheetName: sourceConfig.sheetName } : {}),
+    ...(sourceConfig.range ? { range: sourceConfig.range } : {}),
     requestedRangeLabel,
     destinationConnectionLabel,
     destinationTargetLabel,
     ...(crossBoundaryWarning ? { crossBoundaryWarning } : {}),
+    includeAiSummary,
   };
 }
 
@@ -271,6 +434,8 @@ export interface AnalyzeSheetsDigestInput {
   mysheetsEnabled?: boolean;
   fetchOrgSheetsMetadata?: FetchOrgSheetsMetadataFn;
   emitV2?: boolean;
+  includeAiSummary?: boolean;
+  explicitRange?: string;
   signal?: AbortSignal;
 }
 
@@ -981,20 +1146,49 @@ export async function analyzeSheetsDigestCandidate(
     };
   }
 
+  // GAS-05: Extract, canonicalize, validate, and bind explicit A1 range before preview & hash
+  const rangeCheck = extractPromptDigestRange(request, input.explicitRange);
+  if (!rangeCheck.ok) {
+    return {
+      canAutoDigest: false,
+      requiresClarification: true,
+      reason: rangeCheck.reason,
+    };
+  }
+  if (rangeCheck.canonicalRange) {
+    sourceConfig.range = rangeCheck.canonicalRange;
+    if (!sourceConfig.sheetName && rangeCheck.sheetFromRange) {
+      sourceConfig.sheetName = rangeCheck.sheetFromRange;
+    }
+  }
+
+  // GAS-02: Bind explicit AI summary choice (or natural-language deterministic opt-out) into config, hash, and preview
+  const explicitNoAi =
+    /\b(?:không\s+dùng\s+ai|tắt\s+ai|không\s+tóm\s+tắt\s+ai|chỉ\s+thống\s+kê\s+số\s+liệu|deterministic\s+only|without\s+ai)\b/iu.test(
+      request
+    );
+  const resolvedIncludeAiSummary =
+    typeof input.includeAiSummary === 'boolean' ? input.includeAiSummary : !explicitNoAi;
+
   const config: SheetsDigestConfigV2 = {
     version: 2,
     workspaceMode,
     workspaceId,
     source: sourceConfig,
     destination: destinationConfig,
-    includeAiSummary: true,
+    includeAiSummary: resolvedIncludeAiSummary,
   };
 
   const configHash = recurrence
     ? computeSheetsDigestHash({ userId, recurrence, config })
     : undefined;
 
-  const preview = buildSheetsDigestPreviewInfo(workspaceMode, sourceConfig, destinationConfig);
+  const preview = buildSheetsDigestPreviewInfo(
+    workspaceMode,
+    sourceConfig,
+    destinationConfig,
+    resolvedIncludeAiSummary
+  );
 
   return {
     canAutoDigest: true,
@@ -1029,6 +1223,13 @@ export async function verifySheetsDigestCandidateInTx(
       ok: false,
       reason: 'Cấu hình báo cáo tự động không hợp lệ hoặc thiếu khóa mã hóa.',
     };
+  }
+
+  if (config.source.range !== undefined && config.source.range !== null) {
+    const validatedRange = validateAndCanonicalizeDigestRange(config.source.range);
+    if (!validatedRange.ok) {
+      return { ok: false, reason: validatedRange.reason };
+    }
   }
 
   if (

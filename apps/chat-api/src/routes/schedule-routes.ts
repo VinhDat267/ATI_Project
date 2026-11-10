@@ -92,6 +92,14 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
       res.status(400).json({ error: { code: 'BAD_REQUEST', message: 'Chế độ xác nhận lịch không hợp lệ.' } });
       return;
     }
+    const rawIncludeAiSummary = req.body?.includeAiSummary;
+    if (rawIncludeAiSummary !== undefined && typeof rawIncludeAiSummary !== 'boolean') {
+      res.status(400).json({
+        error: { code: 'BAD_REQUEST', message: 'Tuỳ chọn tóm tắt AI (includeAiSummary) phải là kiểu boolean.' },
+        code: 'BAD_REQUEST',
+      });
+      return;
+    }
     const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
     const change = await service.confirmProposal({
       userId,
@@ -100,6 +108,7 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
       now: now(),
       scope,
       ...(rawMode ? { approvalMode: rawMode } : {}),
+      ...(typeof rawIncludeAiSummary === 'boolean' ? { includeAiSummary: rawIncludeAiSummary } : {}),
     });
     await announce(change);
     res.json({ schedule: change.schedule });
@@ -137,12 +146,21 @@ export function createScheduleRoutes(options: ScheduleRoutesOptions): Router {
   }));
 
   router.post('/schedules/:id/reauthorize-preview', handle(async (req, res, userId) => {
+    const rawIncludeAiSummary = req.body?.includeAiSummary;
+    if (rawIncludeAiSummary !== undefined && typeof rawIncludeAiSummary !== 'boolean') {
+      res.status(400).json({
+        error: { code: 'BAD_REQUEST', message: 'Tuỳ chọn tóm tắt AI (includeAiSummary) phải là kiểu boolean.' },
+        code: 'BAD_REQUEST',
+      });
+      return;
+    }
     const scope = req.workspace ? { workspaceMode: req.workspace.mode, workspaceId: req.workspace.workspaceId } : undefined;
     const preview = await service.createReauthorizePreview({
       userId,
       scheduleId: String(req.params.id),
       now: now(),
       scope,
+      ...(typeof rawIncludeAiSummary === 'boolean' ? { includeAiSummary: rawIncludeAiSummary } : {}),
     });
     res.json(preview);
   }));

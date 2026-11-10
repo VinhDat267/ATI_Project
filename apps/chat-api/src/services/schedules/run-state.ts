@@ -5,6 +5,7 @@ import type {
   ScheduleRunDeliveryResolution,
   ScheduleRunState,
   ScheduleRunView,
+  SheetsDigestConfig,
   SheetsDigestDelivery,
   TelegramDigestDelivery,
   TrelloDigestDelivery,
@@ -30,6 +31,8 @@ export interface RunRow {
     | TrelloDigestDelivery
     | NotionDigestDelivery
     | null;
+  dispatched_config?: SheetsDigestConfig | Record<string, unknown> | null;
+  dispatched_config_hash?: string | null;
   delivery_started_at?: Date | string | null;
   delivery_resolution?: ScheduleRunDeliveryResolution | null;
   delivery_resolved_at?: Date | string | null;
