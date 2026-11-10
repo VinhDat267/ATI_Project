@@ -37,11 +37,30 @@ CREATE TABLE IF NOT EXISTS sheets_append_leases (
   lease_id TEXT NOT NULL CHECK (btrim(lease_id) <> ''),
   owner_id TEXT NOT NULL CHECK (btrim(owner_id) <> ''),
   fencing_token BIGINT NOT NULL DEFAULT 1 CHECK (fencing_token >= 1),
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'unknown_outcome')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'dispatched', 'unknown_outcome', 'released')),
   acquired_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   expires_at TIMESTAMPTZ NOT NULL,
-  unknown_reason TEXT
+  dispatched_at TIMESTAMPTZ,
+  released_at TIMESTAMPTZ,
+  reconciled_at TIMESTAMPTZ,
+  unknown_reason TEXT,
+  dispatched_meta JSONB
 );
+
+ALTER TABLE sheets_append_leases
+  ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS dispatched_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS released_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS reconciled_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS dispatched_meta JSONB;
+
+ALTER TABLE sheets_append_leases
+  DROP CONSTRAINT IF EXISTS sheets_append_leases_status_check;
+
+ALTER TABLE sheets_append_leases
+  ADD CONSTRAINT sheets_append_leases_status_check
+  CHECK (status IN ('active', 'dispatched', 'unknown_outcome', 'released'));
 
 CREATE INDEX IF NOT EXISTS idx_sheets_append_leases_expires_at
   ON sheets_append_leases (expires_at);

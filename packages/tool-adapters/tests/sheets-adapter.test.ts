@@ -320,3 +320,104 @@ it('deduplicates append_rows idempotently on external sync keys or explicit dedu
   });
   expect(apiCalls.filter((c) => c.init.method === 'POST')).toHaveLength(1);
 });
+
+it('GAS-10: shared SheetsAdapter (sheets.append_rows) calls beginWriteDispatch before POST, marks unknown_outcome on ambiguous failure without erasing on release(), blocks un-reconciled retries, and recovers after reconcileAppendLease', async () => {
+  const leaseStore = new adapters.InMemorySheetsAppendLeaseStore();
+  const sheetRows: string[][] = [
+    ['Key', 'Title'],
+    ['GH#100', 'Initial'],
+  ];
+  let postAttempts = 0;
+
+  const fetchFn = vi.fn(async (url: any, init: any) => {
+    if (String(url) === 'https://oauth2.googleapis.com/token') {
+      return json({ access_token: 'fixture-secret-token', token_type: 'Bearer', expires_in: 3600 });
+    }
+    const parsed = new URL(String(url));
+    if ((init?.method ?? 'GET') === 'GET' && parsed.searchParams.get('fields')?.includes('sheets.properties')) {
+      return json(metadata);
+    }
+    if ((init?.method ?? 'GET') === 'GET' && parsed.pathname.includes('/values/')) {
+      return json({ range: 'Tasks!A1:B20', values: sheetRows.map((r) => [...r]) });
+    }
+    if (init?.method === 'POST' && parsed.pathname.includes(':append')) {
+      postAttempts += 1;
+      const body = JSON.parse(String(init.body ?? '{}'));
+      for (const r of body.values ?? []) {
+        sheetRows.push(r.map(String));
+      }
+      if (postAttempts === 1) {
+        return json({}, 502);
+      }
+      return json({
+        spreadsheetId: id,
+        updates: { updatedRange: `Tasks!A${sheetRows.length}:B${sheetRows.length}`, updatedRows: 1 },
+      });
+    }
+    return json(metadata);
+  }) as unknown as typeof fetch;
+
+  const adapter1 = new adapters.SheetsAdapter({
+    credentials,
+    allowedScope: { spreadsheets: [id] },
+    fetchFn,
+    appendLeaseStore: leaseStore,
+    rateLimiter: new adapters.GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+  });
+  const adapter2 = new adapters.SheetsAdapter({
+    credentials,
+    allowedScope: { spreadsheets: [id] },
+    fetchFn,
+    appendLeaseStore: leaseStore,
+    rateLimiter: new adapters.GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+  });
+
+  await expect(
+    adapter1.execute('sheets.append_rows', {
+      spreadsheetId: id,
+      sheet: 'Tasks',
+      deduplicate: true,
+      rows: [['GH#321', 'Shared adapter ambiguous write']],
+    })
+  ).rejects.toMatchObject({ category: 'UNKNOWN', statusCode: 502 });
+
+  const scopeKey = `${id}::tasks`;
+  expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('unknown_outcome');
+
+  // Un-reconciled retry on adapter2 must be blocked before POST
+  await expect(
+    adapter2.execute('sheets.append_rows', {
+      spreadsheetId: id,
+      sheet: 'Tasks',
+      deduplicate: true,
+      rows: [['GH#321', 'Shared adapter ambiguous write']],
+    })
+  ).rejects.toMatchObject({
+    category: 'UNKNOWN',
+    details: { code: 'SHEETS_APPEND_UNKNOWN_OUTCOME_UNRECONCILED', requestSent: false },
+  });
+  expect(postAttempts).toBe(1);
+
+  // Reconcile via adapter2.reconcileAppendLease
+  const reconciled = await (adapter2 as any).reconcileAppendLease({
+    spreadsheetId: id,
+    sheet: 'Tasks',
+  });
+  expect(reconciled).toMatchObject({ reconciled: true });
+  expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('released');
+
+  // Subsequent retry acquires fencingToken 2, sees GH#321 in sheetRows, and skips duplicate
+  const retryRes = await adapter2.execute('sheets.append_rows', {
+    spreadsheetId: id,
+    sheet: 'Tasks',
+    deduplicate: true,
+    rows: [['GH#321', 'Shared adapter ambiguous write']],
+  });
+  expect(retryRes).toMatchObject({
+    spreadsheetId: id,
+    updatedRows: 0,
+    skippedDuplicates: 1,
+  });
+  expect(postAttempts).toBe(1);
+  expect((await leaseStore.getLeaseState?.(scopeKey))?.fencingToken).toBe(2);
+});

@@ -1,4 +1,4 @@
-import type { SheetsAppendLeaseStore } from '@wap/tool-schemas';
+import type { SheetsAppendDispatchMetadata, SheetsAppendLeaseStore } from '@wap/tool-schemas';
 import { BaseAdapter, StepError, type BaseAdapterConfig } from '../base-adapter.js';
 import type { GmailAccessTokenProvider } from '../gmail/token-provider.js';
 import { SHEETS_MAX_CELL_CHARS, SHEETS_MAX_COLUMNS, clipText } from '../bounds.js';
@@ -9,6 +9,7 @@ import {
   bounded,
   buildDeleteRowRequests,
   buildPartialCellUpdates,
+  buildRowDedupSignature,
   computeSheetAggregation,
   executeReadDigestWindow,
   extractTabHeaders,
@@ -17,6 +18,7 @@ import {
   invalid,
   mapRecordsToRows,
   queryText,
+  reconcileDispatchedLeaseAgainstRows,
   resolveDeduplicationPolicy,
   resolveReadRange,
   safeRows,
@@ -96,6 +98,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
   private readonly fetchFn: typeof fetch;
   private readonly enableDriveWriteTools: boolean;
   private readonly appendLeaseStore: SheetsAppendLeaseStore;
+  private readonly hasCustomAppendLeaseStore: boolean;
   private readonly spreadsheetLocales = new Map<string, string>();
   private readonly allowedDriveResources = new Set<string>();
 
@@ -110,6 +113,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
     this.userId = config.userId;
     this.tokens = config.tokens;
     this.appendLeaseStore = config.appendLeaseStore ?? sharedProcessSheetsAppendLeaseStore;
+    this.hasCustomAppendLeaseStore = Boolean(config.appendLeaseStore);
     this.enableDriveWriteTools =
       typeof config.enableDriveWriteTools === 'boolean'
         ? config.enableDriveWriteTools
@@ -304,7 +308,8 @@ export class PersonalSheetsAdapter extends BaseAdapter {
     path: string,
     signal?: AbortSignal,
     body?: unknown,
-    onDispatch?: (dispatched: boolean) => void
+    onDispatch?: (dispatched: boolean) => void,
+    beforeDispatch?: () => Promise<void>
   ): Promise<any> {
     if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
     const writing = body !== undefined;
@@ -330,6 +335,10 @@ export class PersonalSheetsAdapter extends BaseAdapter {
       forceRefresh = false;
 
       if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
+
+      if (writing && beforeDispatch) {
+        await beforeDispatch();
+      }
 
       let response: Response;
       try {
@@ -567,7 +576,8 @@ export class PersonalSheetsAdapter extends BaseAdapter {
         const range = "'" + sheet.replaceAll("'", "''") + "'!A1";
         const readRange = `${quotedSheet}!A1:Z500`;
 
-        const needsSerializedReadWrite = needsHeaderLookup || preliminaryPolicy.enabled;
+        const needsSerializedReadWrite =
+          needsHeaderLookup || preliminaryPolicy.enabled || this.hasCustomAppendLeaseStore;
         const lease = needsSerializedReadWrite
           ? await this.appendLeaseStore.acquireLease({
               scopeKey: `${id}::${sheet.trim().toLowerCase()}`,
@@ -580,6 +590,9 @@ export class PersonalSheetsAdapter extends BaseAdapter {
               },
             })
           : null;
+
+        let batchMutationCommitted = false;
+        let activeDispatchMeta: SheetsAppendDispatchMetadata | undefined;
 
         try {
           let existingRows: unknown[][] | undefined;
@@ -612,17 +625,29 @@ export class PersonalSheetsAdapter extends BaseAdapter {
                 majorDimension: 'ROWS',
                 values: safeRows([u.row]),
               }));
+              const batchDispatchMeta: SheetsAppendDispatchMetadata = {
+                operation: 'upsert',
+                rowCount: filtered.updates.length,
+                candidateKeys: filtered.updates.map((u) => buildRowDedupSignature(u.row, null)),
+                keyColumns: dedupPolicy.keyColumns,
+              };
               const batchRes = await this.request(
                 id + '/values:batchUpdate',
                 signal,
                 { valueInputOption: 'USER_ENTERED', data: batchData },
-                (dispatched) => { writeDispatched = dispatched; }
+                (dispatched) => { writeDispatched = dispatched; },
+                async () => {
+                  activeDispatchMeta = batchDispatchMeta;
+                  await lease?.beginWriteDispatch?.(batchDispatchMeta);
+                }
               );
               const respRange = batchRes?.responses?.[batchRes.responses.length - 1]?.updatedRange;
               if (typeof respRange === 'string') lastUpdatedRange = respRange;
               batchUpdatedRows = Number.isInteger(batchRes?.totalUpdatedRows)
                 ? batchRes.totalUpdatedRows
                 : filtered.updates.length;
+              batchMutationCommitted = true;
+              await lease?.completeWrite?.();
             }
             if (rowsToWrite.length === 0) {
               return {
@@ -635,11 +660,21 @@ export class PersonalSheetsAdapter extends BaseAdapter {
             }
           }
           const rows = safeRows(rowsToWrite);
+          const appendDispatchMeta: SheetsAppendDispatchMetadata = {
+            operation: 'append',
+            rowCount: rows.length,
+            candidateKeys: rows.map((r) => buildRowDedupSignature(r, null)),
+            keyColumns: dedupPolicy.keyColumns,
+          };
           const value = await this.request(
             id + '/values/' + encodeURIComponent(range) + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS',
             signal,
             { majorDimension: 'ROWS', values: rows },
-            (dispatched) => { writeDispatched = dispatched; }
+            (dispatched) => { writeDispatched = dispatched; },
+            async () => {
+              activeDispatchMeta = appendDispatchMeta;
+              await lease?.beginWriteDispatch?.(appendDispatchMeta);
+            }
           );
           if (
             value?.spreadsheetId !== id ||
@@ -649,6 +684,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
           ) {
             badResponse(true);
           }
+          await lease?.completeWrite?.();
           return {
             spreadsheetId: id,
             updatedRange: value.updates.updatedRange,
@@ -656,6 +692,28 @@ export class PersonalSheetsAdapter extends BaseAdapter {
             ...(dedupPolicy.enabled ? { skippedDuplicates } : {}),
             url: spreadsheetUrl(id),
           };
+        } catch (err) {
+          if (lease) {
+            const isLostLeasePreMutation =
+              !batchMutationCommitted &&
+              err instanceof StepError &&
+              err.details?.code === 'SHEETS_APPEND_LEASE_LOST';
+            if (!isLostLeasePreMutation) {
+              const isAmbiguousWriteOutcome =
+                batchMutationCommitted ||
+                (err instanceof StepError ? err.category === 'UNKNOWN' : writeDispatched);
+              if (isAmbiguousWriteOutcome) {
+                writeDispatched = true;
+                await lease.markUnknownOutcome?.(
+                  err instanceof Error ? err.message : 'Ambiguous Sheets append write outcome',
+                  activeDispatchMeta
+                );
+              } else {
+                await lease.abortUncommittedWrite?.();
+              }
+            }
+          }
+          throw err;
         } finally {
           await lease?.release();
         }
@@ -1124,6 +1182,45 @@ export class PersonalSheetsAdapter extends BaseAdapter {
       (path, sig) => this.request(path, sig),
       context?.signal
     );
+  }
+
+  async reconcileAppendLease(input: {
+    spreadsheetId: string;
+    sheet: string;
+    leaseId?: string;
+    fencingToken?: number;
+    signal?: AbortSignal;
+  }): Promise<{
+    reconciled: boolean;
+    committedOnProvider: boolean;
+    matchedSignatures: string[];
+    scopeKey: string;
+  }> {
+    const id = this.checkedId(input?.spreadsheetId);
+    const sheet = titleText(input?.sheet);
+    const scopeKey = `${id}::${sheet.trim().toLowerCase()}`;
+    const state = await this.appendLeaseStore.getLeaseState?.(scopeKey);
+    const quotedSheet = /\s|'/.test(sheet) ? "'" + sheet.replaceAll("'", "''") + "'" : sheet;
+    const readRange = `${quotedSheet}!A1:Z500`;
+    const existingData = await this.request(id + '/values/' + encodeURIComponent(readRange), input.signal);
+    const existingRows = Array.isArray(existingData?.values) ? (existingData.values as unknown[][]) : [];
+    const { committedOnProvider, matchedSignatures } = reconcileDispatchedLeaseAgainstRows(
+      state?.dispatchedMeta,
+      existingRows
+    );
+    const reconciled =
+      (await this.appendLeaseStore.reconcileUnknownLease?.({
+        scopeKey,
+        leaseId: input.leaseId ?? state?.leaseId,
+        fencingToken: input.fencingToken ?? state?.fencingToken,
+        reason: committedOnProvider ? 'committed' : 'aborted',
+      })) ?? false;
+    return {
+      reconciled,
+      committedOnProvider,
+      matchedSignatures,
+      scopeKey,
+    };
   }
 
   private async tabs(

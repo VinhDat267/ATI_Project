@@ -4,6 +4,7 @@ import {
   createPersonalSheetsAdapter,
   type PersonalSheetsAdapterConfig,
 } from '../../src/sheets/personal-sheets-adapter.js';
+import { InMemorySheetsAppendLeaseStore } from '../../src/sheets/sheets-shared.js';
 import { StepError, GlobalRateLimiter } from '../../src/index.js';
 import type { GmailAccessTokenProvider } from '../../src/gmail/token-provider.js';
 
@@ -1541,5 +1542,166 @@ describe('PersonalSheetsAdapter', () => {
     });
 
     expect(calls).toHaveLength(0);
+  });
+
+  it('GAS-10: mysheets.append_rows calls markUnknownOutcome on ambiguous post-dispatch failure, preserves unknown_outcome across release(), blocks un-reconciled retries, and recovers after reconcileAppendLease', async () => {
+    const leaseStore = new InMemorySheetsAppendLeaseStore();
+    const sheetRows: string[][] = [
+      ['Issue', 'Title'],
+      ['GH#100', 'Initial'],
+    ];
+    let postAttempts = 0;
+
+    const customFetch = (async (input: any, init: any) => {
+      const url = new URL(String(input));
+      if ((init?.method ?? 'GET') === 'GET' && url.searchParams.get('fields')?.includes('sheets.properties')) {
+        return json({ sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }] });
+      }
+      if ((init?.method ?? 'GET') === 'GET' && url.pathname.includes('/values/')) {
+        return json({ range: 'Sheet1!A1:B20', values: sheetRows.map((r) => [...r]) });
+      }
+      if (init?.method === 'POST' && url.pathname.includes(':append')) {
+        postAttempts += 1;
+        const parsed = JSON.parse(String(init.body ?? '{}'));
+        for (const r of parsed.values ?? []) {
+          sheetRows.push(r.map(String));
+        }
+        if (postAttempts === 1) {
+          // Provider mutated sheet, then returned 503 (ambiguous outcome)
+          return new Response('Service Unavailable', { status: 503 });
+        }
+        return json({
+          spreadsheetId,
+          updates: { updatedRange: `Sheet1!A${sheetRows.length}:B${sheetRows.length}`, updatedRows: 1 },
+        });
+      }
+      return json({});
+    }) as unknown as typeof fetch;
+
+    const tokens: GmailAccessTokenProvider = { getAccessToken: async () => 'mock-sheets-token' };
+    const adapter1 = createPersonalSheetsAdapter({
+      userId,
+      tokens,
+      allowedScope: { spreadsheets: [spreadsheetId] },
+      fetchFn: customFetch,
+      appendLeaseStore: leaseStore,
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+    });
+    const adapter2 = createPersonalSheetsAdapter({
+      userId,
+      tokens,
+      allowedScope: { spreadsheets: [spreadsheetId] },
+      fetchFn: customFetch,
+      appendLeaseStore: leaseStore,
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+    });
+
+    await expect(
+      adapter1.execute('mysheets.append_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        deduplicate: true,
+        rows: [['GH#321', 'Ambiguous write']],
+      })
+    ).rejects.toMatchObject({ category: 'UNKNOWN', statusCode: 503 });
+
+    const scopeKey = `${spreadsheetId}::sheet1`;
+    const stateAfterFailure = await leaseStore.getLeaseState?.(scopeKey);
+    expect(stateAfterFailure?.status).toBe('unknown_outcome');
+    expect(stateAfterFailure?.fencingToken).toBe(1);
+
+    // Un-reconciled retry on adapter2 must be blocked before dispatching any POST
+    await expect(
+      adapter2.execute('mysheets.append_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        deduplicate: true,
+        rows: [['GH#321', 'Ambiguous write']],
+      })
+    ).rejects.toMatchObject({
+      category: 'UNKNOWN',
+      details: {
+        code: 'SHEETS_APPEND_UNKNOWN_OUTCOME_UNRECONCILED',
+        requestSent: false,
+      },
+    });
+    expect(postAttempts).toBe(1);
+
+    // Reconcile by reading back the sheet and verifying state
+    const reconciled = await (adapter2 as any).reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+    });
+    expect(reconciled).toMatchObject({ reconciled: true });
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('released');
+
+    // Retry after reconciliation acquires fencingToken 2, sees GH#321 already in sheetRows, and skips without a second POST
+    const retryRes = await adapter2.execute('mysheets.append_rows', {
+      spreadsheetId,
+      sheet: 'Sheet1',
+      deduplicate: true,
+      rows: [['GH#321', 'Ambiguous write']],
+    });
+    expect(retryRes).toMatchObject({
+      spreadsheetId,
+      updatedRows: 0,
+      skippedDuplicates: 1,
+    });
+    expect(postAttempts).toBe(1);
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.fencingToken).toBe(2);
+  });
+
+  it('GAS-10: mysheets.append_rows fences off provider POST when beginWriteDispatch rejects due to lost lease ownership', async () => {
+    let postCalled = false;
+    const lostLeaseStore = {
+      acquireLease: async (input: any) => ({
+        leaseId: `${input.scopeKey}#stale`,
+        fencingToken: 1,
+        waitedForContention: false,
+        beginWriteDispatch: async () => {
+          throw new StepError({
+            message: 'Sheets append lease lost before provider write dispatch',
+            category: 'NETWORK',
+            retryable: false,
+            details: { code: 'SHEETS_APPEND_LEASE_LOST', requestSent: false },
+          });
+        },
+        markUnknownOutcome: async () => {},
+        release: async () => {},
+      }),
+    };
+
+    const customFetch = (async (input: any, init: any) => {
+      const url = new URL(String(input));
+      if (init?.method === 'POST') {
+        postCalled = true;
+      }
+      if (url.searchParams.get('fields')?.includes('sheets.properties')) {
+        return json({ sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }] });
+      }
+      return json({ range: 'Sheet1!A1:B2', values: [['Issue', 'Title']] });
+    }) as unknown as typeof fetch;
+
+    const adapter = createPersonalSheetsAdapter({
+      userId,
+      tokens: { getAccessToken: async () => 'mock-sheets-token' },
+      allowedScope: { spreadsheets: [spreadsheetId] },
+      fetchFn: customFetch,
+      appendLeaseStore: lostLeaseStore,
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+    });
+
+    await expect(
+      adapter.execute('mysheets.append_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        deduplicate: true,
+        rows: [['GH#999', 'Stale owner write']],
+      })
+    ).rejects.toMatchObject({
+      category: 'NETWORK',
+      details: { code: 'SHEETS_APPEND_LEASE_LOST', requestSent: false },
+    });
+    expect(postCalled).toBe(false);
   });
 });

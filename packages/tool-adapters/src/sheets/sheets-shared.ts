@@ -1,6 +1,10 @@
 import type {
+  SheetsAppendDispatchMetadata,
   SheetsAppendLeaseAcquireInput,
   SheetsAppendLeaseHandle,
+  SheetsAppendLeaseReconcileInput,
+  SheetsAppendLeaseState,
+  SheetsAppendLeaseStatus,
   SheetsAppendLeaseStore,
   SheetsDigestDataScope,
 } from '@wap/tool-schemas';
@@ -41,12 +45,99 @@ export interface ReadDigestWindowResult {
   unformattedValues?: unknown[][];
 }
 
+export function createUnreconciledAppendLeaseError(state: SheetsAppendLeaseState): StepError {
+  return new StepError({
+    message:
+      `Sheets append lease for '${state.scopeKey}' is in '${state.status}' state ` +
+      `after an ambiguous write outcome (${state.unknownReason ?? 'unresolved write'}). ` +
+      `Reconcile the sheet state before retrying append_rows.`,
+    category: 'UNKNOWN',
+    statusCode: 409,
+    details: {
+      code: 'SHEETS_APPEND_UNKNOWN_OUTCOME_UNRECONCILED',
+      requestSent: false,
+      scopeKey: state.scopeKey,
+      spreadsheetId: state.spreadsheetId,
+      sheetTitle: state.sheetTitle,
+      leaseId: state.leaseId,
+      fencingToken: state.fencingToken,
+      status: state.status,
+      unknownReason: state.unknownReason,
+      dispatchedMeta: state.dispatchedMeta ?? null,
+    },
+  });
+}
+
+export function createLostAppendLeaseError(
+  scopeKey: string,
+  leaseId: string,
+  fencingToken: number,
+  reason: string
+): StepError {
+  return new StepError({
+    message: `Sheets append lease lost before provider write dispatch (${reason})`,
+    category: 'NETWORK',
+    statusCode: 409,
+    details: {
+      code: 'SHEETS_APPEND_LEASE_LOST',
+      requestSent: false,
+      scopeKey,
+      leaseId,
+      fencingToken,
+    },
+  });
+}
+
+export function reconcileDispatchedLeaseAgainstRows(
+  dispatchedMeta: SheetsAppendDispatchMetadata | null | undefined,
+  existingRows: unknown[][]
+): {
+  committedOnProvider: boolean;
+  matchedSignatures: string[];
+} {
+  const expectedSigs = dispatchedMeta?.candidateKeys ?? [];
+  if (expectedSigs.length === 0) {
+    return { committedOnProvider: false, matchedSignatures: [] };
+  }
+  const existingFullSigs = new Set<string>();
+  const existingCol0Sigs = new Set<string>();
+  for (let i = 0; i < existingRows.length; i++) {
+    const row = existingRows[i];
+    if (!Array.isArray(row)) continue;
+    const fullSig = buildRowDedupSignature(row, null);
+    if (fullSig) existingFullSigs.add(fullSig);
+    const col0Sig = buildRowDedupSignature(row, [0]);
+    if (col0Sig) existingCol0Sigs.add(col0Sig);
+  }
+  const matchedSignatures = expectedSigs.filter(
+    (sig: string) => existingFullSigs.has(sig) || existingCol0Sigs.has(sig)
+  );
+  return {
+    committedOnProvider: matchedSignatures.length === expectedSigs.length,
+    matchedSignatures,
+  };
+}
+
 interface InMemoryLeaseEntry {
   tail: Promise<void>;
   activeCount: number;
+  spreadsheetId: string;
+  sheetTitle: string;
+  leaseId: string;
+  ownerId: string;
   fencingToken: number;
-  unknownReason?: string;
+  status: SheetsAppendLeaseStatus;
+  acquiredAt: string;
+  heartbeatAt: string;
+  expiresAt: string;
+  dispatchedAt: string | null;
+  releasedAt: string | null;
+  reconciledAt: string | null;
+  unknownReason: string | null;
+  dispatchedMeta: SheetsAppendDispatchMetadata | null;
 }
+
+const DEFAULT_IN_MEMORY_LEASE_TTL_MS = 30_000;
 
 /**
  * Process-wide in-memory lease store for serializing deduplicated Sheets appends across
@@ -56,17 +147,83 @@ interface InMemoryLeaseEntry {
 export class InMemorySheetsAppendLeaseStore implements SheetsAppendLeaseStore {
   private readonly locks = new Map<string, InMemoryLeaseEntry>();
 
+  private toState(scopeKey: string, entry: InMemoryLeaseEntry): SheetsAppendLeaseState {
+    return {
+      scopeKey,
+      spreadsheetId: entry.spreadsheetId,
+      sheetTitle: entry.sheetTitle,
+      leaseId: entry.leaseId,
+      ownerId: entry.ownerId,
+      fencingToken: entry.fencingToken,
+      status: entry.status,
+      acquiredAt: entry.acquiredAt,
+      expiresAt: entry.expiresAt,
+      dispatchedAt: entry.dispatchedAt,
+      unknownReason: entry.unknownReason,
+      dispatchedMeta: entry.dispatchedMeta,
+    };
+  }
+
+  async getLeaseState(scopeKey: string): Promise<SheetsAppendLeaseState | null> {
+    const entry = this.locks.get(scopeKey);
+    if (!entry || entry.fencingToken === 0) return null;
+    return this.toState(scopeKey, entry);
+  }
+
+  async reconcileUnknownLease(input: SheetsAppendLeaseReconcileInput): Promise<boolean> {
+    const entry = this.locks.get(input.scopeKey);
+    if (!entry) return false;
+    if (entry.status !== 'unknown_outcome' && entry.status !== 'dispatched') {
+      return false;
+    }
+    if (input.leaseId !== undefined && entry.leaseId !== input.leaseId) {
+      return false;
+    }
+    if (input.fencingToken !== undefined && entry.fencingToken !== input.fencingToken) {
+      return false;
+    }
+    if (input.verify) {
+      const verified = await input.verify(this.toState(input.scopeKey, entry));
+      if (!verified) return false;
+    }
+    const nowIso = new Date().toISOString();
+    entry.status = 'released';
+    entry.reconciledAt = nowIso;
+    entry.releasedAt = nowIso;
+    entry.unknownReason = null;
+    return true;
+  }
+
   async acquireLease(input: SheetsAppendLeaseAcquireInput): Promise<SheetsAppendLeaseHandle> {
-    const { scopeKey, signal, onContention } = input;
+    const { scopeKey, spreadsheetId, sheetTitle, ttlMs, signal, onContention } = input;
     if (signal?.aborted) {
       throw new StepError({
         message: 'Sheets append lease cancelled before dispatch',
         category: 'NETWORK',
+        details: { requestSent: false },
       });
     }
     let entry = this.locks.get(scopeKey);
     if (!entry) {
-      entry = { tail: Promise.resolve(), activeCount: 0, fencingToken: 0 };
+      const nowIso = new Date().toISOString();
+      entry = {
+        tail: Promise.resolve(),
+        activeCount: 0,
+        spreadsheetId,
+        sheetTitle,
+        leaseId: '',
+        ownerId: 'in-memory',
+        fencingToken: 0,
+        status: 'released',
+        acquiredAt: nowIso,
+        heartbeatAt: nowIso,
+        expiresAt: nowIso,
+        dispatchedAt: null,
+        releasedAt: nowIso,
+        reconciledAt: null,
+        unknownReason: null,
+        dispatchedMeta: null,
+      };
       this.locks.set(scopeKey, entry);
     }
     const waitedForContention = entry.activeCount > 0;
@@ -96,6 +253,7 @@ export class InMemorySheetsAppendLeaseStore implements SheetsAppendLeaseStore {
                 new StepError({
                   message: 'Sheets append lease cancelled while waiting',
                   category: 'NETWORK',
+                  details: { requestSent: false },
                 })
               );
             if (signal.aborted) {
@@ -111,32 +269,122 @@ export class InMemorySheetsAppendLeaseStore implements SheetsAppendLeaseStore {
     } catch (error) {
       entry.activeCount = Math.max(0, entry.activeCount - 1);
       releaseCurrent();
-      if (entry.activeCount === 0 && this.locks.get(scopeKey) === entry) {
-        this.locks.delete(scopeKey);
-      }
       throw error;
     }
 
+    if (entry.status === 'unknown_outcome' || entry.status === 'dispatched') {
+      if (entry.status === 'dispatched') {
+        entry.status = 'unknown_outcome';
+        entry.unknownReason =
+          entry.unknownReason ?? 'dispatched append lease expired without outcome confirmation';
+      }
+      entry.activeCount = Math.max(0, entry.activeCount - 1);
+      releaseCurrent();
+      throw createUnreconciledAppendLeaseError(this.toState(scopeKey, entry));
+    }
+
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    const effectiveTtlMs = Math.max(100, ttlMs ?? DEFAULT_IN_MEMORY_LEASE_TTL_MS);
     entry.fencingToken += 1;
     const token = entry.fencingToken;
-    const leaseId = `${scopeKey}#${token}`;
+    const leaseId = `${scopeKey}#${token}:${Math.random().toString(36).slice(2, 10)}`;
+    entry.spreadsheetId = spreadsheetId;
+    entry.sheetTitle = sheetTitle;
+    entry.leaseId = leaseId;
+    entry.status = 'active';
+    entry.acquiredAt = nowIso;
+    entry.heartbeatAt = nowIso;
+    entry.expiresAt = new Date(nowMs + effectiveTtlMs).toISOString();
+    entry.dispatchedAt = null;
+    entry.releasedAt = null;
+    entry.reconciledAt = null;
+    entry.unknownReason = null;
+    entry.dispatchedMeta = null;
+
     let released = false;
+
+    const assertOwnership = (action: string) => {
+      if (released || entry!.leaseId !== leaseId || entry!.fencingToken !== token) {
+        throw createLostAppendLeaseError(
+          scopeKey,
+          leaseId,
+          token,
+          `lease ownership superseded before ${action}`
+        );
+      }
+      if (new Date(entry!.expiresAt).getTime() <= Date.now()) {
+        throw createLostAppendLeaseError(
+          scopeKey,
+          leaseId,
+          token,
+          `lease expired before ${action}`
+        );
+      }
+    };
 
     return {
       leaseId,
       fencingToken: token,
       waitedForContention,
-      markUnknownOutcome: async (reason: string) => {
-        entry!.unknownReason = reason;
+      beginWriteDispatch: async (meta?: SheetsAppendDispatchMetadata) => {
+        assertOwnership('write dispatch');
+        if (entry!.status !== 'active' && entry!.status !== 'dispatched') {
+          throw createLostAppendLeaseError(
+            scopeKey,
+            leaseId,
+            token,
+            `unexpected lease status '${entry!.status}' on write dispatch`
+          );
+        }
+        const dispatchIso = new Date().toISOString();
+        entry!.status = 'dispatched';
+        entry!.dispatchedAt = dispatchIso;
+        entry!.heartbeatAt = dispatchIso;
+        if (meta !== undefined) {
+          entry!.dispatchedMeta = meta;
+        }
+      },
+      completeWrite: async () => {
+        if (entry!.leaseId === leaseId && entry!.fencingToken === token && entry!.status === 'dispatched') {
+          entry!.status = 'active';
+          entry!.heartbeatAt = new Date().toISOString();
+        }
+      },
+      abortUncommittedWrite: async () => {
+        if (entry!.leaseId === leaseId && entry!.fencingToken === token && entry!.status === 'dispatched') {
+          entry!.status = 'active';
+          entry!.dispatchedAt = null;
+          entry!.dispatchedMeta = null;
+          entry!.heartbeatAt = new Date().toISOString();
+        }
+      },
+      markUnknownOutcome: async (reason: string, meta?: SheetsAppendDispatchMetadata) => {
+        if (entry!.leaseId === leaseId && entry!.fencingToken === token && entry!.status !== 'released') {
+          entry!.status = 'unknown_outcome';
+          entry!.unknownReason = reason;
+          if (meta !== undefined) {
+            entry!.dispatchedMeta = meta;
+          }
+        }
       },
       release: async () => {
         if (released) return;
         released = true;
+        if (entry!.leaseId === leaseId && entry!.fencingToken === token) {
+          if (entry!.status === 'active') {
+            entry!.status = 'released';
+            entry!.releasedAt = new Date().toISOString();
+          } else if (entry!.status === 'dispatched') {
+            entry!.status = 'unknown_outcome';
+            entry!.unknownReason =
+              entry!.unknownReason ??
+              'lease released while write dispatch was in flight without outcome confirmation';
+          }
+          // If status === 'unknown_outcome', preserve durable uncertainty across release()
+        }
         entry!.activeCount = Math.max(0, entry!.activeCount - 1);
         releaseCurrent();
-        if (entry!.activeCount === 0 && this.locks.get(scopeKey) === entry) {
-          this.locks.delete(scopeKey);
-        }
       },
     };
   }
