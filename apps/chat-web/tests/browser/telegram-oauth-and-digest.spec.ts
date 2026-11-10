@@ -39,8 +39,9 @@ test('TELEGRAM-E2E-1: /guide 1-click showcase, TELEGRAM_PAIRING_PENDING auto-foc
 
   // 1. Verify /guide?service=telegram displays 1-click pairing CTA and OAuth showcase card
   await page.goto('/guide?service=telegram');
-  await expect(page.getByText('Cách kết nối:', { exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Kết nối Telegram 1-Click →/i })).toBeVisible();
+  await expect(page.getByText('Phương thức kết nối:', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Kết nối Telegram →/i })).toBeVisible();
+  await page.getByText('Xem tóm tắt nhanh 7 dịch vụ hỗ trợ liên kết trực tiếp').click();
   await expect(page.getByText('Telegram cá nhân & Nhóm')).toBeVisible();
 
   // 2. Setup mocked Telegram 1-click pairing endpoints (1st call: 409 TELEGRAM_PAIRING_PENDING, 2nd call on window focus: 200 connected/needs_scope)
