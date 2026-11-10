@@ -87,7 +87,7 @@ describe('Worker B Calendar Precheck Remediation (CALENDAR-AUDIT-02)', () => {
     calendarServer = createServer(handler);
     await new Promise<void>((r) => calendarServer!.listen(0, '127.0.0.1', () => r()));
     const { port } = calendarServer.address() as AddressInfo;
-    const baseUrl = `http://127.0.0.1:${port}/calendar/v3`;
+    const baseUrl = `http://127.0.0.1:${port}`;
 
     const conv = (await conversations.createConversation(owner.id)).id;
     const svc = new ChatService({
@@ -373,5 +373,72 @@ describe('Worker B Calendar Precheck Remediation (CALENDAR-AUDIT-02)', () => {
     const warningText = (row.plan_json.warnings ?? []).join('\n');
     expect(warningText.length).toBeGreaterThan(0);
     expect(warningText).not.toContain('Gợi ý khung giờ trống');
+  });
+
+  it('detects cross-midnight and all-day/recurring conflicts, discloses checked calendars and staleness risk, omits free slots on incomplete page coverage, and never mutates approved time', async () => {
+    responses.push(
+      makePlan([
+        {
+          id: 'step_create_cross_midnight',
+          tool: 'mycalendar.create_event',
+          description: 'Ca trực đêm xuyên ngày',
+          args: {
+            calendarId: 'owner.calendar@example.test',
+            summary: 'Ca trực đêm',
+            start: '2026-11-16T22:00:00+07:00',
+            end: '2026-11-17T02:00:00+07:00',
+          },
+          dependsOn: [],
+        },
+      ]),
+    );
+
+    const { row } = await runMessageWithHttpServer('Đặt ca trực đêm 22h 16/11 đến 2h 17/11', (req, res) => {
+      const url = new URL(req.url ?? '/', 'http://127.0.0.1');
+      if (url.pathname.includes('owner.calendar%40example.test/events')) {
+        // 20 events on page 1 + nextPageToken => coverage.complete === false, including an all-day event on 2026-11-17
+        const items = Array.from({ length: 20 }, (_, i) =>
+          i === 0
+            ? {
+                id: 'ev-allday-nextday',
+                summary: 'Company Offsite All-Day',
+                htmlLink: HTML_LINK,
+                start: { date: '2026-11-17' },
+                end: { date: '2026-11-18' },
+              }
+            : {
+                id: `ev-fill-${i}`,
+                summary: `Recurring Standup #${i}`,
+                htmlLink: HTML_LINK,
+                start: { dateTime: `2026-11-16T${String((i % 8) + 8).padStart(2, '0')}:00:00+07:00` },
+                end: { dateTime: `2026-11-16T${String((i % 8) + 8).padStart(2, '0')}:15:00+07:00` },
+              },
+        );
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ items, nextPageToken: 'more-events-page-2' }));
+        return;
+      }
+      if (url.pathname.endsWith('/events')) {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ items: [] }));
+        return;
+      }
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          id: 'owner.calendar@example.test',
+          summary: 'Lịch chính',
+          timeZone: 'Asia/Ho_Chi_Minh',
+        }),
+      );
+    });
+
+    const warningText = (row.plan_json.warnings ?? []).join('\n');
+    expect(warningText).toContain('Company Offsite All-Day');
+    expect(warningText).toContain('owner.calendar@example.test, team.calendar@example.test');
+    expect(warningText).toContain('lịch có thể thay đổi trước khi thực thi');
+    expect(warningText).not.toContain('Gợi ý khung giờ trống');
+    expect(row.plan_json.steps[0].args.start).toBe('2026-11-16T22:00:00+07:00');
+    expect(row.plan_json.steps[0].args.end).toBe('2026-11-17T02:00:00+07:00');
   });
 });

@@ -428,58 +428,116 @@ export class ChatService {
         );
         if (createEventSteps.length > 0 && (this.lookupTool || this.getAdapter)) {
           for (const createStep of createEventSteps) {
+            const targetCalId = String(createStep.args.calendarId);
+            const slotStart = String(createStep.args.start);
+            const slotEnd = String(createStep.args.end);
+            const stepTitle = String(createStep.args.summary || createStep.description || 'Sự kiện mới');
+            const selfEventId =
+              createStep.tool === 'mycalendar.update_event' && typeof createStep.args?.eventId === 'string'
+                ? createStep.args.eventId
+                : undefined;
+            const calendarsToCheck = Array.from(
+              new Set(
+                [targetCalId, ...(mycal.allowedCalendars ?? [])].filter(
+                  (id): id is string => typeof id === 'string' && id.trim().length > 0
+                )
+              )
+            );
+            const datePrefix = slotStart.slice(0, 10);
+            const endDatePrefix = slotEnd.slice(0, 10);
+            const tzSuffix = slotStart.slice(19) || 'Z';
+            const endTzSuffix = slotEnd.slice(19) || tzSuffix;
+            const dayStartIso = `${datePrefix}T00:00:00${tzSuffix}`;
+            const dayEndCandidateIso = `${endDatePrefix}T23:59:59${endTzSuffix}`;
+            const startMs = Date.parse(slotStart);
+            const endMs = Date.parse(slotEnd);
+            const dayStartMs = Date.parse(dayStartIso);
+            const dayEndCandidateMs = Date.parse(dayEndCandidateIso);
+            const readMin =
+              Number.isFinite(dayStartMs) && Number.isFinite(startMs) && dayStartMs <= startMs
+                ? dayStartIso
+                : slotStart;
+            const readMax =
+              Number.isFinite(dayEndCandidateMs) && Number.isFinite(endMs) && dayEndCandidateMs >= endMs
+                ? dayEndCandidateIso
+                : slotEnd;
+
+            const allEvents: Array<{
+              id?: string;
+              title: string;
+              start: string;
+              end: string;
+              transparency?: 'opaque' | 'transparent';
+              status?: 'confirmed' | 'tentative' | 'cancelled';
+              calendarId: string;
+            }> = [];
+            let precheckIncompleteOrFailed = false;
+
             try {
-              const calId = String(createStep.args.calendarId);
-              const slotStart = String(createStep.args.start);
-              const slotEnd = String(createStep.args.end);
               const conflictDeadline = AbortSignal.timeout(5_000);
               const conflictSignal = signal ? AbortSignal.any([signal, conflictDeadline]) : conflictDeadline;
-              let rawResult: any;
-              if (this.lookupTool) {
-                rawResult = await this.lookupTool(
-                  userId,
-                  'mycalendar.list_events',
-                  { calendarId: calId, timeMin: slotStart, timeMax: slotEnd, limit: 20 },
-                  { signal: conflictSignal }
-                );
-              } else if (this.getAdapter) {
-                const adapter = await this.getAdapter('mycalendar', {
-                  userId,
-                  phase: 'planning',
-                  actor: { userId },
-                  connections: { mycalendar: mycalConn },
-                });
-                if (adapter) {
-                  rawResult = await adapter.execute(
-                    'mycalendar.list_events',
-                    { calendarId: calId, timeMin: slotStart, timeMax: slotEnd, limit: 20 },
-                    { signal: conflictSignal }
-                  );
+              const adapter =
+                !this.lookupTool && this.getAdapter
+                  ? await this.getAdapter('mycalendar', {
+                      userId,
+                      phase: 'planning',
+                      actor: { userId },
+                      connections: { mycalendar: mycalConn },
+                    })
+                  : null;
+
+              for (const calId of calendarsToCheck) {
+                try {
+                  let rawResult: any;
+                  if (this.lookupTool) {
+                    rawResult = await this.lookupTool(
+                      userId,
+                      'mycalendar.list_events',
+                      { calendarId: calId, timeMin: readMin, timeMax: readMax, limit: 20 },
+                      { signal: conflictSignal }
+                    );
+                  } else if (adapter) {
+                    rawResult = await adapter.execute(
+                      'mycalendar.list_events',
+                      { calendarId: calId, timeMin: readMin, timeMax: readMax, limit: 20 },
+                      { signal: conflictSignal }
+                    );
+                  }
+                  if (rawResult?.coverage?.complete === false) {
+                    precheckIncompleteOrFailed = true;
+                  }
+                  const calEvents = Array.isArray(rawResult?.events) ? rawResult.events : [];
+                  for (const ev of calEvents) {
+                    if (typeof ev?.start === 'string' && typeof ev?.end === 'string') {
+                      if (selfEventId && ev.id === selfEventId && calId === targetCalId) {
+                        continue;
+                      }
+                      allEvents.push({ ...ev, calendarId: calId });
+                    }
+                  }
+                } catch {
+                  precheckIncompleteOrFailed = true;
                 }
               }
-              const existingEvents: Array<{ title: string; start: string; end: string }> = Array.isArray(rawResult?.events)
-                ? rawResult.events
-                : [];
-              const overlapping = existingEvents.filter((ev) =>
-                typeof ev?.start === 'string' &&
-                typeof ev?.end === 'string' &&
-                eventsOverlap({ start: ev.start, end: ev.end }, { start: slotStart, end: slotEnd })
-              );
-              if (overlapping.length > 0) {
-                const stepTitle = String(createStep.args.summary || createStep.description || 'Sự kiện mới');
-                const titles = overlapping.map((ev) => `"${ev.title}"`).join(', ');
-                const freeSlots: string[] = [];
-                const startMs = Date.parse(slotStart);
-                const endMs = Date.parse(slotEnd);
+            } catch {
+              precheckIncompleteOrFailed = true;
+            }
+
+            const overlapping = allEvents.filter((ev) =>
+              eventsOverlap(ev as any, { start: slotStart, end: slotEnd })
+            );
+
+            if (overlapping.length > 0) {
+              const titles = overlapping.map((ev) => `"${ev.title}"`).join(', ');
+              const freeSlots: string[] = [];
+              if (!precheckIncompleteOrFailed) {
                 const durationMs = endMs > startMs ? endMs - startMs : 3_600_000;
-                const datePrefix = slotStart.slice(0, 10);
-                const tzSuffix = slotStart.slice(19) || 'Z';
                 const workdayStartMs = Date.parse(`${datePrefix}T08:00:00${tzSuffix}`);
                 const workdayEndMs = Date.parse(`${datePrefix}T18:00:00${tzSuffix}`);
                 if (Number.isFinite(workdayStartMs) && Number.isFinite(workdayEndMs)) {
                   const latestConflictEnd = Math.max(
                     endMs,
-                    ...overlapping.map((ev) => Date.parse(ev.end)).filter(Number.isFinite),
+                    ...overlapping.map((ev) => Date.parse(ev.end)).filter(Number.isFinite)
                   );
                   const formatHm = (ms: number) => {
                     const totalMin = 480 + Math.round((ms - workdayStartMs) / 60_000);
@@ -492,28 +550,33 @@ export class ChatService {
                     candStart + durationMs <= workdayEndMs && freeSlots.length < 3;
                     candStart += durationMs
                   ) {
-                    const candStartIso = new Date(candStart).toISOString();
-                    const candEndIso = new Date(candStart + durationMs).toISOString();
-                    const hasClash = existingEvents.some(
-                      (ev) =>
-                        typeof ev?.start === 'string' &&
-                        typeof ev?.end === 'string' &&
-                        eventsOverlap({ start: ev.start, end: ev.end }, { start: candStartIso, end: candEndIso }),
+                    const candStartIso = `${datePrefix}T${formatHm(candStart)}:00${tzSuffix}`;
+                    const candEndIso = `${datePrefix}T${formatHm(candStart + durationMs)}:00${tzSuffix}`;
+                    const hasClash = allEvents.some((ev) =>
+                      eventsOverlap(ev as any, { start: candStartIso, end: candEndIso })
                     );
                     if (!hasClash) {
                       freeSlots.push(`${formatHm(candStart)}–${formatHm(candStart + durationMs)}`);
                     }
                   }
                 }
-                const suggestionSuffix =
-                  freeSlots.length > 0 ? ` Gợi ý khung giờ trống trong ngày: ${freeSlots.join(', ')}.` : '';
-                bound.warnings = [
-                  ...(bound.warnings ?? []),
-                  `Cảnh báo trùng lịch: Sự kiện "${stepTitle}" (${slotStart} – ${slotEnd}) trùng giờ với ${overlapping.length} sự kiện hiện có trên lịch: ${titles}.${suggestionSuffix}`,
-                ];
               }
-            } catch {
-              // Non-fatal: if conflict pre-check times out or fails, planning still proceeds.
+              const suggestionSuffix =
+                freeSlots.length > 0
+                  ? ` Gợi ý khung giờ trống trong ngày: ${freeSlots.join(', ')}.`
+                  : precheckIncompleteOrFailed
+                    ? ' Không đề xuất khung giờ trống tự động vì dữ liệu lịch chưa đầy đủ hoặc một số lịch không phản hồi.'
+                    : '';
+              const scopeNote = ` (Đã kiểm tra tại thời điểm lập kế hoạch trên: ${calendarsToCheck.join(', ')}; lịch có thể thay đổi trước khi thực thi.)`;
+              bound.warnings = [
+                ...(bound.warnings ?? []),
+                `Cảnh báo trùng lịch: Sự kiện "${stepTitle}" (${slotStart} – ${slotEnd}) trùng giờ với ${overlapping.length} sự kiện hiện có trên lịch: ${titles}.${suggestionSuffix}${scopeNote}`,
+              ];
+            } else if (precheckIncompleteOrFailed) {
+              bound.warnings = [
+                ...(bound.warnings ?? []),
+                `Lưu ý kiểm tra lịch: Không thể kiểm tra đầy đủ trạng thái bận/rảnh cho sự kiện "${stepTitle}" (${slotStart} – ${slotEnd}) trên tất cả lịch được cấp quyền (${calendarsToCheck.join(', ')}) do dữ liệu lịch bị giới hạn phân trang hoặc tạm thời không phản hồi; không đề xuất khung giờ trống tự động.`,
+              ];
             }
           }
         }
