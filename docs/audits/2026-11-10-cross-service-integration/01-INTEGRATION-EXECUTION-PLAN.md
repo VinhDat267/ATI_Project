@@ -1,8 +1,8 @@
 # 01 — ATI V3 Cross-Service Integration Gate V2: Preflight & Execution Plan
 
-**Goal:** Assemble, verify, and audit a single combined Git tree integrating Google Sheets R2 (`PR #306`), Trello Combined (`PR #313`), and Google Calendar Combined (`PR #314`) onto `origin/main` (`2eed8d1d4309e833088d6f1d3fa774189049e283`) with full ancestry provenance, zero invariant regressions across scheduler/auth/receipts/leases/UI, real PostgreSQL + multi-process + Chromium E2E evidence, and exact-head CI verification — stopping at **Gate A (Technical Integration Gate)** in **Draft PR** state (`NO MERGE into main`, `NO DEPLOY`, `Production HOLD`).
+**Goal:** Assemble, verify, and audit a single combined Git tree integrating Google Sheets R2 (`PR #306`), Trello Combined (`PR #313`), and Google Calendar Combined (`PR #314`) onto `origin/main` (`2eed8d1d4309e833088d6f1d3fa774189049e283`) with full ancestry provenance, zero invariant regressions across scheduler/auth/receipts/leases/UI, real PostgreSQL + multi-process + Chromium E2E evidence, and exact-head CI verification — stopping at **Gate A (Technical Cross-Service Integration Gate)** in **Draft PR** state (`NO MERGE into main`, `NO DEPLOY`, `PRODUCTION ACTIVATION — HOLD`).
 
-**Architecture:** Traceable two-step `--no-ff` merge assembly (`Trello #313 -> Calendar #314 -> Sheets #306`) inside the dedicated isolated integration worktree, governed by pre-declared cross-service behavioral contracts (`03-SHARED-FILE-CONFLICT-AND-CONTRACT-MATRIX.md`) and verified across four progressive evidence layers (Layer A targeted unit/contract/static guards, Layer B disposable PostgreSQL 16 + loopback HTTP + 2-process OS scheduler/crash/fencing + negative auth, Layer C real Chromium Playwright UI/recovery/privacy/Calendar C1–C2, Layer D full `npm run check` + 25-group `npm run test:browser:v3` + exact-head GitHub Actions `v3 check`).
+**Architecture:** Traceable three-merge `--no-ff` assembly (`Trello #313 -> Calendar #314 -> Sheets #306`) inside the dedicated isolated integration worktree, governed by pre-declared cross-service behavioral contracts (`03-SHARED-FILE-CONFLICT-AND-CONTRACT-MATRIX.md`) and verified across four progressive evidence layers (Layer A targeted unit/contract/static guards, Layer B disposable PostgreSQL 16 + loopback HTTP + 2-process OS scheduler/crash/fencing + negative auth, Layer C real Chromium Playwright UI/recovery/privacy/Calendar C1–C2, Layer D full `npm run check` + 25-group `npm run test:browser:v3` + exact-head GitHub Actions `v3 check` single job `v3`).
 
 **Tech Stack:** TypeScript 5.8 (ESM NodeNext), Node.js >= 20, PostgreSQL 16 (`pg`), Express (`@wap/chat-api`), React 19 + Vite (`@wap/chat-web`), Vitest, Playwright Chromium (`scripts/test-v3-browser.mjs`), GitHub Actions (`.github/workflows/v3-check.yml`).
 
@@ -31,9 +31,9 @@
 | Check | Result | Evidence Source | Label |
 | --- | --- | --- | --- |
 | **Requested Model & Effort** | `gemini-4-carbon-high` (`Gemini 4 Carbon (High)`), effort `high`, **NO fallback** | Task A Orca dispatch specification | `INDEPENDENTLY VERIFIED` |
-| **Effective Configured Model** | `Gemini 4 Carbon (High)` (no fallback model configured) | `C:\Users\VinhDat\.gemini\antigravity-cli\settings.json` line 3 (`"model": "Gemini 4 Carbon (High)"`); session transcript `step_index: 0` (`<USER_SETTINGS_CHANGE>` -> `Model Selection`: `Gemini 4 Carbon (High)`) | `INDEPENDENTLY VERIFIED` |
-| **Effective Configured Effort** | `1.00` (`high` / maximum reasoning effort) | Runtime system instruction header (`EFFORT LEVEL: 1.00`) | `INDEPENDENTLY VERIFIED` |
-| **Served Model Wire Header** | Local transcript `PLANNER_RESPONSE` entries record `source: "MODEL"`, token usage, and `thinking` traces, but do not persist raw upstream HTTP response `modelVersion` headers; zero provider test calls issued per instructions | `C:\Users\VinhDat\.gemini\antigravity-cli\brain\c0a75ee8-abe4-4e67-87e5-226af28b2102\.system_generated\logs\transcript.jsonl` | `NOT VERIFIED` (wire header not exposed locally) |
+| **Effective Configured Model** | `Gemini 4 Carbon (High)` (`antigravity/gemini-4-carbon-high/high`, no fallback model configured) | Orca `worker-show` `launch.effective = antigravity/gemini-4-carbon-high/high` (verified by coordinator Codex); `C:\Users\VinhDat\.gemini\antigravity-cli\settings.json` line 3 (`"model": "Gemini 4 Carbon (High)"`); session transcript `step_index: 0` (`<USER_SETTINGS_CHANGE>` -> `Model Selection`: `Gemini 4 Carbon (High)`) | `INDEPENDENTLY VERIFIED` |
+| **Effective Configured Effort** | `1.00` (`high` / maximum reasoning effort) | Orca `worker-show` `launch.effective = antigravity/gemini-4-carbon-high/high` + runtime system instruction header (`EFFORT LEVEL: 1.00`) | `INDEPENDENTLY VERIFIED` |
+| **Served Model Wire Header** | Local transcript `PLANNER_RESPONSE` entries record `source: "MODEL"`, token usage, and `thinking` traces, but do not expose raw upstream HTTP response `modelVersion` wire headers | Local session transcript (`transcript.jsonl`); upstream wire header not exposed locally | `NOT VERIFIED` |
 | **CodeGraph Availability** | `.codegraph/` absent at worktree root (`Test-Path .codegraph` -> `False`) | PowerShell preflight check (`exit 0`); bounded read-only `git diff` / `git merge-tree` / `read_file` fallback used | `INDEPENDENTLY VERIFIED` |
 | **Isolated Worktree & Branch** | `C:\Users\VinhDat\orca\workspaces\ATI_Project\ati-v3-cross-service-integration-gate` on `VinhDat267/ati-v3-cross-service-integration-gate` | `git status --short --branch` & `git rev-parse HEAD` (`2eed8d1d4309e833088d6f1d3fa774189049e283`, tree `eb2ee6f1183eb0cdc51adfa238e3043a0b4ed4b4`) | `INDEPENDENTLY VERIFIED` |
 
@@ -77,10 +77,10 @@ flowchart LR
 ### 2.2. Combined Integration Draft PR vs. Sequential Merges into `main`
 | Criterion | Option 1: Single Combined Draft Integration PR (Selected) | Option 2: Sequential Merges (`#313` -> `#314` -> `#306`) into `main` |
 | --- | --- | --- |
-| **Intermediate `main` safety** | `main` never observes an intermediate commit where `SlackAdapter.sendMessage` uses `String(res.ts)` (which accepts `ts: {}` as `"[object Object]"`) or where `schedule-service.ts` lacks `GAS-08` snapshot protection. | Merging `#313` before `#306` temporarily exposes `String({})` acceptance on `main`; merging `#306` before `#313` temporarily omits `'undefined'` / `channel` / `requestSent: true` guard. |
+| **Intermediate `main` safety** | `main` never observes an intermediate commit where `SlackAdapter.sendMessage` lacks strict receipt `channel` + `'null'`/`'undefined'` + `requestSent: true` intersection or where `schedule-service.ts` lacks `GAS-08` snapshot protection. | Merging `#313` before `#306` temporarily omits `GAS-08` snapshot protection and falls back to `args.channel` on missing/non-string `res.channel` on `main`; merging `#306` before `#313` temporarily omits `'undefined'`/`'null'` sentinel checks, `channel` validation, and `details: { requestSent: true }`. |
 | **Source CI provenance** | Original Draft PRs `#306`, `#313`, `#314` remain untouched at their CI-verified SHAs (`42811254062`, `42809170181`, `42835422010`), while the new combined Draft PR gets its own exact-head `v3 check` run. | Rebasing `#314` and `#306` onto updated `main` invalidates their pinned SHAs and requires 2 additional full CI/browser cycles during merge execution. |
 | **Ancestry & rollback** | Preserves all 3 source commits via `--no-ff` parents; single merge point at Gate B if Owner later approves. | Three separate `main` advancements; partial rollback if `#306` fails post-merge is higher-blast-radius. |
-| **Tree-equivalence rule** | Pinned final `HEAD` and `HEAD^{tree}` recorded in `02` and `06`. | Permitted at Gate B **only if** Owner explicitly requests sequential landing AND `git diff <combined_tree_sha> <sequential_final_tree_sha> -- ':!docs/audits/2026-11-10-cross-service-integration'` is **empty (`0` bytes)**. |
+| **Tree-equivalence rule** | Pinned final `HEAD` and full-tree `HEAD^{tree}` SHA recorded in `02` and `06`. | Exact tree equivalence holds **only if** full-tree SHAs match identically (`git rev-parse <combined_ref>^{tree} === git rev-parse <sequential_final_ref>^{tree}`, i.e. `git diff <combined_tree_sha> <sequential_final_tree_sha>` is `0` bytes with **zero path exclusions**). If docs-only audit bundle files differ, full trees are **not** equivalent; any docs-only path exclusions must be disclosed separately and **never** reported as exact tree equivalence. |
 
 ---
 
@@ -121,7 +121,9 @@ flowchart TD
   D --> E
 ```
 
-> **Workspace & Parallelism Rule:** Do **not** create nested `git worktree` directories inside `ati-v3-cross-service-integration-gate`. Tasks C and D have strictly disjoint file ownership (`packages/**` + `apps/chat-api/**` + `db/v3/**` vs. `apps/chat-web/**` + `scripts/test-v3-browser.mjs`). They may execute sequentially in this single worktree or via coordinated workers operating on disjoint paths with serialized git staging (`git add <explicit-files>`), never `git add .`.
+> **Workspace & Parallelism Rule:** Do **not** create nested `git worktree` directories inside `ati-v3-cross-service-integration-gate`. Tasks C and D have disjoint file ownership (`packages/**` + `apps/chat-api/**` + `db/v3/**` vs. `apps/chat-web/**` + `scripts/test-v3-browser.mjs`), **however concurrent workers sharing a single worktree are strictly prohibited**:
+> - **Parallel execution:** If Task C and Task D run concurrently via parallel workers, **each worker MUST operate in its own separate isolated `git worktree`** (branched from Task B's pinned commit, outside any existing worktree directory) and reconcile via explicit commits/merges afterward.
+> - **Sequential execution:** Same-worktree execution inside `ati-v3-cross-service-integration-gate` is permitted **only** via strictly sequential ownership handoff (only one active writer at a time, clean working tree between phases, explicit `git add <files>`, never `git add .`).
 
 ---
 
@@ -176,17 +178,18 @@ flowchart TD
     ```
   - [ ] **Step B.5 — Align `PrivacyPage.tsx` top Google overview paragraph (if not folded into `M2`, commit atomically):**
     Ensure the introductory paragraph above `#mycalendar` and `#mysheets` accurately covers both personal Google Sheets (`drive.file`, `ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS=false`) and personal Google Calendar (`calendar.readonly`, `calendar.events` per `#mycalendar` section) without contradicting either region.
-  - [ ] **Step B.6 — Verify ancestry, build, typecheck, and static architecture guards (Layer A Smoke):**
+  - [ ] **Step B.6 — Verify ancestry, web build, typecheck, static architecture guards, and focused contract suites (Layer A Smoke):**
     ```powershell
     git merge-base --is-ancestor 1c17527f16715b2c6655c170cdb448673a84dd1b HEAD
     git merge-base --is-ancestor 3807986542dbe3470b8f3f1cd42413cb7bd460dd HEAD
     git merge-base --is-ancestor f292884d0ae965ffb9841e7063b8843cd266b17e HEAD
-    npm run build --workspaces --if-present
+    npm run build:v3
     npm run typecheck:v3
     npx vitest run evaluations/generic-plumbing/static-guard.test.ts
     npx vitest run apps/chat-web/tests/browser-scenario-selection.test.ts
     ```
-    *Expected:* All commands exit `0`; `scenarios.length === 25`; zero disallowed service literals in `adapter-factory.ts` or `schedule-service.ts`. Record full `git log --graph`, merge parents, and conflict diffs in `02-SOURCE-ANCESTRY-AND-MERGE-EVIDENCE.md`.
+    *Note:* Only `@wap/chat-web` defines a workspace `"build"` script (`npm run build:v3` -> `npm run build -w @wap/chat-web`); `@wap/tool-schemas`, `@wap/tool-adapters`, `@wap/planner`, `@wap/executor`, and `@wap/chat-api` export `./src/index.ts` directly.
+    *Expected:* All commands exit `0`; `scenarios.length === 25`; zero disallowed service literals in `adapter-factory.ts` or `schedule-service.ts`. Record full `git log --graph`, merge parents, and anchored pre-docs commit/tree SHAs in `02-SOURCE-ANCESTRY-AND-MERGE-EVIDENCE.md`.
 
 ---
 
@@ -202,15 +205,16 @@ flowchart TD
     npm test --workspace=@wap/tool-adapters
     npm test --workspace=@wap/planner
     npm test --workspace=@wap/executor
-    npx vitest run evaluations/generic-plumbing/static-guard.test.ts evaluations/security/prompt-injection.eval.ts
+    npm run test:eval:v3
     ```
     Specifically verify:
     - `packages/tool-schemas/tests/sheets-digest-v2-types.test.ts`, `trello-resource-id.test.ts`, `mycalendar-schemas.test.ts`
     - `packages/tool-adapters/tests/slack-adapter.test.ts`, `trello-audit-remediation.test.ts`, `sheets-adapter.test.ts`, `sheets/personal-sheets-adapter.test.ts`, `calendar-adapter.test.ts`, `calendar/personal-calendar-adapter.test.ts`, `calendar/calendar-rem-b.test.ts`, `calendar/calendar-rem-b-review.test.ts`
     - `packages/planner/tests/read-answers.test.ts`, `schedules.test.ts` (SHA-256 prompt baseline check)
+    - `evaluations/generic-plumbing/static-guard.test.ts` and `evaluations/eval.test.ts` (via `npm run test:eval:v3` -> `vitest run evaluations`)
   - [ ] **Step C.2 — Disposable PostgreSQL 16 Fresh + Prior-Schema Upgrade Migration Verification:**
-    Start a clean disposable PostgreSQL 16 instance (e.g. Docker container on loopback port `56534` or dedicated isolated port with `ALLOW_ISOLATED_TEST_PORT=1`, never touching production or unrelated dev data) and verify:
-    1. **Fresh apply (`0001_v3_core.sql` .. `0035_sheets_gas_r2_remediation.sql`):** run `npm run db:migrate:v3` twice consecutively to prove clean creation and idempotent re-run (`exit 0`).
+    Start a clean disposable PostgreSQL 16 instance (e.g. Docker container on a dedicated owned loopback port with `ALLOW_ISOLATED_TEST_PORT=1`, never loading live `.env` or touching unrelated existing DBs) and verify:
+    1. **Fresh apply (`0001_v3_core.sql` .. `0035_sheets_gas_r2_remediation.sql`):** run `node db/v3/migrate.mjs` (with explicit `DATABASE_URL`) twice consecutively to prove clean creation and idempotent re-run (`exit 0`).
     2. **Upgrade path (`0001..0032` -> `0033_sheets_digest_v2_remediation.sql` -> `0034_github_workspace_scoped_team_scope.sql` -> `0035_sheets_gas_r2_remediation.sql`):** seed pre-`0033` `users`, `workspaces`, `conversations`, `schedules` (`sheets_digest`, `trello_digest`, `calendar_digest`), and `schedule_runs`, then apply `0033`, `0034`, `0035` sequentially and re-apply `0035` to verify zero row corruption, intact `sheets_append_leases` constraints, and `trg_schedule_runs_capture_dispatched_config` trigger behavior.
   - [ ] **Step C.3 — Existing Source Backend Integration Suites on Real PostgreSQL:**
     ```powershell
@@ -241,7 +245,7 @@ flowchart TD
     5. **Credential & workspace membership revocation before dispatch / mid-read:** revoke `service_credentials.status = 'revoked'` or `workspace_members.status = 'removed'` before send across Sheets, Trello, and Calendar; assert `outbound === 0`, run `'blocked'`, schedule `'paused'`.
     6. **Cross-service fault isolation:** in a single scheduler batch, inject `AbortSignal.timeout` on Sheets loopback, malformed Slack `{ ok: true, ts: 'undefined' }` on Trello loopback, and `coverage: { complete: false }` partial read on Calendar loopback; verify each run lands in its exact expected state without poisoning healthy runs.
     7. **Combined Negative Authorization Matrix (`outbound === 0`):** exercise `ExecutionService` / `AdapterFactory` / adapters with (i) cross-workspace `X-Workspace-Id`, (ii) blank org `workspaceId`, (iii) cross-user personal credential UUID swap, (iv) Trello `../../` path traversal IDs, (v) out-of-allowlist `spreadsheetId` (`sheets`/`mysheets`), (vi) out-of-allowlist `calendarId` (`mycalendar`), and (vii) revoked OAuth/bot credentials; assert loopback provider HTTP request count === `0` on every case.
-    8. **Malformed receipts & stale lease owners:** assert `{ ok: true, ts: {} }`, `{ ok: true, ts: 12345 }`, `{ ok: true, ts: 'undefined' }`, and missing `channel` on `SlackAdapter.sendMessage` all throw `SLACK_MALFORMED_RECEIPT` (`UNKNOWN`, `retryable: false`, `requestSent: true`), and stale pre-dispatch append lease owners emit `0` HTTP POSTs.
+    8. **Malformed receipts & stale lease owners:** assert `{ ok: true, ts: {} }`, `{ ok: true, ts: 12345 }`, `{ ok: true, ts: 'undefined' }`, `{ ok: true, ts: 'null' }`, and missing/malformed `channel` on `SlackAdapter.sendMessage` all throw `StepError` (`category: 'UNKNOWN'`, `retryable: false`, `details: { requestSent: true }` — resulting in `StepRunner` `'unknown'` and digest runner `*_DELIVERY_UNKNOWN`), and stale pre-dispatch append lease owners emit `0` HTTP POSTs.
 
 ---
 
@@ -269,18 +273,19 @@ flowchart TD
     3. **Recurring Event `timeZone` Contract:** approve a recurring (`RRULE:...`) event in Chromium and assert `fake-google-gmail.mjs` receives matching non-empty `start.timeZone` and `end.timeZone` (`200 OK`, `stats.writes` incremented by `1`, zero `400` errors).
   - [ ] **Step D.3 — Layer C Targeted Real Chromium Scenarios (`scripts/test-v3-browser.mjs`):**
     ```powershell
-    $env:BROWSER_SCENARIO="sheets_digest_v2_recovery"; node scripts/test-v3-browser.mjs
-    $env:BROWSER_SCENARIO="mysheets"; node scripts/test-v3-browser.mjs
-    $env:BROWSER_SCENARIO="trello_telegram_mocked_ui"; node scripts/test-v3-browser.mjs
-    $env:BROWSER_SCENARIO="trello_telegram_sandbox_e2e"; node scripts/test-v3-browser.mjs
-    $env:BROWSER_SCENARIO="mycalendar"; node scripts/test-v3-browser.mjs
-    $env:BROWSER_SCENARIO="calendar_slack"; node scripts/test-v3-browser.mjs
-    $env:BROWSER_SCENARIO="sheets_slack"; node scripts/test-v3-browser.mjs
-    $env:BROWSER_SCENARIO="three_service"; node scripts/test-v3-browser.mjs
-    $env:BROWSER_SCENARIO="nine_service"; node scripts/test-v3-browser.mjs
-    $env:BROWSER_SCENARIO="schedule"; node scripts/test-v3-browser.mjs
-    $env:BROWSER_SCENARIO="fe_10"; node scripts/test-v3-browser.mjs
+    $env:SCENARIO="sheets_digest_v2_recovery"; node scripts/test-v3-browser.mjs
+    $env:SCENARIO="mysheets"; node scripts/test-v3-browser.mjs
+    $env:SCENARIO="trello_telegram_mocked_ui"; node scripts/test-v3-browser.mjs
+    $env:SCENARIO="trello_telegram_sandbox_e2e"; node scripts/test-v3-browser.mjs
+    $env:SCENARIO="mycalendar"; node scripts/test-v3-browser.mjs
+    $env:SCENARIO="calendar_slack"; node scripts/test-v3-browser.mjs
+    $env:SCENARIO="sheets_slack"; node scripts/test-v3-browser.mjs
+    $env:SCENARIO="three_service"; node scripts/test-v3-browser.mjs
+    $env:SCENARIO="nine_service"; node scripts/test-v3-browser.mjs
+    $env:SCENARIO="schedule"; node scripts/test-v3-browser.mjs
+    $env:SCENARIO="default"; node scripts/test-v3-browser.mjs
     ```
+    *Note:* `scripts/test-v3-browser.mjs` filters scenario groups via `process.env.SCENARIO` (not `BROWSER_SCENARIO`), and `FE-10` runs inside the `default` scenario group (`FE-02..FE-12`). Execute against an isolated disposable `DATABASE_URL` and provisioned `CHAT_ADMIN_*` without loading live `.env`.
     *Expected:* Every targeted Chromium scenario exits `0` with zero uncaught page errors or horizontal viewport overflow (`1440px` & `375px`).
 
 ---
@@ -294,20 +299,27 @@ flowchart TD
   - `docs/audits/2026-11-10-cross-service-integration/08-FINAL-ATI-INTEGRATION-VERDICT.md`
   - Task card "Kết quả" completion in `docs/handoff/tasks/XSVC-INTEGRATION-V2.md` and final handoff log entry in `docs/handoff/log/`
 - **Step-by-Step Execution:**
-  - [ ] **Step E.1 — Uninterrupted Local Layer D Gate:**
+  - [ ] **Step E.1 — Uninterrupted Local Layer D Gate (Against Isolated Disposable PostgreSQL, Without Loading Live `.env`):**
     ```powershell
-    Remove-Item Env:BROWSER_SCENARIO -ErrorAction SilentlyContinue
-    npm run db:migrate:v3
+    Remove-Item Env:SCENARIO -ErrorAction SilentlyContinue
+    node db/v3/migrate.mjs
     npm run check
-    npm run test:browser:v3
+    node scripts/test-v3-browser.mjs
     ```
-    *Note on Exact Supported Commands (`package.json` + `.github/workflows/v3-check.yml`):*
-    - `npm run check` executes: `npm run build --workspaces --if-present && npm run typecheck:v3 && npm run test:v3 && npm run eval:security && npm run check:plumbing` (where `scripts/test-v3.mjs` builds all packages, runs Vitest across `tool-schemas`, `tool-adapters`, `planner`, `executor`, `chat-api`, `chat-web`, and runs `evaluations/v3/regression.eval.ts`).
-    - `npm run test:browser:v3` executes `node scripts/test-v3-browser.mjs` across all **25** browser scenario groups sequentially.
+    *Exact Verified Script Definitions (`package.json`, workspace `package.json` files, and `.github/workflows/v3-check.yml`):*
+    - Root `npm run check` executes verbatim:
+      `npm run typecheck:v3 && npm run test:v3 && npm run test:eval:v3 && npm run build:v3 && node scripts/test-v3-web-build-security.mjs && npm run test:launcher:v3 && node --test scripts/v3-local-env.test.mjs scripts/fake-oidc.test.mjs scripts/google-oidc-fixture.test.mjs scripts/slack/inventory.test.mjs scripts/fake-slack-personal.test.mjs scripts/slack/contract-probe.test.mjs`
+      (There are **no** `eval:security` or `check:plumbing` scripts in `package.json`.)
+    - `npm run typecheck:v3` executes `tsc -p apps/chat-api/tsconfig.json --noEmit && tsc -p apps/chat-web/tsconfig.json --noEmit`.
+    - `npm run test:v3` executes `node --env-file-if-exists=.env scripts/test-v3.mjs`, which spawns `npm test` across `@wap/tool-schemas` (`tsc --noEmit -p tsconfig.contracts.json && vitest run`), `@wap/tool-adapters` (`vitest run && npm run test:probe`), `@wap/planner` (`vitest run`), `@wap/executor` (`vitest run`), `@wap/chat-api` (`vitest run`), and `@wap/chat-web` (`vitest run`).
+    - `npm run test:eval:v3` executes `vitest run evaluations` (including `evaluations/generic-plumbing/static-guard.test.ts` and `evaluations/eval.test.ts`).
+    - `npm run build:v3` executes `npm run build -w @wap/chat-web` (`tsc -p tsconfig.json && vite build`).
+    - `npm run test:launcher:v3` executes `node --test scripts/start-v3.test.mjs`.
+    - `npm run test:browser:v3` executes `node --env-file-if-exists=.env scripts/test-v3-browser.mjs` across all **25** browser scenario groups sequentially (when a local `.env` exists in another environment, invoke `node scripts/test-v3-browser.mjs` directly with explicit isolated env vars so live `.env` credentials are never loaded).
   - [ ] **Step E.2 — Publish Draft Integration PR & Verify Exact-Head GitHub Actions `v3 check`:**
     - Inspect `git status` and `git log --oneline origin/main..HEAD` (verify zero AI co-author / "Generated with" lines, zero unintended files).
     - Push `VinhDat267/ati-v3-cross-service-integration-gate` to `origin` and open a **Draft PR** (`gh pr create --draft --base main ...` — **NEVER** mark Ready for Review, **NEVER** merge into `main`).
-    - Wait for `.github/workflows/v3-check.yml` (`v3 check`, jobs `Verify v3 packages and apps` + `Browser E2E`) to complete on the exact final `HEAD` SHA (`gh run view <run_id> --json headSha,status,conclusion,jobs`). If docs-only audit evidence (`06`, `08`) is committed after code CI, re-run and pass `v3 check` on the **exact final commit SHA** so code + audit bundle share a single CI-verified `HEAD`.
+    - Wait for `.github/workflows/v3-check.yml` (`name: v3 check`, which defines **one** job `v3` running `npm ci`, `npm run db:migrate:v3`, `npm run check`, `npm run admin:provision:v3`, `npx playwright install --with-deps chromium`, and `npm run test:browser:v3`) to complete on the exact final `HEAD` SHA (`gh run view <run_id> --json headSha,status,conclusion,jobs`). If docs-only audit evidence (`06`, `08`) is committed after code CI, re-run and pass `v3 check` on the **exact final commit SHA** so code + audit bundle share a single CI-verified `HEAD`.
   - [ ] **Step E.3 — Independent Provenance & Evidence Bundle Finalization (`04..08`):**
     - Complete all 8 audit documents using strict evidence labels (`CI VERIFIED`, `INDEPENDENTLY VERIFIED`, `WORKER REPORTED`, `NOT VERIFIED`, `NOT RUN`).
     - Never claim universal "exactly-once" external delivery (provider HTTP lacks distributed 2PC across Slack/Telegram/Gmail/Sheets; claim bounded single-claim / pre-dispatch fencing / fail-closed unknown recovery only where proven).
@@ -328,7 +340,7 @@ Directory: `docs/audits/2026-11-10-cross-service-integration/`
 | `05-REGRESSION-TEST-EVIDENCE.md` | Task C/D/E | Exact commands, durations, exit codes, test counts, PostgreSQL `0001..0035` fresh/upgrade logs, 2-process + `SIGKILL` logs, negative-auth `outbound=0` logs, Chromium Playwright traces. |
 | `06-CI-AND-PROVENANCE-VERIFICATION.md` | Task E | Final Draft PR link, pinned `HEAD` SHA & `HEAD^{tree}` SHA, GitHub Actions `v3 check` run ID/URL/job logs matching exact `HEAD`, tree-equivalence check. |
 | `07-INHERITED-RISKS-AND-STAGING-GAPS.md` | Task E | Updated risk register carrying forward all unclosed live-provider, staging, distributed-refresh, operator-tooling, and product-adoption gaps. |
-| `08-FINAL-ATI-INTEGRATION-VERDICT.md` | Task E | Gate A (`PASS` / `FAIL`) technical integration verdict, Gate B (`SEPARATE OWNER MERGE REVIEW`), Production Activation (`HOLD`). |
+| `08-FINAL-ATI-INTEGRATION-VERDICT.md` | Task E | Gate A exact allowed verdict (`PASS — VERIFIED WITHIN TESTED SCOPE` / `CONDITIONAL — NON-BLOCKING GAPS` / `NOT READY — BLOCKING DEFECT OR MISSING CRITICAL EVIDENCE` / `FAIL — CONFIRMED REGRESSION`), Gate B (`MERGE READY FOR OWNER REVIEW` / `NOT READY`), Gate C (`PRODUCTION ACTIVATION — HOLD`). |
 
 **Mandatory Evidence Label Vocabulary:**
 - `INDEPENDENTLY VERIFIED` — Directly executed and verified from primary command/DB/browser output by the auditing/verifying agent.
@@ -341,17 +353,19 @@ Directory: `docs/audits/2026-11-10-cross-service-integration/`
 
 ## 6. Inherited Limitations & Cross-Service Risk Register (Preflight Baseline)
 
-| ID | Origin | Severity | Evidence Label | Impact | Service | Owner | Planned Action | Code Gate (Gate A) | Owner Merge Review (Gate B) | Production Gate |
+> **Severity Discipline:** Pre-assembly merge overlaps (`RISK-01`..`RISK-03`) are **`SHARED CONTRACT RISK`** — hypothetical regressions that *would* arise only if an unassembled merge conflict were resolved unsafely, **not** confirmed `P0` defects in any constituent PR and **not** reproduced regressions prior to assembly.
+
+| ID | Origin | Severity / Classification | Evidence Label | Impact | Service | Owner | Planned Action | Code Gate (Gate A) | Owner Merge Review (Gate B) | Production Gate |
 | --- | --- | :---: | --- | --- | --- | --- | --- | --- | --- | --- |
-| **RISK-01** | Combined `#313` ∩ `#306` (`slack-adapter.ts`) | **P0** (if unresolved) | `INDEPENDENTLY VERIFIED` (static catch); `NOT RUN` (combined test) | Trello's `String(res.ts)` converts `ts: {}` to `"[object Object]"` (breaking `GAS-01`); Sheets omits `'undefined'`/`channel`/`requestSent: true` (breaking `TRELLO-AUDIT-08`). | Shared (`slack`, `sheets`, `trello`, `calendar`) | Task B / C | Enforce strict string + non-`'undefined'`/`'null'` + `requestSent: true` intersection in `M2`; prove via loopback tests in Task C. | **MUST CLOSE** (`PASS` required) | Verify in `04`/`05` | Blocks if open |
-| **RISK-02** | Combined `#313` ∩ `#306` (`schedule-service.ts`) | **P0** (if unresolved) | `INDEPENDENTLY VERIFIED` (static catch); `NOT RUN` (combined test) | Merging `resolveRunDelivery` naively drops either `GAS-08`/`GAS-09` immutable snapshot & paused guard or `TRELLO-AUDIT-10` Trello/Telegram manual recovery, or trips `static-guard.test.ts` `'slack'` ban. | Shared (`schedules`, `sheets`, `trello`, `telegram`) | Task B / C | Apply exact per-kind `dispatched_config` + version-guarded fallback + active-status check with `'channelId' in dest`; verify in Task C. | **MUST CLOSE** (`PASS` required) | Verify in `04`/`05` | Blocks if open |
-| **RISK-03** | Combined `#313` ∩ `#306` (`test-v3-browser.mjs`) | **P1** (if unresolved) | `INDEPENDENTLY VERIFIED` (static catch); `NOT RUN` (combined test) | Dropping `sheets_digest_v2_recovery` or `#313`'s ESM exports silently skips recovery/OAuth E2E specs in `npm run test:browser:v3` and CI. | Shared (`chat-web` E2E) | Task B / D | Merge all **25** scenario groups into `OMITTED_SCENARIO_ROUTING` + `resolveActiveScenarios`; run full `test:browser:v3` in Task E. | **MUST CLOSE** (`PASS` required) | Verify in `05`/`06` | Blocks if open |
-| **RISK-04** | PR `#314` (`CALENDAR-COMBINED` Risk #2: `C1/C2` browser gap) | **P1** | `WORKER REPORTED` (jsdom only); `NOT RUN` (Chromium) | Cross-midnight/DST/IANA approved-instant rendering, `sendInvites` pill truthiness, and recurring `timeZone` write were verified in jsdom + adapter tests, not real Chromium. | Calendar (`mycalendar`, `chat-web`) | Task D | Add focused real Chromium assertions in `apps/chat-web/tests/browser/mycalendar.spec.ts` against `fake-google-gmail.mjs` and pass in Layers C & D. | **MUST CLOSE** (`PASS` required) | Verify in `04`/`05` | Blocks if open |
-| **RISK-05** | PR `#306` (`REPORT.md` Residual #2: OS process-kill gap) | **P2** | `NOT RUN` (in `#306` via `SIGKILL`; simulated via SQL TTL expiry) | `#306` simulated worker crash via SQL `expires_at` backdating rather than killing a live child OS process holding a `dispatched` lease / `delivery_started_at` run. | Sheets & Scheduler | Task C | Execute deterministic child-process `SIGKILL` (`TerminateProcess` on Windows) mid-loopback-HTTP in `cross-service-combined-gate.test.ts` and verify `reconcileScheduleRuns` + `unknown_outcome` lease survival. | **TARGET CLOSE** in Task C (document if OS limits arise) | Review runtime proof | Required before prod |
-| **RISK-06** | PR `#306` (`GAS-03` Live Staging Audit) | **P2** | `NOT RUN` | Pre-`0035` staging/prod `sheets_digest` row inventory (`SHEETS-DIGEST-V2-STAGING-RUNBOOK.md` §1) requires live staging DB credentials not available in local/CI sandbox. | Sheets (`db/v3/0035`) | Ops / Owner | Keep documented in `07`; execute `SHEETS-DIGEST-V2-STAGING-RUNBOOK.md` against staging DB prior to production cutover. | Documented non-blocker (`NOT RUN`) | Inform Owner | **BLOCKS PROD** (`HOLD`) |
+| **RISK-01** | Combined `#313` ∩ `#306` (`slack-adapter.ts`) | **High — Shared Contract Risk** (unassembled hypothetical; P1-impact receipt invariant) | `INDEPENDENTLY VERIFIED` (static diff); `NOT RUN` (combined runtime in Task A) | Unsafely taking `#313` alone falls back to `args.channel` on missing/non-string `res.channel` and omits `'null'` sentinel check; taking `#306` alone accepts `ts: 'undefined'`/`'null'`, skips `res.channel` validation, and omits `details: { requestSent: true }`. | Shared (`slack`, `sheets`, `trello`, `calendar`) | Task B / C | Enforce strict string + non-`'undefined'`/`'null'` `ts` & `channel` + `details: { requestSent: true }` in `M2`; prove via real loopback tests in Tasks B & C. | **MUST CLOSE** (`PASS — VERIFIED WITHIN TESTED SCOPE` requires proof) | Verify in `04`/`05` | Blocks if open |
+| **RISK-02** | Combined `#313` ∩ `#306` (`schedule-service.ts`) | **High — Shared Contract Risk** (unassembled hypothetical; P1-impact recovery/snapshot invariant) | `INDEPENDENTLY VERIFIED` (static diff); `NOT RUN` (combined runtime in Task A) | Unsafely resolving `resolveRunDelivery` could drop `GAS-08`/`GAS-09` immutable `dispatched_config` & paused guard, drop `TRELLO-AUDIT-10` Trello/Telegram manual recovery, or trip `static-guard.test.ts` `'slack'` ban. | Shared (`schedules`, `sheets`, `trello`, `telegram`) | Task B / C | Apply exact per-kind `dispatched_config` + version-guarded fallback + active-status check with `'channelId' in dest`; verify on isolated PostgreSQL in Tasks B & C. | **MUST CLOSE** (`PASS — VERIFIED WITHIN TESTED SCOPE` requires proof) | Verify in `04`/`05` | Blocks if open |
+| **RISK-03** | Combined `#313` ∩ `#306` (`test-v3-browser.mjs`) | **Medium-High — Shared Contract Risk** (unassembled hypothetical; P2-impact CI E2E coverage) | `INDEPENDENTLY VERIFIED` (static diff); `NOT RUN` (combined runtime in Task A) | Unsafely resolving `scripts/test-v3-browser.mjs` would omit `sheets_digest_v2_recovery` or `#313`'s ESM exports (`trello_telegram_mocked_ui`, `trello_telegram_sandbox_e2e`) in `npm run test:browser:v3` and CI job `v3`. | Shared (`chat-web` E2E) | Task B / D | Merge all **25** scenario groups into `OMITTED_SCENARIO_ROUTING` + `resolveActiveScenarios`; verify selector in Task B and full `test:browser:v3` in Task E. | **MUST CLOSE** (`PASS — VERIFIED WITHIN TESTED SCOPE` requires proof) | Verify in `05`/`06` | Blocks if open |
+| **RISK-04** | PR `#314` (`CALENDAR-COMBINED` Risk #2: `C1/C2` browser gap) | **Medium (P2 — Inherited Test-Layer Gap)** | `WORKER REPORTED` (jsdom + loopback); `NOT RUN` (Chromium) | Cross-midnight/DST/IANA approved-instant rendering, `sendInvites` pill truthiness, and recurring `timeZone` write were verified in React component + loopback adapter tests in `#314`, not real Chromium. | Calendar (`mycalendar`, `chat-web`) | Task D | Add focused real Chromium assertions in `apps/chat-web/tests/browser/mycalendar.spec.ts` against `fake-google-gmail.mjs` and pass in Layers C & D. | **MUST CLOSE** for `PASS — VERIFIED WITHIN TESTED SCOPE` (else `CONDITIONAL — NON-BLOCKING GAPS`) | Verify in `04`/`05` | Blocks if open |
+| **RISK-05** | PR `#306` (`REPORT.md` Residual #2: OS process-kill gap) | **Medium (P2 — Inherited Test-Layer Gap)** | `NOT RUN` (in `#306` via `SIGKILL`; simulated via SQL TTL expiry) | `#306` simulated worker crash via SQL `expires_at` backdating rather than killing a live child OS process holding a `dispatched` lease / `delivery_started_at` run. | Sheets & Scheduler | Task C | Execute deterministic child-process `SIGKILL` (`TerminateProcess` on Windows) mid-loopback-HTTP in `cross-service-combined-gate.test.ts` and verify `reconcileScheduleRuns` + `unknown_outcome` lease survival. | **TARGET CLOSE** in Task C (document if OS limits arise) | Review runtime proof | Required before prod |
+| **RISK-06** | PR `#306` (`GAS-03` Live Staging Audit) | **P2** | `NOT RUN` | Pre-`0035` staging/prod `sheets_digest` row inventory (`SHEETS-DIGEST-V2-STAGING-RUNBOOK.md` §1) requires live staging DB credentials not available in local/CI sandbox. | Sheets (`db/v3/0035`) | Ops / Owner | Keep documented in `07`; execute `SHEETS-DIGEST-V2-STAGING-RUNBOOK.md` against staging DB prior to production cutover. | Documented non-blocker (`NOT RUN`) | Inform Owner | **BLOCKS PROD** (`PRODUCTION ACTIVATION — HOLD`) |
 | **RISK-07** | PR `#306` (`GAS-10` Manual Append Lease Override Disabled) | **P2** | `CI VERIFIED` (`#306`) | Manual override of `sheets_append_leases.status = 'unknown_outcome'` is intentionally disabled fail-closed until an authenticated, authorized, durably audited operator recovery service exists (`>500`-row out-of-window unverified states require DB/spreadsheet inspection). | Sheets (`sheets`, `mysheets`) | Platform Eng / Ops | Preserve fail-closed rejection in Gate A (`0` unsafe overrides); track operator recovery tooling in `07`. | Fail-closed behavior **REQUIRED** | Owner acknowledges operational constraint | Operational runbook required before prod |
 | **RISK-08** | PR `#313` (`R1`: Single-Process Trello OAuth Refresh Map) | **P2** | `WORKER REPORTED` (`#313`) | `TrelloTokenManager` (`apps/chat-api/src/services/trello/token-manager.ts`) deduplicates concurrent refreshes in-memory per process (`inFlightRefreshes` Map), without a cross-replica PostgreSQL advisory lock when Trello rotates single-use refresh tokens in multi-replica deployments. | Trello (`trello` OAuth) | Backend Eng | Document single-replica constraint / advisory-lock follow-up in `07`; do not invent new distributed token architecture inside this bounded integration gate. | Documented inherited limitation | Owner reviews deployment topology | Single-replica or DB lock required before multi-replica prod |
-| **RISK-09** | PR `#313` (`TRELLO-AUDIT-19`) & PR `#314` (`CALENDAR-AUDIT-12`) & PR `#306` | **P2** | `NOT RUN` | Real external OAuth consent, live Google Sheets/Drive, live Google Calendar events/attendee invitations/revocation propagation, live Trello API, and live Slack/Telegram workspace delivery are prohibited in local/CI gates. | All (`sheets`, `trello`, `calendar`, `slack`, `telegram`, `gmail`) | QA / Owner Staging | Enforce loopback-only (`127.0.0.1`) in Gate A; carry controlled staging checklist forward in `07`. | Documented (`NOT RUN` by safety rule) | Inform Owner | **BLOCKS PROD** (`HOLD`) |
+| **RISK-09** | PR `#313` (`TRELLO-AUDIT-19`) & PR `#314` (`CALENDAR-AUDIT-12`) & PR `#306` | **P2** | `NOT RUN` | Real external OAuth consent, live Google Sheets/Drive, live Google Calendar events/attendee invitations/revocation propagation, live Trello API, and live Slack/Telegram workspace delivery are prohibited in local/CI gates. | All (`sheets`, `trello`, `calendar`, `slack`, `telegram`, `gmail`) | QA / Owner Staging | Enforce loopback-only (`127.0.0.1`) in Gate A; carry controlled staging checklist forward in `07`. | Documented (`NOT RUN` by safety rule) | Inform Owner | **BLOCKS PROD** (`PRODUCTION ACTIVATION — HOLD`) |
 | **RISK-10** | PR `#314` (`CALENDAR-AUDIT-10`, `11`, `FLOW-07`) | **P2** | `WORKER REPORTED` (`#314`) | Calendar digest Slack workspace credential pinning policy (`10`), non-Slack Calendar delivery receipt schema parity (`11`), and broader cross-service `FLOW-07` backlog remain open design/product items outside `#314`. | Calendar (`calendar_digest`) | Product / Arch | Preserve `#314`'s verified scope without out-of-scope redesign; record in `07` for post-Gate-B backlog. | Non-blocker if documented honestly | Owner policy review | Evaluate before enabling org Calendar digests in prod |
 | **RISK-11** | Product Value, User Adoption & ROI | **Info / Gov** | `NOT VERIFIED` | Technical invariant verification does not prove end-user workflow comprehension, retention, or business ROI (§1.4 product scope vs. technical gate). | Platform-wide | Product / Owner | Keep explicitly separated in `08-FINAL-ATI-INTEGRATION-VERDICT.md`. | Out of technical Gate A scope | Separate product review | Separate rollout decision |
 
@@ -364,12 +378,16 @@ Halt affected work and escalate via `orca orchestration` (`NEEDS OWNER DECISION`
 1. `origin/main` (`2eed8d1d...`) or any pinned source PR head (`#306` `f292884d...`, `#313` `1c17527f...`, `#314` `38079865...`) moves, closes, or loses Draft/CI status.
 2. Resolving a combined regression would require relaxing `evaluations/generic-plumbing/static-guard.test.ts`, weakening workspace/credential/allowlist isolation, adding automatic retry on `unknown` write/delivery outcomes, or introducing new database architecture beyond `0035_sheets_gas_r2_remediation.sql`.
 3. Any test or script attempts non-loopback network egress to live Google, Trello, Slack, or Telegram endpoints, or touches another agent's worktree/branch.
-4. Any `P0` or `P1` cross-service invariant failure remains unfixed at Task E.
+4. Any blocking defect or confirmed cross-service invariant regression remains unfixed at Task E.
 
-### 7.2. Three-Gate Separation (Strict Final Verdict Discipline)
-1. **Gate A — Technical Cross-Service Integration Gate (Target of Task E):**
-   - **PASS** *only if*: (a) all three pinned SHAs are verified ancestors of final `HEAD`; (b) Layers A, B, C, and D pass on the combined tree with real PostgreSQL `0001..0035` (fresh + upgrade), 2-process + crash/kill scheduler proof, `outbound === 0` negative auth proof, and real Chromium UI/recovery/privacy/Calendar `C1–C2` proof; (c) zero unresolved `P0`/`P1` defects remain; (d) GitHub Actions `v3 check` succeeds on the **exact final `HEAD` SHA** of the **Draft** integration PR; and (e) all 8 audit documents (`01..08`) are complete and internally consistent. Otherwise **FAIL**.
-2. **Gate B — Owner Merge Review (Separate Human Decision):**
-   - Even if Gate A is `PASS`, the integration PR MUST remain **Draft** (`isDraft: true`) and **unmerged**. Merging into `main` requires separate Owner review of `01..08`.
-3. **Gate C — Production Activation (`ALWAYS HOLD` in this Gate):**
-   - Production deployment, production DB migration `0035`, live OAuth/provider rollout, and feature-flag activation remain **HOLD** pending live staging execution (`GAS-03` runbook, live provider smoke tests, multi-replica refresh/operator recovery readiness).
+### 7.2. Three-Gate Separation & Owner Exact Allowed Verdicts
+1. **Gate A — Technical Cross-Service Integration Gate (Target of Task E — Exact Four Allowed Verdicts):**
+   - `PASS — VERIFIED WITHIN TESTED SCOPE`: All three pinned SHAs are verified ancestors of final `HEAD`; Layers A, B, C, and D pass on the combined tree with real disposable PostgreSQL `0001..0035` (fresh + upgrade), 2-process + crash/kill scheduler proof, `outbound === 0` negative auth proof, and real Chromium UI/recovery/privacy/Calendar `C1–C2` proof; zero blocking defects or confirmed regressions remain; GitHub Actions `v3 check` (single job `v3`) succeeds on the **exact final `HEAD` SHA** of the **Draft** integration PR; and all 8 audit documents (`01..08`) are complete and internally consistent.
+   - `CONDITIONAL — NON-BLOCKING GAPS`: Core cross-service invariants, safety guards, and exact-head CI pass with zero confirmed regressions, while bounded non-blocking test-layer or operational gaps remain explicitly documented.
+   - `NOT READY — BLOCKING DEFECT OR MISSING CRITICAL EVIDENCE`: Required runtime/DB/browser/CI evidence is incomplete or a blocking integration defect remains open.
+   - `FAIL — CONFIRMED REGRESSION`: A reproduced cross-service safety, auth, receipt, recovery, lease, or data-integrity regression is confirmed on the combined tree.
+2. **Gate B — Owner Merge Review (Exact Two Allowed Verdicts: `MERGE READY FOR OWNER REVIEW` / `NOT READY`):**
+   - `MERGE READY FOR OWNER REVIEW`: Gate A satisfies Owner criteria, Draft PR + exact-head CI + 8-file bundle `01..08` are complete for Owner inspection (PR still remains **Draft** and **unmerged** until Owner explicitly acts).
+   - `NOT READY`: Gate A or required provenance/CI/evidence bundle is incomplete (`NOT READY` throughout Tasks A–D and until Task E settles).
+3. **Gate C — Production Activation (Exact Verdict: `PRODUCTION ACTIVATION — HOLD`):**
+   - Always `PRODUCTION ACTIVATION — HOLD` in this gate: production deployment, production DB migration `0035`, live OAuth/provider rollout, and feature-flag activation remain on hold pending live staging execution (`GAS-03` runbook, live provider smoke tests, multi-replica refresh/operator recovery readiness).
