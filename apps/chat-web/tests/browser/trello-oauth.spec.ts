@@ -43,26 +43,51 @@ test('TRELLO: admin selects workspace and two boards, member connects via fake O
     username: 'admin_trello',
     boards: [] as Array<{ boardId: string; boardName: string; member: boolean }>,
   };
+  let failStatusOnce = true;
+  let failWorkspacesOnce = true;
+  let failBoardsOnce = true;
 
   await page.route('**/api/connections/trello', async (route) => {
     if (route.request().method() === 'GET') {
+      if (failStatusOnce) {
+        return route.fulfill({
+          status: 503,
+          json: { error: 'Trello status API unavailable (503)' },
+        });
+      }
       return route.fulfill({ json: adminConnectionState });
     }
     return route.continue();
   });
 
   await page.route('**/api/connections/trello/workspaces', async (route) => {
+    if (failWorkspacesOnce) {
+      return route.fulfill({
+        status: 503,
+        json: { error: 'Trello workspaces API unavailable (503)' },
+      });
+    }
     return route.fulfill({
       json: {
         workspaces: [
           { id: 'ws-1', name: 'Engineering Workspace' },
           { id: 'ws-2', name: 'Design Workspace' },
+          { id: 'ws-empty', name: 'Empty Workspace' },
         ],
       },
     });
   });
 
   await page.route('**/api/connections/trello/workspaces/*/boards', async (route) => {
+    if (failBoardsOnce) {
+      return route.fulfill({
+        status: 503,
+        json: { error: 'Trello boards API unavailable (503)' },
+      });
+    }
+    if (route.request().url().includes('/ws-empty/boards')) {
+      return route.fulfill({ json: { boards: [] } });
+    }
     return route.fulfill({
       json: {
         boards: [
@@ -106,9 +131,32 @@ test('TRELLO: admin selects workspace and two boards, member connects via fake O
   const adminTrelloRow = page.locator('#service-row-trello');
   await expect(adminTrelloRow).toBeVisible();
 
-  // Admin sees #trello-scope, scope counter, and quick filter input
+  // TRELLO-AUDIT-18 / PROD-04: Synthetic 503 on status endpoint shows retryable alert, not "Chưa kết nối"
+  await expect(adminTrelloRow.getByTestId('trello-status-error')).toBeVisible();
+  await expect(adminTrelloRow).toContainText('Tạm thời gián đoạn');
+  await expect(adminTrelloRow.getByText('Chưa kết nối', { exact: true })).toHaveCount(0);
+  failStatusOnce = false;
+  await adminTrelloRow.getByTestId('btn-retry-trello-status').click();
+
+  // Admin sees #trello-scope; synthetic 503 on workspaces endpoint shows retryable alert, not empty board copy
   const scopeSection = page.locator('#trello-scope');
   await expect(scopeSection).toBeVisible();
+  await expect(scopeSection.getByTestId('trello-workspaces-error')).toBeVisible();
+  await expect(scopeSection.getByText('Không có bảng nào trong workspace này.')).toHaveCount(0);
+  failWorkspacesOnce = false;
+  await scopeSection.getByTestId('btn-retry-trello-workspaces').click();
+
+  // Synthetic 503 on boards endpoint shows retryable alert, not empty board copy
+  await expect(scopeSection.getByTestId('trello-boards-error')).toBeVisible();
+  await expect(scopeSection.getByText('Không có bảng nào trong workspace này.')).toHaveCount(0);
+  failBoardsOnce = false;
+  await scopeSection.getByTestId('btn-retry-trello-boards').click();
+
+  // Real 200 empty board list on ws-empty preserves "Không có bảng nào trong workspace này."
+  const workspaceSelect = scopeSection.locator('#trello-workspace-select');
+  await workspaceSelect.selectOption('ws-empty');
+  await expect(scopeSection.getByText('Không có bảng nào trong workspace này.')).toBeVisible();
+  await workspaceSelect.selectOption('ws-1');
 
   const scopeCounter = scopeSection.getByTestId('trello-scope-counter');
   await expect(scopeCounter).toHaveText('Đã chọn 0/10');
