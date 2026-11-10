@@ -2,55 +2,39 @@ import { CALENDAR_ID_PATTERN, GMAIL_ADDRESS_PATTERN, GMAIL_MAX_RECIPIENTS } from
 import { BaseAdapter, StepError, type BaseAdapterConfig } from '../base-adapter.js';
 import type { GmailAccessTokenProvider } from '../gmail/token-provider.js';
 import {
+  assertValidIanaTimeZone,
   badResponse,
   CALENDAR_API_BASE,
+  type CalendarCoverageMetadata,
   type CalendarEventWithConflict,
+  DEFAULT_CALENDAR_TIMEZONE,
   detectCalendarConflicts,
+  enumerateLocalDates,
+  eventBusyIntervalMs,
   eventsOverlap,
+  formatInstantInTimeZone,
+  inferTimeZoneFromIsoOffset,
   invalid,
+  isValidIanaTimeZone,
   limit,
   MAX_RETRY_AFTER_WAIT_MS,
   normalizedEvent,
   only,
   parseCalendarEventQuery,
   plainDescription,
+  resolveNaturalTemporalQuery,
   retryAfterDelayMs,
   sharedLimiter,
   text,
+  throwValidation,
+  validateDateTimeMatchesTimeZone,
   windowSize,
+  zonedWallTimeToInstant,
 } from './calendar-adapter.js';
 
-function resolveNaturalWindowFromQuery(rawQuery: unknown, now = new Date()): { timeMin: string; timeMax: string } {
-  if (typeof rawQuery !== 'string' || !rawQuery.trim()) {
-    invalid('time requires an explicit ISO timezone');
-  }
-  const q = text(rawQuery, 4000).trim().toLowerCase();
-  const vnParts = (d: Date) =>
-    Object.fromEntries(
-      new Intl.DateTimeFormat('en-GB', {
-        timeZone: 'Asia/Ho_Chi_Minh',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      })
-        .formatToParts(d)
-        .map((p) => [p.type, p.value]),
-    );
-  const isTomorrow = /\b(?:ngày\s+mai|ngay\s+mai|sáng\s+mai|sang\s+mai|chiều\s+mai|chieu\s+mai|mai|tomorrow)\b/iu.test(q);
-  const isWeek = /\b(?:tuần\s+này|tuan\s+nay|tuần\s+tới|tuan\s+toi|this\s+week|next\s+week|upcoming|sắp\s+tới|sap\s+toi)\b/iu.test(q);
-  const baseDate = isTomorrow ? new Date(now.getTime() + 86_400_000) : now;
-  const endDate = isWeek ? new Date(baseDate.getTime() + 6 * 86_400_000) : baseDate;
-  const s = vnParts(baseDate);
-  const e = vnParts(endDate);
-  const end = new Date(Date.UTC(Number(e.year), Number(e.month) - 1, Number(e.day)));
-  end.setUTCDate(end.getUTCDate() + 1);
-  const endMonth = String(end.getUTCMonth() + 1).padStart(2, '0');
-  const endDay = String(end.getUTCDate()).padStart(2, '0');
-  return {
-    timeMin: `${s.year}-${s.month}-${s.day}T00:00:00+07:00`,
-    timeMax: `${end.getUTCFullYear()}-${endMonth}-${endDay}T00:00:00+07:00`,
-  };
-}
+const INTERNAL_AVAILABILITY_MAX_PAGES = 10;
+const INTERNAL_AVAILABILITY_MAX_EVENTS = 250;
+const INTERNAL_AVAILABILITY_PAGE_SIZE = 100;
 
 const RECURRENCE_PRESETS: Record<string, string> = {
   DAILY: 'RRULE:FREQ=DAILY',
@@ -64,7 +48,9 @@ const VALID_RRULE_RE = /^RRULE:FREQ=(?:DAILY|WEEKLY|MONTHLY|YEARLY)(?:;[A-Z]+=[A
 
 function normalizeRecurrenceRule(raw: unknown): string[] | undefined {
   if (raw === undefined) return undefined;
-  const checked = text(raw, 500, true).trim().toUpperCase();
+  const candidate =
+    Array.isArray(raw) && raw.length === 1 && typeof raw[0] === 'string' ? raw[0] : raw;
+  const checked = text(candidate, 500, true).trim().toUpperCase();
   if (RECURRENCE_PRESETS[checked]) {
     return [RECURRENCE_PRESETS[checked]!];
   }
@@ -100,6 +86,7 @@ export interface PersonalCalendarAdapterConfig extends BaseAdapterConfig {
   tokens: GmailAccessTokenProvider;
   apiBaseUrl?: string;
   fetchFn?: typeof fetch;
+  now?: () => Date;
 }
 
 /** Personal Calendar v3 (OAuth 2.0 user credentials); explicit resource scope; indeterminate writes are never replayed. */
@@ -109,6 +96,8 @@ export class PersonalCalendarAdapter extends BaseAdapter {
   private readonly tokens: GmailAccessTokenProvider;
   private readonly apiBase: string;
   private readonly fetchFn: typeof fetch;
+  private readonly nowFn: () => Date;
+  private readonly calendarTimeZoneCache = new Map<string, string>();
 
   constructor(config: PersonalCalendarAdapterConfig) {
     super(config);
@@ -125,6 +114,7 @@ export class PersonalCalendarAdapter extends BaseAdapter {
       ? rawBase.replace(/\/+$/, '') + '/'
       : `${rawBase.replace(/\/+$/, '')}/calendar/v3/calendars/`;
     this.fetchFn = config.fetchFn ?? globalThis.fetch;
+    this.nowFn = config.now ?? (() => new Date());
   }
 
   private calendars(): string[] {
@@ -276,10 +266,43 @@ export class PersonalCalendarAdapter extends BaseAdapter {
     }
   }
 
+  private async resolveCalendarTimeZone(
+    calendarId: string,
+    signal?: AbortSignal,
+    options?: { strictForRecurringWrite?: boolean; fallbackIso?: unknown },
+  ): Promise<string> {
+    const cached = this.calendarTimeZoneCache.get(calendarId);
+    if (cached && isValidIanaTimeZone(cached)) {
+      return cached;
+    }
+    try {
+      const meta = await this.request(encodeURIComponent(calendarId), signal);
+      if (typeof meta?.timeZone === 'string' && isValidIanaTimeZone(meta.timeZone)) {
+        const cleanTz = meta.timeZone.trim();
+        this.calendarTimeZoneCache.set(calendarId, cleanTz);
+        return cleanTz;
+      }
+    } catch (err) {
+      if (options?.strictForRecurringWrite) {
+        throw err;
+      }
+    }
+    if (options?.strictForRecurringWrite) {
+      throwValidation(
+        'Recurring event requires a valid IANA timeZone in args or authorized calendar metadata',
+        false,
+      );
+    }
+    return inferTimeZoneFromIsoOffset(options?.fallbackIso);
+  }
+
   async checkConnection(signal?: AbortSignal): Promise<boolean> {
     const id = this.calendars()[0]!;
     this.assertAllowedScope('calendars', id);
     const value = await this.request(encodeURIComponent(id), signal);
+    if (typeof value?.timeZone === 'string' && isValidIanaTimeZone(value.timeZone)) {
+      this.calendarTimeZoneCache.set(id, value.timeZone.trim());
+    }
     return typeof value?.summary === 'string' && typeof value?.timeZone === 'string';
   }
 
@@ -298,7 +321,9 @@ export class PersonalCalendarAdapter extends BaseAdapter {
       { signal },
     );
     const items: CalendarEventWithConflict[] = Array.isArray(listed?.events) ? listed.events : [];
-    return items.filter((ev) => eventsOverlap(ev, { start: slot.start, end: slot.end }));
+    const fallbackTz =
+      this.calendarTimeZoneCache.get(slot.calendarId) ?? inferTimeZoneFromIsoOffset(slot.start);
+    return items.filter((ev) => eventsOverlap(ev, { start: slot.start, end: slot.end }, fallbackTz));
   }
 
   async execute(toolName: string, args: Record<string, any>, context?: { signal?: AbortSignal }): Promise<any> {
@@ -320,6 +345,9 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           this.assertAllowedScope('calendars', id);
           const value = await this.request(encodeURIComponent(id), signal);
           if (typeof value?.summary !== 'string' || typeof value?.timeZone !== 'string') badResponse();
+          if (isValidIanaTimeZone(value.timeZone)) {
+            this.calendarTimeZoneCache.set(id, value.timeZone.trim());
+          }
           if (value.summary.toLowerCase().includes(query)) result.push({ id, title: value.summary, timeZone: value.timeZone });
           if (result.length >= maximum) break;
         }
@@ -327,19 +355,44 @@ export class PersonalCalendarAdapter extends BaseAdapter {
       }
 
       if (toolName === 'mycalendar.list_events') {
-        only(args, ['calendarId', 'timeMin', 'timeMax', 'query', 'limit']);
+        only(args, ['calendarId', 'timeMin', 'timeMax', 'timeZone', 'query', 'limit', 'onlyConflicts']);
         const id = this.checkedId(args.calendarId);
+        const explicitTz = args.timeZone !== undefined ? assertValidIanaTimeZone(args.timeZone) : undefined;
         let timeMin = args.timeMin;
         let timeMax = args.timeMax;
+        let calendarTz = explicitTz;
         if (timeMin === undefined && timeMax === undefined) {
-          const resolved = resolveNaturalWindowFromQuery(args.query);
-          timeMin = resolved.timeMin;
-          timeMax = resolved.timeMax;
+          if (typeof args.query !== 'string' || !args.query.trim()) {
+            invalid('time requires an explicit ISO timezone');
+          }
+          // Validate natural query syntax before making any metadata request
+          resolveNaturalTemporalQuery(args.query, {
+            now: this.nowFn(),
+            timeZone: calendarTz ?? DEFAULT_CALENDAR_TIMEZONE,
+            requireTemporalWindow: true,
+          });
+          if (!calendarTz) {
+            calendarTz = await this.resolveCalendarTimeZone(id, signal);
+          }
+          const resolved = resolveNaturalTemporalQuery(args.query, {
+            now: this.nowFn(),
+            timeZone: calendarTz,
+            requireTemporalWindow: true,
+          });
+          timeMin = resolved.timeMin!;
+          timeMax = resolved.timeMax!;
         } else {
           windowSize(timeMin, timeMax, 31);
+          if (!calendarTz) {
+            calendarTz = this.calendarTimeZoneCache.get(id) ?? inferTimeZoneFromIsoOffset(timeMin);
+          }
         }
         const maximum = limit(args.limit, 20);
-        const parsedQuery = parseCalendarEventQuery(args.query);
+        const parsedQuery = parseCalendarEventQuery(args.query, {
+          now: this.nowFn(),
+          timeZone: calendarTz,
+        });
+        const wantOnlyConflicts = parsedQuery.onlyConflicts || args.onlyConflicts === true;
         const params = new URLSearchParams({
           timeMin,
           timeMax,
@@ -350,27 +403,55 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         if (parsedQuery.textQuery !== undefined) params.set('q', parsedQuery.textQuery);
         const events: Array<ReturnType<typeof normalizedEvent>> = [];
         const seenPages = new Set<string>();
+        let incompleteReason: string | undefined;
         const done = () => {
           const truncated = events.some((event) => event.clipped);
           const baseEvents = events.map(({ clipped: _clipped, ...event }) => event);
-          const processed = parsedQuery.onlyConflicts
+          const processed = wantOnlyConflicts
             ? detectCalendarConflicts(baseEvents, {
                 onlyConflicts: true,
                 keywordFilter: parsedQuery.keywordFilter,
                 annotateConflicts: true,
+                timeZone: calendarTz,
               })
             : baseEvents;
-          return { events: processed, ...(truncated ? { truncated: true } : {}) };
+          const complete = incompleteReason === undefined;
+          const coverage: CalendarCoverageMetadata = {
+            complete,
+            returned: processed.length,
+            totalAvailable: complete ? processed.length : null,
+            ...(incompleteReason ? { reason: incompleteReason } : {}),
+          };
+          return {
+            events: processed,
+            ...(truncated ? { truncated: true } : {}),
+            coverage,
+          };
         };
         for (let page = 0; page < 20; page++) {
           const value = await this.request(encodeURIComponent(id) + '/events?' + params, signal);
           if (!value || typeof value !== 'object' || (value.items !== undefined && !Array.isArray(value.items))) badResponse();
-          for (const item of value.items ?? []) {
+          const items = value.items ?? [];
+          let hitMaxWithUnreadItems = false;
+          for (let idx = 0; idx < items.length; idx++) {
+            const item = items[idx];
             if (item?.status === 'cancelled') continue;
+            if (events.length >= maximum) {
+              hitMaxWithUnreadItems = true;
+              break;
+            }
             events.push(normalizedEvent(item));
-            if (events.length >= maximum) break;
           }
-          if (events.length >= maximum || value.nextPageToken === undefined || value.nextPageToken === '') return done();
+          const hasNextPage = typeof value.nextPageToken === 'string' && value.nextPageToken !== '';
+          if (events.length >= maximum) {
+            if (hitMaxWithUnreadItems) {
+              incompleteReason = 'limit_reached';
+            } else if (hasNextPage) {
+              incompleteReason = 'next_page_available';
+            }
+            return done();
+          }
+          if (value.nextPageToken === undefined || value.nextPageToken === '') return done();
           if (typeof value.nextPageToken !== 'string' || seenPages.has(value.nextPageToken)) badResponse();
           seenPages.add(value.nextPageToken);
           params.set('pageToken', value.nextPageToken);
@@ -406,6 +487,7 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           'calendarId',
           'timeMin',
           'timeMax',
+          'timeZone',
           'query',
           'durationMinutes',
           'workdayStartHour',
@@ -413,12 +495,20 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           'limit',
         ]);
         const id = this.checkedId(args.calendarId);
+        const explicitTz = args.timeZone !== undefined ? assertValidIanaTimeZone(args.timeZone) : undefined;
+        const calendarTz =
+          explicitTz ??
+          (await this.resolveCalendarTimeZone(id, signal, { fallbackIso: args.timeMin }));
         let timeMin = args.timeMin;
         let timeMax = args.timeMax;
         if (timeMin === undefined && timeMax === undefined) {
-          const resolved = resolveNaturalWindowFromQuery(args.query);
-          timeMin = resolved.timeMin;
-          timeMax = resolved.timeMax;
+          const resolved = resolveNaturalTemporalQuery(args.query, {
+            now: this.nowFn(),
+            timeZone: calendarTz,
+            requireTemporalWindow: true,
+          });
+          timeMin = resolved.timeMin!;
+          timeMax = resolved.timeMax!;
         } else {
           windowSize(timeMin, timeMax, 31);
         }
@@ -440,51 +530,88 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         }
         const maxSlots = limit(args.limit, 10);
 
-        const listed = await this.execute(
-          'mycalendar.list_events',
-          { calendarId: id, timeMin, timeMax, limit: 20 },
-          { signal },
-        );
-        const busyEvents: Array<{ start: string; end: string }> = Array.isArray(listed?.events)
-          ? listed.events
-          : [];
-        const busyIntervals = busyEvents
-          .map((ev) => ({ startMs: Date.parse(ev.start), endMs: Date.parse(ev.end) }))
-          .filter((iv) => Number.isFinite(iv.startMs) && Number.isFinite(iv.endMs) && iv.endMs > iv.startMs)
+        // Internal bounded multi-page availability scan (bypasses the 20-event list_events display cap)
+        const scanParams = new URLSearchParams({
+          timeMin,
+          timeMax,
+          singleEvents: 'true',
+          orderBy: 'startTime',
+          maxResults: String(INTERNAL_AVAILABILITY_PAGE_SIZE),
+        });
+        const scannedEvents: Array<ReturnType<typeof normalizedEvent>> = [];
+        const seenScanPages = new Set<string>();
+        let scanIncompleteReason: string | undefined;
+
+        for (let page = 0; page < INTERNAL_AVAILABILITY_MAX_PAGES; page++) {
+          const remaining = INTERNAL_AVAILABILITY_MAX_EVENTS - scannedEvents.length;
+          scanParams.set('maxResults', String(Math.min(INTERNAL_AVAILABILITY_PAGE_SIZE, remaining)));
+          const value = await this.request(encodeURIComponent(id) + '/events?' + scanParams, signal);
+          if (!value || typeof value !== 'object' || (value.items !== undefined && !Array.isArray(value.items))) {
+            badResponse();
+          }
+          const items = value.items ?? [];
+          let hitMaxWithUnreadItems = false;
+          for (let idx = 0; idx < items.length; idx++) {
+            const item = items[idx];
+            if (item?.status === 'cancelled') continue;
+            if (scannedEvents.length >= INTERNAL_AVAILABILITY_MAX_EVENTS) {
+              hitMaxWithUnreadItems = true;
+              break;
+            }
+            scannedEvents.push(normalizedEvent(item));
+          }
+          const hasNextPage = typeof value.nextPageToken === 'string' && value.nextPageToken !== '';
+          if (scannedEvents.length >= INTERNAL_AVAILABILITY_MAX_EVENTS) {
+            if (hitMaxWithUnreadItems) {
+              scanIncompleteReason = 'limit_reached';
+            } else if (hasNextPage) {
+              scanIncompleteReason = 'next_page_available';
+            }
+            break;
+          }
+          if (!hasNextPage) {
+            break;
+          }
+          if (seenScanPages.has(value.nextPageToken)) {
+            scanIncompleteReason = 'pagination_incomplete';
+            break;
+          }
+          if (page === INTERNAL_AVAILABILITY_MAX_PAGES - 1) {
+            scanIncompleteReason = 'page_budget_exceeded';
+            break;
+          }
+          seenScanPages.add(value.nextPageToken);
+          scanParams.set('pageToken', value.nextPageToken);
+        }
+
+        const busyIntervals = scannedEvents
+          .map((ev) => eventBusyIntervalMs(ev, calendarTz))
+          .filter((iv): iv is { startMs: number; endMs: number } => iv !== null)
           .sort((a, b) => a.startMs - b.startMs);
 
-        const tzSuffixMatch = String(timeMin).match(/([+-]\d{2}:\d{2}|Z)$/);
-        const tzSuffix = tzSuffixMatch ? tzSuffixMatch[1]! : '+07:00';
-        const datePrefix = String(timeMin).slice(0, 10);
-        const pad2 = (n: number) => String(n).padStart(2, '0');
-        const workStartIso = `${datePrefix}T${pad2(workdayStartHour)}:00:00${tzSuffix}`;
-        const workEndIso =
-          workdayEndHour === 24
-            ? `${datePrefix}T23:59:59${tzSuffix}`
-            : `${datePrefix}T${pad2(workdayEndHour)}:00:00${tzSuffix}`;
-        const workStartMs = Math.max(Date.parse(timeMin), Date.parse(workStartIso));
-        const workEndMs = Math.min(Date.parse(timeMax), Date.parse(workEndIso));
+        const scanComplete = scanIncompleteReason === undefined;
+        const coverage: CalendarCoverageMetadata = {
+          complete: scanComplete,
+          returned: scannedEvents.length,
+          totalAvailable: scanComplete ? scannedEvents.length : null,
+          ...(scanIncompleteReason ? { reason: scanIncompleteReason } : {}),
+        };
+
+        // Never report free slots when event coverage is incomplete
+        if (!scanComplete) {
+          return {
+            calendarId: id,
+            busyCount: busyIntervals.length,
+            freeSlots: [],
+            coverage,
+          };
+        }
+
+        const windowStartMs = Date.parse(timeMin);
+        const windowEndMs = Date.parse(timeMax);
         const durationMs = durationMinutes * 60_000;
         const stepMs = 30 * 60_000;
-
-        const formatLocalIso = (ms: number): { iso: string; hm: string } => {
-          const offsetMinutes =
-            tzSuffix === 'Z'
-              ? 0
-              : (tzSuffix.startsWith('-') ? -1 : 1) *
-                (Number(tzSuffix.slice(1, 3)) * 60 + Number(tzSuffix.slice(4, 6)));
-          const shifted = new Date(ms + offsetMinutes * 60_000);
-          const yyyy = shifted.getUTCFullYear();
-          const mm = pad2(shifted.getUTCMonth() + 1);
-          const dd = pad2(shifted.getUTCDate());
-          const hh = pad2(shifted.getUTCHours());
-          const min = pad2(shifted.getUTCMinutes());
-          const ss = pad2(shifted.getUTCSeconds());
-          return {
-            iso: `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}${tzSuffix}`,
-            hm: `${hh}:${min}`,
-          };
-        };
+        const localDates = enumerateLocalDates(timeMin, timeMax, calendarTz);
 
         const freeSlots: Array<{
           start: string;
@@ -492,24 +619,34 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           durationMinutes: number;
           label: string;
         }> = [];
-        let cursor = workStartMs;
-        while (cursor + durationMs <= workEndMs && freeSlots.length < maxSlots) {
-          const candEnd = cursor + durationMs;
-          const overlapping = busyIntervals.find(
-            (b) => cursor < b.endMs && b.startMs < candEnd,
-          );
-          if (!overlapping) {
-            const sFmt = formatLocalIso(cursor);
-            const eFmt = formatLocalIso(candEnd);
-            freeSlots.push({
-              start: sFmt.iso,
-              end: eFmt.iso,
-              durationMinutes,
-              label: `${sFmt.hm}–${eFmt.hm}`,
-            });
-            cursor = candEnd;
-          } else {
-            cursor = Math.max(cursor + stepMs, overlapping.endMs);
+
+        for (const dateStr of localDates) {
+          if (freeSlots.length >= maxSlots) break;
+          const workStart = zonedWallTimeToInstant(dateStr, workdayStartHour, 0, 0, calendarTz);
+          const workEnd = zonedWallTimeToInstant(dateStr, workdayEndHour, 0, 0, calendarTz);
+          const dayStartMs = Math.max(windowStartMs, workStart.ms);
+          const dayEndMs = Math.min(windowEndMs, workEnd.ms);
+          if (dayEndMs <= dayStartMs) continue;
+
+          let cursor = dayStartMs;
+          while (cursor + durationMs <= dayEndMs && freeSlots.length < maxSlots) {
+            const candEnd = cursor + durationMs;
+            const overlapping = busyIntervals.find(
+              (b) => cursor < b.endMs && b.startMs < candEnd,
+            );
+            if (!overlapping) {
+              const startIso = formatInstantInTimeZone(cursor, calendarTz);
+              const endIso = formatInstantInTimeZone(candEnd, calendarTz);
+              freeSlots.push({
+                start: startIso.iso,
+                end: endIso.iso,
+                durationMinutes,
+                label: `${startIso.hm}–${endIso.hm}`,
+              });
+              cursor = candEnd;
+            } else {
+              cursor = Math.max(cursor + stepMs, overlapping.endMs);
+            }
           }
         }
 
@@ -517,6 +654,7 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           calendarId: id,
           busyCount: busyIntervals.length,
           freeSlots,
+          coverage,
         };
       }
 
@@ -525,8 +663,8 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         only(
           args,
           isScheduleMeet
-            ? ['calendarId', 'summary', 'description', 'start', 'end', 'attendees', 'sendInvites', 'recurrence']
-            : ['calendarId', 'summary', 'description', 'start', 'end', 'location', 'createMeetLink', 'attendees', 'sendInvites', 'recurrence'],
+            ? ['calendarId', 'summary', 'description', 'start', 'end', 'timeZone', 'attendees', 'sendInvites', 'recurrence']
+            : ['calendarId', 'summary', 'description', 'start', 'end', 'timeZone', 'location', 'createMeetLink', 'attendees', 'sendInvites', 'recurrence'],
         );
         const id = this.checkedId(args.calendarId);
         windowSize(args.start, args.end, 1);
@@ -538,12 +676,30 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         }
         const recurrence = normalizeRecurrenceRule(args.recurrence);
         const attendees = normalizeAttendees(args.attendees);
+        let effectiveTimeZone: string | undefined;
+        if (args.timeZone !== undefined) {
+          effectiveTimeZone = assertValidIanaTimeZone(args.timeZone, false);
+        } else if (recurrence) {
+          effectiveTimeZone = await this.resolveCalendarTimeZone(id, signal, {
+            strictForRecurringWrite: true,
+          });
+        }
+        if (effectiveTimeZone) {
+          validateDateTimeMatchesTimeZone(args.start, effectiveTimeZone, false);
+          validateDateTimeMatchesTimeZone(args.end, effectiveTimeZone, false);
+        }
         const wantMeet = isScheduleMeet || args.createMeetLink === true;
         const sendUpdates = args.sendInvites === true ? 'all' : 'none';
         const body = {
           summary: text(args.summary, 200, true),
-          start: { dateTime: args.start },
-          end: { dateTime: args.end },
+          start: {
+            dateTime: args.start,
+            ...(effectiveTimeZone ? { timeZone: effectiveTimeZone } : {}),
+          },
+          end: {
+            dateTime: args.end,
+            ...(effectiveTimeZone ? { timeZone: effectiveTimeZone } : {}),
+          },
           ...(args.description !== undefined ? { description: plainDescription(text(args.description, 4000)) } : {}),
           ...(!isScheduleMeet && args.location !== undefined ? { location: text(args.location, 1000) } : {}),
           ...(attendees ? { attendees } : {}),
@@ -579,7 +735,7 @@ export class PersonalCalendarAdapter extends BaseAdapter {
       }
 
       if (toolName === 'mycalendar.update_event') {
-        only(args, ['calendarId', 'eventId', 'summary', 'description', 'start', 'end', 'location', 'createMeetLink', 'attendees', 'sendInvites', 'recurrence']);
+        only(args, ['calendarId', 'eventId', 'summary', 'description', 'start', 'end', 'timeZone', 'location', 'createMeetLink', 'attendees', 'sendInvites', 'recurrence']);
         const id = this.checkedId(args.calendarId);
         const eventId = text(args.eventId, 256, true).trim();
         if (eventId === '.' || eventId === '..' || eventId.includes('/')) {
@@ -599,12 +755,45 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         }
         const recurrence = normalizeRecurrenceRule(args.recurrence);
         const attendees = normalizeAttendees(args.attendees);
+        let effectiveTimeZone: string | undefined;
+        if (args.timeZone !== undefined) {
+          effectiveTimeZone = assertValidIanaTimeZone(args.timeZone, false);
+        } else if (recurrence) {
+          effectiveTimeZone = await this.resolveCalendarTimeZone(id, signal, {
+            strictForRecurringWrite: true,
+          });
+        }
+        let targetStart: string | undefined = args.start;
+        let targetEnd: string | undefined = args.end;
+        if (recurrence && (targetStart === undefined || targetEnd === undefined)) {
+          const existing = await this.request(
+            `${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}`,
+            signal,
+          );
+          if (typeof existing?.start?.dateTime === 'string' && typeof existing?.end?.dateTime === 'string') {
+            targetStart = existing.start.dateTime;
+            targetEnd = existing.end.dateTime;
+          }
+        }
+        if (effectiveTimeZone && targetStart !== undefined && targetEnd !== undefined) {
+          validateDateTimeMatchesTimeZone(targetStart, effectiveTimeZone, false);
+          validateDateTimeMatchesTimeZone(targetEnd, effectiveTimeZone, false);
+        }
         const wantMeet = args.createMeetLink === true;
         const sendUpdates = args.sendInvites === true ? 'all' : 'none';
         const body: Record<string, any> = {
           ...(args.summary !== undefined ? { summary: text(args.summary, 200, true) } : {}),
-          ...(args.start !== undefined && args.end !== undefined
-            ? { start: { dateTime: args.start }, end: { dateTime: args.end } }
+          ...(targetStart !== undefined && targetEnd !== undefined
+            ? {
+                start: {
+                  dateTime: targetStart,
+                  ...(effectiveTimeZone ? { timeZone: effectiveTimeZone } : {}),
+                },
+                end: {
+                  dateTime: targetEnd,
+                  ...(effectiveTimeZone ? { timeZone: effectiveTimeZone } : {}),
+                },
+              }
             : {}),
           ...(args.description !== undefined ? { description: plainDescription(text(args.description, 4000)) } : {}),
           ...(args.location !== undefined ? { location: text(args.location, 1000) } : {}),

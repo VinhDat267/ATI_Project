@@ -36,7 +36,7 @@ it('lists bounded events with expansion, chronological ordering and normalized t
   expect(await adapter.execute('calendar.list_events', { calendarId: id, timeMin: start, timeMax: end, query: 'review & prep', limit: 20 }, { signal })).toEqual({ events: [
     { id: event.id, title: 'Review', start, end, url: event.htmlLink },
     { id: 'all_day', title: '(Không có tiêu đề)', start: '2026-10-10', end: '2026-10-11', url: event.htmlLink },
-  ] });
+  ], coverage: { complete: true, returned: 2, totalAvailable: 2 } });
   const params = calls[0]!.url.searchParams;
   expect(Object.fromEntries(params)).toEqual({ timeMin: start, timeMax: end, singleEvents: 'true', orderBy: 'startTime', maxResults: '20', q: 'review & prep' });
   expect(calls[0]!.init.signal).toBe(signal);

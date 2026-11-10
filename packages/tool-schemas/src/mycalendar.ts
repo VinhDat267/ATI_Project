@@ -3,9 +3,16 @@ import { CALENDAR_ID_PATTERN, CALENDAR_TIME_PATTERN } from './calendar.js';
 import { GMAIL_ADDRESS_PATTERN, GMAIL_MAX_RECIPIENTS } from './gmail.js';
 
 export const MYCALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
+export const IANA_TIMEZONE_PATTERN = /^(?:UTC|GMT|[A-Za-z0-9_+-]+\/[A-Za-z0-9_+-]+(?:\/[A-Za-z0-9_+-]+)?)$/;
 
 const str = { type: 'string' };
 const time = { type: 'string', pattern: CALENDAR_TIME_PATTERN };
+const timeZone = {
+  type: 'string',
+  pattern: IANA_TIMEZONE_PATTERN.source,
+  maxLength: 100,
+  description: 'Múi giờ IANA của lịch hoặc sự kiện (ví dụ: "Asia/Ho_Chi_Minh").',
+};
 const calendarId = { type: 'string', pattern: CALENDAR_ID_PATTERN.source, 'x-resource': 'mycalendar' };
 const attendeesSchema = {
   type: 'array',
@@ -16,6 +23,15 @@ const attendeesSchema = {
 };
 const input = (properties: object, required: string[]) => ({ type: 'object', properties, required, additionalProperties: false });
 const output = (properties: object, required: string[]) => ({ type: 'object', properties, required });
+const coverageSchema = output(
+  {
+    complete: { type: 'boolean' },
+    returned: { type: 'integer', minimum: 0 },
+    totalAvailable: { type: ['integer', 'null'], minimum: 0 },
+    reason: str,
+  },
+  ['complete', 'returned', 'totalAvailable'],
+);
 const event = output(
   {
     id: str,
@@ -28,6 +44,7 @@ const event = output(
     attendees: { type: 'array', items: str },
     attendeesCount: { type: 'integer', minimum: 0 },
     recurrence: str,
+    timeZone: str,
   },
   ['id', 'title', 'start', 'end', 'url'],
 );
@@ -43,6 +60,7 @@ const eventObservedFields = [
   'attendees',
   'attendeesCount',
   'recurrence',
+  'timeZone',
   'calendarId',
 ];
 
@@ -66,8 +84,8 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
     discovers: 'myevent',
     observedFields: eventObservedFields,
     description: 'Xem tối đa 20 sự kiện theo giờ bắt đầu trong một lịch cá nhân đã tìm thấy, khoảng tối đa 31 ngày; thời gian ISO có múi giờ hoặc dùng query tự nhiên ("hôm nay", "ngày mai", "tuần này"). Tiêu đề tối đa 200 ký tự, dài hơn thì bị cắt và kết quả có truncated: true.',
-    inputSchema: input({ calendarId, timeMin: time, timeMax: time, query: str, limit: { type: 'integer', minimum: 1, maximum: 20, default: 20 } }, ['calendarId']),
-    outputSchema: output({ events: { type: 'array', items: event }, truncated: { type: 'boolean' } }, ['events']),
+    inputSchema: input({ calendarId, timeMin: time, timeMax: time, timeZone, query: str, limit: { type: 'integer', minimum: 1, maximum: 20, default: 20 } }, ['calendarId']),
+    outputSchema: output({ events: { type: 'array', items: event }, truncated: { type: 'boolean' }, coverage: coverageSchema }, ['events']),
   },
   {
     name: 'mycalendar.get_event',
@@ -96,6 +114,7 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
         meetLink: str,
         attendeesCount: { type: 'integer', minimum: 0 },
         recurrence: str,
+        timeZone: str,
       },
       ['id', 'title', 'start', 'end', 'url'],
     ),
@@ -111,6 +130,7 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
         calendarId,
         timeMin: time,
         timeMax: time,
+        timeZone,
         query: str,
         durationMinutes: { type: 'integer', minimum: 15, maximum: 480, default: 60 },
         workdayStartHour: { type: 'integer', minimum: 0, maximum: 23, default: 8 },
@@ -135,6 +155,7 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
             ['start', 'end', 'durationMinutes', 'label'],
           ),
         },
+        coverage: coverageSchema,
       },
       ['calendarId', 'busyCount', 'freeSlots'],
     ),
@@ -152,6 +173,7 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
         description: { type: 'string', maxLength: 4000 },
         start: time,
         end: time,
+        timeZone,
         location: { type: 'string', maxLength: 1000 },
         createMeetLink: { type: 'boolean' },
         attendees: attendeesSchema,
@@ -176,6 +198,7 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
         description: { type: 'string', maxLength: 4000 },
         start: time,
         end: time,
+        timeZone,
         location: { type: 'string', maxLength: 1000 },
         createMeetLink: { type: 'boolean' },
         attendees: attendeesSchema,
@@ -214,6 +237,7 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
         description: { type: 'string', maxLength: 4000 },
         start: time,
         end: time,
+        timeZone,
         attendees: attendeesSchema,
         sendInvites: { type: 'boolean' },
         recurrence: { type: 'string', maxLength: 500 },
