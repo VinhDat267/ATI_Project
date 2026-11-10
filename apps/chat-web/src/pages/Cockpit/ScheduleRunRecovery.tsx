@@ -36,7 +36,8 @@ export function isUncertainSheetsDeliveryRun(
     getEffectiveDeliveryResolution(run) == null &&
     Boolean(run.deliveryStartedAt) &&
     typeof run.error === 'string' &&
-    run.error.includes('SHEETS_DELIVERY_UNKNOWN')
+    (run.error.includes('SHEETS_DELIVERY_UNKNOWN') ||
+      run.error.includes('TRELLO_DELIVERY_UNKNOWN'))
   );
 }
 
@@ -224,7 +225,11 @@ export function ScheduleRunRecovery({ message, navigate }: { message: ChatMessag
     run &&
       ['expired', 'planning_failed', 'interrupted', 'digest_failed'].includes(run.state) &&
       !getEffectiveDeliveryResolution(run) &&
-      !(typeof run.error === 'string' && run.error.includes('SHEETS_DELIVERY_UNKNOWN'))
+      !(
+        typeof run.error === 'string' &&
+        (run.error.includes('SHEETS_DELIVERY_UNKNOWN') ||
+          run.error.includes('TRELLO_DELIVERY_UNKNOWN'))
+      )
   );
   return <div className="mb-5 v3-space-y-2">{run && ['digest_sent', 'needs_attention'].includes(run.state) && <p role="status" className="text-sm font-medium text-[#111827]">{runLabel(run)}</p>}{run && <SheetsDeliveryRecoveryControl run={run} onResolved={res => { resolvedRunRef.current = res.run; setRun(res.run); schedulesChanged(); }} />}{canReplan && run && <><p className="text-sm text-[#6B7280]">{runLabel(run)}</p><button type="button" className={primaryScheduleButton} disabled={busy} onClick={() => void replan()}>Lập lại kế hoạch</button></>}{error && <p role="alert" className="text-sm text-red-700">{error}</p>}</div>;
 }
