@@ -705,18 +705,21 @@ describe('Cross-Service Combined Runtime Gate (Sheets R2 + Trello #313 + Calenda
     };
   }
 
-  describe('0. Fresh & Pre-Remediation (<=0032 -> 0035) Migration Gate via Actual migrate.mjs', () => {
-    it('0a: applies all 47 SQL files (0001..0035) via node db/v3/migrate.mjs idempotently on a fresh DB', async () => {
+  describe('0. Fresh & Pre-Remediation Migration Gate via Actual migrate.mjs', () => {
+    it('0a: applies every SQL migration via node db/v3/migrate.mjs idempotently on a fresh DB', async () => {
       const rawUrl = process.env.DATABASE_URL!;
       const files = (await readdir(MIGRATIONS_DIR))
         .filter((f) => /^\d{4}_.*\.sql$/.test(f))
         .sort();
-      expect(files).toHaveLength(47);
-      expect(files.slice(-3)).toEqual([
+      const historicalFiles = files.filter((file) => Number(file.slice(0, 4)) <= 35);
+      expect(historicalFiles).toHaveLength(47);
+      expect(historicalFiles.slice(-3)).toEqual([
         '0033_sheets_digest_v2_remediation.sql',
         '0034_github_workspace_scoped_team_scope.sql',
         '0035_sheets_gas_r2_remediation.sql',
       ]);
+
+      const expectedOutput = files.map((file) => `Applied ${file}`);
 
       const suffix = randomUUID().replaceAll('-', '').slice(0, 10);
       const freshDbName = `xsvc_fresh_${suffix}`;
@@ -737,18 +740,18 @@ describe('Cross-Service Combined Runtime Gate (Sheets R2 + Trello #313 + Calenda
 
         const freshPass1 = runMigrate(freshUrl.href);
         expect(freshPass1.status, freshPass1.stderr).toBe(0);
-        expect(freshPass1.stdout.trim().split(/\r?\n/)).toHaveLength(47);
+        expect(freshPass1.stdout.trim().split(/\r?\n/)).toEqual(expectedOutput);
 
         const freshPass2 = runMigrate(freshUrl.href);
         expect(freshPass2.status, freshPass2.stderr).toBe(0);
-        expect(freshPass2.stdout.trim().split(/\r?\n/)).toHaveLength(47);
+        expect(freshPass2.stdout.trim().split(/\r?\n/)).toEqual(expectedOutput);
       } finally {
         await adminPool.query(`DROP DATABASE IF EXISTS "${freshDbName}" WITH (FORCE)`).catch(() => {});
         await adminPool.end();
       }
     }, 15_000);
 
-    it('0b: preserves seeded rows across pre-remediation <=0032 (44 files) -> 0035 upgrade via node db/v3/migrate.mjs idempotently', async () => {
+    it('0b: preserves seeded rows when upgrading a pre-remediation database via node db/v3/migrate.mjs twice', async () => {
       const rawUrl = process.env.DATABASE_URL!;
       const files = (await readdir(MIGRATIONS_DIR))
         .filter((f) => /^\d{4}_.*\.sql$/.test(f))

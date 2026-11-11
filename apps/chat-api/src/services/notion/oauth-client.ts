@@ -407,6 +407,14 @@ export class NotionOAuthClient {
       'identity',
     );
     const returnedId = typeof me?.id === 'string' && NOTION_ID_PATTERN.test(me.id) ? normalizeNotionId(me.id) : '';
+    if (!returnedId || (me?.type !== 'bot' && me?.type !== 'person')) {
+      throw new NotionOAuthError('Không đọc được danh tính bot từ phản hồi Notion.', false, {
+        endpointKind: 'identity',
+        statusCode: 200,
+        reason: 'transient',
+        requestState: 'response_received',
+      });
+    }
     if (me?.type !== 'bot' || returnedId !== normalizeNotionId(botId)) {
       throw new NotionOAuthError('Token Notion không khớp với bot của kết nối.', true, {
         endpointKind: 'identity',

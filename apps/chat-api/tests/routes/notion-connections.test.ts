@@ -342,6 +342,57 @@ describe('Notion OAuth connection routes (/api/connections/notion & /api/connect
     }
   });
 
+  it('keeps an active connection when the provider returns unreadable identity JSON', async () => {
+    const loopback = await startNotionLoopbackServer();
+    try {
+      const { user, userJwt, connectFresh } = await buildLoopbackHarness(loopback);
+      const connection = await connectFresh('26', 'syn_tok_c26');
+      const before = await repo.getActive(user.id, connection.connId);
+
+      loopback.enqueue('GET', '/users/me', { kind: 'raw', status: 200, rawBody: '{"id":' });
+      const check = await request(connection.routeApp)
+        .post(`/api/connections/notion/${connection.connId}/check`)
+        .set('Authorization', `Bearer ${userJwt}`);
+
+      expect(check.status).toBe(502);
+      expect(await repo.getActive(user.id, connection.connId)).toEqual(before);
+      expect(loopback.countPath('/oauth/token')).toBe(0);
+      expect(connection.getNotifyCount()).toBe(0);
+    } finally {
+      await loopback.close();
+    }
+  });
+
+  it('reports uncertain provider revocation after a lost refresh response even when revoking the saved token succeeds', async () => {
+    const loopback = await startNotionLoopbackServer();
+    try {
+      const { user, userJwt, connectFresh } = await buildLoopbackHarness(loopback);
+      const connection = await connectFresh('27', 'syn_tok_c27');
+
+      loopback.enqueue('GET', '/users/me', {
+        kind: 'json', status: 401, body: { code: 'unauthorized' },
+      });
+      loopback.enqueue('POST', '/oauth/token', { kind: 'destroy_socket' });
+      const check = await request(connection.routeApp)
+        .post(`/api/connections/notion/${connection.connId}/check`)
+        .set('Authorization', `Bearer ${userJwt}`);
+      expect(check.status).toBe(409);
+      expect(check.body.authFailureCode).toBe('rotation_unknown');
+      expect(loopback.countPath('/oauth/token')).toBe(1);
+
+      loopback.enqueue('POST', '/oauth/revoke', { kind: 'json', status: 200, body: {} });
+      const result = await request(connection.routeApp)
+        .delete(`/api/connections/notion/${connection.connId}`)
+        .set('Authorization', `Bearer ${userJwt}`);
+      expect(result.status).toBe(200);
+      expect(result.body).toMatchObject({ disconnected: true, providerRevocation: 'unconfirmed' });
+      expect(await repo.getActive(user.id, connection.connId)).toBeNull();
+      expect(loopback.countPath('/oauth/revoke')).toBe(1);
+    } finally {
+      await loopback.close();
+    }
+  });
+
   it('enforces transactional local disconnect vs providerRevocation across 200/502/timeout/socket-loss/local-failure/idempotency and denies cached AdapterFactory execution', async () => {
     const loopback = await startNotionLoopbackServer();
     try {

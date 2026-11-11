@@ -398,9 +398,11 @@ export class NotionConnectionRepo {
       }
       try {
         await revoke(priorRow);
+        // A successful revoke of the saved token cannot resolve a potentially lost rotation.
+        const knownGrant = priorRow.status === 'active' && !priorRow.refresh_in_flight;
         return {
           localDisconnected: true,
-          providerRevocation: 'confirmed',
+          providerRevocation: knownGrant ? 'confirmed' : 'unconfirmed',
         };
       } catch {
         return {
