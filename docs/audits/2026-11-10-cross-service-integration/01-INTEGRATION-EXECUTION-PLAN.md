@@ -13,7 +13,7 @@
 - Companion Matrix: `docs/audits/2026-11-10-cross-service-integration/03-SHARED-FILE-CONFLICT-AND-CONTRACT-MATRIX.md`
 
 **Global Constraints:**
-- **Execution Status (`2026-11-11`):** **Tasks A, B, C, D & E COMPLETED** — Frozen tested code+test anchor `4056fef20127d7da3c3139f34830035facbf5daf` (full-tree `270b82ba509d0ef01069c6548e18eb53853fa556`); uninterrupted `npm run check` (`EXIT_CODE=0`) + all 25 browser scenario groups (`EXIT_CODE=0`) verified locally; Draft PR targeting `main` (`isDraft: true`, `NO MERGE`, `PRODUCTION ACTIVATION — HOLD`). *(Historical Task A scope at commit `83cb3401`: docs-only preflight and execution plan.)*
+- **Execution Status (`2026-11-11`):** **Tasks A, B, C & D COMPLETED; Task E Local Verification & Draft PR `#315` Published (`WORKER REPORTED` on `4056fef20127d7da3c3139f34830035facbf5daf`); Final Docs-Head Exact-Head CI & Coordinator Acceptance `PENDING / NOT VERIFIED` at Commit Time** — Frozen tested code+test anchor `4056fef20127d7da3c3139f34830035facbf5daf` (full-tree `270b82ba509d0ef01069c6548e18eb53853fa556`); uninterrupted `npm run check` (`EXIT_CODE=0`) + all 25 browser scenario groups (`EXIT_CODE=0`) executed locally (`WORKER REPORTED`); Draft PR `#315` targeting `main` (`isDraft: true`, `NO MERGE`, Gate A & Gate B `NOT READY` at commit time pending final exact-head `v3 check` CI and Coordinator Codex acceptance; `PRODUCTION ACTIVATION — HOLD`). *(Historical Task A scope at commit `83cb3401`: docs-only preflight and execution plan.)*
 - **Worktree Exclusivity:** Execute exclusively inside `C:\Users\VinhDat\orca\workspaces\ATI_Project\ati-v3-cross-service-integration-gate` (`VinhDat267/ati-v3-cross-service-integration-gate`). **Never** create nested worktrees inside this workspace; **never** touch dirty `main`, original remediation branches/worktrees, `docs/handoff/CURRENT-STATE.md`, or `docs/handoff/ROADMAP.md`.
 - **No Silent Source Substitution:** Any movement of `origin/main` or source PR heads (`#306`, `#313`, `#314`) halts execution and requires explicit revalidation / coordinator confirmation. Constituent PRs (`#309`, `#310`, `#311`, `#307`, `#308`, `#312`) MUST NOT be integrated separately.
 - **No Production / External Side Effects:** Loopback HTTP (`127.0.0.1`) only. Zero live Google Sheets, Google Calendar, Gmail, Trello, Slack, or Telegram writes/invitations; zero production flag or migration execution.
@@ -117,7 +117,7 @@ flowchart TD
   A["Task A: Preflight, Conflict Matrix & Execution Plan<br/>(Docs-Only Commit — COMPLETED)"] --> B["Task B: Branch Assembly & Conflict Resolution<br/>(M0 #313 -> M1 #314 -> M2 #306 — COMPLETED)"]
   B --> C["Task C: Backend, PostgreSQL 0001..0035, 2-Process/Kill,<br/>Negative Auth & Loopback HTTP Verification (COMPLETED)"]
   B --> D["Task D: Frontend, Privacy, Recovery UI &<br/>Chromium E2E (incl. Calendar C1/C2) Verification (COMPLETED)"]
-  C --> E["Task E: Uninterrupted Layer D Gate, Draft PR,<br/>Exact-Head v3 CI & Final Audit Bundle 04..08 (COMPLETED)"]
+  C --> E["Task E: Uninterrupted Layer D Gate, Draft PR,<br/>Exact-Head v3 CI & Final Audit Bundle 04..08 (Local Gate Done; Final CI/Review Pending)"]
   D --> E
 ```
 
@@ -316,7 +316,7 @@ flowchart TD
     - `npm run build:v3` executes `npm run build -w @wap/chat-web` (`tsc -p tsconfig.json && vite build`).
     - `npm run test:launcher:v3` executes `node --test scripts/start-v3.test.mjs`.
     - `npm run test:browser:v3` executes `node --env-file-if-exists=.env scripts/test-v3-browser.mjs` across all **25** browser scenario groups sequentially (when a local `.env` exists in another environment, invoke `node scripts/test-v3-browser.mjs` directly with explicit isolated env vars so live `.env` credentials are never loaded).
-  - [x] **Step E.2 — Publish Draft Integration PR & Verify Exact-Head GitHub Actions `v3 check`:**
+  - [ ] **Step E.2 — Publish Draft Integration PR & Verify Exact-Head GitHub Actions `v3 check` (`Draft PR #315` opened; final docs-head CI verification `PENDING / NOT VERIFIED` at commit time, recorded externally in PR `#315` body and `worker_done` upon completion):**
     - Inspect `git status` and `git log --oneline origin/main..HEAD` (verify zero AI co-author / "Generated with" lines, zero unintended files).
     - Push `VinhDat267/ati-v3-cross-service-integration-gate` to `origin` and open a **Draft PR** (`gh pr create --draft --base main ...` — **NEVER** mark Ready for Review, **NEVER** merge into `main`).
     - Wait for `.github/workflows/v3-check.yml` (`name: v3 check`, which defines **one** job `v3` running `npm ci`, `npm run db:migrate:v3`, `npm run check`, `npm run admin:provision:v3`, `npx playwright install --with-deps chromium`, and `npm run test:browser:v3`) to complete on the exact final `HEAD` SHA (`gh run view <run_id> --json headSha,status,conclusion,jobs`). If docs-only audit evidence (`06`, `08`) is committed after code CI, re-run and pass `v3 check` on the **exact final commit SHA** so code + audit bundle share a single CI-verified `HEAD`.

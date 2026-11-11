@@ -1,7 +1,7 @@
 # 04 — Cross-Service Invariant Acceptance Matrix
 
 **Audit Bundle:** `docs/audits/2026-11-10-cross-service-integration/`  
-**Document Status:** Task E Final Verification Complete — Anchored to Frozen Code+Test Candidate `4056fef20127d7da3c3139f34830035facbf5daf`  
+**Document Status:** Task E Local Verification Complete (`WORKER REPORTED` on Frozen Code+Test Candidate `4056fef20127d7da3c3139f34830035facbf5daf`); Final Docs-Head Exact-Head CI & Coordinator Acceptance `PENDING / NOT VERIFIED` at Commit Time  
 **Date:** 2026-11-11  
 **Isolated Integration Worktree:** `C:\Users\VinhDat\orca\workspaces\ATI_Project\ati-v3-cross-service-integration-gate`  
 **Integration Branch:** `VinhDat267/ati-v3-cross-service-integration-gate`  
@@ -15,7 +15,7 @@
 This document maps every cross-service safety, authorization, concurrency, delivery-receipt, recovery, schema, and UI disclosure invariant declared in `01-INTEGRATION-EXECUTION-PLAN.md` and `03-SHARED-FILE-CONFLICT-AND-CONTRACT-MATRIX.md` to:
 1. **Exact production implementation files and symbols** verified on frozen integration candidate `4056fef20127d7da3c3139f34830035facbf5daf` (zero invented helper names or error codes).
 2. **Exact automated test suites and assertions** across unit/contract, disposable PostgreSQL 16 + OS multi-process/`SIGKILL`, and real Chromium Playwright E2E layers.
-3. **Explicit coverage boundaries and non-claims**, distinguishing Coordinator-verified runs (`INDEPENDENTLY VERIFIED` by Codex), GitHub Actions runs (`CI VERIFIED`), and worker runs (`WORKER REPORTED` pending final Coordinator acceptance review).
+3. **Explicit coverage boundaries and non-claims**, distinguishing Coordinator-verified runs (`INDEPENDENTLY VERIFIED` by Codex on prior anchors), final exact-head GitHub Actions CI (`PENDING / NOT VERIFIED` at commit time, recorded externally once `C_E3`'s own `v3 check` run finishes), and local worker runs (`WORKER REPORTED` pending final Coordinator acceptance review).
 
 ---
 
@@ -44,4 +44,5 @@ Across all 12 invariant domains (`INV-01` through `INV-12`), **zero unresolved c
 - All **3** textual merge conflicts (`schedule-service.ts`, `slack-adapter.ts`, `scripts/test-v3-browser.mjs`) and **1** semantic merge disclosure (`PrivacyPage.tsx` overview) were reconciled and mutation-tested in Task B (`07c086bf`).
 - All **4** backend cross-service integration/auth defects (`XSVC-RISK-01..04`) were exposed via `RED` tests and fixed surgically in Task C (`7dcd3753`, `INDEPENDENTLY VERIFIED` `15/15` by Coordinator Codex on `a5309f21`).
 - Cockpit/History recovery parity (`XSVC-RISK-13`) and real Chromium Calendar `C1/C2/DST/RRULE` coverage (`MB-05`) were closed in Task D (`5e281998`).
-- Fail-closed unknown `scheduleStatus` handling in `ScheduleRunRecovery.tsx` (`XSVC-RISK-14`) and truthful `drive.file`-only disclosure in `PrivacyPage.tsx` (`XSVC-RISK-15`, inherited from Sheets) were closed via strict TDD `RED -> GREEN` in Task E (`4056fef2`).
+- Fail-closed unknown `scheduleStatus` handling in `ScheduleRunRecovery.tsx` (`XSVC-RISK-14`) and truthful `drive.file`-only disclosure in `PrivacyPage.tsx` (`XSVC-RISK-15`, inherited from Sheets) were closed via strict TDD `RED -> GREEN` in Task E (`4056fef2`, `WORKER REPORTED`).
+- **Commit-Time CI & Acceptance Boundary:** At commit time of final docs head `C_E3`, required GitHub Actions `v3 check` on `C_E3` and Coordinator Codex's final independent acceptance review remain **`PENDING / NOT VERIFIED`**; therefore Gate A and Gate B remain **`NOT READY`** inside committed docs until externally verified.

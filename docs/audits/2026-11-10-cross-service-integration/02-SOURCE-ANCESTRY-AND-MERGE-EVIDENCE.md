@@ -1,13 +1,13 @@
 # 02 — Source Ancestry, `--no-ff` Merge Assembly & Complete Commit Lineage
 
 **Audit Bundle:** `docs/audits/2026-11-10-cross-service-integration/`  
-**Document Status:** Tasks A–E Complete — Anchored to Frozen Code+Test Candidate `4056fef20127d7da3c3139f34830035facbf5daf`  
+**Document Status:** Tasks A–D Settled; Task E Local Gate Complete (`WORKER REPORTED` on Frozen Code+Test Candidate `4056fef20127d7da3c3139f34830035facbf5daf`); Draft PR `#315` Open (`isDraft: true`); Final Docs-Head Exact-Head CI & Coordinator Acceptance `PENDING / NOT VERIFIED` at Commit Time  
 **Date:** 2026-11-11  
 **Isolated Integration Worktree:** `C:\Users\VinhDat\orca\workspaces\ATI_Project\ati-v3-cross-service-integration-gate`  
 **Integration Branch:** `VinhDat267/ati-v3-cross-service-integration-gate`  
-**Current Gate Status (Worker Proposed — Subject to Independent Coordinator Acceptance & Explicit Owner Approval):**
-- **Gate A:** `PASS — VERIFIED WITHIN TESTED SCOPE`
-- **Gate B:** `MERGE READY FOR OWNER REVIEW` *(Draft PR only — explicit Owner approval required)*
+**Current Gate Status at Commit Time (Pre-Push of Final Docs Head `C_E3`):**
+- **Gate A:** `NOT READY — BLOCKING DEFECT OR MISSING CRITICAL EVIDENCE` *(solely pending final exact-head GitHub Actions `v3 check` on `C_E3` — `PENDING / NOT VERIFIED` at commit time — and Coordinator Codex independent acceptance; conditional worker proposal once both complete: `PASS — VERIFIED WITHIN TESTED SCOPE`)*
+- **Gate B:** `NOT READY` *(pending final exact-head CI on `C_E3` and Coordinator Codex acceptance; conditional worker proposal once both complete: `MERGE READY FOR OWNER REVIEW`, Draft PR `#315` only — explicit Owner approval required)*
 - **Gate C:** `PRODUCTION ACTIVATION — HOLD`
 
 ---
@@ -36,7 +36,7 @@ Executed `git fetch origin --prune`, `git rev-parse origin/main`, `gh pr view 31
 
 ## 2. Traceable `--no-ff` Commit Lineage & Frozen Tested Code+Test Anchor (`4056fef2`)
 
-> **Non-Self-Referential Anchor Rule:** Because a Git commit cannot contain its own SHA, all tested code/test provenance in this bundle is anchored at **`4056fef20127d7da3c3139f34830035facbf5daf`** (**Task E Frozen Code+Test Anchor `C_E1`**, full-tree SHA **`270b82ba509d0ef01069c6548e18eb53853fa556`**). The subsequent final Task E documentation commit (`C_E2`) modifies **only** markdown/log files under `docs/audits/2026-11-10-cross-service-integration/` and `docs/handoff/` (`git diff 4056fef20127d7da3c3139f34830035facbf5daf HEAD -- ':!docs'` === `0` bytes), and its exact commit/tree SHA and passing GitHub Actions `v3 check` run are recorded externally in the Draft PR body.
+> **Non-Self-Referential Anchor Rule:** Because a Git commit cannot contain its own SHA, all tested code/test provenance in this bundle is anchored at **`4056fef20127d7da3c3139f34830035facbf5daf`** (**Task E Frozen Code+Test Anchor `C_E1`**, full-tree SHA **`270b82ba509d0ef01069c6548e18eb53853fa556`**). Initial docs commit `C_E2` (`11027dbc1e8c07f78af29c605f5c9eafc85c71a0`, tree `e5ff5077c87f09d60f26b78e9c69faa1dd8efd5f`) opened Draft PR `#315` (`OPEN`, `isDraft: true`) and is superseded by final docs provenance-correction commit `C_E3` (`git diff 4056fef20127d7da3c3139f34830035facbf5daf HEAD -- ':!docs'` === `0` bytes). At `C_E3` commit time, required GitHub Actions `v3 check` on `C_E3` is **`PENDING / NOT VERIFIED`** (superseded run `42955279986` on `11027dbc` does not certify `C_E3`); final `C_E3` SHA, `C_E3^{tree}` SHA, and actual exact-head `v3 check` outcome are recorded externally in Draft PR `#315`'s body and `worker_done` after `C_E3`'s own CI completes.
 
 ### 2.1. First-Parent Commit & Merge Parent Table (`origin/main..4056fef2`)
 
@@ -55,6 +55,7 @@ Executed `git fetch origin --prune`, `git rev-parse origin/main`, `gh pr view 31
 | **`C_D1`** | `5e2819985c205311af0354c796f6d28ac9c2eee2` | `07f6eb1ca67141381d9410c3fbbad5a00469a3b9` | `a5309f2198354d2d46519778ac9100c665ceaa96` | `fix(chat-web): enforce Cockpit schedule recovery parity and add C1/C2 Chromium calendar proofs` (4 files: `ScheduleRunRecovery.tsx`, `mycalendar.spec.ts`, `cross-service-recovery-privacy.test.tsx`, `scripts/fake-google-gmail.mjs`) |
 | **`C_D2`** | `127ded5cf5eabeb50b26c9551880e6c9d40c0ab8` | `231611d80234a122f49d57209a9578e2637fc0b7` | `5e2819985c205311af0354c796f6d28ac9c2eee2` | `docs(audit): record task d chromium c1/c2 and ui evidence and fix provenance` |
 | **`C_E1` (Frozen Tested Code+Test Anchor)** | **`4056fef20127d7da3c3139f34830035facbf5daf`** | **`270b82ba509d0ef01069c6548e18eb53853fa556`** | `127ded5cf5eabeb50b26c9551880e6c9d40c0ab8` | `fix(chat-web): fail closed on unknown schedule status and align mysheets OAuth disclosure` (4 files: `ScheduleRunRecovery.tsx`, `PrivacyPage.tsx`, `cross-service-recovery-privacy.test.tsx`, `calendar-rem-c-09-oauth-disclosure.test.tsx`) |
+| **`C_E2` (Superseded Initial Docs Commit)** | `11027dbc1e8c07f78af29c605f5c9eafc85c71a0` | `e5ff5077c87f09d60f26b78e9c69faa1dd8efd5f` | `4056fef20127d7da3c3139f34830035facbf5daf` | `docs(audit): finalize cross-service integration v2 evidence bundle and task e verdicts` (12 `docs/` files; opened Draft PR `#315`; superseded by `C_E3` to correct premature CI/Gate provenance) |
 
 ### 2.2. Cryptographic Ancestry & Diff Metrics on `4056fef20127d7da3c3139f34830035facbf5daf`
 

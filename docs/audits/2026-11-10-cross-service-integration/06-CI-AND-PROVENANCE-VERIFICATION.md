@@ -1,20 +1,21 @@
 # 06 — CI, Ancestry & Session Provenance Verification
 
 **Audit Bundle:** `docs/audits/2026-11-10-cross-service-integration/`  
-**Document Status:** Task E Final Verification Complete — Anchored to Frozen Code+Test Candidate `4056fef20127d7da3c3139f34830035facbf5daf`  
+**Document Status:** Task E Local Verification Complete (`WORKER REPORTED` on `4056fef20127d7da3c3139f34830035facbf5daf`); Draft PR `#315` Open (`isDraft: true`); Final Docs-Head (`C_E3`) Exact-Head CI & Coordinator Acceptance `PENDING / NOT VERIFIED` at Commit Time  
 **Date:** 2026-11-11  
 **Isolated Integration Worktree:** `C:\Users\VinhDat\orca\workspaces\ATI_Project\ati-v3-cross-service-integration-gate`  
 **Integration Branch:** `VinhDat267/ati-v3-cross-service-integration-gate`  
+**Draft Integration PR:** [`#315`](https://github.com/VinhDat267/ATI_Project/pull/315) (`OPEN`, `isDraft: true`, base `main` — `DO NOT MERGE` without explicit Owner approval)  
 **Tested Code+Test Anchor (`C_E1`):** `4056fef20127d7da3c3139f34830035facbf5daf` (full-tree `270b82ba509d0ef01069c6548e18eb53853fa556`)
 
 ---
 
 ## 1. Non-Self-Referential Commit & CI Provenance Rule
 
-Because a Git commit SHA is a cryptographic hash over its tree and metadata, **no commit can honestly record its own SHA or post-commit GitHub Actions run ID inside itself**. To avoid endless self-referential documentation commits while ensuring GitHub Actions runs on the **exact final `HEAD`** (including this completed 8-file evidence bundle):
+Because a Git commit SHA is a cryptographic hash over its tree and metadata, **no commit can honestly record its own SHA or claim a passing post-commit GitHub Actions run inside itself**. To avoid endless self-referential documentation commits while ensuring GitHub Actions runs on the **exact final `HEAD`**:
 1. All source code and automated test changes were frozen at commit **`4056fef20127d7da3c3139f34830035facbf5daf`** (`C_E1`, full-tree **`270b82ba509d0ef01069c6548e18eb53853fa556`**) before final local verification and documentation finalization.
-2. The subsequent Task E documentation commit (`C_E2`, final `HEAD` of the Draft PR) modifies **only** markdown/log files under `docs/audits/2026-11-10-cross-service-integration/` and `docs/handoff/` (`git diff 4056fef20127d7da3c3139f34830035facbf5daf HEAD -- ':!docs'` === `0` bytes).
-3. Required GitHub Actions workflow `.github/workflows/v3-check.yml` (`name: v3 check`, single job `v3` executing both `npm run check` and all 25 groups of `npm run test:browser:v3`) executes against the **exact final `HEAD` SHA (`C_E2`)** after push and Draft PR creation, and its exact final commit SHA, full-tree SHA (`HEAD^{tree}`), Draft PR number/URL, and passing GitHub Actions run ID/URL are recorded **externally** in the **Draft PR description** and the **Orca worker completion report**, then independently pinned by Coordinator Codex during root acceptance review.
+2. Initial documentation commit **`11027dbc1e8c07f78af29c605f5c9eafc85c71a0`** (`C_E2`, full-tree `e5ff5077c87f09d60f26b78e9c69faa1dd8efd5f`) opened Draft PR [`#315`](https://github.com/VinhDat267/ATI_Project/pull/315) (`OPEN`, `isDraft: true`) and started `v3 check` run [`42955279986`](https://github.com/VinhDat267/ATI_Project/actions/runs/42955279986). Because `11027dbc` contained premature CI/Gate claims written before `42955279986` and Coordinator acceptance completed, `11027dbc` is superseded by one docs-only provenance correction commit (`C_E3`, `git diff 4056fef20127d7da3c3139f34830035facbf5daf HEAD -- ':!docs'` === `0` bytes).
+3. At the moment `C_E3` is committed, required GitHub Actions workflow `.github/workflows/v3-check.yml` (`name: v3 check`, single job `v3` executing both `npm run check` and all 25 groups of `npm run test:browser:v3`) on `C_E3` is **`PENDING / NOT VERIFIED`**, and Coordinator Codex's final independent acceptance is **`PENDING`**. Even if superseded run `42955279986` on `11027dbc` completes, it does **not** certify `C_E3`. Once `C_E3` is pushed and its **own** exact-head `v3 check` run (`headSha === C_E3`) finishes, the exact `C_E3` commit SHA, `C_E3^{tree}` SHA, and actual CI run ID/URL/conclusion are recorded **externally** in Draft PR `#315`'s body and the Orca `worker_done` report (then independently verified by Coordinator Codex) without another self-referential commit.
 
 ---
 
@@ -32,7 +33,7 @@ Because a Git commit SHA is a cryptographic hash over its tree and metadata, **n
 
 ## 3. Revalidated Baseline & Source PR Exact-Head CI Provenance
 
-Revalidated at the start of Task E (`2026-11-11`, via `git fetch origin --prune`, `git rev-parse origin/main`, `gh pr view 306/313/314 --json number,state,isDraft,headRefName,headRefOid,baseRefName`, and `gh run view <id> --json databaseId,headSha,status,conclusion,workflowName,url`) and re-checked immediately before final handoff:
+Revalidated at the start of Task E (`2026-11-11`, via `git fetch origin --prune`, `git rev-parse origin/main`, `gh pr view 306/313/314 --json number,state,isDraft,headRefName,headRefOid,baseRefName`, and `gh run view <id> --json databaseId,headSha,status,conclusion,workflowName,url`) and re-checked before handoff:
 
 | Role | Ref / PR | State & Draft Flag | Exact Commit SHA | Exact Full-Tree SHA (`^{tree}`) | Merge-Base vs `origin/main` | Exact-Head `v3 check` Run | Provenance Label |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -46,7 +47,7 @@ Revalidated at the start of Task E (`2026-11-11`, via `git fetch origin --prune`
 
 ---
 
-## 4. Complete First-Parent Integration Lineage (`origin/main..4056fef2`)
+## 4. Complete First-Parent Integration Lineage (`origin/main..C_E2` + `C_E3` Docs Correction)
 
 | Phase / Step | Commit SHA | Full-Tree SHA (`^{tree}`) | Parent Commit SHA(s) | Summary |
 | --- | --- | --- | --- | --- |
@@ -63,16 +64,18 @@ Revalidated at the start of Task E (`2026-11-11`, via `git fetch origin --prune`
 | **`C_D1`** | `5e2819985c205311af0354c796f6d28ac9c2eee2` | `07f6eb1ca67141381d9410c3fbbad5a00469a3b9` | `a5309f2198354d2d46519778ac9100c665ceaa96` | `fix(chat-web): enforce Cockpit schedule recovery parity and add C1/C2 Chromium calendar proofs` |
 | **`C_D2`** | `127ded5cf5eabeb50b26c9551880e6c9d40c0ab8` | `231611d80234a122f49d57209a9578e2637fc0b7` | `5e2819985c205311af0354c796f6d28ac9c2eee2` | `docs(audit): record task d chromium c1/c2 and ui evidence and fix provenance` |
 | **`C_E1` (Frozen Tested Code+Test Anchor)** | **`4056fef20127d7da3c3139f34830035facbf5daf`** | **`270b82ba509d0ef01069c6548e18eb53853fa556`** | `127ded5cf5eabeb50b26c9551880e6c9d40c0ab8` | `fix(chat-web): fail closed on unknown schedule status and align mysheets OAuth disclosure` |
+| **`C_E2` (Superseded Initial Docs Commit)** | `11027dbc1e8c07f78af29c605f5c9eafc85c71a0` | `e5ff5077c87f09d60f26b78e9c69faa1dd8efd5f` | `4056fef20127d7da3c3139f34830035facbf5daf` | `docs(audit): finalize cross-service integration v2 evidence bundle and task e verdicts` (`133` files vs `main`, `0` non-`docs/` diff vs `4056fef2`; superseded by `C_E3` to correct premature CI/Gate claims) |
+| **`C_E3` (Final Docs Head)** | *Recorded externally in Draft PR `#315` body* | *Recorded externally in Draft PR `#315` body* | `11027dbc1e8c07f78af29c605f5c9eafc85c71a0` | `docs(audit): mark exact-head CI and final gate acceptance pending at commit time` (`0` non-`docs/` diff vs `4056fef2`) |
 
-### Exact Diff & Migration Counts at `4056fef20127d7da3c3139f34830035facbf5daf`
-- **Full diff vs `origin/main` (`2eed8d1d..4056fef2`):** `127 files changed, 24590 insertions(+), 1437 deletions(-)`
-- **Non-`docs/` diff vs `origin/main` (`2eed8d1d..4056fef2 -- ':!docs'`):** `91 files changed, 21815 insertions(+), 1437 deletions(-)`
+### Exact Diff & Migration Counts
+- **Full diff vs `origin/main` at `4056fef2` (`2eed8d1d..4056fef2`):** `127 files changed, 24590 insertions(+), 1437 deletions(-)` (at `11027dbc`: `133 files changed, 25105 insertions(+), 1437 deletions(-)`, `INDEPENDENTLY VERIFIED` by Coordinator Codex).
+- **Non-`docs/` diff vs `origin/main` (`2eed8d1d..HEAD -- ':!docs'`):** `91 files changed, 21815 insertions(+), 1437 deletions(-)` (identical across `4056fef2`, `11027dbc`, and `C_E3`).
 - **Integration-only non-`docs/` diff after `M2` (`678c5337..4056fef2 -- ':!docs'`):** `17 files changed, 5266 insertions(+), 45 deletions(-)` (`plan-repo.ts`, `adapter-factory.ts`, `execution-service.ts`, `calendar-digest-runner.ts`, `trello-digest-runner.ts`, `ScheduleRunRecovery.tsx`, `PrivacyPage.tsx`, `scripts/fake-google-gmail.mjs`, plus 9 backend/frontend/browser test files).
 - **Database migrations (`db/v3/*.sql`):** **47** SQL files total (`0001_v3_core.sql` .. `0035_sheets_gas_r2_remediation.sql`; exactly **1** new migration vs `origin/main`: `db/v3/0035_sheets_gas_r2_remediation.sql`, creating **70** base tables in `public`).
 
 ---
 
-## 5. GitHub Actions Required Workflow Structure & Exact-Head Verification Plan
+## 5. GitHub Actions Required Workflow Structure & Commit-Time CI Status
 
 ### 5.1. Verified `.github/workflows/v3-check.yml` Topology
 `.github/workflows/v3-check.yml` (`name: v3 check`) triggers on `pull_request` (and `push` to `main`) and defines **exactly one job (`v3` on `ubuntu-latest`, Node.js `24`, with `postgres:16` service container on `127.0.0.1:5432/ati_v3`)** executing sequentially:
@@ -84,9 +87,14 @@ Revalidated at the start of Task E (`2026-11-11`, via `git fetch origin --prune`
 6. `npx playwright install --with-deps chromium`
 7. `npm run test:browser:v3` (all **25** Playwright Chromium scenario groups in `scripts/test-v3-browser.mjs`)
 
-### 5.2. Final Exact-Head CI Recording (External to `C_E2`)
-- **Local Pre-Push Verification on `4056fef20127d7da3c3139f34830035facbf5daf` (`WORKER REPORTED`):** Both `npm run check` (`EXIT_CODE=0`, `6,494` passed, `0` failed, `1` conditional skip in `761.71s`) and all **25** scenario groups of `npm run test:browser:v3` (`EXIT_CODE=0`, `201` passed, `0` failed, `1` conditional skip in `1115.47s`) passed uninterrupted against disposable PostgreSQL 16 (`ati-xsvc-v2-taske-56534`, subsequently removed via `docker rm -f`) — full command/count breakdown in `05-REGRESSION-TEST-EVIDENCE.md` §8.
-- **Remote Exact-Head Verification on Final Docs Commit (`C_E2`):** Executed immediately after pushing `VinhDat267/ati-v3-cross-service-integration-gate` and opening the **Draft PR** (`[DO NOT MERGE] chore(ati): V3 cross-service combined integration gate`, `isDraft: true`, targeting `main`). The exact `C_E2` commit SHA, `C_E2^{tree}` SHA, Draft PR URL, and passing `v3 check` run ID/URL (`headSha === C_E2`, `status: completed`, `conclusion: success`) are published directly in the **Draft PR body** and **Orca `worker_done` report**, without introducing a trailing post-CI commit.
+### 5.2. Observed CI & Acceptance Status at `C_E3` Commit Time (External Recording Rule)
+| Verification Target | Status at `C_E3` Commit Time | Provenance Label | External Capture Location |
+| --- | --- | --- | --- |
+| **Local Layer D Gate on `4056fef2` (`npm run check` + all 25 `test:browser:v3` groups)** | Executed locally (`6,494` passed + `1` skip; `201` browser passed + `1` skip) | **`WORKER REPORTED`** | `05-REGRESSION-TEST-EVIDENCE.md` §8 & `evidence/task-e-full-check-and-browser-25.txt` |
+| **Draft PR [`#315`](https://github.com/VinhDat267/ATI_Project/pull/315)** | `OPEN`, `isDraft: true`, base `main` | **`INDEPENDENTLY VERIFIED`** (by Codex at `11027dbc`) | GitHub PR `#315` |
+| **Superseded `C_E2` (`11027dbc`) CI Run [`42955279986`](https://github.com/VinhDat267/ATI_Project/actions/runs/42955279986)** | `completed` / `success` on `11027dbc1e8c07f78af29c605f5c9eafc85c71a0` (was `in_progress` during initial review); **does NOT certify final docs head `C_E3`** | **`CI VERIFIED` for superseded `11027dbc` ONLY (`NOT VERIFIED` for `C_E3`)** | Historical superseded reference only |
+| **Final Docs Head (`C_E3`) Exact-Head `v3 check` Run (`headSha === C_E3`)** | **`PENDING / NOT VERIFIED`** *(not yet pushed at commit time)* | **`NOT VERIFIED` at commit time** *(transitions to `CI VERIFIED` externally only after `C_E3` run succeeds)* | **Draft PR `#315` body** & **Orca `worker_done` report** |
+| **Coordinator Codex Final Acceptance Review** | **`PENDING`** *(prior Codex reruns on `2fa749fc`, `a5309f21`, `127ded5c` are `INDEPENDENTLY VERIFIED`)* | **`NOT VERIFIED` at commit time** | Coordinator Codex root acceptance record |
 
 ---
 
@@ -94,4 +102,4 @@ Revalidated at the start of Task E (`2026-11-11`, via `git fetch origin --prune`
 
 Per `XSVC-INTEGRATION-V2` §2.3, **exact tree equivalence** may be claimed **only** when full-tree Git SHAs (`git rev-parse <refA>^{tree}` vs. `git rev-parse <refB>^{tree}`) match 100% identically (`git diff <treeA> <treeB>` === `0` bytes with **zero path exclusions**):
 - **Combined Integration PR vs. Raw Sequential Merges (`#313 -> #314 -> #306`):** Full-tree SHAs are **NOT** equivalent, and non-`docs/` trees are also **intentionally NOT identical** to raw constituent merges because the combined branch includes **6 essential TDD `RED -> GREEN` integration/contract fixes** (`PrivacyPage.tsx` overview + `drive.file` truthfulness, `calendar-digest-runner.ts` & `trello-digest-runner.ts` Telegram binding, `adapter-factory.ts` blank-scope & `phase === 'execution'` revocation guards, `plan-repo.ts` & `execution-service.ts` pre-step membership/scope guard, and `ScheduleRunRecovery.tsx` Cockpit paused/cancelled/`unknown` status fail-closed parity) plus combined integration tests and the `docs/audits/2026-11-10-cross-service-integration/` evidence bundle.
-- **Frozen Tested Anchor `C_E1` (`4056fef2`, tree `270b82ba...`) vs. Final Docs Commit `C_E2`:** Full-tree SHAs differ (`docs/` files updated in `C_E2`); non-`docs/` source and test paths are 100% byte-identical (`git diff 4056fef20127d7da3c3139f34830035facbf5daf C_E2 -- ':!docs'` === `0` bytes — disclosed strictly as a path-scoped comparison, **not** full-tree equivalence), and GitHub Actions `v3 check` runs directly on `C_E2`.
+- **Frozen Tested Anchor `C_E1` (`4056fef2`, tree `270b82ba...`) vs. Final Docs Commit `C_E3`:** Full-tree SHAs differ (`docs/` files updated in `C_E2`/`C_E3`); non-`docs/` source and test paths are 100% byte-identical (`git diff 4056fef20127d7da3c3139f34830035facbf5daf C_E3 -- ':!docs'` === `0` bytes — disclosed strictly as a path-scoped comparison, **not** full-tree equivalence), and required GitHub Actions `v3 check` must pass directly on `C_E3` before claiming exact-head CI verification.

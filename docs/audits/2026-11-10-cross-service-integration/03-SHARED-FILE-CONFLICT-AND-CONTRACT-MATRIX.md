@@ -1,11 +1,11 @@
 # 03 — Shared-File Conflict & Cross-Service Contract Matrix
 
 **Audit Bundle:** `docs/audits/2026-11-10-cross-service-integration/`  
-**Document Status:** Tasks A–E Complete — Combined Candidate Assembled (`07c086bf`), Backend Gate (`7dcd3753`), Frontend/Chromium Gate (`5e281998`), and Final Scoped TDD Fixes + Full Check + All-25 Browser Gate Verified at Frozen Anchor `4056fef20127d7da3c3139f34830035facbf5daf` (full-tree `270b82ba509d0ef01069c6548e18eb53853fa556`)  
+**Document Status:** Tasks A–D Settled; Task E Scoped TDD Fixes + Local Full Check + All-25 Browser Gate Executed (`WORKER REPORTED` at Frozen Anchor `4056fef20127d7da3c3139f34830035facbf5daf`, full-tree `270b82ba509d0ef01069c6548e18eb53853fa556`); Final Docs-Head Exact-Head CI & Coordinator Acceptance `PENDING / NOT VERIFIED` at Commit Time  
 **Date:** 2026-11-11  
 **Isolated Integration Worktree:** `C:\Users\VinhDat\orca\workspaces\ATI_Project\ati-v3-cross-service-integration-gate`  
-**Integration Branch:** `VinhDat267/ati-v3-cross-service-integration-gate` (Draft PR targeting `main` — `DO NOT MERGE` without explicit Owner approval)  
-**Current Gate Status (Worker Proposed — Subject to Independent Coordinator Acceptance & Explicit Owner Approval):** Gate A `PASS — VERIFIED WITHIN TESTED SCOPE` | Gate B `MERGE READY FOR OWNER REVIEW` | Gate C `PRODUCTION ACTIVATION — HOLD`  
+**Integration Branch:** `VinhDat267/ati-v3-cross-service-integration-gate` (Draft PR `#315` targeting `main` — `DO NOT MERGE` without explicit Owner approval)  
+**Current Gate Status at Commit Time:** Gate A `NOT READY — BLOCKING DEFECT OR MISSING CRITICAL EVIDENCE` *(pending final exact-head CI on `C_E3` & Coordinator acceptance; conditional worker proposal: `PASS — VERIFIED WITHIN TESTED SCOPE`)* | Gate B `NOT READY` *(conditional worker proposal after CI & Coordinator acceptance: `MERGE READY FOR OWNER REVIEW`)* | Gate C `PRODUCTION ACTIVATION — HOLD`  
 **Normative Authorities:** `AGENTS.md` (v3.1), `docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md`, `docs/team-workflow.md`, `docs/handoff/REVIEW-CHECKLIST.md`
 
 ---
@@ -195,7 +195,7 @@ All three source PRs were merged via `--no-ff` in the planned sequence (`M0` `#3
 
 ### 7.1. Shared-File Disposition & Proof Summary (Rows 1–10)
 
-| Row | File Path | Disposition Commit(s) | Resolution Applied | Provenance Label | Final Layer C / D Runtime Status (`4056fef2`) |
+| Row | File Path | Disposition Commit(s) | Resolution Applied | Provenance Label | Local Layer C / D Status on `4056fef2` (`WORKER REPORTED`; Final CI & Codex Acceptance `PENDING`) |
 | :---: | --- | :---: | --- | --- | --- |
 | 1 (`MB-01`) | `apps/chat-api/src/services/schedules/schedule-service.ts` | `678c5337` + test in `07c086bf` | Merged `SCHEDULE_CONFLICTS` (`SCHEDULE_PAUSED` with `'tạm dừng'`, `CONFIG_CHANGED_SINCE_RUN`, `MISSING_DISPATCH_SNAPSHOT`); enforced per-kind `run.dispatched_config` + `schedule.version === run.schedule_version` guard on `mark_sent` across `sheets_digest`, `trello_digest`, and `telegram_digest`; preserved `assertSheetsDigestCanResumeInTx` + `SCHEDULE_PAUSED` for Sheets and `REAUTHORIZATION_REQUIRED` / `SCHEDULE_PAUSED` / `SCHEDULE_CLOSED` / `CONFIG_CHANGED_SINCE_RUN` / pinned `service_credentials` checks for Trello/Telegram on `retry_new_run`; kept `0` `'slack'` literals. | `INDEPENDENTLY VERIFIED` (`cross-service-combined-gate.test.ts` `15/15` by Codex on `a5309f21`; `static-guard.test.ts` `2/2`) + `WORKER REPORTED` (`npm run check` `276` API files / `2725` PASS on `4056fef2`) | **COMPLETED (`PASS`)** |
 | 2 (`MB-02`) | `packages/tool-adapters/src/slack/slack-adapter.ts` | `678c5337` + test in `07c086bf` | Enforced strict string + trimmed non-empty + `!== 'undefined'` + `!== 'null'` on both `res?.ts` and `res?.channel`, throwing `StepError({ category: 'UNKNOWN', retryable: false, details: { requestSent: true } })` (no invented error symbol) and returning `{ ts: rawTs, channel: rawChannel }`. | `INDEPENDENTLY VERIFIED` (`slack-adapter.test.ts` by Codex on `2fa749fc` + `S6`/malformed receipt in `cross-service-combined-gate.test.ts` by Codex on `a5309f21`) + `WORKER REPORTED` (`@wap/tool-adapters` `744/744` & `@wap/executor` `56/56` on `4056fef2`) | **COMPLETED (`PASS`)** |
