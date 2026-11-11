@@ -13,6 +13,8 @@ import {
 
 const V3_DIR = fileURLToPath(new URL('../../../../db/v3/', import.meta.url));
 const MIGRATION_FILE = '0036_notion_oauth_durability.sql';
+// Full migration replays issue dozens of sequential PostgreSQL queries.
+const MIGRATION_REPLAY_TIMEOUT_MS = 30_000;
 const ALLOWLISTED_CODES = [
   'access_rejected',
   'refresh_retryable',
@@ -166,7 +168,7 @@ describe('migration 0036_notion_oauth_durability.sql on disposable PostgreSQL', 
     const defaultActive = await repo.getActive(userId);
     expect(defaultActive?.id).toBe(rowActiveId);
     expect((defaultActive as any)?.auth_failure_code).toBeNull();
-  });
+  }, MIGRATION_REPLAY_TIMEOUT_MS);
 
   it('applies full v3 migration chain twice on a fresh schema, accepts NULL and all 6 allowlisted codes, and rejects invalid codes with 23514', async () => {
     const firstRun = await applyMigrations(freshPool);
@@ -220,5 +222,5 @@ describe('migration 0036_notion_oauth_durability.sql on disposable PostgreSQL', 
         [userId],
       ),
     ).rejects.toMatchObject({ code: '23514' });
-  });
+  }, MIGRATION_REPLAY_TIMEOUT_MS);
 });
