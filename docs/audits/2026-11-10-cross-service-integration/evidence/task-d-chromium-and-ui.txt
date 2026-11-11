@@ -1,0 +1,74 @@
+=== TASK D SANITIZED EVIDENCE SUMMARY (Anchored at C_D1: 5e2819985c205311af0354c796f6d28ac9c2eee2, tree: 07f6eb1ca67141381d9410c3fbbad5a00469a3b9) ===
+
+[1] Environment & Disposable PostgreSQL 16 Isolation
+- has_dotenv: False (Test-Path .env -> False; [WebServer] .env not found. Continuing without it.)
+- Owned disposable container: ati-xsvc-v2-taskd-d2-56534 (id c5c563a6df56, postgres:16-alpine, 127.0.0.1:56534->5432/tcp, DB ati_v3)
+- Migrations applied: npm run db:migrate:local:v3 -> exit 0 (47 SQL files 0001_v3_core.sql .. 0035_sheets_gas_r2_remediation.sql)
+- Sandbox admin provisioned: npm run admin:provision:local:v3 -> exit 0 (ci-browser@localhost.test, id 34288e77-f495-4056-b5b3-2d3fbc47965e)
+- Container teardown: docker rm -f ati-xsvc-v2-taskd-d2-56534 -> exit 0
+- Untouched host containers verified before & after:
+  - eba2bdc4b9f0 ati-xsvc-v2-taskd-56534 (Exited, preserved from owner pause)
+  - 9718bcf4290f ati-cal-combined-gate-56657 (Exited)
+  - 20f50936ac02 ati-v3-test-db-56534 (Created)
+  - bbb95cabe5a4 ati-v3-postgres-1 (Exited)
+  - synthia-release-* (Exited)
+
+[2] TDD RED -> GREEN Verification (Cockpit ScheduleRunRecovery Parity)
+- RED against a5309f21:apps/chat-web/src/pages/Cockpit/ScheduleRunRecovery.tsx:
+  Command: npm test --workspace=@wap/chat-web -- tests/cross-service-recovery-privacy.test.tsx
+  Exit code: 1 (Test Files: 1 failed (1) | Tests: 3 failed | 1 passed (4))
+  Observed RED failures:
+  1. Test 1: Unable to find [data-testid="paused-schedule-retry-warning"]; checkbox-confirm-duplicate-risk & retry_new_run not disabled on paused sheets_digest / trello_digest schedules in Cockpit ScheduleRunRecovery because ScheduleRunRecovery did not query apiClient.getSchedules() or pass scheduleStatus to SheetsDeliveryRecoveryControl.
+  2. Test 2: screen.queryByRole('button', { name: 'Lập lại kế hoạch' }) returned non-null <button> on an interrupted run with deliveryStartedAt != null and SHEETS_APPEND_UNKNOWN_OUTCOME_UNRECONCILED.
+  3. Test 3: expect(getSchedulesSpy).toHaveBeenCalled() failed (0 calls).
+- GREEN with minimal fix in apps/chat-web/src/pages/Cockpit/ScheduleRunRecovery.tsx (+ Test 5 History ScheduleSection & cancelled-schedule parity):
+  Command: npm test --workspace=@wap/chat-web -- tests/cross-service-recovery-privacy.test.tsx
+  Exit code: 0 (Test Files: 1 passed (1) | Tests: 5 passed (5), 0 skipped)
+
+[3] Full Frontend Unit, Real-Backend React/Postgres, Typecheck, Build, Security & Adapter Contract Suites
+- Full @wap/chat-web suite ($env:DATABASE_URL="postgresql://ati_v3:<REDACTED>@127.0.0.1:56534/ati_v3"; npm test --workspace=@wap/chat-web -- --maxWorkers=4):
+  Exit code: 0 | Test Files: 121 passed (121) | Tests: 1241 passed (1241) | 0 failed | 0 skipped | Duration: 139.98s
+  Key included suites:
+  - tests/browser-scenario-selection.test.ts: 4 passed (4) (confirms all 25 scenario groups in scripts/test-v3-browser.mjs)
+  - tests/cross-service-recovery-privacy.test.tsx: 5 passed (5)
+  - tests/schedule-sheets-digest-v2-real-backend.test.tsx: 3 passed (3) (also verified standalone: 14.33s, exit 0)
+  - tests/schedule-sheets-digest-v2.test.tsx: 8 passed (8)
+  - tests/schedule-trello-digest-mode.test.tsx: 4 passed (4)
+  - tests/mysheets-ui.test.tsx: 24 passed (24)
+  - tests/calendar-rem-c-07-invitation-preview.test.tsx: 7 passed (7)
+  - tests/calendar-rem-c-09-oauth-disclosure.test.tsx: 2 passed (2)
+  - tests/calendar-rem-c-review-regressions.test.tsx: 8 passed (8)
+- npm run typecheck:v3 -> exit 0
+- npm run build:v3 -> exit 0 (214 modules transformed, built in 876ms)
+- node scripts/test-v3-web-build-security.mjs -> exit 0 (PASS: production build excludes credential sentinels and 8 forbidden UI claims)
+- npm test --workspace=@wap/tool-adapters -> exit 0 (27 Vitest files / 712 tests passed + 32 node --test probe tests passed = 744 passed, 0 skipped)
+- node --test scripts/google-oidc-fixture.test.mjs scripts/v3-local-env.test.mjs scripts/start-v3.test.mjs -> exit 0 (7 passed, 0 failed, 0 skipped)
+
+[4] Real Chromium Playwright Scenarios via `SCENARIO=<name> node scripts/test-v3-browser.mjs`
+Common env: RUNTIME_MODE=sandbox, V3_LOCAL_DB_PORT=56534, DATABASE_URL=postgresql://ati_v3:<REDACTED>@127.0.0.1:56534/ati_v3, CHAT_ADMIN_EMAIL=ci-browser@localhost.test, CHAT_ADMIN_PASSWORD=<REDACTED>
+
+A. Real Backend + Vite + PostgreSQL 16 + Loopback HTTP Fixtures (`real_backend_sandbox`):
+1. SCENARIO=mycalendar -> exit 0 | 10 passed, 0 failed, 0 skipped (59.1s)
+   - [1/10] MYCALENDAR: Flow 1 - connect from settings, select scope, re-select scope
+   - [2/10] MYCALENDAR: Flow 2 - disconnect, connect from chat refusal, plan and receipt
+   - [3/10] MYCALENDAR: Flow 3 - scope_required state recovery from refusal without re-running OAuth
+   - [4..7/10] MYCALENDAR: Flow 4 - viewports 1440x900 & 375x812 in light & dark modes
+   - [8/10] MYCALENDAR: Flow 5 - 1-click primary calendar, rich PlanMoment pills, conflict free-slot 1-click, calendar-event-preview modal, and Google Meet join link on ReceiptMoment
+   - [9/10] MYCALENDAR: Flow 6 - C1/DST real Chromium cross-midnight (2026-11-12T23:15:00-05:00 -> 2026-11-13T00:45:00-05:00, America/New_York) & America/New_York DST spring-forward recurring event (2026-03-08T01:30:00-05:00 -> 2026-03-08T03:30:00-04:00, RRULE:FREQ=WEEKLY;COUNT=3, 3600000ms elapsed) with PlanMoment, PreviewModal, and outbound fake-google-gmail.mjs /__stats instant/timeZone proof (writes incremented, 0 HTTP 400s)
+   - [10/10] MYCALENDAR: Flow 7 - C2 real Chromium invitation & existing-attendee notification disclosures and sendInvites omitted (sendUpdates=none) / false (sendUpdates=none) / true (sendUpdates=all) + update_event omitted attendees + sendInvites=true (PATCH sendUpdates=all + existing-attendee disclosure) outbound parity
+2. SCENARIO=mysheets -> exit 0 | 10 passed, 0 failed, 0 skipped (39.9s)
+3. SCENARIO=trello_telegram_sandbox_e2e -> exit 0 | 2 passed, 0 failed, 0 skipped (19.2s)
+4. SCENARIO=calendar_slack -> exit 0 | 1 passed, 0 failed, 0 skipped (13.1s)
+5. SCENARIO=sheets_slack -> exit 0 | 1 passed, 0 failed, 0 skipped (11.8s)
+6. SCENARIO=three_service -> exit 0 | 1 passed, 0 failed, 0 skipped (12.2s)
+7. SCENARIO=nine_service -> exit 0 | 1 passed, 0 failed, 0 skipped (11.4s)
+8. SCENARIO=schedule -> exit 0 | 26 passed, 0 failed, 0 skipped (1.6m)
+9. SCENARIO=default -> exit 0 | 96 passed, 0 failed, 1 skipped (8.6m; conditional skip at apps/chat-web/tests/browser/fe-08-landing-auth.spec.ts:128 requiring GOOGLE_OAUTH_CLIENT_ID in SCENARIO=auth04)
+Subtotal (9 real-backend Chromium groups): 148 passed, 0 failed, 1 conditional skip.
+
+B. Route-Mocked Chromium UI Scenarios (`mocked_browser_routes` — Playwright page.route API interception; UI/DOM proof only, NOT backend/provider adapter proof):
+10. SCENARIO=sheets_digest_v2_recovery -> exit 0 | 1 passed, 0 failed, 0 skipped (10.8s)
+11. SCENARIO=trello_telegram_mocked_ui -> exit 0 | 2 passed, 0 failed, 0 skipped (20.6s)
+Subtotal (2 route-mocked Chromium groups): 3 passed, 0 failed, 0 skipped.
+
+C. Remaining 14 of 25 Scenario Groups: NOT RUN in Task D (reserved for Task E full uninterrupted `npm run test:browser:v3`).
