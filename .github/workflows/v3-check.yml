@@ -50,7 +50,13 @@ jobs:
       - run: npm run db:migrate:v3
       - run: npm run check
       - run: npm run admin:provision:v3
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and verify runner libraries
+        run: |
+          npx playwright install chromium
+          if ! node --input-type=module -e 'import { chromium } from "@playwright/test"; const browser = await chromium.launch(); await browser.close()'; then
+            npx playwright install-deps chromium
+            node --input-type=module -e 'import { chromium } from "@playwright/test"; const browser = await chromium.launch(); await browser.close()'
+          fi
       - run: npm run test:browser:v3
 
   v3-exact-sha:

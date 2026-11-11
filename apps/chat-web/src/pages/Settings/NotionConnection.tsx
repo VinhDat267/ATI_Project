@@ -24,6 +24,7 @@ interface NotionDatabaseItem {
 interface NotionConnectionItem {
   id: string;
   status: 'connected' | 'needs_scope' | 'reconnect_required';
+  authFailureCode?: string | null;
   workspaceId: string;
   workspaceName: string;
   workspaceIcon?: string | null;
@@ -39,6 +40,7 @@ interface NotionConnectionItem {
 interface NotionConnectionStatus {
   available: boolean;
   status: 'unconfigured' | 'not_connected' | 'reconnect_required' | 'needs_scope' | 'connected';
+  authFailureCode?: string | null;
   activeConnectionId?: string;
   workspaceId?: string;
   workspaceName?: string;
@@ -48,6 +50,23 @@ interface NotionConnectionStatus {
   ownerName?: string | null;
   selectedDatabases?: NotionDatabaseItem[];
   connections: NotionConnectionItem[];
+}
+
+function reconnectDiagnosticMessage(code?: string | null): string {
+  switch (code) {
+    case 'refresh_retryable':
+      return 'Việc làm mới phiên tạm thời gián đoạn trước khi gửi tới Notion. Bạn có thể bấm Kiểm tra để thử khôi phục hoặc kết nối lại Notion.';
+    case 'client_misconfigured':
+      return 'Cấu hình ứng dụng OAuth Notion trên máy chủ không khớp với kết nối đã lưu. Vui lòng kiểm tra cấu hình hoặc kết nối lại.';
+    case 'identity_mismatch':
+      return 'Danh tính workspace hoặc bot Notion không còn khớp với phiên ủy quyền ban đầu. Vui lòng kết nối lại Notion.';
+    case 'rotation_unknown':
+      return 'Không xác nhận được trạng thái làm mới token từ Notion; hệ thống đã dừng tự động thử lại để an toàn. Vui lòng kết nối lại Notion.';
+    case 'grant_rejected':
+    case 'access_rejected':
+    default:
+      return 'Phiên ủy quyền Notion đã hết hiệu lực hoặc bị thu hồi. Vui lòng kết nối lại Notion.';
+  }
 }
 
 function normalizeNotionStatus(raw: any): NotionConnectionStatus {
@@ -67,6 +86,7 @@ function normalizeNotionStatus(raw: any): NotionConnectionStatus {
     ...c,
     id: String(c?.id ?? ''),
     status: mapConnStatus(c?.status),
+    authFailureCode: typeof c?.authFailureCode === 'string' ? c.authFailureCode : null,
     workspaceId: String(c?.workspaceId ?? ''),
     workspaceName: String(c?.workspaceName ?? ''),
     botId: String(c?.botId ?? ''),
@@ -86,6 +106,12 @@ function normalizeNotionStatus(raw: any): NotionConnectionStatus {
   return {
     available: raw?.available !== undefined ? Boolean(raw.available) : status !== 'unconfigured',
     status,
+    authFailureCode:
+      typeof raw?.authFailureCode === 'string'
+        ? raw.authFailureCode
+        : typeof activeConn?.authFailureCode === 'string'
+          ? activeConn.authFailureCode
+          : null,
     activeConnectionId: raw?.activeConnectionId ?? activeConn?.id,
     workspaceId: raw?.workspaceId ?? activeConn?.workspaceId,
     workspaceName: raw?.workspaceName ?? activeConn?.workspaceName,
@@ -119,6 +145,7 @@ export function NotionConnection({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [revokeUnconfirmed, setRevokeUnconfirmed] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
   // Scope picker states
@@ -205,6 +232,7 @@ export function NotionConnection({
     setBusy(true);
     setError('');
     setNotice('');
+    setRevokeUnconfirmed(false);
     try {
       const { url } = await apiClient.startNotionConnection();
       if (ownerRef.current !== startOwner) return;
@@ -222,14 +250,21 @@ export function NotionConnection({
     setBusy(true);
     setError('');
     setNotice('');
+    setRevokeUnconfirmed(false);
     try {
-      await apiClient.disconnectNotionConnection(activeConnectionId);
+      const res = await apiClient.disconnectNotionConnection(activeConnectionId);
       if (ownerRef.current !== startOwner) return;
       setConfirmDisconnect(false);
       setEditingScope(false);
       await fetchStatus();
       await refresh?.();
-      setNotice('Đã ngắt kết nối Notion.');
+      if ((res as any)?.providerRevocation === 'confirmed') {
+        setRevokeUnconfirmed(false);
+        setNotice('Đã ngắt kết nối Notion và thu hồi quyền truy cập từ Notion.');
+      } else {
+        setRevokeUnconfirmed(true);
+        setNotice('Đã ngắt kết nối Notion trên hệ thống.');
+      }
     } catch (err: any) {
       if (ownerRef.current !== startOwner) return;
       setError(err?.message || 'Không thể ngắt kết nối Notion.');
@@ -244,6 +279,7 @@ export function NotionConnection({
     setBusy(true);
     setError('');
     setNotice('');
+    setRevokeUnconfirmed(false);
     try {
       const res = await apiClient.activateNotionConnection(connectionId);
       if (ownerRef.current !== startOwner) return;
@@ -264,6 +300,7 @@ export function NotionConnection({
     setBusy(true);
     setError('');
     setNotice('');
+    setRevokeUnconfirmed(false);
     try {
       const res = await apiClient.checkNotionConnection(activeConnectionId);
       if (ownerRef.current !== startOwner) return;
@@ -280,6 +317,7 @@ export function NotionConnection({
     } catch (err: any) {
       if (ownerRef.current !== startOwner) return;
       setError(err?.message || 'Không thể kiểm tra kết nối Notion.');
+      await fetchStatus();
     } finally {
       if (ownerRef.current === startOwner) setBusy(false);
     }
@@ -350,6 +388,7 @@ export function NotionConnection({
   if (!standalone && (!data || data.status === 'unconfigured')) return null;
 
   const status = data?.status ?? 'not_connected';
+  const authFailureCode = data?.authFailureCode ?? null;
   const workspaceName = data?.workspaceName;
   const databases = data?.selectedDatabases ?? [];
   const connections = data?.connections ?? [];
@@ -472,9 +511,31 @@ export function NotionConnection({
               </div>
             </div>
           )}
+
+          {status === 'reconnect_required' && (
+            <p
+              data-testid="notion-auth-diagnostic"
+              className="mt-2 text-xs text-amber-700 dark:text-amber-400"
+            >
+              {reconnectDiagnosticMessage(authFailureCode)}
+            </p>
+          )}
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {status === 'reconnect_required' &&
+            authFailureCode === 'refresh_retryable' &&
+            activeConnectionId && (
+              <button
+                id="notion-check"
+                type="button"
+                disabled={busy}
+                onClick={handleCheckHealth}
+                className={SECONDARY_ACTION_BTN}
+              >
+                Kiểm tra
+              </button>
+            )}
           {(status === 'not_connected' || status === 'reconnect_required') && (
             <button
               id="notion-connect"
@@ -671,6 +732,14 @@ export function NotionConnection({
       )}
 
       {notice && <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-400">{notice}</p>}
+      {revokeUnconfirmed && (
+        <p
+          data-testid="notion-revoke-unconfirmed"
+          className="mt-2 rounded-lg border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
+        >
+          Đã xoá thông tin ủy quyền tại hệ thống, nhưng chưa thể xác nhận thu hồi trực tiếp với Notion. Để thu hồi hoàn toàn, hãy mở Notion → Settings &amp; members → Connections và gỡ tích hợp.
+        </p>
+      )}
       {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
     </div>
   );

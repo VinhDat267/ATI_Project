@@ -54,6 +54,7 @@ describe('NotionTokenManager on PostgreSQL', () => {
 
     let refreshed = 0;
     const oauth = {
+      appId: 'app-1',
       refresh: async (rt: string) => {
         expect(rt).toBe('valid-refresh');
         refreshed++;
@@ -78,7 +79,10 @@ describe('NotionTokenManager on PostgreSQL', () => {
     expect(result).toBe('ok:fresh-token');
     expect(refreshed).toBe(1);
 
-    // Simulate interrupted refresh_in_flight checkpoint -> next call must flip to reconnect_required
+    const afterRotate = (await repo.getActive(alice.id, row.id))!;
+    expect(afterRotate.config).toBeTruthy();
+
+    // Simulate interrupted refresh_in_flight checkpoint -> next call must quarantine to reconnect_required + rotation_unknown while preserving last ciphertext
     await db.pool.query('UPDATE notion_connections SET refresh_in_flight=true WHERE id=$1', [row.id]);
     await expect(
       tm.execute(alice.id, row.id, row.identity_version, async () => 'never'),
@@ -86,6 +90,8 @@ describe('NotionTokenManager on PostgreSQL', () => {
 
     const afterFail = (await repo.getActive(alice.id, row.id))!;
     expect(afterFail.status).toBe('reconnect_required');
-    expect(afterFail.config).toBeNull();
+    expect(afterFail.refresh_in_flight).toBe(false);
+    expect((afterFail as any).auth_failure_code).toBe('rotation_unknown');
+    expect(afterFail.config).toBe(afterRotate.config);
   });
 });

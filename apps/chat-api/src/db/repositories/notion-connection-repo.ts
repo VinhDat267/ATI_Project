@@ -9,6 +9,19 @@ export interface NotionSelectedDatabaseItem {
   url?: string;
 }
 
+export type NotionAuthFailureCode =
+  | 'access_rejected'
+  | 'refresh_retryable'
+  | 'rotation_unknown'
+  | 'grant_rejected'
+  | 'client_misconfigured'
+  | 'identity_mismatch';
+
+export interface NotionDisconnectOutcome {
+  localDisconnected: boolean;
+  providerRevocation: 'confirmed' | 'unconfirmed';
+}
+
 export interface NotionConnectionRow {
   id: string;
   user_id: string;
@@ -25,6 +38,7 @@ export interface NotionConnectionRow {
   selected_databases: NotionSelectedDatabaseItem[];
   is_default: boolean;
   refresh_in_flight: boolean;
+  auth_failure_code?: NotionAuthFailureCode | null;
   connected_at: Date;
 }
 
@@ -46,14 +60,48 @@ export class NotionConnectionRepo {
 
   async withOwner<T>(userId: string, action: (client: pg.PoolClient) => Promise<T>): Promise<T> {
     const client = await this.pool.connect();
+    let lockAcquired = false;
+    let actionError: unknown;
+    let hasActionError = false;
     try {
       await client.query("SELECT pg_advisory_lock(hashtext('ati-notion-owner'),hashtext($1))", [userId]);
+      lockAcquired = true;
       return await action(client);
+    } catch (err) {
+      actionError = err;
+      hasActionError = true;
+      throw err;
     } finally {
-      try {
-        await client.query("SELECT pg_advisory_unlock(hashtext('ati-notion-owner'),hashtext($1))", [userId]);
-      } finally {
-        client.release();
+      if (!lockAcquired) {
+        client.release(
+          hasActionError
+            ? actionError instanceof Error
+              ? actionError
+              : new Error(String(actionError))
+            : undefined,
+        );
+      } else {
+        let unlockFailure: Error | undefined;
+        try {
+          const unlockRes = await client.query<{ unlocked: boolean }>(
+            "SELECT pg_advisory_unlock(hashtext('ati-notion-owner'),hashtext($1)) AS unlocked",
+            [userId],
+          );
+          if (unlockRes.rows[0]?.unlocked !== true) {
+            unlockFailure = new Error(
+              'Failed to release Notion owner lock (pg_advisory_unlock returned false)',
+            );
+          }
+        } catch (unlockErr) {
+          unlockFailure =
+            unlockErr instanceof Error
+              ? unlockErr
+              : new Error(`Failed to release Notion owner lock: ${String(unlockErr)}`);
+        }
+        client.release(unlockFailure);
+        if (unlockFailure && !hasActionError) {
+          throw unlockFailure;
+        }
       }
     }
   }
@@ -212,6 +260,7 @@ export class NotionConnectionRepo {
              allowed_databases = '{}',
              selected_databases = '[]'::jsonb,
              refresh_in_flight = false,
+             auth_failure_code = NULL,
              connected_at = excluded.connected_at
            RETURNING *`,
           [
@@ -298,22 +347,32 @@ export class NotionConnectionRepo {
     userId: string,
     id: string,
     revoke?: (row: NotionConnectionRow) => Promise<void>,
-  ): Promise<void> {
-    await this.withOwner(userId, async (c) => {
-      const row = await this.get(c, userId, id);
+  ): Promise<NotionDisconnectOutcome> {
+    return this.withOwner(userId, async (c) => {
+      let priorRow: NotionConnectionRow | null = null;
+      let transitioned = false;
       await c.query('BEGIN');
       try {
+        priorRow =
+          (
+            await c.query<NotionConnectionRow>(
+              'SELECT * FROM notion_connections WHERE id=$1 AND user_id=$2 FOR UPDATE',
+              [id, userId],
+            )
+          ).rows[0] ?? null;
         await c.query('DELETE FROM notion_oauth_states WHERE user_id=$1', [userId]);
-        await c.query(
+        const upd = await c.query(
           `UPDATE notion_connections
            SET status='disconnected',
                config=NULL,
                is_default=false,
                identity_version=identity_version+1,
-               refresh_in_flight=false
+               refresh_in_flight=false,
+               auth_failure_code=NULL
            WHERE id=$1 AND user_id=$2 AND status<>'disconnected'`,
           [id, userId],
         );
+        transitioned = upd.rowCount === 1;
         // Promote the newest remaining active connection to default if any exist
         await c.query(
           `UPDATE notion_connections
@@ -328,11 +387,28 @@ export class NotionConnectionRepo {
         );
         await c.query('COMMIT');
       } catch (e) {
-        await c.query('ROLLBACK');
+        await c.query('ROLLBACK').catch(() => {});
         throw e;
       }
-      if (row?.status !== 'disconnected' && row?.config && revoke) {
-        await revoke(row);
+      if (!transitioned || !priorRow?.config || !revoke) {
+        return {
+          localDisconnected: transitioned,
+          providerRevocation: 'unconfirmed',
+        };
+      }
+      try {
+        await revoke(priorRow);
+        // A successful revoke of the saved token cannot resolve a potentially lost rotation.
+        const knownGrant = priorRow.status === 'active' && !priorRow.refresh_in_flight;
+        return {
+          localDisconnected: true,
+          providerRevocation: knownGrant ? 'confirmed' : 'unconfirmed',
+        };
+      } catch {
+        return {
+          localDisconnected: true,
+          providerRevocation: 'unconfirmed',
+        };
       }
     });
   }

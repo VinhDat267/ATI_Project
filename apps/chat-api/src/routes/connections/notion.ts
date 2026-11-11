@@ -105,6 +105,10 @@ export function notionConnectionView(row: NotionConnectionRow) {
         ? ('connected' as const)
         : ('scope_required' as const)
       : row.status;
+  const authFailureCode =
+    row.status === 'reconnect_required' && row.refresh_in_flight
+      ? ('rotation_unknown' as const)
+      : (row.auth_failure_code ?? null);
   return {
     id: row.id,
     workspaceId: row.workspace_id,
@@ -113,6 +117,7 @@ export function notionConnectionView(row: NotionConnectionRow) {
     botId: row.bot_id,
     identityVersion: row.identity_version,
     status,
+    authFailureCode,
     allowedDatabases: row.allowed_databases,
     selectedDatabases: row.selected_databases ?? [],
     isDefault: Boolean(row.is_default),
@@ -170,6 +175,7 @@ export function createNotionConnectionRoutes(options: NotionConnectionsOptions):
     res.status(200).json({
       available: true,
       status: activeConnection ? activeConnection.status : 'disconnected',
+      authFailureCode: activeConnection?.authFailureCode ?? null,
       toolsAvailable: Boolean(activeConnection?.toolsAvailable),
       activeConnectionId: activeConnection?.id,
       workspaceId: activeConnection?.workspaceId,
@@ -442,9 +448,24 @@ export function createNotionConnectionRoutes(options: NotionConnectionsOptions):
     }
     const startedAt = clock();
     try {
-      await tokens!.execute(user.id, row.id, row.identity_version, (accessToken, botId) =>
-        client!.verify(accessToken, botId, AbortSignal.timeout(timeoutMs)),
-      );
+      let recovered = false;
+      if (typeof tokens!.checkConnection === 'function') {
+        const checkResult = await tokens!.checkConnection(
+          user.id,
+          row.id,
+          row.identity_version,
+          (accessToken, botId) =>
+            client!.verify(accessToken, botId, AbortSignal.timeout(timeoutMs)),
+        );
+        recovered = checkResult.recovered;
+      } else {
+        await tokens!.execute(user.id, row.id, row.identity_version, (accessToken, botId) =>
+          client!.verify(accessToken, botId, AbortSignal.timeout(timeoutMs)),
+        );
+      }
+      if (recovered && options.tokens) {
+        options.onConnectionChanged?.(user.id);
+      }
       const latest = await options.repo!.getActive(user.id, row.id);
       const latencyMs = Math.max(0, clock() - startedAt);
       res.status(200).json({
@@ -454,7 +475,11 @@ export function createNotionConnectionRoutes(options: NotionConnectionsOptions):
       });
     } catch (err) {
       const latest = await options.repo!.getActive(user.id, row.id);
-      res.status(409).json({
+      const status =
+        err instanceof NotionOAuthError && !err.authenticationLost && latest?.status === 'active'
+          ? 502
+          : 409;
+      res.status(status).json({
         error: err instanceof Error ? err.message : 'Kết nối Notion cần kết nối lại.',
         ...(latest ? notionConnectionView(latest) : {}),
       });
@@ -468,13 +493,30 @@ export function createNotionConnectionRoutes(options: NotionConnectionsOptions):
       res.status(404).json({ error: 'Không tìm thấy kết nối Notion.' });
       return;
     }
-    await options.repo!.disconnect(user.id, id, async (row) => {
-      if (!row.config) return;
-      const cfg = decryptCredentials(row.config, options.encryptionKey!);
-      await client!.revoke(cfg.accessToken, AbortSignal.timeout(revokeTimeoutMs));
+    let localCommitted = false;
+    let providerRevocation: 'confirmed' | 'unconfirmed' = 'unconfirmed';
+    try {
+      const outcome = await options.repo!.disconnect(user.id, id, async (row) => {
+        localCommitted = true;
+        if (!row.config) return;
+        const cfg = decryptCredentials(row.config, options.encryptionKey!);
+        await client!.revoke(cfg.accessToken, AbortSignal.timeout(revokeTimeoutMs));
+      });
+      localCommitted = true;
+      if (outcome?.providerRevocation === 'confirmed') {
+        providerRevocation = 'confirmed';
+      }
+    } finally {
+      if (localCommitted) {
+        options.onConnectionChanged?.(user.id);
+      }
+    }
+    res.status(200).json({
+      disconnected: true,
+      status: 'disconnected',
+      toolsAvailable: false,
+      providerRevocation,
     });
-    options.onConnectionChanged?.(user.id);
-    res.status(200).json({ disconnected: true, status: 'disconnected', toolsAvailable: false });
   });
 
   return router;
