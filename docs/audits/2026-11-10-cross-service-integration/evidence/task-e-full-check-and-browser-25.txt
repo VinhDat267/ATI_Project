@@ -1,0 +1,157 @@
+=== TASK E LAYER D FULL LOCAL VERIFICATION EVIDENCE (SANITIZED SUMMARY) ===
+Tested Code+Test Commit Anchor (C_E1): 4056fef20127d7da3c3139f34830035facbf5daf
+Tested Full-Tree SHA (HEAD^{tree}):    270b82ba509d0ef01069c6548e18eb53853fa556
+Disposable PostgreSQL 16 Container:    ati-xsvc-v2-taske-56534 (postgres:16-alpine PostgreSQL 16.15, 127.0.0.1:56534->5432/tcp, removed via docker rm -f after run)
+Live .env Present:                     False (Test-Path .env -> False)
+Date:                                  2026-11-11
+
+--- PART 1: UNINTERRUPTED npm run check (4-CPU / 3-Worker CI Parity Affinity, Zero Timeout/Skip Edits) ---
+> check
+> npm run typecheck:v3 && npm run test:v3 && npm run test:eval:v3 && npm run build:v3 && node scripts/test-v3-web-build-security.mjs && npm run test:launcher:v3 && node --test scripts/v3-local-env.test.mjs scripts/fake-oidc.test.mjs scripts/google-oidc-fixture.test.mjs scripts/slack/inventory.test.mjs scripts/fake-slack-personal.test.mjs scripts/slack/contract-probe.test.mjs
+> typecheck:v3
+> tsc -p apps/chat-api/tsconfig.json --noEmit && tsc -p apps/chat-web/tsconfig.json --noEmit
+> test:v3
+> node --env-file-if-exists=.env scripts/test-v3.mjs
+> @wap/tool-schemas@0.1.0 test
+> tsc --noEmit -p tsconfig.contracts.json && vitest run
+ Test Files  27 passed (27)
+      Tests  593 passed (593)
+   Duration  5.50s (transform 1.72s, setup 0ms, import 5.77s, tests 1.22s, environment 6ms)
+> @wap/tool-adapters@0.1.0 test
+> vitest run && npm run test:probe
+ Test Files  27 passed (27)
+      Tests  712 passed (712)
+   Duration  13.51s (transform 3.39s, setup 0ms, import 10.61s, tests 20.17s, environment 4ms)
+> @wap/tool-adapters@0.1.0 test:probe
+> node --test tests/jira-oauth-probe.check.mjs
+ℹ tests 32
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ skipped 0
+ℹ duration_ms 1733.9428
+> @wap/planner@0.1.0 test
+> vitest run
+ Test Files  40 passed (40)
+      Tests  567 passed (567)
+   Duration  12.36s (transform 2.67s, setup 0ms, import 15.64s, tests 8.26s, environment 6ms)
+> @wap/executor@0.1.0 test
+> vitest run
+ Test Files  7 passed (7)
+      Tests  56 passed (56)
+   Duration  1.90s (transform 1.49s, setup 0ms, import 2.62s, tests 219ms, environment 1ms)
+> @wap/chat-api@0.1.0 test
+> vitest run
+ Test Files  276 passed (276)
+      Tests  2725 passed (2725)
+   Duration  436.41s (transform 15.79s, setup 0ms, import 213.00s, tests 1000.22s, environment 44ms)
+> @wap/chat-web@0.1.0 test
+> vitest run
+ Test Files  121 passed (121)
+      Tests  1242 passed (1242)
+   Duration  194.93s (transform 14.36s, setup 37.91s, import 67.65s, tests 260.48s, environment 167.78s)
+> test:eval:v3
+> vitest run evaluations
+ Test Files  31 passed (31)
+      Tests  500 passed | 1 skipped (501)
+   Duration  19.10s (transform 2.72s, setup 0ms, import 11.30s, tests 34.21s, environment 4ms)
+> build:v3
+> npm run build -w @wap/chat-web
+> @wap/chat-web@0.1.0 build
+> tsc -p tsconfig.json && vite build
+✓ built in 1.12s
+PASS: production build excludes credential sentinels and 8 forbidden UI claims
+> test:launcher:v3
+> node --test scripts/start-v3.test.mjs
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ skipped 0
+ℹ duration_ms 3739.4666
+ℹ tests 66
+ℹ suites 0
+ℹ pass 66
+ℹ fail 0
+ℹ skipped 0
+ℹ duration_ms 8113.4873
+=== NPM_RUN_CHECK EXIT_CODE=0 ELAPSED_SEC=761.71 ===
+
+--- PART 2: UNINTERRUPTED npm run test:browser:v3 (ALL 25 SCENARIO GROUPS) ---
+Running v3 browser scenario: slack_assistant
+Running 5 tests using 1 worker
+  5 passed (36.8s)
+Running v3 browser scenario: slack_write
+Running 4 tests using 1 worker
+  4 passed (35.4s)
+Running v3 browser scenario: slack_read
+Running 4 tests using 1 worker
+  4 passed (57.3s)
+Running v3 browser scenario: slack_oauth
+Running 4 tests using 1 worker
+  4 passed (25.4s)
+Running v3 browser scenario: default
+Running 97 tests using 1 worker
+  1 skipped
+  96 passed (7.7m)
+Running v3 browser scenario: auth02
+Running 2 tests using 1 worker
+  2 passed (16.0s)
+Running v3 browser scenario: auth04
+Running 6 tests using 1 worker
+  6 passed (20.2s)
+Running v3 browser scenario: clarification
+Running 3 tests using 1 worker
+  3 passed (15.2s)
+Running v3 browser scenario: partial_failure
+Running 2 tests using 1 worker
+  2 passed (17.6s)
+Running v3 browser scenario: three_service
+Running 1 test using 1 worker
+  1 passed (11.6s)
+Running v3 browser scenario: four_service
+Running 1 test using 1 worker
+  1 passed (9.4s)
+Running v3 browser scenario: nine_service
+Running 1 test using 1 worker
+  1 passed (9.9s)
+Running v3 browser scenario: sheets_slack
+Running 1 test using 1 worker
+  1 passed (9.6s)
+Running v3 browser scenario: calendar_slack
+Running 1 test using 1 worker
+  1 passed (9.2s)
+Running v3 browser scenario: notion_slack
+Running 1 test using 1 worker
+  1 passed (9.2s)
+Running v3 browser scenario: telegram_slack
+Running 1 test using 1 worker
+  1 passed (9.1s)
+Running v3 browser scenario: jira_slack
+Running 1 test using 1 worker
+  1 passed (9.2s)
+Running v3 browser scenario: answer
+Running 4 tests using 1 worker
+  4 passed (18.8s)
+Running v3 browser scenario: gmail
+Running 12 tests using 1 worker
+  12 passed (1.2m)
+Running v3 browser scenario: mycalendar
+Running 10 tests using 1 worker
+  10 passed (50.8s)
+Running v3 browser scenario: mysheets
+Running 10 tests using 1 worker
+  10 passed (43.1s)
+Running v3 browser scenario: schedule
+Running 26 tests using 1 worker
+  26 passed (1.6m)
+Running v3 browser scenario: trello_telegram_mocked_ui
+Running 2 tests using 1 worker
+  2 passed (23.5s)
+Running v3 browser scenario: trello_telegram_sandbox_e2e
+Running 2 tests using 1 worker
+  2 passed (16.3s)
+Running v3 browser scenario: sheets_digest_v2_recovery
+Running 1 test using 1 worker
+  1 passed (10.6s)
+=== BROWSER_ALL_25 EXIT_CODE=0 ELAPSED_SEC=1115.47 (25 GROUPS: 201 PASSED, 0 FAILED, 1 CONDITIONAL SKIP) ===

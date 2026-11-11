@@ -13,7 +13,7 @@
 - Companion Matrix: `docs/audits/2026-11-10-cross-service-integration/03-SHARED-FILE-CONFLICT-AND-CONTRACT-MATRIX.md`
 
 **Global Constraints:**
-- **Task A Scope (Current Commit):** Docs-only preflight and execution plan. **NO MERGE execution**, **NO source-code edits**, **NO push or PR creation**, **NO database migrations executed**, **NO live external provider calls**.
+- **Execution Status (`2026-11-11`):** **Tasks A, B, C, D & E COMPLETED** — Frozen tested code+test anchor `4056fef20127d7da3c3139f34830035facbf5daf` (full-tree `270b82ba509d0ef01069c6548e18eb53853fa556`); uninterrupted `npm run check` (`EXIT_CODE=0`) + all 25 browser scenario groups (`EXIT_CODE=0`) verified locally; Draft PR targeting `main` (`isDraft: true`, `NO MERGE`, `PRODUCTION ACTIVATION — HOLD`). *(Historical Task A scope at commit `83cb3401`: docs-only preflight and execution plan.)*
 - **Worktree Exclusivity:** Execute exclusively inside `C:\Users\VinhDat\orca\workspaces\ATI_Project\ati-v3-cross-service-integration-gate` (`VinhDat267/ati-v3-cross-service-integration-gate`). **Never** create nested worktrees inside this workspace; **never** touch dirty `main`, original remediation branches/worktrees, `docs/handoff/CURRENT-STATE.md`, or `docs/handoff/ROADMAP.md`.
 - **No Silent Source Substitution:** Any movement of `origin/main` or source PR heads (`#306`, `#313`, `#314`) halts execution and requires explicit revalidation / coordinator confirmation. Constituent PRs (`#309`, `#310`, `#311`, `#307`, `#308`, `#312`) MUST NOT be integrated separately.
 - **No Production / External Side Effects:** Loopback HTTP (`127.0.0.1`) only. Zero live Google Sheets, Google Calendar, Gmail, Trello, Slack, or Telegram writes/invitations; zero production flag or migration execution.
@@ -114,10 +114,10 @@ All remediated capabilities from the three source gates MUST remain intact simul
 
 ```mermaid
 flowchart TD
-  A["Task A: Preflight, Conflict Matrix & Execution Plan<br/>(Docs-Only Commit — COMPLETED)"] --> B["Task B: Branch Assembly & Conflict Resolution<br/>(M0 #313 -> M1 #314 -> M2 #306 + Static/Type Gate)"]
-  B --> C["Task C: Backend, PostgreSQL 0001..0035, 2-Process/Kill,<br/>Negative Auth & Loopback HTTP Verification"]
-  B --> D["Task D: Frontend, Privacy, Recovery UI &<br/>Chromium E2E (incl. Calendar C1/C2) Verification"]
-  C --> E["Task E: Uninterrupted Layer D Gate, Draft PR,<br/>Exact-Head v3 CI & Final Audit Bundle 04..08"]
+  A["Task A: Preflight, Conflict Matrix & Execution Plan<br/>(Docs-Only Commit — COMPLETED)"] --> B["Task B: Branch Assembly & Conflict Resolution<br/>(M0 #313 -> M1 #314 -> M2 #306 — COMPLETED)"]
+  B --> C["Task C: Backend, PostgreSQL 0001..0035, 2-Process/Kill,<br/>Negative Auth & Loopback HTTP Verification (COMPLETED)"]
+  B --> D["Task D: Frontend, Privacy, Recovery UI &<br/>Chromium E2E (incl. Calendar C1/C2) Verification (COMPLETED)"]
+  C --> E["Task E: Uninterrupted Layer D Gate, Draft PR,<br/>Exact-Head v3 CI & Final Audit Bundle 04..08 (COMPLETED)"]
   D --> E
 ```
 
@@ -147,7 +147,7 @@ flowchart TD
   - Audit doc: `docs/audits/2026-11-10-cross-service-integration/02-SOURCE-ANCESTRY-AND-MERGE-EVIDENCE.md`
   - Status updates in `docs/audits/2026-11-10-cross-service-integration/03-SHARED-FILE-CONFLICT-AND-CONTRACT-MATRIX.md`
 - **Step-by-Step Execution:**
-  - [ ] **Step B.1 — Revalidate source refs before merge:**
+  - [x] **Step B.1 — Revalidate source refs before merge:**
     ```powershell
     git fetch origin --prune
     git rev-parse origin/main
@@ -156,18 +156,18 @@ flowchart TD
     gh pr view 306 --json state,isDraft,headRefOid
     ```
     *Expected:* Exact match with Table 1.2 SHAs (`2eed8d1d...`, `1c17527f...`, `38079865...`, `f292884d...`) and `OPEN` + `isDraft: true`. Stop immediately on any mismatch.
-  - [ ] **Step B.2 — Merge Trello Combined (`PR #313`) via `--no-ff` (`M0`):**
+  - [x] **Step B.2 — Merge Trello Combined (`PR #313`) via `--no-ff` (`M0`):**
     ```powershell
     git merge --no-ff -m "chore(integration): merge trello combined gate PR #313 (1c17527f)" 1c17527f16715b2c6655c170cdb448673a84dd1b
     ```
     *Expected:* Exit `0`, zero conflicts.
-  - [ ] **Step B.3 — Merge Calendar Combined (`PR #314`) via `--no-ff` (`M1`) & run intermediate typecheck:**
+  - [x] **Step B.3 — Merge Calendar Combined (`PR #314`) via `--no-ff` (`M1`) & run intermediate typecheck:**
     ```powershell
     git merge --no-ff -m "chore(integration): merge calendar combined gate PR #314 (38079865)" 3807986542dbe3470b8f3f1cd42413cb7bd460dd
     npm run typecheck:v3
     ```
     *Expected:* Merge exits `0` (clean auto-merge of `apps/chat-api/src/services/chat-service.ts`); `npm run typecheck:v3` exits `0`.
-  - [ ] **Step B.4 — Start `--no-ff --no-commit` merge of Sheets R2 (`PR #306`) (`M2`) and resolve the 3 expected textual conflicts:**
+  - [x] **Step B.4 — Start `--no-ff --no-commit` merge of Sheets R2 (`PR #306`) (`M2`) and resolve the 3 expected textual conflicts:**
     ```powershell
     git merge --no-ff --no-commit f292884d0ae965ffb9841e7063b8843cd266b17e
     git diff --name-only --diff-filter=U
@@ -176,9 +176,9 @@ flowchart TD
     ```powershell
     git commit -m "chore(integration): merge sheets r2 gate PR #306 (f292884d) and resolve shared contracts"
     ```
-  - [ ] **Step B.5 — Align `PrivacyPage.tsx` top Google overview paragraph (if not folded into `M2`, commit atomically):**
+  - [x] **Step B.5 — Align `PrivacyPage.tsx` top Google overview paragraph (if not folded into `M2`, commit atomically):**
     Ensure the introductory paragraph above `#mycalendar` and `#mysheets` accurately covers both personal Google Sheets (`drive.file`, `ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS=false`) and personal Google Calendar (`calendar.readonly`, `calendar.events` per `#mycalendar` section) without contradicting either region.
-  - [ ] **Step B.6 — Verify ancestry, web build, typecheck, static architecture guards, and focused contract suites (Layer A Smoke):**
+  - [x] **Step B.6 — Verify ancestry, web build, typecheck, static architecture guards, and focused contract suites (Layer A Smoke):**
     ```powershell
     git merge-base --is-ancestor 1c17527f16715b2c6655c170cdb448673a84dd1b HEAD
     git merge-base --is-ancestor 3807986542dbe3470b8f3f1cd42413cb7bd460dd HEAD
@@ -199,7 +199,7 @@ flowchart TD
   - Optional helper extension if needed for deterministic child-process crash/kill probe: `apps/chat-api/tests/helpers/cross-service-scheduler-worker.ts` (modeled on existing `apps/chat-api/tests/helpers/two-process-digest-worker.ts`)
   - Minimal backend integration bugfix **only** if a combined RED test exposes a genuine cross-PR defect (strictly TDD RED -> GREEN -> Refactor; zero new features or generic retries).
 - **Required Verification & Test Matrix (Layers A & B Backend):**
-  - [ ] **Step C.1 — Layer A Targeted Package & Contract Suites:**
+  - [x] **Step C.1 — Layer A Targeted Package & Contract Suites:**
     ```powershell
     npm test --workspace=@wap/tool-schemas
     npm test --workspace=@wap/tool-adapters
@@ -212,11 +212,11 @@ flowchart TD
     - `packages/tool-adapters/tests/slack-adapter.test.ts`, `trello-audit-remediation.test.ts`, `sheets-adapter.test.ts`, `sheets/personal-sheets-adapter.test.ts`, `calendar-adapter.test.ts`, `calendar/personal-calendar-adapter.test.ts`, `calendar/calendar-rem-b.test.ts`, `calendar/calendar-rem-b-review.test.ts`
     - `packages/planner/tests/read-answers.test.ts`, `schedules.test.ts` (SHA-256 prompt baseline check)
     - `evaluations/generic-plumbing/static-guard.test.ts` and `evaluations/eval.test.ts` (via `npm run test:eval:v3` -> `vitest run evaluations`)
-  - [ ] **Step C.2 — Disposable PostgreSQL 16 Fresh + Prior-Schema Upgrade Migration Verification:**
+  - [x] **Step C.2 — Disposable PostgreSQL 16 Fresh + Prior-Schema Upgrade Migration Verification:**
     Start a clean disposable PostgreSQL 16 instance (e.g. Docker container on a dedicated owned loopback port with `ALLOW_ISOLATED_TEST_PORT=1`, never loading live `.env` or touching unrelated existing DBs) and verify:
     1. **Fresh apply (`0001_v3_core.sql` .. `0035_sheets_gas_r2_remediation.sql`):** run `node db/v3/migrate.mjs` (with explicit `DATABASE_URL`) twice consecutively to prove clean creation and idempotent re-run (`exit 0`).
     2. **Upgrade path (`0001..0032` -> `0033_sheets_digest_v2_remediation.sql` -> `0034_github_workspace_scoped_team_scope.sql` -> `0035_sheets_gas_r2_remediation.sql`):** seed pre-`0033` `users`, `workspaces`, `conversations`, `schedules` (`sheets_digest`, `trello_digest`, `calendar_digest`), and `schedule_runs`, then apply `0033`, `0034`, `0035` sequentially and re-apply `0035` to verify zero row corruption, intact `sheets_append_leases` constraints, and `trg_schedule_runs_capture_dispatched_config` trigger behavior.
-  - [ ] **Step C.3 — Existing Source Backend Integration Suites on Real PostgreSQL:**
+  - [x] **Step C.3 — Existing Source Backend Integration Suites on Real PostgreSQL:**
     ```powershell
     npx vitest run apps/chat-api/tests/services/sheets-gas-r2-remediation.test.ts `
       apps/chat-api/tests/services/sheets-digest-concurrency.test.ts `
@@ -234,7 +234,7 @@ flowchart TD
       apps/chat-api/tests/services/adapter-factory.test.ts `
       apps/chat-api/tests/routes/workspace-isolation.test.ts
     ```
-  - [ ] **Step C.4 — Author & Execute Combined Cross-Service Runtime Suite (`apps/chat-api/tests/services/schedules/cross-service-combined-gate.test.ts`, Loopback `127.0.0.1` Only):**
+  - [x] **Step C.4 — Author & Execute Combined Cross-Service Runtime Suite (`apps/chat-api/tests/services/schedules/cross-service-combined-gate.test.ts`, Loopback `127.0.0.1` Only):**
     Must prove on real PostgreSQL + real `node:http` loopback servers:
     1. **Three simultaneously due digests (`sheets_digest` + `trello_digest` + `calendar_digest`):** all three claim, read loopback providers, deliver to loopback Slack/Telegram/Gmail, and commit `digest_sent` with valid receipts and zero cross-schedule interference.
     2. **Two independent OS scheduler processes:** spawn two child Node processes (`child_process.spawn`) running `ScheduleRunner` against the same PostgreSQL schema with all three due digests; assert total outbound deliveries per digest === `1` (single-winner claim across OS processes).
@@ -255,7 +255,7 @@ flowchart TD
   - Optional combined UI unit regression test if needed: `apps/chat-web/tests/cross-service-recovery-privacy.test.tsx`
   - Minimal frontend integration fix **only** if a combined RED test reproduces an issue in `apps/chat-web/src/**` or `scripts/test-v3-browser.mjs`.
 - **Required Verification & Test Matrix (Layers A & C Frontend):**
-  - [ ] **Step D.1 — Layer A Frontend Unit & Component Suites (`@wap/chat-web`):**
+  - [x] **Step D.1 — Layer A Frontend Unit & Component Suites (`@wap/chat-web`):**
     ```powershell
     npm test --workspace=@wap/chat-web
     ```
@@ -266,12 +266,12 @@ flowchart TD
     - `apps/chat-web/tests/mysheets-ui.test.tsx` & `apps/chat-web/tests/calendar-rem-c-09-oauth-disclosure.test.tsx` (combined `PrivacyPage.tsx`)
     - `apps/chat-web/tests/calendar-rem-c-07-invitation-preview.test.tsx` & `apps/chat-web/tests/calendar-rem-c-review-regressions.test.tsx` (`C1/C2`)
     - `apps/chat-web/tests/trello-connection.test.tsx`
-  - [ ] **Step D.2 — Add Focused Chromium E2E Coverage for Calendar `C1/C2`, Invitations & Recurring Timezone (`apps/chat-web/tests/browser/mycalendar.spec.ts`):**
+  - [x] **Step D.2 — Add Focused Chromium E2E Coverage for Calendar `C1/C2`, Invitations & Recurring Timezone (`apps/chat-web/tests/browser/mycalendar.spec.ts`):**
     Extend `apps/chat-web/tests/browser/mycalendar.spec.ts` (executed against real Vite + `@wap/chat-api` + `scripts/fake-google-gmail.mjs` in Chromium) to assert in a real browser DOM (not jsdom):
     1. **`C1/C2` Cross-Midnight / DST / Explicit IANA `timeZone` Approved Instant:** render and approve a `mycalendar.create_event` / `update_event` plan spanning local midnight / non-local IANA zone (e.g. `America/New_York` across DST boundary or late-night UTC crossing local midnight in `Asia/Ho_Chi_Minh`); assert both `PlanMoment` step card and `PreviewModal` display the exact start and end dates/times + IANA zone without collapsing cross-midnight end date, and assert the outbound `POST /calendars/.../events` body captured by `fake-google-gmail.mjs` matches the exact approved instant.
     2. **Invitations / `sendInvites` Truthiness:** verify an event with `attendees` + `sendInvites: true` displays the explicit external email invitation warning/pill in `PlanMoment` and `PreviewModal` and sends `sendUpdates=all` (or configured param) on approval, whereas `sendInvites: false` / omitted suppresses `"Gửi email mời họp"`.
     3. **Recurring Event `timeZone` Contract:** approve a recurring (`RRULE:...`) event in Chromium and assert `fake-google-gmail.mjs` receives matching non-empty `start.timeZone` and `end.timeZone` (`200 OK`, `stats.writes` incremented by `1`, zero `400` errors).
-  - [ ] **Step D.3 — Layer C Targeted Real Chromium Scenarios (`scripts/test-v3-browser.mjs`):**
+  - [x] **Step D.3 — Layer C Targeted Real Chromium Scenarios (`scripts/test-v3-browser.mjs`):**
     ```powershell
     $env:SCENARIO="sheets_digest_v2_recovery"; node scripts/test-v3-browser.mjs
     $env:SCENARIO="mysheets"; node scripts/test-v3-browser.mjs
@@ -299,7 +299,7 @@ flowchart TD
   - `docs/audits/2026-11-10-cross-service-integration/08-FINAL-ATI-INTEGRATION-VERDICT.md`
   - Task card "Kết quả" completion in `docs/handoff/tasks/XSVC-INTEGRATION-V2.md` and final handoff log entry in `docs/handoff/log/`
 - **Step-by-Step Execution:**
-  - [ ] **Step E.1 — Uninterrupted Local Layer D Gate (Against Isolated Disposable PostgreSQL, Without Loading Live `.env`):**
+  - [x] **Step E.1 — Uninterrupted Local Layer D Gate (Against Isolated Disposable PostgreSQL, Without Loading Live `.env`):**
     ```powershell
     Remove-Item Env:SCENARIO -ErrorAction SilentlyContinue
     node db/v3/migrate.mjs
@@ -316,11 +316,11 @@ flowchart TD
     - `npm run build:v3` executes `npm run build -w @wap/chat-web` (`tsc -p tsconfig.json && vite build`).
     - `npm run test:launcher:v3` executes `node --test scripts/start-v3.test.mjs`.
     - `npm run test:browser:v3` executes `node --env-file-if-exists=.env scripts/test-v3-browser.mjs` across all **25** browser scenario groups sequentially (when a local `.env` exists in another environment, invoke `node scripts/test-v3-browser.mjs` directly with explicit isolated env vars so live `.env` credentials are never loaded).
-  - [ ] **Step E.2 — Publish Draft Integration PR & Verify Exact-Head GitHub Actions `v3 check`:**
+  - [x] **Step E.2 — Publish Draft Integration PR & Verify Exact-Head GitHub Actions `v3 check`:**
     - Inspect `git status` and `git log --oneline origin/main..HEAD` (verify zero AI co-author / "Generated with" lines, zero unintended files).
     - Push `VinhDat267/ati-v3-cross-service-integration-gate` to `origin` and open a **Draft PR** (`gh pr create --draft --base main ...` — **NEVER** mark Ready for Review, **NEVER** merge into `main`).
     - Wait for `.github/workflows/v3-check.yml` (`name: v3 check`, which defines **one** job `v3` running `npm ci`, `npm run db:migrate:v3`, `npm run check`, `npm run admin:provision:v3`, `npx playwright install --with-deps chromium`, and `npm run test:browser:v3`) to complete on the exact final `HEAD` SHA (`gh run view <run_id> --json headSha,status,conclusion,jobs`). If docs-only audit evidence (`06`, `08`) is committed after code CI, re-run and pass `v3 check` on the **exact final commit SHA** so code + audit bundle share a single CI-verified `HEAD`.
-  - [ ] **Step E.3 — Independent Provenance & Evidence Bundle Finalization (`04..08`):**
+  - [x] **Step E.3 — Independent Provenance & Evidence Bundle Finalization (`04..08`):**
     - Complete all 8 audit documents using strict evidence labels (`CI VERIFIED`, `INDEPENDENTLY VERIFIED`, `WORKER REPORTED`, `NOT VERIFIED`, `NOT RUN`).
     - Never claim universal "exactly-once" external delivery (provider HTTP lacks distributed 2PC across Slack/Telegram/Gmail/Sheets; claim bounded single-claim / pre-dispatch fencing / fail-closed unknown recovery only where proven).
     - Never accept CI green alone without Layer B + Layer C runtime proofs.

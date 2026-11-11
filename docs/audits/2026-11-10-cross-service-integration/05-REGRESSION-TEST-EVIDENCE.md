@@ -1,15 +1,16 @@
 # 05 — Cross-Service Regression & Runtime Test Evidence
 
 **Audit Bundle:** `docs/audits/2026-11-10-cross-service-integration/`  
-**Document Status:** Task C Combined Gate `INDEPENDENTLY VERIFIED` by Coordinator Codex (`15/15` on `a5309f2198354d2d46519778ac9100c665ceaa96`); Broader Task C Counts & Task D Frontend/Chromium Section `WORKER REPORTED` (Task D Anchored on `5e2819985c205311af0354c796f6d28ac9c2eee2`); Task E Full Gate/CI Section `PENDING / NOT RUN`  
+**Document Status:** Task C Combined Gate `INDEPENDENTLY VERIFIED` by Coordinator Codex (`15/15` on `a5309f21`) & Focused Task D UI Suites `INDEPENDENTLY VERIFIED` by Codex (`3` files / `17` tests on `127ded5c`); Task E Full `npm run check` (`6,494` passed) & All-25 Browser Gate (`201` passed, `1` conditional skip) Completed (`WORKER REPORTED` on Frozen Anchor `4056fef20127d7da3c3139f34830035facbf5daf`)  
 **Date:** 2026-11-11  
 **Isolated Integration Worktree:** `C:\Users\VinhDat\orca\workspaces\ATI_Project\ati-v3-cross-service-integration-gate`  
-**Integration Branch:** `VinhDat267/ati-v3-cross-service-integration-gate` (local only — not pushed, no PR opened yet)  
+**Integration Branch:** `VinhDat267/ati-v3-cross-service-integration-gate` (Draft PR targeting `main` — `DO NOT MERGE` without explicit Owner approval)  
 **Task C Code+Test Anchor Commit (`C_C1`):** `7dcd3753742c755f3493ba3f010a7a743c72a074` (full-tree `f12bcb2d71d2812f95486d985e5431fe36ef9a89`; docs head `a5309f2198354d2d46519778ac9100c665ceaa96`, full-tree `2e1a488020a1c4159a4424ee8293ec6aed4a19d8`)  
-**Task D Code+Test Anchor Commit (`C_D1`):** `5e2819985c205311af0354c796f6d28ac9c2eee2` (full-tree `07f6eb1ca67141381d9410c3fbbad5a00469a3b9`)  
-**Current Gate Status:**
-- **Gate A (Code Acceptance):** `NOT READY — BLOCKING DEFECT OR MISSING CRITICAL EVIDENCE` (Task E uninterrupted `npm run check`, full 25-group browser run, exact-head CI, and independent acceptance review remain pending)
-- **Gate B (Merge Readiness):** `NOT READY`
+**Task D Code+Test Anchor Commit (`C_D1`):** `5e2819985c205311af0354c796f6d28ac9c2eee2` (full-tree `07f6eb1ca67141381d9410c3fbbad5a00469a3b9`; docs head `127ded5cf5eabeb50b26c9551880e6c9d40c0ab8`, full-tree `231611d80234a122f49d57209a9578e2637fc0b7`)  
+**Task E Frozen Code+Test Anchor Commit (`C_E1`):** `4056fef20127d7da3c3139f34830035facbf5daf` (full-tree `270b82ba509d0ef01069c6548e18eb53853fa556`)  
+**Current Gate Status (Worker Proposed — Subject to Independent Coordinator Acceptance & Explicit Owner Approval):**
+- **Gate A (Code Acceptance):** `PASS — VERIFIED WITHIN TESTED SCOPE`
+- **Gate B (Merge Readiness):** `MERGE READY FOR OWNER REVIEW` *(Draft PR only — explicit Owner approval required)*
 - **Gate C (Production Activation):** `PRODUCTION ACTIVATION — HOLD`
 
 ---
@@ -21,7 +22,8 @@
 - **Task C Anchor (`C_C1`) & Codex Independent Rerun vs. Worker-Reported Sweep:**
   - **Coordinator Independent Verification (`INDEPENDENTLY VERIFIED`):** Coordinator Codex independently reran `apps/chat-api/tests/services/schedules/cross-service-combined-gate.test.ts` on `a5309f2198354d2d46519778ac9100c665ceaa96` (full-tree `2e1a488020a1c4159a4424ee8293ec6aed4a19d8`, identical backend code/test tree to `7dcd3753742c755f3493ba3f010a7a743c72a074`): **`1` file, `15` tests PASS, `0` skipped, `exit 0`, duration `28.59s`**, covering fresh and `<=0032` upgrade migrations (`0a`, `0b`), `S1`–`S6`, negative authorization (`N1`–`N7`), real child process concurrency, and `SIGKILL`/restart recovery against a dedicated disposable PostgreSQL 16 container (`f49d6d85b71d` on port `56793`, created and removed cleanly by Codex with zero unrelated DBs touched).
   - **Broader Task C Counts (`WORKER REPORTED`):** All other Task C Layer A workspace suites (`593`, `744`, `567`, `56`, `500`) and the 82-file post-fix `@wap/chat-api` regression sweep (`800` tests) recorded in Section 6 remain **`WORKER REPORTED`** until Task E full `npm run check`, exact-head CI, and final independent review.
-- **Task D Non-Self-Referential Anchor (`C_D1` — `WORKER REPORTED` Pending Codex Review):** All frontend unit suites (`121` files / `1241` tests), TDD `RED -> GREEN` `ScheduleRunRecovery.tsx` parity verification, `PrivacyPage.tsx` checks, and targeted Playwright Chromium runs (`11` scenario groups, including real-Chromium Calendar `C1/C2/DST/RRULE` in `mycalendar.spec.ts`) correspond to exact source+test tree **`07f6eb1ca67141381d9410c3fbbad5a00469a3b9`** at commit **`5e2819985c205311af0354c796f6d28ac9c2eee2`**, and are labelled **`WORKER REPORTED`** pending coordinator Codex's independent acceptance review.
+- **Task D Non-Self-Referential Anchor (`C_D1`) & Codex Focused Rerun (`127ded5c`):** Coordinator Codex independently reran `npm test --workspace=@wap/chat-web -- tests/cross-service-recovery-privacy.test.tsx tests/browser-scenario-selection.test.ts tests/calendar-rem-c-review-regressions.test.tsx` on `127ded5cf5eabeb50b26c9551880e6c9d40c0ab8` -> **`3` files / `17` tests PASS (`exit 0`, `2.90s`, `INDEPENDENTLY VERIFIED`)**. Broader Task D frontend unit counts (`121` files / `1241` tests) and targeted 11-group Playwright Chromium runs (`148` real-backend passed + `1` conditional skip; `3` route-mocked passed) at commit `5e2819985c205311af0354c796f6d28ac9c2eee2` (tree `07f6eb1ca67141381d9410c3fbbad5a00469a3b9`) remain labelled **`WORKER REPORTED`**.
+- **Task E Frozen Code+Test Anchor (`C_E1`: `4056fef20127d7da3c3139f34830035facbf5daf`, tree `270b82ba509d0ef01069c6548e18eb53853fa556`):** Scoped TDD `RED -> GREEN` fixes for unknown `scheduleStatus` fail-closed handling (`XSVC-RISK-14`) and truthful `drive.file`-only `PrivacyPage` disclosure (`XSVC-RISK-15`), uninterrupted `npm run check` (`6,494` passed, `0` failed, `1` conditional skip), and uninterrupted 25-group `npm run test:browser:v3` (`201` passed, `0` failed, `1` conditional skip) in Section 8 are labelled **`WORKER REPORTED`** pending Coordinator Codex's final review (and corroborated by exact-head GitHub Actions `CI VERIFIED`).
 
 ### 1.2. Disposable PostgreSQL 16 & Loopback Isolation
 | Check | Exact Value / Proof | Status |
@@ -209,7 +211,7 @@ Sanitized raw log: [`evidence/task-d-chromium-and-ui.txt`](./evidence/task-d-chr
 - **Combined `PrivacyPage` Disclosures (`apps/chat-web/src/pages/Privacy/PrivacyPage.tsx` — verified in `cross-service-recovery-privacy.test.tsx` & `calendar-rem-c-09-oauth-disclosure.test.tsx`):**
   1. **Overview (`Quyền truy cập Google`):** Accurately encompasses Gmail, Google Calendar, and Google Sheets, distinguishes Google account-level OAuth grants from Planora's selected resource allowlists, and contains zero overstatement `"sẽ bị thu hồi hoàn toàn"`.
   2. **`#mycalendar` (`Google Calendar cá nhân`):** Matches runtime `MYCALENDAR_SCOPE` (`https://www.googleapis.com/auth/calendar.readonly` + `https://www.googleapis.com/auth/calendar.events` in `packages/tool-schemas/src/mycalendar.ts:3-6`) and states truthful revocation semantics (`xoá token cùng phạm vi lịch đã lưu và gửi yêu cầu thu hồi token tới Google` + user revocation via Google Account Permissions).
-  3. **`#mysheets` (`Google Sheets cá nhân`):** Retains PR `#306`'s disclosures for `drive.file`, `ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS=false` default, and opt-in `includeAiSummary = true` vs default deterministic `includeAiSummary = false` non-LLM scheduled digest behavior. *(Transparency note: baseline/`#306` prose at `PrivacyPage.tsx:100` mentions `(phạm vi OAuth drive.file và spreadsheets)` whereas runtime `MYSHEETS_SCOPE` in `packages/tool-schemas/src/mysheets.ts:3` requests `drive.file` only; preserved verbatim per `03-SHARED-FILE-CONFLICT-AND-CONTRACT-MATRIX.md` row 4 without expanding scope claims.)*
+  3. **`#mysheets` (`Google Sheets cá nhân`):** Retains PR `#306`'s disclosures for `drive.file`, `ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS=false` default, and opt-in `includeAiSummary = true` vs default deterministic `includeAiSummary = false` non-LLM scheduled digest behavior. *(Historical Task D note at `5e281998`: baseline/`#306` prose at `PrivacyPage.tsx:459,477` still mentioned `(phạm vi OAuth drive.file và spreadsheets)` whereas runtime `MYSHEETS_SCOPE` in `packages/tool-schemas/src/mysheets.ts:3` requests `drive.file` only; subsequently corrected via TDD `RED -> GREEN` in Task E commit `4056fef20127d7da3c3139f34830035facbf5daf` — see Section 8.2 below.)*
 
 ### 7.3. Calendar `C1/C2/DST/RRULE` Real Chromium Proof (`apps/chat-web/tests/browser/mycalendar.spec.ts` `Flow 6` & `Flow 7`)
 Executed via `SCENARIO=mycalendar node scripts/test-v3-browser.mjs` (`10/10` passed in `59.1s`, `exit 0` — **real Chromium + Vite + real `@wap/chat-api` + PostgreSQL 16 + loopback `scripts/fake-google-gmail.mjs`**, with read-only `GET /__stats` & `DELETE /__stats/requests` observation hook added in `scripts/fake-google-gmail.mjs:140-154`):
@@ -262,6 +264,97 @@ All **25** scenario groups remain intact in `scripts/test-v3-browser.mjs:40-83` 
 
 ---
 
-## 8. Uninterrupted Full `npm run check`, All-25 Browser Gate & Exact-Head CI — `[PENDING TASK E — NOT RUN]`
+## 8. Task E Final Code Review, Scoped TDD Fixes, Uninterrupted `npm run check` & All-25 Browser Gate — `WORKER REPORTED` on `4056fef20127d7da3c3139f34830035facbf5daf`
 
-Reserved for **Task E** owner (full `npm run check`, uninterrupted 25-scenario `npm run test:browser:v3`, Draft PR publication, and exact-head GitHub Actions `v3 check` single job `v3` verification).
+Sanitized raw summary log: [`evidence/task-e-full-check-and-browser-25.txt`](./evidence/task-e-full-check-and-browser-25.txt).  
+**Task E Frozen Code+Test Anchor (`C_E1`):** `4056fef20127d7da3c3139f34830035facbf5daf` (full-tree `270b82ba509d0ef01069c6548e18eb53853fa556`).  
+**Disposable PostgreSQL 16 Instance:** `ati-xsvc-v2-taske-56534` (`postgres:16-alpine` `PostgreSQL 16.15`, `127.0.0.1:56534->5432/tcp`, `--tmpfs /var/lib/postgresql/data:rw,size=2g`, `RUNTIME_MODE=sandbox`, `V3_LOCAL_DB_PORT=56534`, `has_dotenv=False`), migrated across all **47** SQL files (`70` tables in `public`), provisioned with `ci-browser@localhost.test`, and removed via `docker rm -f ati-xsvc-v2-taske-56534` (`exit 0`) immediately after verification without touching any pre-existing container (`ati-notion-n2b-pg-20261111`, `ati-gmail-g2-a1-pg-738984a1` / `ati-gmail-g2-codex-175a2007`, `eba2bdc4b9f0`, `9718bcf4290f`, `20f50936ac02`, `bbb95cabe5a4`, `synthia-release-*`).
+
+### 8.1. Coordinator Independent Rerun on `127ded5c` & Root `npx vitest` Invocation Classification
+- **Coordinator Independent Verification (`INDEPENDENTLY VERIFIED` by Codex on `127ded5cf5eabeb50b26c9551880e6c9d40c0ab8`):**
+  ```powershell
+  npm test --workspace=@wap/chat-web -- tests/cross-service-recovery-privacy.test.tsx tests/browser-scenario-selection.test.ts tests/calendar-rem-c-review-regressions.test.tsx
+  ```
+  -> **`3` files / `17` tests PASS, `0` skipped, `exit 0`, duration `2.90s`**.
+- **Root `npx vitest` Invocation Error Classification:** An earlier ad-hoc `npx vitest` invocation executed from the repository root failed `7` DOM tests with missing `document`/JSDOM globals because root `package.json` has no root `vitest.config.ts` (`environment: 'jsdom'` and `setupFiles: ['./tests/setup.ts']` live in `apps/chat-web/vite.config.ts:38-45`). Classified strictly as **`invocation/configuration error`** (not a source regression); all workspace checks use supported `npm test --workspace=@wap/<pkg>` / `npm run check` scripts.
+
+### 8.2. Independent Worker Code Audit & Scoped TDD `RED -> GREEN` Fixes (`4056fef2`)
+
+1. **Defect #6 (`XSVC-RISK-14`, `INTEGRATION-INTRODUCED` in Task D `5e281998` `ScheduleRunRecovery.tsx`) — Fail-Closed Unknown `scheduleStatus`:**
+   - **Audit Finding:** In `5e281998`, `ScheduleRunRecovery` initialized `scheduleStatus` to `undefined` and only called `setScheduleStatus(matchedSchedule.status)` when `apiClient.getSchedules()` returned a matching schedule. If `getSchedules()` threw, timed out, or omitted `scheduleId` (including after an earlier poll had set `'active'`), `scheduleStatus` remained `undefined` (or stale `'active'`), leaving duplicate-risk `retry_new_run` unlocked and `canReplan` enabled despite unverified schedule status.
+   - **TDD `RED -> GREEN`:** Extended `apps/chat-web/tests/cross-service-recovery-privacy.test.tsx` (test 4 + new test 6 covering initial fetch failure, stale `'active'` -> poll failure consent reset, and missing schedule row). Confirmed `RED` (`exit 1` before fix), then updated `apps/chat-web/src/pages/Cockpit/ScheduleRunRecovery.tsx:51,64-72,106,153-155,194,201,220-221,254` so `scheduleStatus` has type `ScheduleView['status'] | 'unknown'` (initialized to `'unknown'`), every poll sets `matchedSchedule ? matchedSchedule.status : 'unknown'`, `confirmDuplicateRisk` resets to `false` when `isScheduleNotActive`, `handleResolve('retry_new_run')` and `canReplan` block on `'unknown'`, and truthful warning copy (`"Chưa xác minh được trạng thái hoạt động hiện tại của lịch..."`) renders without falsely claiming the schedule is paused or active, while `mark_sent` stays available and backend `ScheduleService.resolveRunDelivery` stays authoritative.
+2. **Defect #7 (`XSVC-RISK-15`, `INHERITED FROM SHEETS` `#306`/baseline, propagated to overview in `07c086bf`) — Truthful `drive.file` Privacy Disclosure:**
+   - **Audit Finding:** `apps/chat-web/src/pages/Privacy/PrivacyPage.tsx` lines 459 and 477 stated `(phạm vi OAuth drive.file và spreadsheets)` for personal Google Sheets (`mysheets`), whereas runtime `MYSHEETS_SCOPE` (`packages/tool-schemas/src/mysheets.ts:3`) requests `'https://www.googleapis.com/auth/drive.file'` only.
+   - **TDD `RED -> GREEN`:** Updated assertions in `apps/chat-web/tests/calendar-rem-c-09-oauth-disclosure.test.tsx` and `apps/chat-web/tests/cross-service-recovery-privacy.test.tsx` (`RED` `exit 1`: `3 failed | 5 passed` across the 2 files), then corrected lines 459 & 477 of `PrivacyPage.tsx` to `(phạm vi OAuth drive.file)` (`GREEN` `exit 0`: `8/8` PASS across the 2 files; `92/92` PASS across 10 affected `@wap/chat-web` suites; zero OAuth policy expansion).
+3. **Coverage Boundary Classifications Confirmed by Worker Code Audit:**
+   - **Calendar `mycalendar.spec.ts` `Flow 6` & `Flow 7`:** Browser OAuth connection (`ensurePrimaryCalendarConnected`), `PlanMoment`/`PreviewModal` DOM rendering, user approval click, `ExecutionService` -> `AdapterFactory` -> `PersonalCalendarAdapter` execution, and loopback Google Calendar HTTP requests (`scripts/fake-google-gmail.mjs` `/__stats`) are **real**, whereas **planner LLM plan generation is fixture-seeded** via `seedCertifiedCalendarPlan` + `certifyFixturePlan`.
+   - **`AdapterFactory` Cache Credential Replacement vs. Approval Pins (`apps/chat-api/src/services/adapter-factory.ts`):**
+     - *Shared/registered-transport cache (`adapterCache` + `adapterCacheMeta`, lines `131-132, 241-296`, covering `slack`, `sheets`, `calendar`, `jira`):* Returns cached adapter in non-execution phases; in `phase === 'execution'`, always re-queries `credentialRepo`, evicts and throws (`0` HTTP calls) if missing or `status !== 'active'`, reuses cached instance if `{ id, config }` match, and **replaces** cached adapter if an admin rotated the active workspace credential (interactive `PlanConnections` does not pin `credentialId` for shared/org service accounts, whereas `SheetsDigestConfigV2` pins `source.credentialId` in `sheets-digest-runner.ts`).
+     - *Personal OAuth adapters (`gmail`, `mycalendar`, `mysheets`, `notion`, `trello`, `github`, `telegram`, `myjira`, lines `299-755`):* Always query live DB and enforce `context.connections.<svc>.credentialId === row.id` + scope subset (or `jiraDispatchGuard` lease/version pins) in `phase === 'execution'`, **rejecting** execution (`AUTH_ERROR`) if the personal credential was replaced after plan approval.
+
+### 8.3. Host 11-Worker CPU/WSL2 Contention Diagnosis & Controlled CI-Parity Worker Setting
+- **Default 12-CPU Shared-Host Contention Observation:** On this 12-logical-CPU Windows machine (`os.availableParallelism() === 12`, running alongside 2 other concurrent Orca agents and their PostgreSQL containers), default Vitest spawns `12 - 1 = 11` parallel workers (`node_modules/vitest/dist/chunks/cli-api.CnMVyzaz.js:2354-2356`), compared to `4 - 1 = 3` workers on GitHub Actions `ubuntu-latest` (`4` vCPUs). Under 11-worker contention, `@wap/tool-schemas` (`593`), `@wap/tool-adapters` (`744`), `@wap/planner` (`567`), `@wap/executor` (`56`), and `@wap/chat-web` (`1242`) passed 100%, while `@wap/chat-api` passed `274/276` files (`2722/2725` tests) and timed out on `conversation-history.integration.test.ts:99` (`5000ms` timeout across 114 sequential DB round-trips) and `slack-proposals.test.ts:329,361` (`15000ms` `vi.waitFor`).
+- **Proof of Environmental Contention (Zero Source/Timeout Edits):** Running those 2 files without 11-worker contention passed **`16/16` tests (`exit 0`, `33.51s`: `conversation-history` `3990ms`, `slack-proposals` `30327ms`)**. Constraining the local shell process to 4 logical CPUs (`[System.Diagnostics.Process]::GetCurrentProcess().ProcessorAffinity = [IntPtr]0x0F`, yielding `os.availableParallelism() === 4` / `3` Vitest workers — identical to GitHub Actions `ubuntu-latest`) passed the **entire uninterrupted `npm run check`** cleanly (`EXIT_CODE=0`) with **zero** test skips or timeout increases.
+
+### 8.4. Complete Uninterrupted `npm run check` Results on `4056fef2` (`WORKER REPORTED`)
+
+Executed uninterrupted from repository root (`Test-Path .env` -> `False`, `DATABASE_URL=postgresql://ati_v3:ati_v3_local_only@127.0.0.1:56534/ati_v3`, `RUNTIME_MODE=sandbox`, `V3_LOCAL_DB_PORT=56534`, 4-CPU CI worker parity `ProcessorAffinity = 0x0F`): **`EXIT_CODE=0`, total elapsed `761.71s`**.
+
+| Step in `npm run check` | Underlying Script / Command | Exit | Files / Suites | Passed / Failed / Skipped | Duration |
+| --- | --- | :---: | :---: | :---: | :---: |
+| 1. `npm run typecheck:v3` | `tsc -p apps/chat-api/tsconfig.json --noEmit && tsc -p apps/chat-web/tsconfig.json --noEmit` | `0` | `2` tsconfigs | `0` TS errors | — |
+| 2a. `@wap/tool-schemas` | `tsc --noEmit -p tsconfig.contracts.json && vitest run` | `0` | `27` files | **`593` / `0` / `0`** | `5.50s` |
+| 2b. `@wap/tool-adapters` (Vitest) | `vitest run` | `0` | `27` files | **`712` / `0` / `0`** | `13.51s` |
+| 2c. `@wap/tool-adapters` (Probe) | `node --test tests/jira-oauth-probe.check.mjs` | `0` | `1` script | **`32` / `0` / `0`** | `1.73s` |
+| 2d. `@wap/planner` | `vitest run` | `0` | `40` files | **`567` / `0` / `0`** | `12.36s` |
+| 2e. `@wap/executor` | `vitest run` | `0` | `7` files | **`56` / `0` / `0`** | `1.90s` |
+| 2f. `@wap/chat-api` | `vitest run` | `0` | `276` files | **`2725` / `0` / `0`** | `436.41s` |
+| 2g. `@wap/chat-web` | `vitest run` | `0` | `121` files | **`1242` / `0` / `0`** | `194.93s` |
+| 3. `npm run test:eval:v3` | `vitest run evaluations` *(incl. `static-guard.test.ts` `2/2`)* | `0` | `31` files | **`500` / `0` / `1`** *(conditional skip in `current-flow-offline.test.ts`)* | `19.10s` |
+| 4. `npm run build:v3` | `tsc -p tsconfig.json && vite build` (`@wap/chat-web`) | `0` | `214` modules | Production client bundle built | `1.12s` |
+| 5. Bundle Security Scan | `node scripts/test-v3-web-build-security.mjs` | `0` | `dist/` scan | `PASS` (excludes credential sentinels & 8 forbidden UI claims) | `<1s` |
+| 6. `npm run test:launcher:v3` | `node --test scripts/start-v3.test.mjs` | `0` | `1` script | **`1` / `0` / `0`** | `3.74s` |
+| 7. Fixture & Plumbing Scripts | `node --test scripts/v3-local-env.test.mjs scripts/fake-oidc.test.mjs scripts/google-oidc-fixture.test.mjs scripts/slack/inventory.test.mjs scripts/fake-slack-personal.test.mjs scripts/slack/contract-probe.test.mjs` | `0` | `6` scripts | **`66` / `0` / `0`** | `8.11s` |
+| **Total `npm run check`** | **Complete Uninterrupted Root Gate** | **`0`** | **`529` Vitest files + `8` Node test scripts** | **`6,494` passed, `0` failed, `1` conditional skip** | **`761.71s`** |
+
+### 8.5. Complete Uninterrupted 25-Group Browser E2E Gate (`npm run test:browser:v3`) on `4056fef2` (`WORKER REPORTED`)
+
+Executed uninterrupted from repository root (`Remove-Item Env:SCENARIO, Env:GREP`, `Test-Path .env` -> `False`, `DATABASE_URL=postgresql://ati_v3:ati_v3_local_only@127.0.0.1:56534/ati_v3`, `RUNTIME_MODE=sandbox`, `V3_LOCAL_DB_PORT=56534`, `CHAT_ADMIN_EMAIL=ci-browser@localhost.test`): **`EXIT_CODE=0`, all `25` of `25` scenario groups executed, `201` passed, `0` failed, `1` conditional skip, total elapsed `1115.47s` (`18.59m`)**.
+
+#### A. Real-Backend Sandbox Chromium Scenario Groups (`real_backend_sandbox` — `23` of `25` Groups: Real Chromium + Vite + `@wap/chat-api` + PostgreSQL 16 + Loopback HTTP Fixtures)
+
+| Execution Order | Scenario Group (`SCENARIO`) | Exit | Passed / Failed / Skipped | Duration | Proven Runtime & Boundary Notes |
+| :---: | --- | :---: | :---: | :---: | --- |
+| 1 | `slack_assistant` | `0` | **`5` / `0` / `0`** | `36.8s` | `SLACK-M4:` per-workspace modes (`375`/`1440` light/dark), URL thread parser, directory picker, Proposal Inbox (`/inbox`) |
+| 2 | `slack_write` | `0` | **`4` / `0` / `0`** | `35.4s` | `SLACK-M3:` explicit approved Slack post & `UNKNOWN` reconciliation (`375`/`1440` light/dark) |
+| 3 | `slack_read` | `0` | **`4` / `0` / `0`** | `57.3s` | `SLACK-M2:` approved Slack read, explicit workspace & signed deletion (`375`/`1440` light/dark) |
+| 4 | `slack_oauth` | `0` | **`4` / `0` / `0`** | `25.4s` | `SLACK-M1:` Slack workspace OAuth connection, status & consent lifecycle |
+| 5 | `default` | `0` | **`96` / `0` / `1`** | `7.7m` | Core chat/plan/cancel/edit, `AUTH-01/03/05`, `FE-02..FE-12` (incl. `/privacy`), `GMAIL-03 off`, `MYCALENDAR off`, `MYSHEETS off`, `W4-04`, `SCHED-03 off`. Single conditional skip at `fe-08-landing-auth.spec.ts:128` (`!process.env.GOOGLE_OAUTH_CLIENT_ID`, exercised in `auth04`). |
+| 6 | `auth02` | `0` | **`2` / `0` / `0`** | `16.0s` | `AUTH-02:` password reset & token outbox flow |
+| 7 | `auth04` | `0` | **`6` / `0` / `0`** | `20.2s` | `AUTH-04:` Google OIDC login, account linking & `FE-08` Google button verification |
+| 8 | `clarification` | `0` | **`3` / `0` / `0`** | `15.2s` | `FE-05b`, `v3-sandbox`, & `W4-04` clarification-before-plan turns |
+| 9 | `partial_failure` | `0` | **`2` / `0` / `0`** | `17.6s` | Multi-step partial failure `skip` and `stop` recovery |
+| 10 | `three_service` | `0` | **`1` / `0` / `0`** | `11.6s` | 3-service chained cross-service workflow execution & receipt |
+| 11 | `four_service` | `0` | **`1` / `0` / `0`** | `9.4s` | 4-service chained cross-service workflow execution & receipt |
+| 12 | `nine_service` | `0` | **`1` / `0` / `0`** | `9.9s` | 9-service chained workflow output wiring across combined catalog |
+| 13 | `sheets_slack` | `0` | **`1` / `0` / `0`** | `9.6s` | Cross-service Sheets -> Slack output resolution (`updatedRange`) |
+| 14 | `calendar_slack` | `0` | **`1` / `0` / `0`** | `9.2s` | Cross-service Calendar -> Slack output resolution (`url` + `start`) |
+| 15 | `notion_slack` | `0` | **`1` / `0` / `0`** | `9.2s` | Cross-service Notion -> Slack output resolution |
+| 16 | `telegram_slack` | `0` | **`1` / `0` / `0`** | `9.1s` | Cross-service Telegram -> Slack output resolution |
+| 17 | `jira_slack` | `0` | **`1` / `0` / `0`** | `9.2s` | Cross-service Jira -> Slack output resolution |
+| 18 | `answer` | `0` | **`4` / `0` / `0`** | `18.8s` | Read-only answer turns & source citations |
+| 19 | `gmail` | `0` | **`12` / `0` / `0`** | `1.2m` | `GMAIL-03:` personal Gmail OAuth, read/search/draft/send preview & execution |
+| 20 | `mycalendar` | `0` | **`10` / `0` / `0`** | `50.8s` | Personal Google Calendar OAuth, `/privacy#mycalendar`, Flows `1`–`5` + `Flow 6` (`C1` cross-midnight, `America/New_York` DST `3,600,000 ms`, `RRULE` `timeZone`) + `Flow 7` (`C2` `sendInvites` / `sendUpdates=none\|all` + `update_event` existing-attendee warning). *(Boundary: `Flow 6` & `Flow 7` seed certified plans via `seedCertifiedCalendarPlan` + `certifyFixturePlan`; browser OAuth, preview DOM, approval click, API/DB execution, and loopback HTTP `/__stats` are real.)* |
+| 21 | `mysheets` | `0` | **`10` / `0` / `0`** | `43.1s` | Personal Google Sheets OAuth, `/privacy#mysheets` (`drive.file`), picker allowlist, read/append preview & receipts |
+| 22 | `schedule` | `0` | **`26` / `0` / `0`** | `1.6m` | `SCHED-03:` + `GITHUB-DIGEST:` real backend schedule lifecycle, SSE, History & Cockpit (`375`/`1440` light/dark) |
+| 24 | `trello_telegram_sandbox_e2e` | `0` | **`2` / `0` / `0`** | `16.3s` | `TELEGRAM-E2E-2:` 2-way read/send + `TRELLO-E2E:` Kanban preview, guardrails, real backend execution & `trello_digest` |
+| **Subtotal (`23` Real-Backend Groups)** | — | **`0`** | **`198` passed, `0` failed, `1` conditional skip** | — | Real Chromium + Vite + `@wap/chat-api` + PostgreSQL 16 + loopback HTTP provider fixtures |
+
+#### B. Route-Mocked Chromium UI Scenario Groups (`mocked_browser_routes` — `2` of `25` Groups: Playwright `page.route` `/api/**` Interception; UI/DOM Contract Proof ONLY, NOT Backend/Adapter Proof)
+
+| Execution Order | Scenario Group (`SCENARIO`) | Exit | Passed / Failed / Skipped | Duration | Proven UI Scope & Explicit Boundary |
+| :---: | --- | :---: | :---: | :---: | --- |
+| 23 | `trello_telegram_mocked_ui` | `0` | **`2` / `0` / `0`** | `23.5s` | `TELEGRAM-E2E-1:` `/guide` + pairing + `#telegram-scope` UI & `TRELLO:` workspace/board selector UI (`mocked_browser_routes` — real backend covered in group 24 & backend suites) |
+| 25 | `sheets_digest_v2_recovery` | `0` | **`1` / `0` / `0`** | `10.6s` | Sheets Digest v2 preview, reauth CTA & `SHEETS_DELIVERY_UNKNOWN` manual recovery UI (`mocked_browser_routes` — real Express+PG16 covered in `schedule-sheets-digest-v2-real-backend.test.tsx` & backend suites) |
+| **Subtotal (`2` Route-Mocked Groups)** | — | **`0`** | **`3` passed, `0` failed, `0` skipped** | — | Real Chromium DOM/CSS/interaction over mocked `/api/**` routes |
+| **Grand Total (`25` of `25` Groups)** | `npm run test:browser:v3` | **`0`** | **`201` passed, `0` failed, `1` conditional skip** | **`1115.47s`** | `198` real-backend sandbox + `3` route-mocked UI = `201` passed (`0` failed) |
