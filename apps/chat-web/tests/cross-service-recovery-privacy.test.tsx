@@ -565,10 +565,16 @@ describe('XSVC-INTEGRATION-V2 Task D: Combined ScheduleRunRecovery, Sheets Appen
     });
 
     expect(sheetsRegion).toHaveTextContent('drive.file');
+    expect(sheetsRegion.textContent ?? '').not.toMatch(/\bspreadsheets\b/i);
     expect(sheetsRegion).toHaveTextContent('ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS=false');
     expect(sheetsRegion).toHaveTextContent('includeAiSummary = true');
     expect(sheetsRegion).toHaveTextContent('includeAiSummary = false');
     expect(sheetsRegion).toHaveTextContent('9router');
+
+    const overviewHeading = screen.getByText('Quyền truy cập Google');
+    const overviewCardText = overviewHeading.closest('div')?.parentElement?.textContent ?? '';
+    expect(overviewCardText).toContain('drive.file');
+    expect(overviewCardText).not.toMatch(/\bspreadsheets\b/i);
 
     expect(calendarRegion).toHaveTextContent('calendar.readonly');
     expect(calendarRegion).toHaveTextContent('calendar.events');
@@ -689,5 +695,206 @@ describe('XSVC-INTEGRATION-V2 Task D: Combined ScheduleRunRecovery, Sheets Appen
     expect(screen.getByTestId('checkbox-confirm-duplicate-risk')).toBeDisabled();
     expect(screen.getByTestId('btn-resolve-retry-new-run')).toBeDisabled();
     expect(screen.getByTestId('btn-resolve-mark-sent')).toBeEnabled();
+  });
+
+  it('6. treats failed or missing schedule status fetch in ScheduleRunRecovery as unknown (never active), clears stale active state and consent on poll failure, blocks replan until verified, and keeps backend authorization authoritative', async () => {
+    vi.spyOn(useSchedulesHook, 'useSchedulesEnabled').mockReturnValue(true);
+
+    const uncertainSheetsRun: ScheduleRunView = {
+      id: 'run-unknown-sched-status-1',
+      scheduleId: 'sched-unknown-status-1',
+      trigger: 'scheduled',
+      dueAt: '2026-11-11T01:00:00.000Z',
+      createdAt: '2026-11-11T01:00:02.000Z',
+      state: 'needs_attention',
+      missedCount: 0,
+      convId: 'conv-unknown-status-1',
+      planId: null,
+      planStatus: null,
+      error: 'SHEETS_DELIVERY_UNKNOWN: Không nhận được phản hồi sau khi bắt đầu gửi Gmail.',
+      deliveryStartedAt: '2026-11-11T01:00:05.000Z',
+      deliveryResolution: null,
+      deliveryResolvedAt: null,
+      deliveryFollowupRunId: null,
+    };
+
+    const activeSchedule: ScheduleView = {
+      id: 'sched-unknown-status-1',
+      convId: 'conv-sched-root-1',
+      version: 3,
+      name: 'Báo cáo Sheets sáng',
+      request: 'Đọc bảng Q4 gửi Gmail',
+      recurrence: { type: 'daily', time: '08:00' },
+      services: ['mysheets', 'gmail'],
+      status: 'active',
+      pauseReason: null,
+      nextRuns: [],
+      lastRun: uncertainSheetsRun,
+      kind: 'sheets_digest',
+      approvalMode: 'auto_digest',
+    };
+
+    useChatStore.getState().setConversationId('conv-unknown-status-1');
+
+    // Part A: Initial getSchedules() fails -> schedule status is unknown, must NOT claim active or paused
+    const getSchedulesSpy = vi
+      .spyOn(apiClient, 'getSchedules')
+      .mockRejectedValueOnce(new Error('503 Service Unavailable'));
+    vi.spyOn(apiClient, 'getScheduleRuns').mockResolvedValue({ runs: [uncertainSheetsRun] });
+    const resolveSpy = vi.spyOn(apiClient, 'resolveScheduleRunDelivery');
+
+    const view = render(
+      <ScheduleRunRecovery
+        message={{
+          id: 'msg-unknown-status-1',
+          role: 'user',
+          content: activeSchedule.request,
+          metadata: {
+            type: 'schedule_run',
+            scheduleId: activeSchedule.id,
+            runId: uncertainSheetsRun.id,
+            name: activeSchedule.name,
+            dueAt: uncertainSheetsRun.dueAt,
+            trigger: 'scheduled',
+          },
+        }}
+        navigate={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByTestId('sheets-delivery-recovery-panel')).toBeInTheDocument();
+    const warning = screen.getByTestId('paused-schedule-retry-warning');
+    expect(warning).toHaveTextContent(/Chưa xác minh được trạng thái hoạt động hiện tại của lịch/i);
+    expect(warning).not.toHaveTextContent(/Lịch đang tạm dừng hoặc đã hủy/i);
+
+    const dupCheckbox = screen.getByTestId('checkbox-confirm-duplicate-risk') as HTMLInputElement;
+    const retryBtn = screen.getByTestId('btn-resolve-retry-new-run');
+    const markSentBtn = screen.getByTestId('btn-resolve-mark-sent');
+
+    expect(dupCheckbox).toBeDisabled();
+    expect(dupCheckbox.checked).toBe(false);
+    expect(retryBtn).toBeDisabled();
+    expect(markSentBtn).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Lập lại kế hoạch' })).toBeNull();
+
+    // Clicking disabled duplicate-risk / retry controls must never trigger replay
+    fireEvent.click(dupCheckbox);
+    fireEvent.click(retryBtn);
+    expect(resolveSpy).not.toHaveBeenCalled();
+
+    // Backend authorization remains authoritative even on mark_sent (e.g. schedule cancelled on server)
+    resolveSpy.mockRejectedValueOnce(
+      Object.assign(new Error('SCHEDULE_CLOSED: Lịch đã hủy, không thể cập nhật lượt chạy.'), {
+        status: 409,
+        code: 'SCHEDULE_CLOSED',
+      })
+    );
+    fireEvent.click(markSentBtn);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/SCHEDULE_CLOSED/);
+    expect(screen.queryByTestId('delivery-resolution-badge')).toBeNull();
+
+    // Part B: Subsequent poll resolves active -> unlocks checkbox, then next poll fails -> clears stale active & resets consent
+    getSchedulesSpy.mockResolvedValueOnce({ schedules: [activeSchedule] });
+    await act(async () => {
+      window.dispatchEvent(new Event('schedules:changed'));
+    });
+
+    await waitFor(() => {
+      expect(dupCheckbox).toBeEnabled();
+    });
+    expect(screen.queryByTestId('paused-schedule-retry-warning')).toBeNull();
+
+    fireEvent.click(dupCheckbox);
+    expect(dupCheckbox.checked).toBe(true);
+    expect(retryBtn).toBeEnabled();
+
+    // Now getSchedules omits the schedule (e.g. workspace switched or schedule removed) -> status becomes unknown again
+    getSchedulesSpy.mockResolvedValueOnce({ schedules: [] });
+    await act(async () => {
+      window.dispatchEvent(new Event('schedules:changed'));
+    });
+
+    await waitFor(() => {
+      expect(dupCheckbox).toBeDisabled();
+    });
+    expect(dupCheckbox.checked).toBe(false);
+    expect(retryBtn).toBeDisabled();
+    expect(screen.getByTestId('paused-schedule-retry-warning')).toHaveTextContent(
+      /Chưa xác minh được trạng thái hoạt động hiện tại của lịch/i
+    );
+    fireEvent.click(retryBtn);
+    expect(resolveSpy).toHaveBeenCalledTimes(1); // still only the earlier mark_sent attempt
+
+    view.unmount();
+    cleanup();
+
+    // Part C: Replannable run state (planning_failed) must NOT offer replan while schedule status is unknown
+    const failedPlanRun: ScheduleRunView = {
+      id: 'run-failed-unknown-sched-1',
+      scheduleId: 'sched-plan-unknown-1',
+      trigger: 'scheduled',
+      dueAt: '2026-11-11T02:00:00.000Z',
+      createdAt: '2026-11-11T02:00:01.000Z',
+      state: 'planning_failed',
+      missedCount: 0,
+      convId: 'conv-plan-unknown-1',
+      planId: null,
+      planStatus: null,
+      error: 'Lỗi lập kế hoạch tạm thời.',
+      deliveryStartedAt: null,
+      deliveryResolution: null,
+      deliveryResolvedAt: null,
+      deliveryFollowupRunId: null,
+    };
+
+    useChatStore.getState().setConversationId('conv-plan-unknown-1');
+    getSchedulesSpy.mockRejectedValueOnce(new Error('Network timeout'));
+    vi.spyOn(apiClient, 'getScheduleRuns').mockResolvedValue({ runs: [failedPlanRun] });
+
+    render(
+      <ScheduleRunRecovery
+        message={{
+          id: 'msg-plan-unknown-1',
+          role: 'user',
+          content: 'Gửi lịch họp',
+          metadata: {
+            type: 'schedule_run',
+            scheduleId: 'sched-plan-unknown-1',
+            runId: failedPlanRun.id,
+          },
+        }}
+        navigate={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(apiClient.getScheduleRuns).toHaveBeenCalledWith('sched-plan-unknown-1', 50);
+    });
+    expect(screen.queryByRole('button', { name: 'Lập lại kế hoạch' })).toBeNull();
+
+    // Once schedule status is verified non-cancelled ('active'), replan action becomes available
+    getSchedulesSpy.mockResolvedValueOnce({
+      schedules: [
+        {
+          id: 'sched-plan-unknown-1',
+          convId: 'conv-plan-root-1',
+          version: 1,
+          name: 'Lịch họp sáng',
+          request: 'Gửi lịch họp',
+          recurrence: { type: 'daily', time: '08:00' },
+          services: ['calendar', 'slack'],
+          status: 'active',
+          pauseReason: null,
+          nextRuns: [],
+          lastRun: failedPlanRun,
+          kind: 'plan',
+        },
+      ],
+    });
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+    });
+
+    expect(await screen.findByRole('button', { name: 'Lập lại kế hoạch' })).toBeEnabled();
   });
 });

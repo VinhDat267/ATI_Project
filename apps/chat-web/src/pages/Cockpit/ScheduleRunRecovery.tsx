@@ -48,7 +48,7 @@ export function SheetsDeliveryRecoveryControl({
 }: {
   run: ScheduleRunView;
   isSheetsSchedule?: boolean;
-  scheduleStatus?: ScheduleView['status'];
+  scheduleStatus?: ScheduleView['status'] | 'unknown';
   onResolved: (res: {
     run: ScheduleRunView;
     followUpRun: ScheduleRunView | null;
@@ -67,6 +67,8 @@ export function SheetsDeliveryRecoveryControl({
     setTrackedRunIdentity(runIdentity);
     setConfirmDuplicateRisk(false);
     setResolveError('');
+  } else if (isScheduleNotActive && confirmDuplicateRisk) {
+    setConfirmDuplicateRisk(false);
   }
 
   const resolution = getEffectiveDeliveryResolution(run);
@@ -101,7 +103,7 @@ export function SheetsDeliveryRecoveryControl({
 
   const handleResolve = async (mode: 'mark_sent' | 'retry_new_run') => {
     if (locked.current) return;
-    if (mode === 'retry_new_run' && !confirmDuplicateRisk) return;
+    if (mode === 'retry_new_run' && (!confirmDuplicateRisk || isScheduleNotActive)) return;
     locked.current = true;
     setBusy(true);
     setResolveError('');
@@ -148,7 +150,9 @@ export function SheetsDeliveryRecoveryControl({
             role="note"
             className="p-2 rounded-lg bg-amber-100/80 border border-amber-300 text-amber-950 font-medium"
           >
-            Lịch đang tạm dừng hoặc đã hủy. Vui lòng tiếp tục (Chạy tiếp) hoặc cấp quyền lại lịch trước khi tạo lượt gửi bù mới để lượt chạy bù không bị hủy.
+            {scheduleStatus === 'unknown'
+              ? 'Chưa xác minh được trạng thái hoạt động hiện tại của lịch. Vui lòng tải lại để kiểm tra lịch đang bật trước khi tạo lượt gửi bù mới.'
+              : 'Lịch đang tạm dừng hoặc đã hủy. Vui lòng tiếp tục (Chạy tiếp) hoặc cấp quyền lại lịch trước khi tạo lượt gửi bù mới để lượt chạy bù không bị hủy.'}
           </p>
         )}
         <label className="flex items-start gap-2 cursor-pointer text-[#111827]">
@@ -187,14 +191,14 @@ export function SheetsDeliveryRecoveryControl({
 }
 
 export function ScheduleRunRecovery({ message, navigate }: { message: ChatMessage; navigate: (path: string) => void }) {
-  const [run, setRun] = useState<ScheduleRunView | null>(null), [scheduleStatus, setScheduleStatus] = useState<ScheduleView['status'] | undefined>(undefined), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const [run, setRun] = useState<ScheduleRunView | null>(null), [scheduleStatus, setScheduleStatus] = useState<ScheduleView['status'] | 'unknown'>('unknown'), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const resolvedRunRef = useRef<ScheduleRunView | null>(null);
   const locked = useRef(false);
   const operation = useRef<AbortController | null>(null);
   useEffect(() => () => operation.current?.abort(), []);
   useEffect(() => {
     resolvedRunRef.current = null;
-    setScheduleStatus(undefined);
+    setScheduleStatus('unknown');
     let current = true;
     const convId = useChatStore.getState().conversationId;
     const owns = () => current && useChatStore.getState().conversationId === convId;
@@ -214,7 +218,7 @@ export function ScheduleRunRecovery({ message, navigate }: { message: ChatMessag
         ]);
         if (!owns()) return;
         const matchedSchedule = schedulesData?.schedules?.find(item => item.id === scheduleId);
-        if (matchedSchedule) setScheduleStatus(matchedSchedule.status);
+        setScheduleStatus(matchedSchedule ? matchedSchedule.status : 'unknown');
         const fetched = data.runs.find(row => row.id === message.metadata?.runId) ?? null;
         const value =
           fetched &&
@@ -247,6 +251,7 @@ export function ScheduleRunRecovery({ message, navigate }: { message: ChatMessag
   };
   const canReplan = Boolean(
     run &&
+      scheduleStatus !== 'unknown' &&
       scheduleStatus !== 'cancelled' &&
       ['expired', 'planning_failed', 'interrupted', 'digest_failed'].includes(run.state) &&
       !(run.deliveryStartedAt && run.state !== 'digest_failed') &&

@@ -64,6 +64,7 @@ describe('CALENDAR-AUDIT-09 — Google Calendar OAuth scope & revocation disclos
     expect(calSection.textContent ?? '').not.toMatch(/sẽ bị thu hồi hoàn toàn/i);
 
     expect(sheetsSection).toHaveTextContent('drive.file');
+    expect(sheetsSection.textContent ?? '').not.toMatch(/\bspreadsheets\b/i);
     expect(sheetsSection).toHaveTextContent('mysheets.list_drive_files');
     expect(sheetsSection).toHaveTextContent('mysheets.get_doc');
     expect(sheetsSection).toHaveTextContent('ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS=false');
@@ -73,6 +74,7 @@ describe('CALENDAR-AUDIT-09 — Google Calendar OAuth scope & revocation disclos
     const overviewCardText = overviewHeading.closest('div')?.parentElement?.textContent ?? '';
     expect(overviewCardText).toMatch(/Khi chưa kết nối dịch vụ cá nhân, Planora không truy cập Drive hay lịch cá nhân/i);
     expect(overviewCardText).toContain('drive.file');
+    expect(overviewCardText).not.toMatch(/\bspreadsheets\b/i);
     expect(overviewCardText).toContain('calendar.readonly');
     expect(overviewCardText).toContain('calendar.events');
     expect(overviewCardText).toMatch(/các lịch bạn đã chọn|danh sách lịch đã chọn/i);
