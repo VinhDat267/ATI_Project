@@ -11,7 +11,7 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Hôm nay bạn muốn nhờ việc gì?');
     const answerEvent = page.waitForResponse(response => response.url().includes('/stream') && response.status() === 200);
-    await page.getByRole('textbox').fill('Xem các issue Jira đang mở');
+    await page.getByRole('textbox').fill('Xem các trang trong Notion database aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee');
     await page.getByRole('button', { name: 'Gửi yêu cầu', exact: true }).click();
     await answerEvent;
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Câu trả lời');
@@ -21,7 +21,7 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     await expect(page.getByText('Chưa có gì được ghi lên công cụ nào.')).toBeVisible();
     await expect(page.getByText(/1 lần tra cứu/)).toBeVisible();
     await page.getByRole('button', { name: 'Đã tra cứu' }).click();
-    const link = page.getByRole('link', { name: 'https://ati-test.atlassian.net/browse/ATI-42' });
+    const link = page.getByRole('link', { name: 'https://www.notion.so/22222222333344445555666666666666' });
     await expect(link).toHaveAttribute('target', '_blank');
     await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     await expect(page.getByRole('textbox')).toHaveCount(1);
@@ -32,7 +32,7 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     try {
       const saved = (await db.query("SELECT content,metadata FROM messages WHERE conv_id=$1 AND metadata->>'type'='answer'", [conversationId])).rows[0];
       expect(saved.metadata.replyToMessageId).toBeTruthy();
-      expect(saved.metadata.lookups[0].tool).toBe('jira.search_issues');
+      expect(saved.metadata.lookups[0].tool).toBe('notion.query_database');
       expect((await db.query('SELECT * FROM plans WHERE conv_id=$1', [conversationId])).rows).toHaveLength(0);
       await page.reload();
       await expect(page.getByRole('heading', { level: 1 })).toHaveText('Câu trả lời');

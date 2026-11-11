@@ -254,12 +254,12 @@ export function createSandboxProvider(scenario?: string) {
       if (input.conversationHistory.some(message => message.content.includes('<previous_answer>'))) return JSON.stringify({
         kind: 'plan', thinking: 'Send summary', summary: 'Gửi tóm tắt vào Slack', warnings: [],
         steps: [{ id: 'send', tool: 'slack.send_message', description: 'Gửi tóm tắt',
-          args: { channel: '#general', text: 'Jira ATI-42: Login bug' }, dependsOn: [] }],
+          args: { channel: '#general', text: 'Notion: ATI Review' }, dependsOn: [] }],
       });
       if (input.conversationHistory.at(-1)?.content.includes('<search_results>')) return JSON.stringify({
-        kind: 'answer', text: 'Jira ATI-42: Login bug — Open.\n<b>x</b> https://a.example',
+        kind: 'answer', text: 'Notion: ATI Review — In progress.\n<b>x</b> https://a.example',
       });
-      return JSON.stringify({ kind: 'search', calls: [{ tool: 'jira.search_issues', args: { projectKey: 'ATI', query: 'Login' } }] });
+      return JSON.stringify({ kind: 'search', calls: [{ tool: 'notion.query_database', args: { databaseId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', query: '' } }] });
     };
     return mockProvider;
   }
