@@ -105,7 +105,7 @@ const PRIOR_REQUIRED_PATTERNS = [
   'approved Calendar workflow carries event url and start to Slack',
   'approved Notion workflow carries page url to Slack',
   'approved Telegram workflow carries messageId to Slack',
-  'approved Jira workflow carries key and url to Slack',
+  'G2A blocks legacy Jira workflow before plan or delivery',
   'ANS-01:',
   'GMAIL-03:',
   'OAUTH-01 from chat:',

@@ -50,3 +50,9 @@ Raw receipts, independent review and screenshots: `D:/ATI-Audits/jira-g2a-comple
 Source-test total: **5,931 PASS**. Independent final scope: **PASS**. Final policy extraction containment + unchanged architecture static guard independently passed 14/14. Final production hashes are preserved in `production-manifest.json`; the candidate file manifest and preservation receipt are external evidence artifacts.
 
 Local Jira G2A implementation is complete with no reproduced blocking finding left open. The owned test database is stopped after verification; its data and all receipts are retained. No commit, push, PR, remote CI, production activation or native Jira Cloud provider acceptance is claimed. Jira writes, scheduled Jira and external Jira LLM egress remain disabled within the approved G2A scope. `CURRENT-STATE.md` and `ROADMAP.md` were not changed.
+
+## PR #318 browser compatibility follow-up
+
+Publication authorized after implementation: commit `efc77e5b2226d8b240767c8febcf938c9e1289ea`, PR #318. CI run `43056306179` passed full `npm run check`, but its browser suite failed the historical `jira_slack` test expecting a legacy Jira write followed by Slack. Frozen G2A permits synthetic shared Jira only in `four_service`, `five_service`, and `nine_service`; CI confirmed the four/nine scenarios still pass. No production policy was relaxed.
+
+Updated that browser scenario to assert visible `JIRA_LLM_EGRESS_DISABLED_IN_G2A`, absent approval CTA and real SQL zero plans/execution steps. Updated its runner selector and selector regression. Focused `SCENARIO=jira_slack npm run test:browser:v3`: 1 PASS (11.6s), exit 0 on local56534; selector suite 4/4 PASS. Receipt: `jira-browser-g2a-green.log`; original CI failure: `pr318-ci-failure.log` in the external evidence root. Final remote CI for the follow-up commit remains required before merge. Earlier no-publication statements describe the implementation verification checkpoint.
