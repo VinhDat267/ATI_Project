@@ -214,7 +214,7 @@ async function claimNotionDigestDelivery(
   client: pg.PoolClient,
   run: NotionDigestRunInput,
   signal: AbortSignal,
-): Promise<'claimed' | 'discarded'> {
+): Promise<'claimed' | 'discarded' | 'busy'> {
   try {
     const found = await client.query('SELECT conv_id FROM schedules WHERE id = $1', [run.scheduleId]);
     if (!found.rowCount) {
@@ -222,74 +222,68 @@ async function claimNotionDigestDelivery(
     }
     const scheduleConvId = found.rows[0].conv_id;
 
-    for (;;) {
-      signal.throwIfAborted();
-      await client.query('BEGIN');
-      await client.query("SET LOCAL lock_timeout = '10s'");
-      await client.query('SELECT id FROM conversations WHERE id = $1 FOR UPDATE', [scheduleConvId]);
-      const schedule = (
+    signal.throwIfAborted();
+    await client.query('BEGIN');
+    await client.query("SET LOCAL lock_timeout = '10s'");
+    await client.query('SELECT id FROM conversations WHERE id = $1 FOR UPDATE', [scheduleConvId]);
+    const schedule = (
+      await client.query(
+        `SELECT s.id, s.user_id, s.kind, s.version, s.status, s.digest_config, s.digest_config_hash
+           FROM schedules s
+           JOIN users u ON u.id = s.user_id AND u.status = 'active'
+          WHERE s.id = $1
+            FOR UPDATE OF s`,
+        [run.scheduleId],
+      )
+    ).rows[0];
+    signal.throwIfAborted();
+    if (
+      !schedule ||
+      schedule.user_id !== run.userId ||
+      schedule.kind !== 'notion_digest' ||
+      schedule.version !== run.scheduleVersion ||
+      schedule.digest_config_hash !== run.digestConfigHash ||
+      (schedule.status !== 'active' && schedule.status !== 'completed')
+    ) {
+      await client.query('COMMIT');
+      return 'discarded';
+    }
+
+    let currentRun: { status: string; delivery_started_at: Date | null } | undefined;
+    try {
+      currentRun = (
         await client.query(
-          `SELECT s.id, s.user_id, s.kind, s.version, s.status, s.digest_config, s.digest_config_hash
-             FROM schedules s
-             JOIN users u ON u.id = s.user_id AND u.status = 'active'
-            WHERE s.id = $1
-              FOR UPDATE OF s`,
-          [run.scheduleId],
+          'SELECT status, delivery_started_at FROM schedule_runs WHERE id = $1 AND schedule_id = $2 FOR UPDATE NOWAIT',
+          [run.runId, run.scheduleId],
         )
       ).rows[0];
-      signal.throwIfAborted();
-      if (
-        !schedule ||
-        schedule.user_id !== run.userId ||
-        schedule.kind !== 'notion_digest' ||
-        schedule.version !== run.scheduleVersion ||
-        schedule.digest_config_hash !== run.digestConfigHash ||
-        (schedule.status !== 'active' && schedule.status !== 'completed')
-      ) {
-        await client.query('COMMIT');
-        return 'discarded';
+    } catch (err: any) {
+      if (err?.code === '55P03') {
+        await client.query('ROLLBACK');
+        return 'busy';
       }
-
-      let currentRun: { status: string; delivery_started_at: Date | null } | undefined;
-      try {
-        currentRun = (
-          await client.query(
-            'SELECT status, delivery_started_at FROM schedule_runs WHERE id = $1 AND schedule_id = $2 FOR UPDATE NOWAIT',
-            [run.runId, run.scheduleId],
-          )
-        ).rows[0];
-      } catch (err: any) {
-        if (err?.code === '55P03') {
-          await client.query('ROLLBACK');
-          await client.query(
-            'SELECT id FROM schedule_runs WHERE id = $1 AND schedule_id = $2 FOR UPDATE',
-            [run.runId, run.scheduleId],
-          );
-          continue;
-        }
-        throw err;
-      }
-
-      signal.throwIfAborted();
-      if (!currentRun || currentRun.status !== 'planning' || currentRun.delivery_started_at !== null) {
-        await client.query('COMMIT');
-        return 'discarded';
-      }
-
-      const marked = await client.query(
-        `UPDATE schedule_runs
-            SET delivery_started_at = now(), updated_at = now(),
-                dispatched_config = $3::jsonb, dispatched_config_hash = $4
-          WHERE id = $1
-            AND schedule_id = $2
-            AND status = 'planning'
-            AND delivery_started_at IS NULL
-        RETURNING id`,
-        [run.runId, run.scheduleId, JSON.stringify(schedule.digest_config), schedule.digest_config_hash],
-      );
-      await client.query('COMMIT');
-      return marked.rowCount ? 'claimed' : 'discarded';
+      throw err;
     }
+
+    signal.throwIfAborted();
+    if (!currentRun || currentRun.status !== 'planning' || currentRun.delivery_started_at !== null) {
+      await client.query('COMMIT');
+      return 'discarded';
+    }
+
+    const marked = await client.query(
+      `UPDATE schedule_runs
+          SET delivery_started_at = now(), updated_at = now(),
+              dispatched_config = $3::jsonb, dispatched_config_hash = $4
+        WHERE id = $1
+          AND schedule_id = $2
+          AND status = 'planning'
+          AND delivery_started_at IS NULL
+      RETURNING id`,
+      [run.runId, run.scheduleId, JSON.stringify(schedule.digest_config), schedule.digest_config_hash],
+    );
+    await client.query('COMMIT');
+    return marked.rowCount ? 'claimed' : 'discarded';
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);
     throw error;
@@ -354,9 +348,11 @@ export function createNotionDigestRunner(options: NotionDigestRunnerOptions): Ru
     let deliveryStarted = false;
     try {
       return await sources.withSource(run.userId, binding, signal, async (client) => {
-        if (await claimNotionDigestDelivery(client, run, signal) !== 'claimed') {
-          return { state: 'discarded' };
+        const claim = await claimNotionDigestDelivery(client, run, signal);
+        if (claim === 'busy') {
+          return { state: 'digest_failed', error: 'Lượt gửi Notion đang được xử lý. Chưa có bản tin nào được gửi từ lượt thử này.' };
         }
+        if (claim === 'discarded') return { state: 'discarded' };
         deliveryStarted = true;
         const receipt = await slackAdapter.execute('slack.send_message', { channel: config.channelId, text }, { signal });
         if (typeof receipt?.ts !== 'string' || !receipt.ts.trim()) {

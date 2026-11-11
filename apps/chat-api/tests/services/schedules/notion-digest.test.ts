@@ -306,7 +306,7 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       });
     });
 
-    it('discards when the schedule is cancelled before the Slack delivery claim', async () => {
+    it.each(['cancelled', 'run-locked'] as const)('does not dispatch when the Slack delivery claim is %s', async (reason) => {
       const user = await db.person('NotionDigestSafetyOwner');
       const convRes = await db.pool.query(
         "INSERT INTO conversations(user_id, status, title) VALUES($1, 'chatting', 'Lịch Notion Safety') RETURNING id",
@@ -359,6 +359,7 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       });
 
       let slackSendCallsAfterCancel = 0;
+      let lockedRun: pg.PoolClient | undefined;
       const runner = new ScheduleRunner({
         pool: db.pool,
         timeZone: 'Asia/Ho_Chi_Minh',
@@ -370,13 +371,33 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
           pool: db.pool,
           notionSources: {
             read: async () => {
-              await service.setStatus({
-                userId: user.id, scheduleId: confirmed.schedule.id, action: 'cancel',
-                version: confirmed.schedule.version, now: new Date('2026-11-03T01:31:05.000Z'),
-              });
+              if (reason === 'cancelled') {
+                await service.setStatus({
+                  userId: user.id, scheduleId: confirmed.schedule.id, action: 'cancel',
+                  version: confirmed.schedule.version, now: new Date('2026-11-03T01:31:05.000Z'),
+                });
+              } else {
+                lockedRun = await db.pool.connect();
+                await lockedRun.query('BEGIN');
+                const locked = await lockedRun.query(
+                  "SELECT id FROM schedule_runs WHERE schedule_id=$1 AND status='planning' FOR UPDATE",
+                  [confirmed.schedule.id],
+                );
+                expect(locked.rowCount).toBe(1);
+              }
               return { pages: [], pagesByDatabase: new Map() };
             },
-            withSource,
+            withSource: async (ownerId, binding, signal, action) => {
+              try {
+                return await withSource(ownerId, binding, signal, action);
+              } finally {
+                if (lockedRun) {
+                  await lockedRun.query('ROLLBACK');
+                  lockedRun.release();
+                  lockedRun = undefined;
+                }
+              }
+            },
           },
           getAdapter: async (serviceName: string) => {
             if (serviceName === 'slack') {
@@ -396,8 +417,17 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
         recordState: (client, row, now) => service.recordState(client, row, now),
       });
 
-      await runner.tick();
-      expect(slackSendCallsAfterCancel).toBe(0);
+      try {
+        await runner.tick();
+        expect(slackSendCallsAfterCancel).toBe(0);
+        const runs = await service.listRuns(user.id, confirmed.schedule.id, 5, new Date('2026-11-03T01:32:00.000Z'));
+        expect(runs[0]?.state).toBe(reason === 'cancelled' ? 'discarded' : 'digest_failed');
+      } finally {
+        if (lockedRun) {
+          await lockedRun.query('ROLLBACK');
+          lockedRun.release();
+        }
+      }
     });
   });
 });

@@ -14,3 +14,5 @@ Base `6de1a31a` sau #317.
 - Baseline RED: lịch Telegram cũ chưa có binding đi qua adapter trước khi dừng. GREEN: lịch đó bị chặn trước khi lấy adapter, đọc hoặc gửi.
 - PostgreSQL 16 + HTTP loopback: cả 8 trường hợp nguồn A/B, đổi data source ở bước xác nhận và lúc chạy, mất chia sẻ, lưu trữ, thu hồi trước gửi, khóa thu hồi trong lúc gửi và pool một kết nối đều được kiểm tra. Luồng Slack xác nhận và chạy qua ScheduleRunner trên PostgreSQL.
 - Sáu suite API OAuth/lịch 51/51 PASS, hai suite Web 44/44 PASS, typecheck và diff check exit 0. Review độc lập phát hiện lỗi endpoint sandbox, JSONB hash và cạn pool. Đã sửa và bổ sung kiểm thử tương ứng. Xem PR để theo dõi CI và kết luận review cuối.
+
+- Slack: test PostgreSQL giữ khóa dòng lượt chạy xác minh runner thoát ngay theo NOWAIT, không gửi. Suite Slack 8/8 PASS.
