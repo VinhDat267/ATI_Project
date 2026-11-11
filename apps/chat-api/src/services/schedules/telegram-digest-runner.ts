@@ -12,11 +12,19 @@ import type { TelegramBotClient } from '../telegram/bot-client.js';
 import { localLabel } from './next-occurrence.js';
 import { analyzeSheetKpiMetrics } from './sheets-digest-runner.js';
 import {
+  approvedTelegramNotionBinding,
+  telegramNotionSource,
   buildTelegramDigestSourceArgs,
   computeTelegramDigestConfigHash,
   READ_DIGEST_SOURCE_MAP,
 } from './telegram-digest-candidate.js';
 import { buildPinnedTelegramAdapterContext } from './digest-scope-guard.js';
+
+import { NOTION_DIGEST_REAPPROVAL, isNotionSourceDenied, type NotionDigestSourceAuthority } from '../notion/digest-source-authority.js';
+
+const notionBlocked = (): DigestRunOutcome => ({
+  status: 'blocked', error: NOTION_DIGEST_REAPPROVAL, pauseSchedule: true,
+});
 
 export const TELEGRAM_DELIVERY_UNKNOWN =
   'TELEGRAM_DELIVERY_UNKNOWN: Đã bắt đầu gửi bản tin Telegram nhưng mất kết nối hoặc thiếu biên nhận hợp lệ từ dịch vụ đích. Hệ thống tạm dừng tự động gửi lại để tránh trùng lặp.';
@@ -76,6 +84,7 @@ export interface TelegramDigestRunnerOptions {
   timeZone: string;
   summarizeWithAi?: (prompt: string, signal: AbortSignal) => Promise<string | null>;
   aiTimeoutMs?: number;
+  notionSources?: Pick<NotionDigestSourceAuthority, 'read' | 'withSource'>;
 }
 
 export function summarizeSourceItems(
@@ -244,6 +253,7 @@ export class TelegramDigestRunner {
     run: DigestRunInput,
     pinnedCredentialId: string,
     signal: AbortSignal,
+    ownerClient?: pg.PoolClient,
   ): Promise<
     | { allowed: true; claimedInDb: boolean }
     | { allowed: false; outcome: DigestRunOutcome }
@@ -274,7 +284,7 @@ export class TelegramDigestRunner {
       }
       return { allowed: true, claimedInDb: false };
     }
-    const client = await (this.options.pool as pg.Pool).connect();
+    const client = ownerClient ?? await (this.options.pool as pg.Pool).connect();
     try {
       await client.query('BEGIN');
       await client.query("SET LOCAL lock_timeout = '10s'");
@@ -356,10 +366,13 @@ export class TelegramDigestRunner {
 
       const claimed = await client.query(
         `UPDATE schedule_runs
-         SET delivery_started_at = now(), updated_at = now()
+         SET delivery_started_at = now(), updated_at = now(),
+             dispatched_config = COALESCE($3::jsonb, dispatched_config),
+             dispatched_config_hash = COALESCE($4, dispatched_config_hash)
          WHERE id = $1 AND schedule_id = $2 AND status = 'planning' AND delivery_started_at IS NULL
          RETURNING id`,
-        [run.runId, run.scheduleId],
+        [run.runId, run.scheduleId, ownerClient ? JSON.stringify(schedule.digest_config) : null,
+          ownerClient ? schedule.digest_config_hash : null],
       );
       await client.query('COMMIT');
       if (claimed.rowCount === 0) {
@@ -370,7 +383,7 @@ export class TelegramDigestRunner {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
     } finally {
-      client.release();
+      if (!ownerClient) client.release();
     }
   }
 
@@ -386,12 +399,18 @@ export class TelegramDigestRunner {
       };
     }
 
-    if (!digestConfig || !digestConfigHash) {
+    if (!digestConfig || !digestConfigHash || !Array.isArray(digestConfig.sources)) {
       return {
         status: 'blocked',
         error: 'Cấu hình báo cáo tự động bị thiếu hoặc không hợp lệ.',
         pauseSchedule: true,
       };
+    }
+
+    const notionBinding = approvedTelegramNotionBinding(digestConfig);
+    if (telegramNotionSource(digestConfig) &&
+        (!notionBinding || !this.options.notionSources || notionBinding.ownerId !== userId || run.workspaceMode === 'organization')) {
+      return notionBlocked();
     }
 
     const computedHash = computeTelegramDigestConfigHash(digestConfig);
@@ -507,7 +526,8 @@ export class TelegramDigestRunner {
     for (const source of digestConfig.sources) {
       signal.throwIfAborted();
       try {
-        const adapter = await this.options.adapterFactory.getAdapterForService(source.service, {
+        const adapter = source.service === 'notion' ? null :
+          await this.options.adapterFactory.getAdapterForService(source.service, {
           userId,
           phase: 'planning',
           workspaceMode: run.workspaceMode,
@@ -519,7 +539,10 @@ export class TelegramDigestRunner {
         });
 
         let rawResult: unknown;
-        if (source.service === 'mycalendar' && source.tool === 'mycalendar.list_events') {
+        if (source.service === 'notion') {
+          if (!notionBinding || !this.options.notionSources) return notionBlocked();
+          rawResult = await this.options.notionSources.read(userId, notionBinding, signal);
+        } else if (source.service === 'mycalendar' && source.tool === 'mycalendar.list_events') {
           let allowedCalendars: string[] = [];
           try {
             const mycalRec = await this.options.credentialRepo.getPersonalCredentials('mycalendar', userId);
@@ -624,30 +647,6 @@ export class TelegramDigestRunner {
               } else {
                 throw innerErr;
               }
-            } else if (source.service === 'notion') {
-              const dbsRes = await adapter.execute('notion.search_databases', { query: '' }, { signal });
-              const dbs = Array.isArray(dbsRes?.databases)
-                ? dbsRes.databases
-                : Array.isArray(dbsRes)
-                  ? dbsRes
-                  : [];
-              const mergedPages: any[] = [];
-              for (const db of dbs.slice(0, 3)) {
-                const dbId = String(db?.id ?? '').trim();
-                if (!dbId) continue;
-                const pageRes = await adapter.execute(
-                  'notion.query_database',
-                  { databaseId: dbId, limit: 10 },
-                  { signal, databaseId: dbId },
-                );
-                const pages = Array.isArray(pageRes?.pages)
-                  ? pageRes.pages
-                  : Array.isArray(pageRes)
-                    ? pageRes
-                    : [];
-                mergedPages.push(...pages);
-              }
-              rawResult = { pages: mergedPages };
             } else {
               throw innerErr;
             }
@@ -664,6 +663,7 @@ export class TelegramDigestRunner {
         });
         sections.push(`• ${source.label} (${count}):\n${lines.join('\n')}`);
       } catch (err: any) {
+        if (source.service === 'notion' && isNotionSourceDenied(err)) return notionBlocked();
         failedLabels.push(source.label);
         sourceStatuses.push({
           service: source.service,
@@ -684,7 +684,7 @@ export class TelegramDigestRunner {
 
     // 4. Optional AI highlight summary (10s timeout via AbortSignal) & format plain-text digest (max 4000 chars)
     let aiHighlight = '';
-    if (this.options.summarizeWithAi) {
+    if (!notionBinding && this.options.summarizeWithAi) {
       const aiController = new AbortController();
       const onParentAbort = () => aiController.abort();
       signal.addEventListener('abort', onParentAbort, { once: true });
@@ -765,16 +765,22 @@ export class TelegramDigestRunner {
           },
         },
       });
-      const claim = await this.claimTelegramDigestDelivery(run, pinnedCredentialId, signal);
-      if (!claim.allowed) {
-        return claim.outcome;
-      }
-      deliveryStarted = claim.claimedInDb;
-      const sendRes = await telegramAdapter.execute(
-        'telegram.send_message',
-        { chatId: targetChatId, text: digestText },
-        { signal, chatId: targetChatId },
-      );
+      const dispatch = async (ownerClient?: pg.PoolClient) => {
+        const claim = await this.claimTelegramDigestDelivery(run, pinnedCredentialId, signal, ownerClient);
+        if (!claim.allowed) return claim;
+        deliveryStarted = claim.claimedInDb;
+        const receipt = await telegramAdapter.execute(
+          'telegram.send_message',
+          { chatId: targetChatId, text: digestText },
+          { signal, chatId: targetChatId },
+        );
+        return { allowed: true as const, receipt };
+      };
+      const sent = notionBinding && this.options.notionSources
+        ? await this.options.notionSources.withSource(userId, notionBinding, signal, dispatch)
+        : await dispatch();
+      if (!sent.allowed) return sent.outcome;
+      const sendRes = sent.receipt;
       const validMessageId =
         typeof sendRes?.messageId === 'number' &&
         Number.isInteger(sendRes.messageId) &&
@@ -797,6 +803,7 @@ export class TelegramDigestRunner {
         },
       };
     } catch (err: any) {
+      if (!deliveryStarted && notionBinding && isNotionSourceDenied(err)) return notionBlocked();
       if (deliveryStarted) {
         if (isDefiniteWriteRejection(err) && this.options.pool) {
           await this.options.pool

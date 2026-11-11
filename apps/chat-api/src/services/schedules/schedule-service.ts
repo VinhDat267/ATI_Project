@@ -41,14 +41,15 @@ import {
   type FetchOrgSheetsMetadataFn,
 } from './sheets-digest-candidate.js';
 import { canonicalizeDigestConfig, computeDigestConfigHash } from './github-digest-candidate.js';
-import { computeTelegramDigestConfigHash } from './telegram-digest-candidate.js';
+import { approvedTelegramNotionBinding, computeTelegramDigestConfigHash, telegramNotionSource } from './telegram-digest-candidate.js';
+import { canonicalNotionDigestBinding, lockApprovedNotionSource, NOTION_DIGEST_REAPPROVAL, type NotionDigestSourceAuthority } from '../notion/digest-source-authority.js';
 import {
   buildConfirmedTrelloDigestDelivery,
   canonicalizeTrelloDigestConfig,
   computeTrelloDigestConfigHash,
   getTrelloDigestPinnedCredentialIds,
 } from './trello-digest-candidate.js';
-import { canonicalizeNotionDigestConfig, computeNotionDigestConfigHash } from './notion-digest-candidate.js';
+import { approvedSlackNotionBinding, canonicalizeNotionDigestConfig, computeNotionDigestConfigHash } from './notion-digest-candidate.js';
 import { canonicalizeJiraDigestConfig, computeJiraDigestConfigHash, type JiraDigestCandidate, type JiraDigestConfig } from './jira-digest-candidate.js';
 
 export const SCHEDULE_CONFLICTS = {
@@ -139,6 +140,7 @@ export interface ScheduleServiceOptions {
   /** Plans a run in the background; the scheduler (SCHED-01) or nothing in tests. */
   runner?: { planNow(runId: string): Promise<void> };
   maxSchedules?: number;
+  verifyNotionSource?: Pick<NotionDigestSourceAuthority, 'withSource'>['withSource'];
   credentialRepo?: CredentialRepo;
   encryptionKey?: string;
   mysheetsEnabled?: boolean;
@@ -338,6 +340,31 @@ export class ScheduleService {
   }): Promise<ScheduleChange> {
     const { userId, convId, messageId, now, scope, approvalMode, includeAiSummary } = input;
     if (!isUuid(convId) || !isUuid(messageId)) throw new ScheduleNotFound();
+    // Check provider metadata before acquiring scheduler transaction locks.
+    const verifyNotionSource = this.options.verifyNotionSource;
+    let verifiedNotionSource: string | undefined;
+    if (verifyNotionSource && approvalMode === 'auto_digest') {
+      const preview = (await this.options.pool.query<{ metadata: ScheduleProposalMetadata }>(
+        `SELECT m.metadata FROM messages m JOIN conversations c ON c.id=m.conv_id
+          WHERE m.id=$1 AND c.id=$2 AND c.user_id=$3 AND c.workspace_id IS NULL AND c.workspace_mode <> 'organization'
+            AND NOT EXISTS (SELECT 1 FROM schedules s WHERE s.conv_id=c.id AND s.last_proposal_id=m.id)`,
+        [messageId, convId, userId],
+      )).rows[0]?.metadata;
+      if (preview?.type === 'schedule_proposal' &&
+          (preview.proposal?.action === 'create' || preview.proposal?.action === 'update')) {
+        const cfg = (preview.digestCandidate as TelegramDigestCandidate | NotionDigestCandidate | undefined)?.config;
+        const binding = cfg && typeof cfg === 'object' &&
+          ('sources' in cfg ? approvedTelegramNotionBinding(cfg) : approvedSlackNotionBinding(cfg));
+        if (binding?.ownerId === userId) {
+          try {
+            await verifyNotionSource(userId, binding, AbortSignal.timeout(10_000), async () => undefined);
+            verifiedNotionSource = JSON.stringify(canonicalNotionDigestBinding(binding));
+          } catch {
+            // The transaction can still recognize a proposal another request already applied.
+          }
+        }
+      }
+    }
     return this.transaction(async (client) => {
       const proposed = await captureScheduleArtifact(client, this.registry, 'messages', messageId);
       const existingId = (await client.query('SELECT id FROM schedules WHERE conv_id=$1', [convId])).rows[0]?.id;
@@ -552,6 +579,14 @@ export class ScheduleService {
           if (computedHash !== candidate.configHash) {
             throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
           }
+          if (telegramNotionSource(candidate.config) || metadata.services.includes('notion')) {
+            const binding = approvedTelegramNotionBinding(candidate.config);
+            if (!binding || wsMode === 'organization' ||
+                (verifyNotionSource && verifiedNotionSource !== JSON.stringify(canonicalNotionDigestBinding(binding))) ||
+                !(await lockApprovedNotionSource(client, userId, binding))) {
+              throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', NOTION_DIGEST_REAPPROVAL);
+            }
+          }
           telegramDigestConfig = candidate.config;
           telegramDigestHash = computedHash;
           digestFields = {
@@ -722,12 +757,21 @@ export class ScheduleService {
           }
           await this.ensureRoom(client, userId, { workspaceMode: wsMode, workspaceId: wsId });
           const next = this.next({ recurrence: proposal.recurrence! }, now);
+          const binding = approvedSlackNotionBinding(notionCandidate.config);
+          if (!binding || wsMode === 'organization' ||
+              (verifyNotionSource && verifiedNotionSource !== JSON.stringify(canonicalNotionDigestBinding(binding))) ||
+              !(await lockApprovedNotionSource(client, userId, binding))) {
+            throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', NOTION_DIGEST_REAPPROVAL);
+          }
           const config = canonicalizeNotionDigestConfig(notionCandidate.config);
           const configHash = computeNotionDigestConfigHash({
             config,
             recurrence: proposal.recurrence!,
             userId,
           });
+          if (notionCandidate.configHash !== configHash) {
+            throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', NOTION_DIGEST_REAPPROVAL);
+          }
           const created = await client.query(
             `INSERT INTO schedules(
                user_id, conv_id, name, request, recurrence, services, status, next_run_at, last_proposal_id,
@@ -817,6 +861,7 @@ export class ScheduleService {
         return this.recordState(client, tagScheduleContext(created.rows[0],segments), now);
       }
       if (!existing || metadata.baseVersion !== existing.version) throw new ScheduleConflict('STALE_PROPOSAL');
+      if (proposal.action === 'resume') await this.assertNotionSourceInTx(client, existing);
       if (proposal.action === 'resume' && existing.kind === 'sheets_digest') {
         if (existing.status === 'cancelled' || existing.status === 'completed') {
           throw new ScheduleConflict('SCHEDULE_CLOSED');
@@ -854,10 +899,22 @@ export class ScheduleService {
             fields.digest_config_hash = null;
             fields.digest_approved_at = null;
           } else {
+            const previousConfig = existing.digest_config as TelegramDigestConfig;
+            const previouslyNotion = Boolean(telegramNotionSource(previousConfig));
+            const previewNotion = Boolean(telegramNotionSource(tgCandidate?.config));
+            if ((previouslyNotion && proposal.request !== existing.request) || (previewNotion && !previouslyNotion)) {
+              throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', NOTION_DIGEST_REAPPROVAL);
+            }
             const updatedConfig: TelegramDigestConfig =
-              tgCandidate?.canAutoDigest && tgCandidate.config
+              !previouslyNotion && tgCandidate?.canAutoDigest && tgCandidate.config
                 ? tgCandidate.config
-                : { ...(existing.digest_config as TelegramDigestConfig), recurrence: fields.recurrence };
+                : { ...previousConfig, recurrence: fields.recurrence };
+            if (previouslyNotion) {
+              const binding = approvedTelegramNotionBinding(updatedConfig);
+              if (!binding || wsMode === 'organization' || !(await lockApprovedNotionSource(client, userId, binding))) {
+                throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', NOTION_DIGEST_REAPPROVAL);
+              }
+            }
             fields.kind = 'telegram_digest';
             fields.digest_config = updatedConfig;
             fields.digest_config_hash = computeTelegramDigestConfigHash(updatedConfig);
@@ -989,8 +1046,8 @@ export class ScheduleService {
           }
         } else if (approvalMode === 'auto_digest' || existing.kind === 'notion_digest') {
           const notionCandidate = metadata.digestCandidate as NotionDigestCandidate | undefined;
-          const candidateConfig = notionCandidate?.canAutoDigest && notionCandidate.config
-            ? notionCandidate.config
+          const candidateConfig = approvalMode === 'auto_digest'
+            ? notionCandidate?.canAutoDigest ? notionCandidate.config : undefined
             : existing.kind === 'notion_digest' && proposal.request === existing.request
               ? (existing.digest_config as NotionDigestConfig | undefined)
               : undefined;
@@ -1000,12 +1057,22 @@ export class ScheduleService {
             }
             digestUpdate = { kind: 'plan' };
           } else {
+            const binding = approvedSlackNotionBinding(candidateConfig);
+            if (!binding || wsMode === 'organization' ||
+                (approvalMode === 'auto_digest' && verifyNotionSource &&
+                  verifiedNotionSource !== JSON.stringify(canonicalNotionDigestBinding(binding))) ||
+                !(await lockApprovedNotionSource(client, userId, binding))) {
+              throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', NOTION_DIGEST_REAPPROVAL);
+            }
             const config = canonicalizeNotionDigestConfig(candidateConfig);
             const configHash = computeNotionDigestConfigHash({
               config,
               recurrence: fields.recurrence,
               userId,
             });
+            if (approvalMode === 'auto_digest' && notionCandidate?.configHash !== configHash) {
+              throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', NOTION_DIGEST_REAPPROVAL);
+            }
             digestUpdate = {
               kind: 'notion_digest',
               config,
@@ -1480,11 +1547,24 @@ export class ScheduleService {
     return guarded.row;
   }
 
+  private async assertNotionSourceInTx(client: pg.PoolClient, row: ScheduleRow): Promise<void> {
+    if (row.kind === 'telegram_digest' && !telegramNotionSource(row.digest_config as TelegramDigestConfig)) return;
+    if (row.kind !== 'notion_digest' && row.kind !== 'telegram_digest') return;
+
+    const binding = row.kind === 'notion_digest'
+      ? row.digest_config && approvedSlackNotionBinding(row.digest_config as NotionDigestConfig)
+      : approvedTelegramNotionBinding(row.digest_config as TelegramDigestConfig);
+    if (!binding || row.workspace_mode === 'organization' || !(await lockApprovedNotionSource(client, row.user_id, binding))) {
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', NOTION_DIGEST_REAPPROVAL);
+    }
+  }
+
   async setStatus(input: { userId: string; scheduleId: string; action: 'pause' | 'resume' | 'cancel'; version: number; now: Date; scope?: ScheduleScope }): Promise<ScheduleChange> {
     return this.transaction(async (client) => {
       const row = await this.lockSchedule(client, input.scheduleId, input.userId, input.scope);
       if (!row) throw new ScheduleNotFound();
       if (row.version !== input.version) throw new ScheduleConflict('STALE_VERSION');
+      if (input.action === 'resume') await this.assertNotionSourceInTx(client, row);
       if (input.action === 'resume' && row.kind === 'sheets_digest') {
         if (row.status === 'cancelled' || row.status === 'completed') {
           throw new ScheduleConflict('SCHEDULE_CLOSED');
@@ -1913,6 +1993,7 @@ export class ScheduleService {
           }
         } else if (schedule.kind === 'telegram_digest') {
           const cfg = schedule.digest_config as TelegramDigestConfig;
+          await this.assertNotionSourceInTx(client, schedule);
           const expectedHash = computeTelegramDigestConfigHash(cfg);
           if (expectedHash !== schedule.digest_config_hash) {
             throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');

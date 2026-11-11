@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type {
+  NotionDigestSourceBinding,
   ScheduleResponse,
   TelegramDigestCandidate,
   TelegramDigestConfig,
@@ -7,6 +8,20 @@ import type {
 } from '@wap/tool-schemas';
 import type { TelegramConnectionLookupResult } from '../telegram/connection-reference.js';
 import type { GitHubConnectionLookupResult } from '../github/connection-reference.js';
+
+import { isNotionDigestSourceBinding, NOTION_DIGEST_REAPPROVAL } from '../notion/digest-source-authority.js';
+
+export function telegramNotionSource(config: TelegramDigestConfig | null | undefined) {
+  return Array.isArray(config?.sources) ? config.sources.find((source) => source?.service === 'notion') : undefined;
+}
+
+export function approvedTelegramNotionBinding(config: TelegramDigestConfig): NotionDigestSourceBinding | undefined {
+  const source = telegramNotionSource(config);
+  if (config.sources.length === 1 && source?.tool === 'notion.query_database' &&
+      source.args === undefined && isNotionDigestSourceBinding(source.notionBinding)) {
+    return source.notionBinding;
+  }
+}
 
 export const READ_DIGEST_SOURCE_MAP: Record<string, TelegramDigestSource> = {
   github: {
@@ -43,8 +58,7 @@ export const READ_DIGEST_SOURCE_MAP: Record<string, TelegramDigestSource> = {
   },
   notion: {
     service: 'notion',
-    tool: 'notion.search_pages',
-    args: { query: '' },
+    tool: 'notion.query_database',
     label: 'Trang Notion',
   },
   jira: {
@@ -109,6 +123,7 @@ export function computeTelegramDigestConfigHash(config: TelegramDigestConfig): s
       tool: s.tool,
       ...(s.args !== undefined ? { args: s.args } : {}),
       label: s.label,
+      ...(s.notionBinding !== undefined ? { notionBinding: s.notionBinding } : {}),
     })),
     recurrence: config.recurrence,
     timeZone: config.timeZone,
@@ -164,6 +179,7 @@ export interface EvaluateTelegramDigestInput {
   telegramLookup?: TelegramConnectionLookupResult | null;
   githubLookup?: Pick<GitHubConnectionLookupResult, 'status' | 'connection'> | null;
   existingDigest?: TelegramDigestConfig | null;
+  notionBinding?: NotionDigestSourceBinding;
 }
 
 export function evaluateTelegramDigestCandidate(
@@ -185,6 +201,11 @@ export function evaluateTelegramDigestCandidate(
       canAutoDigest: false,
       disabledReason: 'Cần ít nhất một dịch vụ nguồn dữ liệu (GitHub, Calendar, Trello, Sheets...) để tổng hợp báo cáo tự động.',
     };
+  }
+
+  if (nonTelegramServices.includes('notion') &&
+      (new Set(nonTelegramServices).size !== 1 || !isNotionDigestSourceBinding(input.notionBinding))) {
+    return { canAutoDigest: false, disabledReason: NOTION_DIGEST_REAPPROVAL };
   }
 
   const unsupported = nonTelegramServices.filter((s) => !READ_DIGEST_SOURCE_MAP[s]);
@@ -304,6 +325,11 @@ export function evaluateTelegramDigestCandidate(
       for (const repo of [...new Set(repos)]) {
         sources.push({ ...source, args: { repo, query: 'open' }, label: `${source.label} (${repo})` });
       }
+    } else if (service === 'notion' && input.notionBinding) {
+      sources.push({
+        ...source, notionBinding: input.notionBinding,
+        label: `Notion · ${input.notionBinding.workspaceName} · ${input.notionBinding.databases.map((d) => d.title).join(', ')}`,
+      });
     } else {
       sources.push({ ...source });
     }

@@ -34,6 +34,7 @@ export interface ScheduleRuntimeOptions {
   runGithubDigest?: RunGithubDigest;
   runTrelloDigest?: RunTrelloDigest;
   runNotionDigest?: RunNotionDigest;
+  verifyNotionSource?: import('../services/schedules/schedule-service.js').ScheduleServiceOptions['verifyNotionSource'];
   executeDigestRun?: ExecuteDigestRun;
   emit?: (convId: string, event: string, payload: unknown) => unknown;
   now?: () => Date;
@@ -60,6 +61,7 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
     timeZone,
     runner: { planNow: (runId) => runner.planNow(runId) },
     credentialRepo: options.credentialRepo,
+    verifyNotionSource: options.verifyNotionSource,
     encryptionKey: options.encryptionKey,
     mysheetsEnabled: options.mysheetsEnabled,
     emitV2: options.emitV2,

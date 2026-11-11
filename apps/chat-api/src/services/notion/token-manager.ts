@@ -166,7 +166,7 @@ export class NotionTokenManager {
     userId: string,
     id: string,
     version: number,
-    operation: (accessToken: string, botId: string) => Promise<T>,
+    operation: (accessToken: string, botId: string, client: pg.PoolClient) => Promise<T>,
   ): Promise<T> {
     return this.repo.withOwner(userId, async (c) => {
       const row = await this.repo.get(c, userId, id);
@@ -207,7 +207,7 @@ export class NotionTokenManager {
 
       const cfg = decryptCredentials(row.config, this.key);
       try {
-        return await operation(cfg.accessToken, row.bot_id);
+        return await operation(cfg.accessToken, row.bot_id, c);
       } catch (e) {
         if (e instanceof NotionOAuthError && e.reason === 'identity_mismatch') {
           await this.quarantineActiveRow(c, userId, id, version, 'identity_mismatch', false);
@@ -347,7 +347,7 @@ export class NotionTokenManager {
       }
 
       try {
-        return await operation(next.accessToken, row.bot_id);
+        return await operation(next.accessToken, row.bot_id, c);
       } catch (postRefreshErr) {
         if (
           postRefreshErr instanceof NotionOAuthError &&

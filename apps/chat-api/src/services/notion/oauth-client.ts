@@ -20,6 +20,10 @@ export interface NotionDatabaseItem {
   url: string;
 }
 
+export interface NotionDigestDatabase extends NotionDatabaseItem {
+  dataSourceId: string;
+}
+
 export type NotionEndpointKind = 'resource' | 'identity' | 'token' | 'revoke';
 
 export type NotionFailureReason =
@@ -179,6 +183,10 @@ export class NotionOAuthClient {
   private readonly fetchFn: typeof fetch;
   constructor(private readonly config: NotionOAuthConfig, fetchFn: typeof fetch = fetch) {
     this.fetchFn = fetchFn;
+  }
+
+  get apiBaseUrl(): string {
+    return this.config.apiBaseUrl;
   }
 
   get appId(): string {
@@ -568,9 +576,16 @@ export class NotionOAuthClient {
   }
 
   async validateDatabases(
+    accessToken: string, idsOrUrls: string[], signal: AbortSignal, singleSource: true,
+  ): Promise<NotionDigestDatabase[]>;
+  async validateDatabases(
+    accessToken: string, idsOrUrls: string[], signal: AbortSignal,
+  ): Promise<NotionDatabaseItem[]>;
+  async validateDatabases(
     accessToken: string,
     idsOrUrls: string[],
     signal: AbortSignal,
+    singleSource = false,
   ): Promise<NotionDatabaseItem[]> {
     const normalized = Array.from(
       new Set(
@@ -606,13 +621,28 @@ export class NotionOAuthClient {
         data?.archived === true ||
         returnedId !== databaseId
       ) {
-        throw new NotionOAuthError('Database Notion không thuộc phạm vi đã chia sẻ cho kết nối.');
+        throw new NotionOAuthError('Database Notion không thuộc phạm vi đã chia sẻ cho kết nối.', false, {
+          reason: 'resource_unavailable',
+        });
       }
-      items.push({
+      const database = {
         id: returnedId,
         title: plainTitle(data?.title),
         url: typeof data?.url === 'string' ? data.url : '',
-      });
+      };
+      if (!singleSource) {
+        items.push(database);
+        continue;
+      }
+      const rawSourceId = data.data_sources?.[0]?.id;
+      if (!Array.isArray(data.data_sources) || data.data_sources.length !== 1 ||
+          typeof rawSourceId !== 'string' || !NOTION_ID_PATTERN.test(rawSourceId)) {
+        throw new NotionOAuthError('Database Notion cần có đúng một data source hợp lệ.', false, {
+          reason: 'resource_unavailable',
+        });
+      }
+      const digestDatabase: NotionDigestDatabase = { ...database, dataSourceId: normalizeNotionId(rawSourceId) };
+      items.push(digestDatabase);
     }
     return items;
   }

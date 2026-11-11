@@ -568,11 +568,25 @@ export interface ScheduleDigestCandidate {
   configHash?: string;
 }
 
+export interface NotionDigestSourceBinding {
+  version: 1;
+  ownerId: string;
+  credentialId: string;
+  appId: string;
+  workspaceId: string;
+  actorId: string;
+  botId: string;
+  identityVersion: number;
+  workspaceName: string;
+  databases: Array<{ databaseId: string; dataSourceId: string; title: string }>;
+}
+
 export interface TelegramDigestSource {
   service: string;
   tool: string;
   args?: Record<string, any>;
   label: string;
+  notionBinding?: NotionDigestSourceBinding;
 }
 
 export interface TelegramDigestConfig {
@@ -669,6 +683,7 @@ export interface TrelloDigestCandidate {
 }
 
 export interface NotionDigestConfig {
+  notionBinding?: NotionDigestSourceBinding;
   credentialId: string;
   workspaceId: string;
   workspaceName: string;

@@ -1,9 +1,13 @@
 import { createHash } from 'node:crypto';
 import type { NotionDigestConfig, NotionDigestCandidate, ScheduleRecurrence } from '@wap/tool-schemas';
+import {
+  canonicalNotionDigestBinding, isNotionDigestSourceBinding, NOTION_DIGEST_REAPPROVAL, type NotionDigestSourceAuthority,
+} from '../notion/digest-source-authority.js';
 import { canonicalizeRecurrence } from './github-digest-candidate.js';
 
 export function canonicalizeNotionDigestConfig(config: NotionDigestConfig): NotionDigestConfig {
   return {
+    ...(config.notionBinding !== undefined ? { notionBinding: canonicalNotionDigestBinding(config.notionBinding) } : {}),
     credentialId: config.credentialId,
     workspaceId: config.workspaceId,
     workspaceName: config.workspaceName,
@@ -38,6 +42,16 @@ export function computeNotionDigestConfigHash(input: {
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
 
+export function approvedSlackNotionBinding(config: NotionDigestConfig) {
+  const binding = config.notionBinding;
+  if (config.telegramChatId || !isNotionDigestSourceBinding(binding) ||
+      !Array.isArray(config.databases) || config.databases.length !== binding.databases.length ||
+      !binding.databases.every(({ databaseId }) => config.databases.some((db) => db?.id === databaseId)) ||
+      config.credentialId !== binding.credentialId || config.identityVersion !== binding.identityVersion ||
+      config.workspaceId !== binding.workspaceId || config.botId !== binding.botId) return;
+  return binding;
+}
+
 const WRITE_INTENT_REGEX =
   /(?:^|\s)(tạo\s+trang|tạo\s+page|thêm\s+trang|thêm\s+page|thêm\s+nội\s+dung|sửa\s+trang|cập\s+nhật\s+trang|ghi\s+vào\s+notion|create\s+page|append\s+block|update\s+page)(?=$|\s|[.,;!?])/i;
 
@@ -47,8 +61,8 @@ export interface EvaluateNotionDigestInput {
   proposal?: { request: string; recurrence: ScheduleRecurrence; [key: string]: any };
   services: string[];
   recurrence?: ScheduleRecurrence;
-  notionConnection?: (userId: string, scopeId?: string) => Promise<any>;
-  telegramConnection?: (userId: string) => Promise<any>;
+  workspaceMode?: 'legacy' | 'personal' | 'organization';
+  notionSources?: Pick<NotionDigestSourceAuthority, 'prepare'>;
   getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
 }
 
@@ -59,19 +73,9 @@ export async function evaluateNotionDigestCandidate(
   const request = input.request ?? input.proposal?.request ?? '';
   const recurrence = (input.recurrence ?? input.proposal?.recurrence)!;
   const serviceSet = new Set(services);
-  const isTelegramDest =
-    serviceSet.size === 2 &&
-    serviceSet.has('notion') &&
-    serviceSet.has('telegram') &&
-    typeof input.telegramConnection === 'function';
-  const isSlackDest = serviceSet.size === 2 && serviceSet.has('notion') && serviceSet.has('slack');
-
-  if (!isSlackDest && !isTelegramDest) {
-    return {
-      canAutoDigest: false,
-      disabledReason:
-        'Chỉ bật được khi lịch chỉ đọc Notion và gửi báo cáo vào 1 kênh Slack hoặc Telegram đã chọn.',
-    };
+  if (serviceSet.size !== 2 || !serviceSet.has('notion') || !serviceSet.has('slack') ||
+      input.workspaceMode === 'organization') {
+    return { canAutoDigest: false, disabledReason: NOTION_DIGEST_REAPPROVAL };
   }
 
   if (WRITE_INTENT_REGEX.test(request)) {
@@ -82,132 +86,8 @@ export async function evaluateNotionDigestCandidate(
     };
   }
 
-  let notion: any;
-  try {
-    notion = await input.notionConnection?.(userId);
-  } catch {
-    notion = null;
-  }
-
-  if (
-    !notion ||
-    notion.status !== 'connected' ||
-    !notion.connection ||
-    !Array.isArray(notion.connection.databaseIds) ||
-    notion.connection.databaseIds.length === 0
-  ) {
-    return {
-      canAutoDigest: false,
-      disabledReason:
-        'Cần kết nối Notion cá nhân và chọn ít nhất 1 database Notion trong phạm vi cho phép.',
-    };
-  }
-
-  const lowerReq = request.toLowerCase();
-  const dbItems: Array<{ id: string; title: string; url?: string }> =
-    Array.isArray(notion.selectedDatabases) && notion.selectedDatabases.length > 0
-      ? notion.selectedDatabases
-      : (notion.connection.databaseIds as string[]).map((id: string) => ({
-          id,
-          title: id,
-        }));
-
-  const matchedDbs = new Map<string, { id: string; title: string; url?: string }>();
-  for (const item of dbItems) {
-    const dTitleLower = String(item.title || '').toLowerCase();
-    const dIdLower = String(item.id || '').toLowerCase();
-    if (
-      (dTitleLower && lowerReq.includes(dTitleLower)) ||
-      (dIdLower && lowerReq.includes(dIdLower))
-    ) {
-      matchedDbs.set(dIdLower, {
-        id: dIdLower,
-        title: String(item.title || item.id),
-        ...(item.url ? { url: String(item.url) } : {}),
-      });
-    }
-  }
-
-  if (matchedDbs.size === 0) {
-    for (const item of dbItems.slice(0, 5)) {
-      const dIdLower = String(item.id).toLowerCase();
-      matchedDbs.set(dIdLower, {
-        id: dIdLower,
-        title: String(item.title || item.id),
-        ...(item.url ? { url: String(item.url) } : {}),
-      });
-    }
-  }
-
-  if (matchedDbs.size === 0 || matchedDbs.size > 5) {
-    return {
-      canAutoDigest: false,
-      disabledReason:
-        'Cần có từ 1 đến 5 database Notion hợp lệ thuộc phạm vi được phép để tổng hợp bản tin.',
-    };
-  }
-
-  const databases = Array.from(matchedDbs.values());
-
-  if (isTelegramDest) {
-    let tg: any;
-    try {
-      tg = await input.telegramConnection?.(userId);
-    } catch {
-      tg = null;
-    }
-    const selectedChats: Array<{ chatId: string; title: string }> = Array.isArray(tg?.selectedChats)
-      ? tg.selectedChats
-      : [];
-    if (!tg || tg.status !== 'connected' || selectedChats.length === 0) {
-      return {
-        canAutoDigest: false,
-        disabledReason: 'Cần kết nối Telegram cá nhân và chọn ít nhất 1 cuộc trò chuyện nhận bản tin.',
-      };
-    }
-
-    let matchedChat: { chatId: string; title: string } | null = null;
-    const byTitle = selectedChats.filter(
-      (c) => c.title && lowerReq.includes(String(c.title).toLowerCase())
-    );
-    if (byTitle.length === 1) {
-      matchedChat = byTitle[0]!;
-    } else if (selectedChats.length === 1) {
-      matchedChat = selectedChats[0]!;
-    }
-
-    if (!matchedChat) {
-      return {
-        canAutoDigest: false,
-        disabledReason: 'Cần chỉ rõ 1 cuộc trò chuyện Telegram hợp lệ thuộc phạm vi được phép nhận bản tin.',
-      };
-    }
-
-    const config = canonicalizeNotionDigestConfig({
-      credentialId: notion.connection.credentialId,
-      workspaceId: notion.connection.workspaceId,
-      workspaceName: notion.connection.workspaceName,
-      botId: notion.connection.botId,
-      identityVersion: notion.connection.identityVersion,
-      databases,
-      channelId: '',
-      channelName: '',
-      telegramChatId: String(matchedChat.chatId),
-      telegramChatTitle: String(matchedChat.title),
-    });
-
-    const configHash = computeNotionDigestConfigHash({
-      config,
-      recurrence,
-      userId,
-    });
-
-    return {
-      canAutoDigest: true,
-      config,
-      configHash,
-    };
-  }
+  const binding = await input.notionSources?.prepare(userId, request, AbortSignal.timeout(10_000)).catch(() => undefined);
+  if (!binding) return { canAutoDigest: false, disabledReason: NOTION_DIGEST_REAPPROVAL };
 
   // Slack destination
   const hashMatch =
@@ -248,12 +128,13 @@ export async function evaluateNotionDigestCandidate(
   }
 
   const config = canonicalizeNotionDigestConfig({
-    credentialId: notion.connection.credentialId,
-    workspaceId: notion.connection.workspaceId,
-    workspaceName: notion.connection.workspaceName,
-    botId: notion.connection.botId,
-    identityVersion: notion.connection.identityVersion,
-    databases,
+    notionBinding: binding,
+    credentialId: binding.credentialId,
+    workspaceId: binding.workspaceId,
+    workspaceName: binding.workspaceName,
+    botId: binding.botId,
+    identityVersion: binding.identityVersion,
+    databases: binding.databases.map(({ databaseId, title }) => ({ id: databaseId, title })),
     channelId: matchedChannel.id,
     channelName: matchedChannel.name,
   });
