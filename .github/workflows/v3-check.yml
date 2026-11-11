@@ -5,21 +5,23 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-    inputs:
-      target_gate:
-        description: 'Locked exact-SHA verification target (Target A: 6588b5c3e001aaa24b41a71ce169fe06c2fb84df)'
-        required: true
-        type: choice
-        default: notion-n2b-6588b5c3
-        options:
-          - notion-n2b-6588b5c3
 
 permissions:
   contents: read
 
+# A new push to the same PR cancels the run that is still going.
+concurrency:
+  group: v3-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DATABASE_URL: postgresql://ati_v3:ati_v3_ci_only@127.0.0.1:5432/ati_v3
+  RUNTIME_MODE: sandbox
+  CHAT_ADMIN_EMAIL: ci-browser@localhost.test
+  CHAT_ADMIN_PASSWORD: ci-browser-test-password-2026
+
 jobs:
-  v3:
-    if: github.event_name != 'workflow_dispatch'
+  check:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -35,11 +37,6 @@ jobs:
           --health-interval 2s
           --health-timeout 3s
           --health-retries 30
-    env:
-      DATABASE_URL: postgresql://ati_v3:ati_v3_ci_only@127.0.0.1:5432/ati_v3
-      RUNTIME_MODE: sandbox
-      CHAT_ADMIN_EMAIL: ci-browser@localhost.test
-      CHAT_ADMIN_PASSWORD: ci-browser-test-password-2026
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -49,25 +46,9 @@ jobs:
       - run: npm ci
       - run: npm run db:migrate:v3
       - run: npm run check
-      - run: npm run admin:provision:v3
-      - name: Install Chromium and verify runner libraries
-        run: |
-          npx playwright install chromium
-          if ! node --input-type=module -e 'import { chromium } from "@playwright/test"; const browser = await chromium.launch(); await browser.close()'; then
-            npx playwright install-deps chromium
-            node --input-type=module -e 'import { chromium } from "@playwright/test"; const browser = await chromium.launch(); await browser.close()'
-          fi
-      - run: npm run test:browser:v3
 
-  v3-exact-sha:
-    if: github.event_name == 'workflow_dispatch'
+  browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    permissions:
-      contents: read
-    concurrency:
-      group: v3-exact-sha-notion-n2b-6588b5c3
-      cancel-in-progress: false
     services:
       postgres:
         image: postgres:16
@@ -82,335 +63,20 @@ jobs:
           --health-interval 2s
           --health-timeout 3s
           --health-retries 30
-    env:
-      DATABASE_URL: postgresql://ati_v3:ati_v3_ci_only@127.0.0.1:5432/ati_v3
-      RUNTIME_MODE: sandbox
-      CHAT_ADMIN_EMAIL: ci-browser@localhost.test
-      CHAT_ADMIN_PASSWORD: ci-browser-test-password-2026
-      V3_BROWSER_OUTPUT_DIR: /tmp/ati-ci-raw-browser-results
     steps:
-      - name: Validate locked target gate and remote branch ref
-        env:
-          INPUT_TARGET_GATE: ${{ inputs.target_gate }}
-          EXPECTED_REPO: VinhDat267/ATI_Project
-          EXPECTED_REMOTE_REF: refs/heads/VinhDat267/notion-n2b-oauth-20261111
-          EXPECTED_SHA: 6588b5c3e001aaa24b41a71ce169fe06c2fb84df
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/ati-ci-evidence
-          : > /tmp/ati-ci-evidence/step-conclusions.jsonl
-
-          if [[ "${GITHUB_REPOSITORY}" != "${EXPECTED_REPO}" ]]; then
-            echo "::error::Unexpected repository ${GITHUB_REPOSITORY}"
-            exit 1
-          fi
-          if [[ "${INPUT_TARGET_GATE}" != "notion-n2b-6588b5c3" ]]; then
-            echo "::error::Unsupported target_gate ${INPUT_TARGET_GATE}"
-            exit 1
-          fi
-
-          REMOTE_LINE="$(git ls-remote "https://github.com/${EXPECTED_REPO}.git" "${EXPECTED_REMOTE_REF}")"
-          REMOTE_SHA="${REMOTE_LINE%%$'\t'*}"
-          if [[ "${REMOTE_SHA}" != "${EXPECTED_SHA}" ]]; then
-            echo "::error::REMOTE_REF_SHA_MISMATCH ref=${EXPECTED_REMOTE_REF} expected=${EXPECTED_SHA} actual=${REMOTE_SHA:-MISSING}"
-            exit 1
-          fi
-          printf '%s\n' "${REMOTE_SHA}" > /tmp/ati-ci-evidence/remote-branch-sha.txt
-
-      - name: Checkout immutable Target A commit
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          ref: 6588b5c3e001aaa24b41a71ce169fe06c2fb84df
-          fetch-depth: 2
-          persist-credentials: false
-          clean: true
-
-      - name: Verify exact Target A commit, parent, tree, lockfile, and 16-file manifest
-        env:
-          INPUT_TARGET_GATE: ${{ inputs.target_gate }}
-          EXPECTED_REPO: VinhDat267/ATI_Project
-          EXPECTED_REMOTE_REF: refs/heads/VinhDat267/notion-n2b-oauth-20261111
-          EXPECTED_SHA: 6588b5c3e001aaa24b41a71ce169fe06c2fb84df
-          EXPECTED_PARENT_SHA: 2eed8d1d4309e833088d6f1d3fa774189049e283
-          EXPECTED_TREE_SHA: a56d824dbb4ff51c7e099b00c1af224a88dbf1ae
-          EXPECTED_LOCKFILE_BLOB: 713a51f75565bc36a7a05e2b697d6c721834cbcd
-          EXPECTED_LOCKFILE_SHA256: 2405645881240af670f1b446c35dff7298522e6294f06f2559b0d34386c2b24f
-        run: |
-          set -euo pipefail
-          START_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          ACTUAL_HEAD="$(git rev-parse HEAD)"
-          ACTUAL_PARENT="$(git rev-parse 'HEAD^')"
-          ACTUAL_TREE="$(git rev-parse 'HEAD^{tree}')"
-          DIRTY_STATUS="$(git status --porcelain=v1 --untracked-files=all)"
-          LOCKFILE_BLOB="$(git rev-parse HEAD:package-lock.json)"
-          LOCKFILE_SHA256="$(sha256sum package-lock.json | awk '{print $1}')"
-          DIFF_COUNT="$(git diff-tree --no-commit-id --name-only -r HEAD | wc -l | tr -d ' ')"
-
-          if [[ "${GITHUB_REPOSITORY}" != "${EXPECTED_REPO}" ]]; then
-            echo "::error::REPO_MISMATCH actual=${GITHUB_REPOSITORY}"
-            exit 1
-          fi
-          if [[ -n "${DIRTY_STATUS}" ]]; then
-            echo "::error::WORKTREE_NOT_CLEAN"
-            exit 1
-          fi
-          if [[ "${ACTUAL_HEAD}" != "${EXPECTED_SHA}" ]]; then
-            echo "::error::EXACT_SHA_MISMATCH expected=${EXPECTED_SHA} actual=${ACTUAL_HEAD}"
-            exit 1
-          fi
-          if [[ "${ACTUAL_PARENT}" != "${EXPECTED_PARENT_SHA}" ]]; then
-            echo "::error::EXACT_PARENT_MISMATCH expected=${EXPECTED_PARENT_SHA} actual=${ACTUAL_PARENT}"
-            exit 1
-          fi
-          if [[ "${ACTUAL_TREE}" != "${EXPECTED_TREE_SHA}" ]]; then
-            echo "::error::EXACT_TREE_MISMATCH expected=${EXPECTED_TREE_SHA} actual=${ACTUAL_TREE}"
-            exit 1
-          fi
-          if [[ "${LOCKFILE_BLOB}" != "${EXPECTED_LOCKFILE_BLOB}" ]]; then
-            echo "::error::LOCKFILE_BLOB_MISMATCH expected=${EXPECTED_LOCKFILE_BLOB} actual=${LOCKFILE_BLOB}"
-            exit 1
-          fi
-          if [[ "${LOCKFILE_SHA256}" != "${EXPECTED_LOCKFILE_SHA256}" ]]; then
-            echo "::error::LOCKFILE_SHA256_MISMATCH expected=${EXPECTED_LOCKFILE_SHA256} actual=${LOCKFILE_SHA256}"
-            exit 1
-          fi
-          if [[ "${DIFF_COUNT}" != "16" ]]; then
-            echo "::error::COMMITTED_FILE_COUNT_MISMATCH expected=16 actual=${DIFF_COUNT}"
-            exit 1
-          fi
-
-          cat <<'EOF' > /tmp/ati-ci-evidence/expected-16-manifest.sha256
-          8accf6978af8182bbb60ea9a2deb4620c58620b14eafda903c83fdb7b233d519  apps/chat-api/src/db/repositories/notion-connection-repo.ts
-          9dc85df050f420af97f84261777764ab5c6b546c9f14699b84e085690b8a3879  apps/chat-api/src/routes/connections/notion.ts
-          aa4e9b2ac5ca767d331f644e748d2113c85a927396623fa61ef9601ed4e850bd  apps/chat-api/src/services/notion/connection-reference.ts
-          270e562aa5d2af20b872a4f0e785154c1eac7b2c419c17ef87b0f396f1ba9990  apps/chat-api/src/services/notion/oauth-client.ts
-          79317f17bf42324162de15175d1e4ba28faf144bcd3c3c1070634f6ca22ff594  apps/chat-api/src/services/notion/token-manager.ts
-          f69b0ea4f06e838e50701e9e7e251ebce243481fdab23e3cba1a1cc3c58fdb2a  apps/chat-api/tests/db/notion-oauth-durability-migration.test.ts
-          ff5e930e50b49a982faa0f3b774d0d61ae671e855d890102bae02f081d815e1d  apps/chat-api/tests/helpers/notion-oauth-test-env.ts
-          78c903eb1f8a2fe3a1a57b44f575265c1532e3df0efcb00893c33d928a0705f5  apps/chat-api/tests/helpers/notion-refresh-crash-child.ts
-          23a57bb9f4a45b424327c9141c8a049892223dafaaaf71c2772edd1537c2f36a  apps/chat-api/tests/routes/notion-connections.test.ts
-          b6e6a2db64b66cebb2d8a514ec971a569590ab0e6e0e7f5b22abdcf5bad1adbb  apps/chat-api/tests/services/notion-oauth-durability.test.ts
-          6738c62a8c7fc276dbef28e9223edef52f5295ec6957ff0b012d577321ccc517  apps/chat-api/tests/services/notion-oauth-restart.test.ts
-          e24518a91c462ece010792a9262dc6201433e398a427983efe1379329f46ce30  apps/chat-api/tests/services/notion-oauth.test.ts
-          1961a59d3796349b534cab1a0ba697e96bcc5d1bce3874a7635fea7a6d639c43  apps/chat-api/tests/services/notion-token-manager.test.ts
-          d189b1282643c4ee25b97ad6bd6c4d2322742655f5826d09fc687ad5c03def4c  apps/chat-web/src/pages/Settings/NotionConnection.tsx
-          e9981253d0578012e36212e9484b892ddccd375d7393634c580cc7ebf0898d51  apps/chat-web/tests/notion-connection.test.tsx
-          7511b9bfec96cb013ad2bce2cc36162e9c5a7f444b3adc3e5d430eb62b8b4a4b  db/v3/0036_notion_oauth_durability.sql
-          EOF
-          sha256sum -c /tmp/ati-ci-evidence/expected-16-manifest.sha256 | tee /tmp/ati-ci-evidence/00-source-manifest-check.log
-
-          python3 - <<'PY' > /tmp/ati-ci-evidence/ci-exact-sha-provenance.json
-          import hashlib, json, os, subprocess
-          def git(*args):
-              return subprocess.check_output(["git", *args], text=True).strip()
-          manifest_rows = []
-          with open("/tmp/ati-ci-evidence/expected-16-manifest.sha256", "r", encoding="utf-8") as fh:
-              for line in fh:
-                  line = line.strip()
-                  if not line:
-                      continue
-                  exp_sha, rel_path = line.split("  ", 1)
-                  with open(rel_path, "rb") as target_fh:
-                      act_sha = hashlib.sha256(target_fh.read()).hexdigest()
-                  manifest_rows.append({
-                      "path": rel_path,
-                      "expected_sha256": exp_sha,
-                      "actual_sha256": act_sha,
-                      "git_blob_oid": git("rev-parse", f"HEAD:{rel_path}"),
-                      "verified": exp_sha == act_sha,
-                  })
-          with open("/tmp/ati-ci-evidence/remote-branch-sha.txt", "r", encoding="utf-8") as rfh:
-              remote_branch_sha = rfh.read().strip()
-          doc = {
-              "workflow_repository": os.environ.get("GITHUB_REPOSITORY"),
-              "workflow_ref": os.environ.get("GITHUB_WORKFLOW_REF"),
-              "workflow_sha": os.environ.get("GITHUB_WORKFLOW_SHA"),
-              "event_name": os.environ.get("GITHUB_EVENT_NAME"),
-              "dispatch_event_ref": os.environ.get("GITHUB_REF"),
-              "dispatch_event_github_sha_not_tested_target": os.environ.get("GITHUB_SHA"),
-              "triggering_actor": os.environ.get("GITHUB_ACTOR"),
-              "run_id": os.environ.get("GITHUB_RUN_ID"),
-              "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
-              "target_gate": os.environ.get("INPUT_TARGET_GATE"),
-              "verified_remote_branch_ref": os.environ.get("EXPECTED_REMOTE_REF"),
-              "verified_remote_branch_sha": remote_branch_sha,
-              "actual_tested_head_sha": git("rev-parse", "HEAD"),
-              "actual_tested_parent_sha": git("rev-parse", "HEAD^"),
-              "actual_tested_tree_sha": git("rev-parse", "HEAD^{tree}"),
-              "package_lock_blob_oid": git("rev-parse", "HEAD:package-lock.json"),
-              "package_lock_sha256": os.environ.get("EXPECTED_LOCKFILE_SHA256"),
-              "manifest_provenance": "notion-n2b-commit-verification-20261111/02-CONTROLLED-LOCAL-COMMIT.md",
-              "manifest_file_count": len(manifest_rows),
-              "sha_verification_outcome": "PASS" if len(manifest_rows) == 16 and all(r["verified"] for r in manifest_rows) else "FAIL",
-              "manifest_verification_exit_status": 0,
-              "files": manifest_rows,
-          }
-          print(json.dumps(doc, indent=2))
-          PY
-
-          END_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          printf '{"step":"00-source-guard","command":"git rev-parse + sha256sum -c (16 files)","started_at":"%s","completed_at":"%s","exit_code":0}\n' \
-            "${START_UTC}" "${END_UTC}" >> /tmp/ati-ci-evidence/step-conclusions.jsonl
-
-          {
-            echo "## Exact-SHA Source Provenance (Target A)"
-            echo '```json'
-            cat /tmp/ati-ci-evidence/ci-exact-sha-provenance.json
-            echo '```'
-          } >> "${GITHUB_STEP_SUMMARY}"
-
-      - name: Setup Node.js 24
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
-
-      - name: Install lockfile-pinned dependencies (npm ci)
+      - run: npm ci
+      - run: npm run db:migrate:v3
+      - run: npm run admin:provision:v3
+      - name: Install Chromium and verify runner libraries
         run: |
-          set -uo pipefail
-          START_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          npm ci 2>&1 | tee /tmp/ati-ci-evidence/01-npm-ci.log
-          RC=${PIPESTATUS[0]}
-          END_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          printf '{"step":"01-npm-ci","command":"npm ci","started_at":"%s","completed_at":"%s","exit_code":%d}\n' \
-            "${START_UTC}" "${END_UTC}" "${RC}" >> /tmp/ati-ci-evidence/step-conclusions.jsonl
-          exit "${RC}"
-
-      - name: Apply Target A PostgreSQL migrations (db:migrate:v3)
-        run: |
-          set -uo pipefail
-          START_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          npm run db:migrate:v3 2>&1 | tee /tmp/ati-ci-evidence/02-db-migrate.log
-          RC=${PIPESTATUS[0]}
-          END_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          printf '{"step":"02-db-migrate-v3","command":"npm run db:migrate:v3","started_at":"%s","completed_at":"%s","exit_code":%d}\n' \
-            "${START_UTC}" "${END_UTC}" "${RC}" >> /tmp/ati-ci-evidence/step-conclusions.jsonl
-          exit "${RC}"
-
-      - name: Execute full workspace check (npm run check)
-        run: |
-          set -uo pipefail
-          START_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          npm run check 2>&1 | tee /tmp/ati-ci-evidence/03-npm-run-check.log
-          RC=${PIPESTATUS[0]}
-          END_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          printf '{"step":"03-npm-run-check","command":"npm run check","started_at":"%s","completed_at":"%s","exit_code":%d}\n' \
-            "${START_UTC}" "${END_UTC}" "${RC}" >> /tmp/ati-ci-evidence/step-conclusions.jsonl
-          exit "${RC}"
-
-      - name: Provision sandbox browser admin (admin:provision:v3)
-        run: |
-          set -uo pipefail
-          START_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          npm run admin:provision:v3 2>&1 | tee /tmp/ati-ci-evidence/04-admin-provision.log
-          RC=${PIPESTATUS[0]}
-          END_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          printf '{"step":"04-admin-provision-v3","command":"npm run admin:provision:v3","started_at":"%s","completed_at":"%s","exit_code":%d}\n' \
-            "${START_UTC}" "${END_UTC}" "${RC}" >> /tmp/ati-ci-evidence/step-conclusions.jsonl
-          exit "${RC}"
-
-      - name: Install Playwright Chromium browser
-        run: |
-          set -uo pipefail
-          START_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          npx playwright install --with-deps chromium 2>&1 | tee /tmp/ati-ci-evidence/05-playwright-install.log
-          RC=${PIPESTATUS[0]}
-          END_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          printf '{"step":"05-playwright-install","command":"npx playwright install --with-deps chromium","started_at":"%s","completed_at":"%s","exit_code":%d}\n' \
-            "${START_UTC}" "${END_UTC}" "${RC}" >> /tmp/ati-ci-evidence/step-conclusions.jsonl
-          exit "${RC}"
-
-      - name: Execute 22 Chromium browser scenario groups (test:browser:v3)
-        run: |
-          set -uo pipefail
-          START_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          npm run test:browser:v3 2>&1 | tee /tmp/ati-ci-evidence/06-test-browser-v3.log
-          RC=${PIPESTATUS[0]}
-          END_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          printf '{"step":"06-test-browser-v3","command":"npm run test:browser:v3","started_at":"%s","completed_at":"%s","exit_code":%d}\n' \
-            "${START_UTC}" "${END_UTC}" "${RC}" >> /tmp/ati-ci-evidence/step-conclusions.jsonl
-          exit "${RC}"
-
-      - name: Sanitize public-repo logs, record cleanup status, and seal SHA-256 manifest
-        if: always()
-        env:
-          CURRENT_JOB_STATUS: ${{ job.status }}
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/ati-ci-evidence
-          if [[ -d /tmp/ati-ci-raw-browser-results ]]; then
-            cp -r /tmp/ati-ci-raw-browser-results /tmp/ati-ci-evidence/playwright-browser-results || true
+          npx playwright install chromium
+          if ! node --input-type=module -e 'import { chromium } from "@playwright/test"; const browser = await chromium.launch(); await browser.close()'; then
+            npx playwright install-deps chromium
+            node --input-type=module -e 'import { chromium } from "@playwright/test"; const browser = await chromium.launch(); await browser.close()'
           fi
-
-          if [[ -d node_modules/pg ]]; then
-            node --input-type=module - <<'JS' > /tmp/ati-ci-evidence/07-cleanup-and-pg-status.json || true
-          import pg from 'pg';
-          const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-          try {
-            const tables = await pool.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'public'");
-            const notionCol = await pool.query("SELECT count(*)::int AS n FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'notion_connections' AND column_name = 'auth_failure_code'");
-            const sheets0035 = await pool.query("SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'sheets_append_leases'");
-            console.log(JSON.stringify({
-              postgres_reachable_at_teardown: true,
-              public_table_count: tables.rows[0].n,
-              notion_0036_auth_failure_code_present: notionCol.rows[0].n === 1,
-              main_0035_sheets_append_leases_present: sheets0035.rows[0].n > 0,
-              disposable_service_container_teardown: "github_actions_ephemeral_job_container_auto_destroyed"
-            }, null, 2));
-          } catch (err) {
-            console.log(JSON.stringify({ postgres_reachable_at_teardown: false, reason: String(err.message || err) }, null, 2));
-          } finally {
-            await pool.end().catch(() => {});
-          }
-          JS
-          fi
-
-          python3 - <<'PY'
-          import json, os, pathlib, re
-
-          root = pathlib.Path("/tmp/ati-ci-evidence")
-          steps = []
-          jsonl_path = root / "step-conclusions.jsonl"
-          if jsonl_path.exists():
-              for line in jsonl_path.read_text(encoding="utf-8", errors="replace").splitlines():
-                  if line.strip():
-                      steps.append(json.loads(line))
-
-          summary = {
-              "job_status_at_seal": os.environ.get("CURRENT_JOB_STATUS"),
-              "recorded_step_count": len(steps),
-              "steps": steps,
-              "cleanup_status": "ephemeral_runner_and_service_container_disposed_post_job",
-          }
-          (root / "job-and-step-conclusions.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
-
-          patterns = [
-              (re.compile(r"postgresql://[^\s'\"`]+"), "postgresql://<REDACTED_CI_DB_URI>"),
-              (re.compile(r"ati_v3_ci_only"), "<REDACTED_CI_DB_PASSWORD>"),
-              (re.compile(r"ci-browser-test-password-2026"), "<REDACTED_CI_ADMIN_PASSWORD>"),
-              (re.compile(r"FE01_(?:admin|demo)_sentinel_[0-9]+!"), "<REDACTED_SENTINEL>"),
-              (re.compile(r"(?i)(authorization:\s*bearer\s+)[A-Za-z0-9._~+/=-]+"), r"\1<REDACTED_BEARER>"),
-              (re.compile(r"\b(?:ntn|secret)_[A-Za-z0-9]{12,}\b"), "<REDACTED_NOTION_TOKEN>"),
-              (re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b"), "<REDACTED_SLACK_TOKEN>"),
-          ]
-
-          for p in root.rglob("*"):
-              if p.is_file() and p.suffix in {".log", ".txt", ".json", ".jsonl", ".md"}:
-                  raw = p.read_text(encoding="utf-8", errors="replace")
-                  scrubbed = raw
-                  for rx, repl in patterns:
-                      scrubbed = rx.sub(repl, scrubbed)
-                  if scrubbed != raw:
-                      p.write_text(scrubbed, encoding="utf-8")
-          PY
-
-          (cd /tmp/ati-ci-evidence && find . -type f ! -name 'SHA256SUMS.txt' -print0 | sort -z | xargs -0 -r sha256sum > SHA256SUMS.txt && test -s SHA256SUMS.txt)
-
-      - name: Upload exact-SHA verification evidence
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: exact-sha-evidence-${{ github.run_id }}-${{ github.run_attempt }}
-          path: /tmp/ati-ci-evidence
-          if-no-files-found: error
-          retention-days: 30
+      - run: npm run test:browser:v3

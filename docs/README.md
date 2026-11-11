@@ -3,8 +3,9 @@
 ## Bắt đầu
 
 - [README](../README.md) (tiếng Anh) và [README.vi](../README.vi.md) (tiếng Việt): giới thiệu, cài đặt, chạy sandbox/live và các lệnh.
-- [Trạng thái hiện tại](handoff/CURRENT-STATE.md): số liệu mới nhất, lỗi đã biết, quy tắc đã chốt. Đọc trước khi làm bất cứ việc gì.
-- [Bàn giao giữa các agent](handoff/README.md), [lộ trình](handoff/ROADMAP.md) và [task card](handoff/tasks/).
+- [Quy tắc làm việc](../AGENTS.md): ship nhỏ, CI gác cổng.
+- [Trạng thái hiện tại](handoff/CURRENT-STATE.md): một trang về từng dịch vụ, việc đang làm và lỗi đã biết.
+- [Bàn giao giữa các agent](handoff/README.md) và [việc ưu tiên](handoff/ROADMAP.md). Quy trình cũ: [lưu trữ](archive/handoff-2026-11-12/README.md).
 - [Môi trường v3 cục bộ](V3-LOCAL-SETUP.md): PostgreSQL thật ở chế độ sandbox.
 
 ## Thiết kế và phạm vi
@@ -12,7 +13,7 @@
 - [Đặc tả v3](superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md) và [kế hoạch triển khai](superpowers/plans/2026-09-29-ai-workflow-platform-v3.md): hành vi thiết kế, 28 tasks nền và backlog Phase 7 đa dịch vụ.
 - [Phạm vi nền tảng đa dịch vụ](MULTI-SERVICE-SCOPE.md): mục tiêu sản phẩm, giới hạn mã, backlog và tiêu chí nghiệm thu dẫn từ đặc tả.
 - [Báo cáo dự án](PROJECT-REPORT.md): mục tiêu, kiến trúc, tiến độ đến 29/09; số liệu mới hơn ở CURRENT-STATE.
-- [Quy ước làm việc nhóm](team-workflow.md): sở hữu module, commit, nhánh.
+- [Quy ước Git](team-workflow.md): nhánh, commit, PR.
 - Tài liệu đề tài ban đầu: [mô tả dự án](mo-ta-du-an.md), [yêu cầu chức năng](functional-requirements.md), [màn hình](screens.html), [wireframe](wireframes.html), [ADR-001](ADR-001-FRONTEND-STACK.md), [ADR-002](ADR-002-FRONTEND-UI-DATA-LAYER.md). Các tài liệu này viết cho v1/v2; giữ lại làm tham khảo cho báo cáo môn học.
 
 ## Bằng chứng

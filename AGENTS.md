@@ -1,69 +1,48 @@
-# ATI Project — Multi-Agent Engineering Protocol (v3)
+# ATI Project (Planora): quy tắc cho AI coding agent
 
-**Version:** 3.1  
+Áp dụng cho mọi agent làm việc trong repo này (Codex, Antigravity, Claude Code, Cursor, Gemini CLI…). Nhóm vibe code 100%. Mục tiêu là **ship tính năng chạy được, nhỏ và an toàn**, không phải viết hồ sơ.
 
-> **Đối tượng:** Tài liệu này áp dụng cho mọi AI coding assistant làm việc với
-> repository này (Antigravity, Codex, Claude Code, Cursor, Gemini CLI, v.v.).
-> Dù bạn là agent nào, hãy tuân thủ các quy tắc dưới đây khi đọc/ghi code
-> trong repo `ATI_Project`.
+## 1. Bắt đầu một phiên (khoảng 2 phút)
 
-> **Bắt đầu ở đây:** trước khi làm bất cứ việc gì, đọc [`docs/handoff/CURRENT-STATE.md`](docs/handoff/CURRENT-STATE.md) (dự án đang ở đâu) và [`docs/handoff/README.md`](docs/handoff/README.md) (cách nhận việc và bàn giao). Việc cần làm nằm trong [`docs/handoff/ROADMAP.md`](docs/handoff/ROADMAP.md) và `docs/handoff/tasks/`.
+1. Đọc [`docs/handoff/CURRENT-STATE.md`](docs/handoff/CURRENT-STATE.md): một trang về trạng thái từng dịch vụ và việc đang làm. Việc ưu tiên nằm ở [`docs/handoff/ROADMAP.md`](docs/handoff/ROADMAP.md).
+2. `git fetch origin`. Làm trên nhánh mới tách từ `origin/main`. Nếu thư mục đang có thay đổi chưa commit không phải của bạn, tạo `git worktree` riêng, không chuyển nhánh của người khác.
+3. Cần chi tiết lịch sử thì xem `git log`, mô tả PR trên GitHub, hoặc `docs/archive/`. **Không bắt buộc đọc.**
 
-## 1. Phạm vi & Quyền lực chuẩn tắc (Scope & Source of Truth)
+## 2. Mã nguồn ở đâu
 
-Tài liệu này quy định các ranh giới kỹ thuật đặc thù cho repository `ATI_Project`. Toàn bộ phương pháp luận Superpowers và vai trò Antigravity Master Orchestrator được tự động kế thừa từ **Global Rules**.
+`packages/tool-schemas/` · `packages/tool-adapters/` · `packages/planner/` · `packages/executor/` · `apps/chat-api/` · `apps/chat-web/` · `db/v3/` · `prompts/` · `evaluations/`.
 
-### 1.1. Quyền lực phạm vi v3 (Active Scope Authority)
-- **Báo cáo Tổng quan Project:** [`docs/PROJECT-REPORT.md`](docs/PROJECT-REPORT.md) là tài liệu mô tả toàn cảnh dự án (mục tiêu, kiến trúc, tiến độ). Đọc file này trước để nắm bức tranh tổng thể.
-- **Đặc tả Thiết kế v3:** [`docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md`](docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md) là tài liệu chuẩn tắc duy nhất về hành vi nghiệp vụ, luồng xử lý, tool catalog và schema của hệ thống v3.
-- **Kế hoạch Triển khai:** [`docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md`](docs/superpowers/plans/2026-09-29-ai-workflow-platform-v3.md) chứa 28 tasks nền và backlog Phase 7 đa dịch vụ còn mở. Hoàn thành 28 tasks không đồng nghĩa hoàn thành toàn bộ scope sản phẩm.
-- **Quy tắc Phân quyền Module & Git:** [`docs/team-workflow.md`](docs/team-workflow.md) là chuẩn tắc về ranh giới sở hữu thư mục (Module Ownership), quy chuẩn commit (Conventional Commits) và chiến lược nhánh.
+- Một tính năng được phép sửa xuyên các package (schema → adapter → API → web) trong cùng một PR.
+- Mã v1/v2 đã xoá; ảnh chụp nằm ở tag `archive/v2-final`. Không khôi phục vào `main`.
+- Hành vi nghiệp vụ chuẩn: [đặc tả v3](docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md). Chỉ tra khi cần.
 
-### 1.2. Phạm vi nền tảng đa dịch vụ
-- Mục tiêu sản phẩm là workflow trên nhiều dịch vụ bên ngoài đã tích hợp và được cấp quyền; Trello/Slack chỉ là đợt triển khai đầu tiên.
-- Áp dụng tiêu chí nghiệm thu ở mục 1.4 của đặc tả v3. Không tuyên bố hoàn thành nền tảng chỉ dựa trên demo hai dịch vụ hoặc một adapter giả lập bổ sung.
-- [`docs/MULTI-SERVICE-SCOPE.md`](docs/MULTI-SERVICE-SCOPE.md) ghi khoảng cách mã nguồn và backlog; tài liệu này không thay thế quyền lực chuẩn tắc của đặc tả v3.
-- Khi thêm dịch vụ, phải xét catalog, routing/gather, adapter, xác thực, phạm vi tài nguyên, API/UI cấu hình và kiểm thử liên dịch vụ; không giả định chỉ cần thêm một file adapter.
+## 3. Bất biến an toàn của sản phẩm (không được phá)
 
-### 1.3. Mã nguồn cũ (v1/v2) đã xoá
-- Ngày 05/10/2026, chủ dự án quyết định xoá mã và tài liệu v1/v2 khỏi `main`: `apps/api/`, `apps/web/`, `apps/mcp-task-hub/`, `packages/dsl/`, `packages/engine/`, `packages/db/`, `db/migrations/` cùng các báo cáo, kế hoạch và bằng chứng đi kèm.
-- Ảnh chụp trước khi xoá là tag `archive/v2-final`. Cần đối chứng thì đọc từ tag (`git show archive/v2-final:<đường dẫn>`); không khôi phục vào `main` khi chưa có yêu cầu của chủ dự án.
-- Mọi mã nguồn hiện nằm tại:
-  - `packages/tool-schemas/`
-  - `packages/tool-adapters/`
-  - `packages/planner/`
-  - `packages/executor/`
-  - `apps/chat-api/`
-  - `apps/chat-web/`
-  - `db/v3/`
-  - `prompts/`
-  - `evaluations/`
+1. Mọi lệnh ghi ra dịch vụ ngoài phải qua **preview và người dùng duyệt** (`plan_hash`). Không có đường tắt.
+2. Kết quả gửi hoặc ghi **chưa rõ (`unknown`) thì không tự chạy lại**. Chuyển `needs_attention` để người xử lý.
+3. Adapter chỉ chạm tài nguyên trong **allowlist/phạm vi đã chọn**. Credential cá nhân hay tổ chức phải đúng ngữ cảnh workspace.
+4. **Không commit secret** (token, mật khẩu, `.env`, dữ liệu thật của người dùng).
+5. Migration DB chỉ thêm, chạy lại được (idempotent). Không sửa migration đã merge.
 
----
+## 4. Test
 
-## 2. Ranh giới Sở hữu Module (Module Ownership)
+- Có test cho hành vi bạn thêm hoặc sửa. Sửa bug thì có test tái hiện bug.
+- Logic DB, khóa hoặc đồng thời: test trên PostgreSQL thật (`DATABASE_URL`). Timeout: test bằng `AbortSignal` thật. Không mock hình thức kiểu `let approved = true`.
+- Trước khi mở PR: chạy test của phần mình sửa và `npm run typecheck:v3`. **Toàn bộ suite giao cho CI**, không bắt buộc chạy `npm run check` đầy đủ ở máy.
+- Đổi prompt hoặc planner: ghi rõ đã chạy golden set với model thật hay chưa.
 
-- Phân chia quyền sở hữu file và thư mục giữa các chuyên gia được quy định chi tiết tại **Mục 1 của [`docs/team-workflow.md`](docs/team-workflow.md)**.
-- Mỗi subagent chỉ được phép tạo và sửa đổi files trong package mà vai trò của mình sở hữu.
-- Không sửa chéo files của package khác. Khi cần tích hợp, 2 bên phải thỏa thuận interface chung tại `packages/tool-schemas` trước khi code.
+## 5. Ship
 
----
+1. Nhánh `feat|fix|chore|docs/<tên-ngắn>`, commit theo Conventional Commits.
+2. Chỉ `git add` file của việc mình làm (không dùng `git add -A`).
+3. Mở PR theo mẫu: **Làm gì / Vì sao / Đã test gì**. Không có chữ ký "Generated with…".
+4. **CI xanh thì merge.** CI đỏ vì test chập chờn hoặc vì PR khác thì báo trong PR, sửa ở chỗ gây lỗi.
+5. Nếu PR làm thay đổi trạng thái một dịch vụ, sửa **dòng tương ứng** trong `CURRENT-STATE.md` ngay trong PR đó. Không mở PR riêng chỉ để ghi sổ.
 
-## 3. Tiêu chuẩn Bằng chứng & Kiểm thử (Evidence Standards)
+**Nhờ agent khác review diff trước khi merge** khi PR đụng vào: migration DB, OAuth/token, luồng gửi hoặc ghi ra dịch vụ thật, xoá dữ liệu, hoặc CI. Các PR khác không bắt buộc review. Checklist ngắn ở [`docs/handoff/REVIEW-CHECKLIST.md`](docs/handoff/REVIEW-CHECKLIST.md).
 
-- **Tuyệt đối không dùng "Mock ảo giác":** Không viết test mock hình thức (ví dụ: mock boolean `let approved = false` để giả vờ test race condition database).
-- **Kiểm thử Concurrency thực tế:** Phải chứng minh qua câu lệnh truy vấn `WHERE status = 'pending'` thật hoặc in-memory DB pool.
-- **Kiểm thử Timeout thực tế:** Phải kiểm tra tín hiệu hủy thực tế thông qua `AbortSignal`.
-- Trọng tài `Reality Checker` mặc định phản biện "CHƯA ĐẠT" và yêu cầu bằng chứng chạy lệnh thực tế (output log, exit code 0) trước khi đóng task.
+## 6. Không làm
 
----
-
-## 4. Bàn giao và nghiệm thu giữa các agent (bắt buộc)
-
-Nhiều agent khác nhau cùng làm dự án này và không agent nào nhớ phiên của agent khác. Trí nhớ chung nằm trong `docs/handoff/` (xem `docs/handoff/README.md`).
-
-1. **Trước khi làm:** đọc `docs/handoff/CURRENT-STATE.md` và 3 file mới nhất trong `docs/handoff/log/`. Chạy `git status` và `git log -5 --format='%h %ar %s'`; nếu thư mục có thay đổi chưa commit không phải của bạn, hoặc đang ở một nhánh có commit mới của agent khác, làm trong `git worktree` riêng, không chuyển nhánh.
-2. **Khi làm:** chỉ làm một task card trong `docs/handoff/tasks/`, trên nhánh riêng, đúng phạm vi. TDD, bằng chứng thật như mục 3. Khi commit, chỉ `git add` đúng các file của task.
-3. **Khi xong:** trong cùng PR, điền phần "Kết quả" của task card và thêm **một file mới** trong `docs/handoff/log/`. Không sửa `CURRENT-STATE.md` hay `ROADMAP.md` (chỉ reviewer sửa, sau khi merge). Mô tả PR theo `.github/pull_request_template.md`, có file đã sửa, output test thật, commit hash; không có dòng "Generated with …" hay chữ ký AI.
-4. **Review:** reviewer độc lập review theo `docs/handoff/REVIEW-CHECKLIST.md`, chạy lại test ở máy, mặc định kết luận "chưa đạt" cho tới khi có bằng chứng. Phát hiện sai sót thì sửa trước khi sang task tiếp theo.
-5. **Merge:** chỉ khi CI xanh và review đạt. Sau khi merge, reviewer cập nhật `CURRENT-STATE.md` và `ROADMAP.md`.
+- Không viết task card, log, báo cáo audit hay bộ bằng chứng nếu không được yêu cầu. Mô tả PR là đủ.
+- Không mở rộng phạm vi ngoài việc được giao. Thấy lỗi khác thì ghi vào `ROADMAP.md` hoặc báo lại.
+- Không push thẳng `main`, không `--force` lên nhánh chung, không `--no-verify`.

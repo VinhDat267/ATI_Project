@@ -181,7 +181,7 @@ node node_modules/playwright/cli.js test --config apps/chat-web/playwright.confi
 
 ## Trạng thái dự án
 
-[`docs/handoff/CURRENT-STATE.md`](docs/handoff/CURRENT-STATE.md) là nguồn chuẩn cho trạng thái, số liệu đo và lỗi đã biết; mỗi số liệu ở đó có ngày và commit. Tóm tắt tính đến 11/10/2026:
+[`docs/handoff/CURRENT-STATE.md`](docs/handoff/CURRENT-STATE.md) là nguồn chuẩn (một trang) cho trạng thái từng dịch vụ và lỗi đã biết. Tóm tắt dưới đây là ảnh chụp lịch sử tính đến 11/10/2026:
 
 - **Đã xong:** adapter cho cả 8 dịch vụ; tài khoản (đăng ký email có quản trị viên duyệt, Gmail SMTP, đăng nhập Google, quản lý phiên); giao diện mới (FE-04 → FE-11).
 - **Đã đo với model thật** (08/10/2026, mỗi bộ 3 lần): bộ cơ bản 150/150 đúng, câu tự do 52/54, đa dịch vụ 129/132.
@@ -192,26 +192,26 @@ Chưa tuyên bố sẵn sàng cho production.
 
 ## Làm việc trong repository
 
-Nhiều người và AI agent (Codex, Claude Code và các agent khác) cùng làm ở đây, và không ai nhớ phiên làm việc của người khác. Trí nhớ chung nằm trong [`docs/handoff/`](docs/handoff/README.md).
+Nhóm làm bằng AI agent (Codex, Antigravity, Claude Code và các agent khác), và không agent nào nhớ phiên của agent khác. Quy tắc làm việc nằm ở [`AGENTS.md`](AGENTS.md): ship nhỏ, CI gác cổng.
 
-1. **Trước khi làm**, đọc `CURRENT-STATE.md` và 3 file mới nhất trong `docs/handoff/log/`, rồi chạy `git status`. Nếu thư mục có thay đổi không phải của bạn, làm trong một `git worktree` riêng.
-2. **Nhận một task card** trong [`docs/handoff/tasks/`](docs/handoff/tasks/), làm trên nhánh riêng. Viết test fail trước. Logic database test trên PostgreSQL thật, timeout test bằng `AbortSignal` thật; không mock hình thức.
-3. **Khi xong**, điền phần kết quả của task card và thêm một file mới trong `docs/handoff/log/` ngay trong PR đó. Không sửa `CURRENT-STATE.md` hay `ROADMAP.md`; reviewer cập nhật sau khi merge.
-4. **Review và merge.** Reviewer độc lập chạy lại test theo [`REVIEW-CHECKLIST.md`](docs/handoff/REVIEW-CHECKLIST.md). PR chỉ merge khi CI xanh và review đạt.
+1. **Bắt đầu**: đọc [`CURRENT-STATE.md`](docs/handoff/CURRENT-STATE.md) (một trang), rồi tách nhánh từ `origin/main`. Nếu thư mục có thay đổi không phải của bạn, dùng `git worktree` riêng.
+2. **Làm**: có test cho hành vi thay đổi. Logic database test trên PostgreSQL thật, timeout test bằng `AbortSignal` thật; không mock hình thức.
+3. **Mở PR** (làm gì / vì sao / đã test gì). Nếu trạng thái dịch vụ đổi, sửa dòng của dịch vụ đó trong `CURRENT-STATE.md` ngay trong PR.
+4. **CI xanh thì merge.** PR đụng migration DB, OAuth/token, ghi ra dịch vụ thật, xoá dữ liệu hoặc CI thì nhờ thêm một lượt đọc diff ([checklist](docs/handoff/REVIEW-CHECKLIST.md)).
 
 Quy ước:
 
-- Conventional Commits; chỉ `git add` đúng các file của task.
-- Mô tả PR theo [mẫu](.github/pull_request_template.md), có file đã sửa, output test thật và commit hash.
-- Sở hữu module và chiến lược nhánh: [`docs/team-workflow.md`](docs/team-workflow.md). Quy tắc cho AI agent: [`AGENTS.md`](AGENTS.md).
+- Conventional Commits; chỉ `git add` đúng các file của thay đổi. Quy ước nhánh và commit: [`docs/team-workflow.md`](docs/team-workflow.md).
+- Mô tả PR theo [mẫu](.github/pull_request_template.md).
+- Quy trình cũ (nhật ký trạng thái chi tiết, lộ trình theo tuần, task card, log mỗi PR) được lưu ở [`docs/archive/handoff-2026-11-12/`](docs/archive/handoff-2026-11-12/README.md).
 - Repository công khai: không commit `.env`, token, bằng chứng chạy thật (`docs/ai-evidence/V3-LIVE-EXECUTION/`, `docs/ai-evidence/AUTH-LIVE/`) hay báo cáo môn học.
 
 ## Tài liệu
 
 | Tài liệu | Nội dung |
 |---|---|
-| [CURRENT-STATE](docs/handoff/CURRENT-STATE.md) | Dự án đang ở đâu: số liệu, PR mới merge, lỗi đã biết, quyết định đã chốt |
-| [ROADMAP](docs/handoff/ROADMAP.md) và [task card](docs/handoff/tasks/) | Việc tiếp theo và tiêu chí nghiệm thu từng task |
+| [CURRENT-STATE](docs/handoff/CURRENT-STATE.md) | Một trang: trạng thái từng dịch vụ, việc đang làm, lỗi đã biết |
+| [ROADMAP](docs/handoff/ROADMAP.md) | Danh sách việc ưu tiên ngắn |
 | [Đặc tả v3](docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md) | Chuẩn về hành vi, luồng xử lý, catalog tool và schema |
 | [Đặc tả giao diện mới](docs/superpowers/specs/2026-10-05-ui-redesign-agentic-design.md) và [design system](docs/design/design-system.md) | Giao diện Agentic và 12 bản mẫu |
 | [Phạm vi đa dịch vụ](docs/MULTI-SERVICE-SCOPE.md) | Tiêu chí nghiệm thu khi thêm dịch vụ |
