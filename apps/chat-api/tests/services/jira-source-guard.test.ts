@@ -254,6 +254,7 @@ describe('JIRA-08 Task 5 Source Guard, Persistence, and Publication Guards', () 
       eventEmitter: chatEvents.emitter,
       jiraHistorySanitizer: sanitizer,
       jiraPolicyService: policyService,
+      jiraLlmEgressEnabled: true,
     });
 
     // Post a new user message to trigger pipeline
@@ -322,6 +323,7 @@ describe('JIRA-08 Task 5 Source Guard, Persistence, and Publication Guards', () 
       eventEmitter: chatEvents.emitter,
       jiraHistorySanitizer: sanitizer,
       jiraPolicyService: policyService,
+      jiraLlmEgressEnabled: true,
     });
 
     await chatService.handleUserMessage({
@@ -581,6 +583,7 @@ describe('JIRA-08 Task 5 Source Guard, Persistence, and Publication Guards', () 
       planRepo,
       planner: mockPlanner as any,
       eventEmitter: chatEvents.emitter,
+      jiraLlmEgressEnabled: true,
     });
 
     await chatService.handleUserMessage({
@@ -634,6 +637,7 @@ describe('JIRA-08 Task 5 Source Guard, Persistence, and Publication Guards', () 
         planRepo,
         planner: mockPlanner as any,
         eventEmitter: { emit: () => {} },
+        jiraLlmEgressEnabled: true,
         // jiraHistorySanitizer omitted!
       });
 
@@ -682,6 +686,7 @@ describe('JIRA-08 Task 5 Source Guard, Persistence, and Publication Guards', () 
         planRepo,
         planner: mockPlanner as any,
         eventEmitter: { emit: () => {} },
+        jiraLlmEgressEnabled: true,
         // jiraPolicyService omitted!
       });
 
@@ -763,6 +768,7 @@ describe('JIRA-08 Task 5 Source Guard, Persistence, and Publication Guards', () 
         eventEmitter: chatEvents.emitter,
         jiraHistorySanitizer: sanitizer,
         jiraPolicyService: policyService,
+        jiraLlmEgressEnabled: true,
       });
 
       await chatService.handleUserMessage({
@@ -830,6 +836,7 @@ describe('JIRA-08 Task 5 Source Guard, Persistence, and Publication Guards', () 
         eventEmitter: chatEvents.emitter,
         jiraHistorySanitizer: sanitizer,
         jiraPolicyService: policyService,
+        jiraLlmEgressEnabled: true,
       });
 
       await chatService.handleUserMessage({

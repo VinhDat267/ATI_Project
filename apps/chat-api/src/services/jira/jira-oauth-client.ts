@@ -145,6 +145,10 @@ export class JiraOAuthClient {
     return result;
   }
 
+  get clientId(): string {
+    return this.config.clientId;
+  }
+
   authorizationUrl(options: JiraAuthorizationUrlOptions): string {
     if (!options?.state) {
       throw new JiraOAuthError('[INVALID_CONFIG] state is required for authorization URL', 'INVALID_CONFIG');
@@ -164,7 +168,7 @@ export class JiraOAuthClient {
       'scope',
       options.mode === 'identity'
         ? 'read:me offline_access'
-        : 'read:me read:jira-work write:jira-work offline_access'
+        : 'read:me read:jira-work offline_access'
     );
     url.searchParams.set('redirect_uri', this.config.redirectUri);
     url.searchParams.set('state', options.state);

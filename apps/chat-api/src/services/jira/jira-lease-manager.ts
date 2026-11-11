@@ -213,7 +213,9 @@ export class JiraLeaseManager {
     let committed = false;
     try {
       await client.query('BEGIN');
-      const leaseRes = await client.query<{
+      // Step 1: Read immutable lease identifiers without holding a row lock first,
+      // so authority tables are ALWAYS locked before jira_authorization_leases (preventing 40P01 deadlocks).
+      const leaseInitRes = await client.query<{
         status: RevalidateLeaseResult['status'];
         expired: boolean;
         workspace_id: string;
@@ -235,33 +237,22 @@ export class JiraLeaseManager {
           workspace_version, membership_version, identity_version,
           site_policy_version, project_policy_version
         FROM jira_authorization_leases
-        WHERE lease_id = $1
-        FOR UPDATE`,
+        WHERE lease_id = $1`,
         [leaseId]
       );
 
-      const lease = leaseRes.rows[0];
+      const lease = leaseInitRes.rows[0];
       if (!lease) {
         await client.query('ROLLBACK');
         return action(client, { valid: false });
       }
 
-      if (lease.expired && lease.status === 'active') {
-        await client.query(
-          `UPDATE jira_authorization_leases SET status = 'expired', released_at = clock_timestamp() WHERE lease_id = $1`,
-          [leaseId]
-        );
-        await client.query('COMMIT');
-        committed = true;
-        return action(client, { valid: false, status: 'expired' });
-      }
-
-      if (lease.status !== 'active') {
+      if (lease.status !== 'active' && !lease.expired) {
         await client.query('ROLLBACK');
         return action(client, { valid: false, status: lease.status });
       }
 
-      // Lock and recheck all authority rows FOR SHARE before persisting receipt or emitting SSE
+      // Step 2: Lock and recheck all authority rows FOR SHARE in canonical top-down order
       const authRes = await client.query<{
         workspace_valid: boolean;
         general_member_valid: boolean;
@@ -330,6 +321,38 @@ export class JiraLeaseManager {
         if (!projRow || !projRow.project_valid) {
           authorityValid = false;
         }
+      }
+
+      // Step 3: Now lock jira_authorization_leases FOR UPDATE (always last in the lock hierarchy)
+      const lockedLeaseRes = await client.query<{
+        status: RevalidateLeaseResult['status'];
+        expired: boolean;
+      }>(
+        `SELECT status, expires_at <= clock_timestamp() AS expired
+         FROM jira_authorization_leases
+         WHERE lease_id = $1
+         FOR UPDATE`,
+        [leaseId]
+      );
+      const lockedLease = lockedLeaseRes.rows[0];
+      if (!lockedLease) {
+        await client.query('ROLLBACK');
+        return action(client, { valid: false });
+      }
+
+      if (lockedLease.expired && lockedLease.status === 'active') {
+        await client.query(
+          `UPDATE jira_authorization_leases SET status = 'expired', released_at = clock_timestamp() WHERE lease_id = $1`,
+          [leaseId]
+        );
+        await client.query('COMMIT');
+        committed = true;
+        return action(client, { valid: false, status: 'expired' });
+      }
+
+      if (lockedLease.status !== 'active') {
+        await client.query('ROLLBACK');
+        return action(client, { valid: false, status: lockedLease.status });
       }
 
       if (!authorityValid) {

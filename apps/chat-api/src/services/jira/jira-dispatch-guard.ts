@@ -1,4 +1,5 @@
 import type { Pool } from 'pg';
+import { isJiraG2AAllowedTool, JIRA_CAPABILITY_DISABLED_IN_G2A } from '@wap/tool-schemas';
 import type { JiraLeaseManager } from './jira-lease-manager.js';
 
 export interface DispatchScope {
@@ -27,7 +28,7 @@ export interface GuardedDispatchOptions {
       options?: { signal?: AbortSignal }
     ) => Promise<{ canBrowse: boolean; canCreateIssue: boolean; canAddComment: boolean; status?: string; reason?: string }>;
   };
-  tool?: string;
+  tool: string;
   deferRelease?: boolean;
 }
 
@@ -61,6 +62,13 @@ export class JiraDispatchGuard {
     options: GuardedDispatchOptions,
     dispatchFn: (token: string, signal: AbortSignal) => Promise<T>
   ): Promise<T> {
+    if (options.isWrite || !isJiraG2AAllowedTool(options.tool)) {
+      throw new JiraDispatchError(
+        `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Jira writes and non-G2A capabilities are disabled in G2A read-only mode`,
+        JIRA_CAPABILITY_DISABLED_IN_G2A
+      );
+    }
+
     if (!scope.userId || !scope.workspaceId || !scope.cloudId) {
       throw new JiraDispatchError(
         'Invalid dispatch scope: userId, workspaceId, and cloudId are required',
@@ -163,13 +171,14 @@ export class JiraDispatchGuard {
           'PERMISSION_DENIED'
         );
       }
-      if (options.tool === 'myjira.create_issue' && !nativeRes.canCreateIssue) {
+      const rawTool: string | undefined = options.tool;
+      if (rawTool === 'myjira.create_issue' && !nativeRes.canCreateIssue) {
         throw new JiraDispatchError(
           'Native Jira permission denied: User lacks CREATE_ISSUES permission',
           'PERMISSION_DENIED'
         );
       }
-      if (options.tool === 'myjira.add_comment' && !nativeRes.canAddComment) {
+      if (rawTool === 'myjira.add_comment' && !nativeRes.canAddComment) {
         throw new JiraDispatchError(
           'Native Jira permission denied: User lacks ADD_COMMENTS permission',
           'PERMISSION_DENIED'
@@ -206,8 +215,9 @@ export class JiraDispatchGuard {
     try {
       await client.query('BEGIN');
 
-      // Lock lease row FOR UPDATE to linearize against concurrent markRevoked
-      const leaseRes = await client.query<{
+      // Canonical lock hierarchy to prevent 40P01 deadlocks against disconnect/re-consent:
+      // 1. Read immutable lease binding fields without FOR UPDATE first
+      const leaseInitRes = await client.query<{
         status: string;
         expired: boolean;
         grant_id: string;
@@ -221,31 +231,43 @@ export class JiraDispatchGuard {
                 grant_id, jira_account_id, atlassian_account_id,
                 membership_version, identity_version, workspace_version
          FROM jira_authorization_leases
-         WHERE lease_id = $1 FOR UPDATE`,
+         WHERE lease_id = $1`,
         [lease.leaseId]
       );
 
-      const leaseRow = leaseRes.rows[0];
-      if (!leaseRow || leaseRow.status !== 'active' || leaseRow.expired) {
+      const leaseInit = leaseInitRes.rows[0];
+      if (!leaseInit || leaseInit.status !== 'active' || leaseInit.expired) {
         throw new JiraDispatchError('Lease expired or revoked before dispatch lock', 'LEASE_INVALID');
       }
-      if (scope.expectedGrantId && leaseRow.grant_id !== scope.expectedGrantId) {
+      if (scope.expectedGrantId && leaseInit.grant_id !== scope.expectedGrantId) {
         throw new JiraDispatchError('Approved grant mismatch on locked lease', 'GRANT_MISMATCH');
       }
-      if (scope.expectedAccountId && leaseRow.jira_account_id !== scope.expectedAccountId) {
+      if (scope.expectedAccountId && leaseInit.jira_account_id !== scope.expectedAccountId) {
         throw new JiraDispatchError('Approved account mismatch on locked lease', 'ACCOUNT_MISMATCH');
       }
-      if (scope.expectedMembershipVersion !== undefined && leaseRow.membership_version !== scope.expectedMembershipVersion) {
+      if (scope.expectedMembershipVersion !== undefined && leaseInit.membership_version !== scope.expectedMembershipVersion) {
         throw new JiraDispatchError('Approved membership version changed before dispatch', 'MEMBERSHIP_VERSION_STALE');
       }
-      if (scope.expectedIdentityVersion !== undefined && leaseRow.identity_version !== scope.expectedIdentityVersion) {
+      if (scope.expectedIdentityVersion !== undefined && leaseInit.identity_version !== scope.expectedIdentityVersion) {
         throw new JiraDispatchError('Approved identity version changed before dispatch', 'IDENTITY_VERSION_STALE');
       }
-      if (scope.expectedWorkspaceVersion !== undefined && leaseRow.workspace_version !== scope.expectedWorkspaceVersion) {
+      if (scope.expectedWorkspaceVersion !== undefined && leaseInit.workspace_version !== scope.expectedWorkspaceVersion) {
         throw new JiraDispatchError('Approved workspace version changed before dispatch', 'WORKSPACE_VERSION_STALE');
       }
 
-      // Check dual-layer membership FOR SHARE (ati_workspace_memberships + workspace_members + users)
+      // 2. Lock workspace FOR SHARE
+      const wsRes = await client.query<{ status: string; version: number }>(
+        `SELECT status, version FROM ati_workspaces WHERE id = $1 FOR SHARE`,
+        [scope.workspaceId]
+      );
+      if (!wsRes.rows[0] || wsRes.rows[0].status !== 'active') {
+        throw new JiraDispatchError('Workspace inactive or archived before dispatch', 'WORKSPACE_INACTIVE');
+      }
+      if (scope.expectedWorkspaceVersion !== undefined && wsRes.rows[0].version !== scope.expectedWorkspaceVersion) {
+        throw new JiraDispatchError('Workspace version changed before dispatch', 'WORKSPACE_VERSION_STALE');
+      }
+
+      // 3. Lock dual-layer membership FOR SHARE (ati_workspace_memberships + workspace_members + users)
       const memRes = await client.query<{
         jira_member_status: string;
         membership_version: number;
@@ -275,8 +297,8 @@ export class JiraDispatchGuard {
         throw new JiraDispatchError('Approved membership version changed before dispatch', 'MEMBERSHIP_VERSION_STALE');
       }
 
-      // Check Jira account FOR SHARE
-      const targetAccountId = scope.expectedAccountId ?? leaseRow.jira_account_id;
+      // 4. Lock Jira account FOR SHARE
+      const targetAccountId = scope.expectedAccountId ?? leaseInit.jira_account_id;
       const accRes = await client.query<{
         id: string;
         atlassian_account_id: string;
@@ -300,8 +322,8 @@ export class JiraDispatchGuard {
         throw new JiraDispatchError('Jira account identity version changed before dispatch', 'IDENTITY_VERSION_STALE');
       }
 
-      // Check approved grant row FOR SHARE
-      const activeGrantId = scope.expectedGrantId ?? leaseRow.grant_id;
+      // 5. Lock approved grant row FOR SHARE
+      const activeGrantId = scope.expectedGrantId ?? leaseInit.grant_id;
       const grantRes = await client.query<{ status: string; account_id: string }>(
         `SELECT status, account_id FROM jira_oauth_grants WHERE id = $1 FOR SHARE`,
         [activeGrantId]
@@ -310,7 +332,7 @@ export class JiraDispatchGuard {
         throw new JiraDispatchError('Approved grant is revoked or inactive before dispatch', 'GRANT_REVOKED');
       }
 
-      // Check grant site access FOR SHARE
+      // 6. Lock grant site access FOR SHARE
       const grantSiteRes = await client.query<{ id: string }>(
         `SELECT id FROM jira_grant_sites
          WHERE grant_id = $1 AND cloud_id = $2 AND product_type = 'jira'
@@ -321,19 +343,7 @@ export class JiraDispatchGuard {
         throw new JiraDispatchError('Site access revoked from grant before dispatch', 'SITE_ACCESS_REVOKED');
       }
 
-      // Check workspace FOR SHARE
-      const wsRes = await client.query<{ status: string; version: number }>(
-        `SELECT status, version FROM ati_workspaces WHERE id = $1 FOR SHARE`,
-        [scope.workspaceId]
-      );
-      if (!wsRes.rows[0] || wsRes.rows[0].status !== 'active') {
-        throw new JiraDispatchError('Workspace inactive or archived before dispatch', 'WORKSPACE_INACTIVE');
-      }
-      if (scope.expectedWorkspaceVersion !== undefined && wsRes.rows[0].version !== scope.expectedWorkspaceVersion) {
-        throw new JiraDispatchError('Workspace version changed before dispatch', 'WORKSPACE_VERSION_STALE');
-      }
-
-      // Check site policy FOR SHARE
+      // 7. Lock site policy FOR SHARE
       const siteRes = await client.query<{ id: string; active: boolean; policy_version: number }>(
         `SELECT id, active, policy_version
          FROM ati_workspace_jira_sites
@@ -348,7 +358,7 @@ export class JiraDispatchGuard {
         throw new JiraDispatchError('Site policy version changed before dispatch', 'SITE_POLICY_STALE');
       }
 
-      // Check project policy FOR SHARE if projectId is provided
+      // 8. Lock project policy FOR SHARE if projectId is provided
       if (scope.projectId) {
         const projRes = await client.query<{ selected: boolean; policy_version: number }>(
           `SELECT selected, policy_version
@@ -363,6 +373,21 @@ export class JiraDispatchGuard {
         if (scope.projectPolicyVersion !== undefined && projRow.policy_version !== scope.projectPolicyVersion) {
           throw new JiraDispatchError('Project policy version changed before dispatch', 'PROJECT_POLICY_STALE');
         }
+      }
+
+      // 9. Lock lease row FOR UPDATE LAST to linearize against concurrent disconnect/markRevoked
+      const leaseRes = await client.query<{
+        status: string;
+        expired: boolean;
+      }>(
+        `SELECT status, expires_at <= clock_timestamp() AS expired
+         FROM jira_authorization_leases
+         WHERE lease_id = $1 FOR UPDATE`,
+        [lease.leaseId]
+      );
+      const leaseRow = leaseRes.rows[0];
+      if (!leaseRow || leaseRow.status !== 'active' || leaseRow.expired) {
+        throw new JiraDispatchError('Lease expired or revoked before dispatch lock', 'LEASE_INVALID');
       }
 
       // Step 5: Execute dispatch function holding the lock

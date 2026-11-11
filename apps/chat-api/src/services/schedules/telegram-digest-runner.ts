@@ -14,6 +14,7 @@ import { analyzeSheetKpiMetrics } from './sheets-digest-runner.js';
 import {
   buildTelegramDigestSourceArgs,
   computeTelegramDigestConfigHash,
+  getDigestSourceDisabledReason,
   READ_DIGEST_SOURCE_MAP,
 } from './telegram-digest-candidate.js';
 import { buildPinnedTelegramAdapterContext } from './digest-scope-guard.js';
@@ -377,6 +378,15 @@ export class TelegramDigestRunner {
   async execute(run: DigestRunInput, signal: AbortSignal): Promise<DigestRunOutcome> {
     signal.throwIfAborted();
     const { digestConfig, digestConfigHash, userId } = run;
+
+    // Legacy schedules remain unchanged. Reject the whole run before even
+    // reading another source: per-source errors deliberately allow partial delivery.
+    const disabledSourceReason = Array.isArray(digestConfig?.sources)
+      ? digestConfig.sources.map(getDigestSourceDisabledReason).find(reason => reason !== undefined)
+      : undefined;
+    if (disabledSourceReason) {
+      return { status: 'blocked', error: disabledSourceReason };
+    }
 
     if (run.workspaceMode === 'organization' && (!run.workspaceId || !run.workspaceId.trim())) {
       return {

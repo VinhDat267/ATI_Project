@@ -191,7 +191,7 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
     await expect(
       guard.executeGuardedDispatch(
         scope,
-        { isWrite: false, timeoutMs: 5000 },
+        { isWrite: false, tool: 'myjira.search_issues', timeoutMs: 5000 },
         async (token, signal) => {
           const res = await fetch(`${serverUrl}/read`, { signal, headers: { Authorization: `Bearer ${token}` } });
           return res.json();
@@ -237,7 +237,7 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
     await expect(
       guard.executeGuardedDispatch(
         scope,
-        { isWrite: true, timeoutMs: 5000 },
+        { isWrite: true, tool: 'myjira.create_issue', timeoutMs: 5000 },
         async (token, signal) => {
           const res = await fetch(`${serverUrl}/write`, {
             method: 'POST',
@@ -280,7 +280,7 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
     const dispatchPromise = guard
       .executeGuardedDispatch(
         scope,
-        { isWrite: false, timeoutMs: 5000 },
+        { isWrite: false, tool: 'myjira.search_issues', timeoutMs: 5000 },
         async (token, signal) => {
           const res = await fetch(`${serverUrl}/read`, { signal, headers: { Authorization: `Bearer ${token}` } });
           const json = await res.json();
@@ -323,9 +323,8 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
     expect(completionOrder.indexOf('dispatch_done')).toBeLessThan(completionOrder.indexOf('revoke_committed'));
   });
 
-  it('write dispatch: dispatch wins => revoke waits/commits after dispatch boundary', async () => {
+  it('write dispatch: immediately rejects isWrite=true fail-closed in G2A with zero HTTP calls', async () => {
     httpCallCount = 0;
-    httpHoldDelayMs = 150; // Hold HTTP for 150ms
     const f = await createFixture('write_disp_wins');
 
     const tokenManager = {
@@ -344,12 +343,10 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
       projectPolicyVersion: 1,
     };
 
-    const completionOrder: string[] = [];
-
-    const dispatchPromise = guard
-      .executeGuardedDispatch(
+    await expect(
+      guard.executeGuardedDispatch(
         scope,
-        { isWrite: true, timeoutMs: 5000 },
+        { isWrite: true, tool: 'myjira.create_issue', timeoutMs: 5000 },
         async (token, signal) => {
           const res = await fetch(`${serverUrl}/write`, {
             method: 'POST',
@@ -357,41 +354,14 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
             headers: { Authorization: `Bearer ${token}` },
             body: JSON.stringify({ issue: 'Create' }),
           });
-          const json = await res.json();
-          completionOrder.push('write_done');
-          return json;
+          return res.json();
         }
       )
-      .then((res) => {
-        completionOrder.push('write_completed');
-        return res;
-      });
+    ).rejects.toMatchObject({
+      code: 'JIRA_CAPABILITY_DISABLED_IN_G2A',
+    });
 
-    await new Promise((r) => setTimeout(r, 30));
-
-    const client2Pool = ctx.createWorkerPool({ max: 1, applicationName: 'client2_write_revoker' });
-    const revokePromise = (async () => {
-      const client2 = await client2Pool.connect();
-      try {
-        await client2.query('BEGIN');
-        await client2.query(
-          `UPDATE jira_authorization_leases SET status = 'revoked', released_at = clock_timestamp()
-           WHERE workspace_id = $1 AND status = 'active'`,
-          [f.workspaceId]
-        );
-        await client2.query('COMMIT');
-        completionOrder.push('write_revoke_committed');
-      } finally {
-        client2.release();
-        await client2Pool.end();
-      }
-    })();
-
-    const [dispatchResult] = await Promise.all([dispatchPromise, revokePromise]);
-    expect(dispatchResult).toEqual({ ok: true, callIndex: 1 });
-    expect(httpCallCount).toBe(1);
-
-    expect(completionOrder.indexOf('write_done')).toBeLessThan(completionOrder.indexOf('write_revoke_committed'));
+    expect(httpCallCount).toBe(0);
   });
 
   it('stalled HTTP respects deadline and abort signal, releasing lock cleanly', async () => {
@@ -420,7 +390,7 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
     await expect(
       guard.executeGuardedDispatch(
         scope,
-        { isWrite: false, timeoutMs: 100 },
+        { isWrite: false, tool: 'myjira.search_issues', timeoutMs: 100 },
         async (token, signal) => {
           const res = await fetch(`${serverUrl}/stalled`, { signal, headers: { Authorization: `Bearer ${token}` } });
           return res.json();
@@ -464,7 +434,7 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
     // Client 1 runs dispatch
     const dispatchPromise = guard.executeGuardedDispatch(
       scope,
-      { isWrite: false, timeoutMs: 5000 },
+      { isWrite: false, tool: 'myjira.search_issues', timeoutMs: 5000 },
       async (token, signal) => {
         const res = await fetch(`${serverUrl}/read`, { signal, headers: { Authorization: `Bearer ${token}` } });
         return res.json();
@@ -550,7 +520,7 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
     await expect(
       guard.executeGuardedDispatch(
         scope,
-        { isWrite: false, timeoutMs: 5000 },
+        { isWrite: false, tool: 'myjira.search_issues', timeoutMs: 5000 },
         async () => {
           dispatchCalled = true;
           return { ok: true };
@@ -603,7 +573,7 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
       await expect(
         guard.executeGuardedDispatch(
           scope,
-          { isWrite: false, timeoutMs: 5000 },
+          { isWrite: false, tool: 'myjira.search_issues', timeoutMs: 5000 },
           async () => {
             outboundCalled = true;
             return { ok: true };
@@ -656,7 +626,7 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
       await expect(
         guard.executeGuardedDispatch(
           scope,
-          { isWrite: false, timeoutMs: 5000 },
+          { isWrite: false, tool: 'myjira.search_issues', timeoutMs: 5000 },
           async () => {
             outboundCalled = true;
             return { ok: true };

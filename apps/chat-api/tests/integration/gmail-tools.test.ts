@@ -90,7 +90,7 @@ it('sandbox does not hide Gmail planner failures behind a shared write plan', ()
   expect(mayFallbackToShared({ userMessage: 'Tạo card Trello', memory: {} as any }, true)).toBe(false);
   expect(mayFallbackToShared({ userMessage: 'Tạo issue GitHub', memory: {} as any }, true)).toBe(false);
   expect(mayFallbackToShared({ userMessage: 'Gửi tin Slack vào kênh', memory: {} as any }, true)).toBe(true);
-  expect(gmailServiceRegistry(false)).toHaveLength(8);
+  expect(gmailServiceRegistry(false)).toHaveLength(7);
 });
 it('real PostgreSQL token manager refresh 503 fails a write before any Gmail API dispatch', async () => {
   google.settings.refresh = 'server_error';

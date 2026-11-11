@@ -138,9 +138,9 @@ describe('Jira Approval and Start Guards (JIRA-08 Task 2 Real PostgreSQL Tests)'
     const steps: PlanStep[] = [
       {
         id: 'step_1',
-        tool: 'myjira.create_issue',
-        description: 'Create issue',
-        args: { siteId, projectKey, summary: 'Task Approval Test' },
+        tool: 'myjira.search_issues',
+        description: 'Search issues',
+        args: { siteId, projectKey, query: 'Task Approval Test' },
         dependsOn: [],
       },
     ];
@@ -547,10 +547,10 @@ describe('Jira Approval and Start Guards (JIRA-08 Task 2 Real PostgreSQL Tests)'
     if (!res2.valid) {
       expect(res2.status).toBe(403);
       expect(res2.category).toBe('denied');
-      expect(res2.reason).toMatch(/CREATE_ISSUES/i);
+      expect(res2.reason).toMatch(/JIRA_CAPABILITY_DISABLED_IN_G2A|CREATE_ISSUES/i);
     }
 
-    // 3. Add comment denied
+    // 3. Add comment denied in G2A
     const commentDeniedVerifier = {
       verifyUserPermissions: async () => ({
         canBrowse: true,
@@ -568,7 +568,7 @@ describe('Jira Approval and Start Guards (JIRA-08 Task 2 Real PostgreSQL Tests)'
     if (!res3.valid) {
       expect(res3.status).toBe(403);
       expect(res3.category).toBe('denied');
-      expect(res3.reason).toMatch(/ADD_COMMENTS/i);
+      expect(res3.reason).toMatch(/JIRA_CAPABILITY_DISABLED_IN_G2A|ADD_COMMENTS/i);
     }
 
     // 4. Verification unavailable (503)

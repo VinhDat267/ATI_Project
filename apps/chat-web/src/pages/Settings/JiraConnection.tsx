@@ -1469,7 +1469,16 @@ export function JiraConnection({
       </div>
 
       {/* COCKPIT JIRA CONVERSATION CTA */}
-      <div className="mt-5 pt-4 border-t border-[#E7E7E2] dark:border-[#374151]">
+      <div className="mt-5 pt-4 border-t border-[#E7E7E2] dark:border-[#374151] space-y-3">
+        <div
+          data-testid="jira-g2a-policy-banner"
+          className="p-3.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 text-xs text-amber-900 dark:text-amber-200"
+        >
+          <span className="font-semibold">Chế độ G2A Chỉ đọc &amp; Bảo vệ Dữ liệu (D09-LLM-OFF):</span>{' '}
+          Kết nối OAuth hiện chỉ yêu cầu quyền đọc (<code>read:me</code>, <code>read:jira-work</code>,{' '}
+          <code>offline_access</code>). Danh mục Site/Project và kết nối cá nhân hoạt động trực tiếp không qua LLM;
+          các thao tác ghi Jira, lịch tự động Jira và tổng hợp hội thoại qua mô hình AI bên ngoài đang tạm khoá trong giai đoạn G2A.
+        </div>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl bg-neutral-50 dark:bg-[#1F2937]/30 border border-[#E7E7E2] dark:border-[#374151]">
           <div>
             <h5 className="font-semibold text-xs text-[#111827] dark:text-white">

@@ -2,12 +2,18 @@ import type { PlanRepo, PlanRow } from '../db/repositories/plan-repo.js';
 import type { StepRepo } from '../db/repositories/step-repo.js';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
-import { StepRunner, ExecutionController, type StepState, type StepOutputs, type ExecuteStepOptions } from '@wap/executor';
-import type { PlanStep } from '@wap/tool-schemas';
+import { StepRunner, ExecutionController, isWriteTool, type StepState, type StepOutputs, type ExecuteStepOptions } from '@wap/executor';
+import {
+  isJiraG2AAllowedTool,
+  JIRA_CAPABILITY_DISABLED_IN_G2A,
+  JIRA_CROSS_SERVICE_EGRESS_DENIED,
+  JIRA_LEGACY_SHARED_DISABLED,
+  type PlanStep,
+} from '@wap/tool-schemas';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { readableRecoveryPlan, recoveryConflict, restoredProgress, validateRecoveryAction, verifiedRecoveryPlan, verifiedRecoverySteps } from './execution-recovery.js';
-import type { AdapterContext } from './adapter-factory.js';
+import { AdapterFactory, type AdapterContext } from './adapter-factory.js';
 import { validateJiraApprovalBinding } from './jira/jira-approval-guard.js';
 import { validateReportEvidenceBinding } from './report-evidence-guard.js';
 import { relevantGroundingUserTexts, type ReportArtifactStore, type ChatMessage } from '@wap/planner';
@@ -50,6 +56,7 @@ export interface ExecutionServiceOptions {
   jiraNativeVerifier?: any;
   reportEvidenceStore?: ReportArtifactStore;
   enforceReportGrounding?: boolean;
+  enforceJiraG2AContainment?: boolean;
 }
 
 export class ExecutionService {
@@ -64,6 +71,7 @@ export class ExecutionService {
   private jiraNativeVerifier?: any;
   private reportEvidenceStore?: ReportArtifactStore;
   private enforceReportGrounding?: boolean;
+  private enforceJiraG2AContainment: boolean;
   private activeControllers = new Map<string, ExecutionController>();
   private activeRuns = new Map<string, Promise<unknown>>();
   private queuedStarts = new Set<string>();
@@ -86,6 +94,55 @@ export class ExecutionService {
     this.jiraNativeVerifier = options.jiraNativeVerifier;
     this.reportEvidenceStore = options.reportEvidenceStore;
     this.enforceReportGrounding = options.enforceReportGrounding ?? true;
+    this.enforceJiraG2AContainment =
+      options.enforceJiraG2AContainment ?? (options.adapterFactory instanceof AdapterFactory);
+  }
+
+  private checkJiraG2APlanContainment(
+    planJson: any,
+  ): { ok: true } | { ok: false; code: string; message: string } {
+    const steps: PlanStep[] = Array.isArray(planJson?.steps) ? planJson.steps : [];
+    for (const step of steps) {
+      const tool = typeof step?.tool === 'string' ? step.tool : '';
+      if (tool.startsWith('myjira.') && !isJiraG2AAllowedTool(tool)) {
+        return {
+          ok: false,
+          code: JIRA_CAPABILITY_DISABLED_IN_G2A,
+          message: `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Tool '${tool}' is disabled in Jira G2A read-only rollout.`,
+        };
+      }
+      if (this.enforceJiraG2AContainment && tool.startsWith('jira.')) {
+        return {
+          ok: false,
+          code: JIRA_LEGACY_SHARED_DISABLED,
+          message: `${JIRA_LEGACY_SHARED_DISABLED}: Legacy shared Jira tool '${tool}' is disabled.`,
+        };
+      }
+    }
+
+    if (this.enforceJiraG2AContainment) {
+      const touchesJira =
+        Boolean(planJson?.connections?.myjira) ||
+        steps.some(
+          (s) =>
+            typeof s?.tool === 'string' &&
+            (s.tool.startsWith('myjira.') || s.tool.startsWith('jira.')),
+        ) ||
+        planJson?.reportEvidence?.kind === 'jira_progress' ||
+        (typeof planJson?.reportEvidence?.sourceTool === 'string' &&
+          (planJson.reportEvidence.sourceTool.startsWith('myjira.') ||
+            planJson.reportEvidence.sourceTool.startsWith('jira.')));
+      const hasAnyWrite = steps.some((s) => typeof s?.tool === 'string' && isWriteTool(s.tool));
+      if (touchesJira && hasAnyWrite) {
+        return {
+          ok: false,
+          code: JIRA_CROSS_SERVICE_EGRESS_DENIED,
+          message: `${JIRA_CROSS_SERVICE_EGRESS_DENIED}: Cross-service write plans derived from Jira data are disabled in G2A.`,
+        };
+      }
+    }
+
+    return { ok: true };
   }
 
   private emitExecution(convId:string,event:string,payload:any):void{
@@ -190,6 +247,11 @@ export class ExecutionService {
       }
     } catch {
       return { success: false, status: 409, error: 'Plan integrity check failed' };
+    }
+
+    const jiraG2ACheck = this.checkJiraG2APlanContainment(planJson);
+    if (!jiraG2ACheck.ok) {
+      return { success: false, status: 403, error: jiraG2ACheck.message };
     }
 
     // Everything that can fail is done before the approval CAS commits.
@@ -457,6 +519,11 @@ export class ExecutionService {
       throw recoveryConflict('Reconciliation required: execution controller is unavailable');
     }
     const { steps, connections } = verifiedRecoveryPlan(plan);
+    const rawPlanJson = typeof plan.plan_json === 'string' ? JSON.parse(plan.plan_json) : plan.plan_json;
+    const jiraG2ACheck = this.checkJiraG2APlanContainment({ ...rawPlanJson, steps, connections });
+    if (!jiraG2ACheck.ok) {
+      throw Object.assign(new Error(jiraG2ACheck.message), { status: 403, code: jiraG2ACheck.code });
+    }
     if (connections?.myjira) {
       const pool = this.pool ?? (this.planRepo as any).pool;
       if (pool) {
@@ -557,6 +624,11 @@ export class ExecutionService {
 
   async continueExecution(planId: string, userId: string): Promise<any> {
     const plan = await this.getOwnedPlan(planId, userId);
+    const planJsonForCheck = typeof plan.plan_json === 'string' ? JSON.parse(plan.plan_json) : plan.plan_json;
+    const jiraG2ACheck = this.checkJiraG2APlanContainment(planJsonForCheck);
+    if (!jiraG2ACheck.ok) {
+      throw Object.assign(new Error(jiraG2ACheck.message), { status: 403, code: jiraG2ACheck.code });
+    }
     if (await this.requiresSlackPostReconcile(plan, userId)) throw recoveryConflict('SLACK_POST_RECONCILE_REQUIRED');
     if (this.activeRuns.has(planId) || this.activeControllers.get(planId)?.isExecuting()) {
       throw recoveryConflict('Execution is already running');
@@ -583,6 +655,11 @@ export class ExecutionService {
 
   private async continueStep(planId: string, stepId: string, userId: string, action: 'retry' | 'skip'): Promise<any> {
     let planRow = await this.getOwnedPlan(planId, userId);
+    const planJsonForCheck = typeof planRow.plan_json === 'string' ? JSON.parse(planRow.plan_json) : planRow.plan_json;
+    const jiraG2ACheck = this.checkJiraG2APlanContainment(planJsonForCheck);
+    if (!jiraG2ACheck.ok) {
+      throw Object.assign(new Error(jiraG2ACheck.message), { status: 403, code: jiraG2ACheck.code });
+    }
     // Include the preceding run's plan-status write in the serialization boundary.
     const priorRun = this.activeRuns.get(planId);
     if (priorRun) {

@@ -192,25 +192,16 @@ export class JiraOAuthRepo {
       const existing = existingRowRes.rows[0];
       if (existing) {
         accountId = existing.id;
-        if (existing.status !== 'connected') {
-          await client.query(
-            `UPDATE jira_accounts
-             SET status = 'connected',
-                 identity_version = identity_version + 1,
-                 display_name = COALESCE($2, display_name),
-                 updated_at = clock_timestamp()
-             WHERE id = $1`,
-            [accountId, data.displayName ?? null]
-          );
-        } else if (data.displayName) {
-          await client.query(
-            `UPDATE jira_accounts
-             SET display_name = $2,
-                 updated_at = clock_timestamp()
-             WHERE id = $1`,
-            [accountId, data.displayName]
-          );
-        }
+        // Every OAuth re-consent advances identity_version to fence stale approvals/leases/caches
+        await client.query(
+          `UPDATE jira_accounts
+           SET status = 'connected',
+               identity_version = identity_version + 1,
+               display_name = COALESCE($2, display_name),
+               updated_at = clock_timestamp()
+           WHERE id = $1`,
+          [accountId, data.displayName ?? null]
+        );
       } else {
         const insertRes = await client.query<{ id: string }>(
           `INSERT INTO jira_accounts (user_id, atlassian_account_id, display_name, status, identity_version)
@@ -232,22 +223,26 @@ export class JiraOAuthRepo {
         : null;
       const expiresAt = new Date(Date.now() + Math.max(0, data.expiresInSeconds) * 1000);
 
-      // Revoke any previous active grants for this account
+      // Revoke any previous non-revoked grants for this account and wipe stale ciphertexts
       await client.query(
         `UPDATE jira_oauth_grants
          SET status = 'revoked',
+             encrypted_access_token = NULL,
+             encrypted_refresh_token = NULL,
+             refresh_state = 'idle',
+             refresh_attempt_id = NULL,
              updated_at = clock_timestamp()
-         WHERE account_id = $1 AND status = 'active'`,
+         WHERE account_id = $1 AND status != 'revoked'`,
         [accountId]
       );
 
-      // Insert new active grant
+      // Insert new active grant generation
       const grantRes = await client.query<{ id: string }>(
         `INSERT INTO jira_oauth_grants (
            account_id, encrypted_access_token, encrypted_refresh_token,
-           scopes, expires_at, status, refresh_state
+           scopes, expires_at, status, refresh_state, created_at, updated_at
          )
-         VALUES ($1, $2, $3, $4, $5, 'active', 'idle')
+         VALUES ($1, $2, $3, $4, $5, 'active', 'idle', clock_timestamp(), clock_timestamp())
          RETURNING id`,
         [accountId, encryptedAccess, encryptedRefresh, data.scopes, expiresAt]
       );
@@ -256,6 +251,14 @@ export class JiraOAuthRepo {
         throw new JiraOAuthRepoError(500, 'INSERT_FAILED', 'Failed to insert Jira OAuth grant');
       }
       const grantId = grantRow.id;
+
+      // Revoke any active authorization leases bound to prior generations
+      await client.query(
+        `UPDATE jira_authorization_leases
+         SET status = 'revoked', released_at = clock_timestamp()
+         WHERE jira_account_id = $1 AND status = 'active'`,
+        [accountId]
+      );
 
       await client.query('COMMIT');
       return {
@@ -318,54 +321,70 @@ export class JiraOAuthRepo {
 
       const dedupedSites = deduplicateSites(data.sites);
 
+      // Advance identity_version on every site consent / re-consent to fence prior approvals & caches
+      await client.query(
+        `UPDATE jira_accounts
+         SET identity_version = identity_version + 1,
+             updated_at = clock_timestamp()
+         WHERE id = $1`,
+        [account.id]
+      );
+
       const encryptedAccess = encryptCredentials({ token: data.accessToken }, this.encryptionKey);
       const encryptedRefresh = data.refreshToken
         ? encryptCredentials({ token: data.refreshToken }, this.encryptionKey)
         : null;
       const expiresAt = new Date(Date.now() + Math.max(0, data.expiresInSeconds) * 1000);
 
-      const grantRes = await client.query<{ id: string }>(
-        `SELECT id FROM jira_oauth_grants
-         WHERE account_id = $1 AND status = 'active'
-         ORDER BY created_at DESC
-         LIMIT 1
+      // Lock prior active grants, preserve fallback refresh token only if caller omitted one on initial 2-step flow, then revoke all prior grants
+      const priorGrantsRes = await client.query<{
+        id: string;
+        encrypted_refresh_token: string | null;
+      }>(
+        `SELECT id, encrypted_refresh_token
+         FROM jira_oauth_grants
+         WHERE account_id = $1 AND status != 'revoked'
+         ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, created_at DESC
          FOR UPDATE`,
         [account.id]
       );
+      const inheritedRefresh = encryptedRefresh ?? priorGrantsRes.rows[0]?.encrypted_refresh_token ?? null;
 
-      let grantId: string;
-      const existingGrant = grantRes.rows[0];
-      if (existingGrant) {
-        grantId = existingGrant.id;
-        await client.query(
-          `UPDATE jira_oauth_grants
-           SET encrypted_access_token = $1,
-               encrypted_refresh_token = COALESCE($2, encrypted_refresh_token),
-               scopes = $3,
-               expires_at = $4,
-               status = 'active',
-               status_reason = NULL,
-               refresh_state = 'idle',
-               updated_at = clock_timestamp()
-           WHERE id = $5`,
-          [encryptedAccess, encryptedRefresh, data.scopes, expiresAt, grantId]
-        );
-      } else {
-        const newGrantRes = await client.query<{ id: string }>(
-          `INSERT INTO jira_oauth_grants (
-             account_id, encrypted_access_token, encrypted_refresh_token,
-             scopes, expires_at, status, refresh_state
-           )
-           VALUES ($1, $2, $3, $4, $5, 'active', 'idle')
-           RETURNING id`,
-          [account.id, encryptedAccess, encryptedRefresh, data.scopes, expiresAt]
-        );
-        const newGrant = newGrantRes.rows[0];
-        if (!newGrant) {
-          throw new JiraOAuthRepoError(500, 'INSERT_FAILED', 'Failed to insert Jira OAuth grant');
-        }
-        grantId = newGrant.id;
+      await client.query(
+        `UPDATE jira_oauth_grants
+         SET status = 'revoked',
+             encrypted_access_token = NULL,
+             encrypted_refresh_token = NULL,
+             refresh_state = 'idle',
+             refresh_attempt_id = NULL,
+             updated_at = clock_timestamp()
+         WHERE account_id = $1 AND status != 'revoked'`,
+        [account.id]
+      );
+
+      // Always create a brand-new grant generation (immutable grantId per consent)
+      const newGrantRes = await client.query<{ id: string }>(
+        `INSERT INTO jira_oauth_grants (
+           account_id, encrypted_access_token, encrypted_refresh_token,
+           scopes, expires_at, status, refresh_state, created_at, updated_at
+         )
+         VALUES ($1, $2, $3, $4, $5, 'active', 'idle', clock_timestamp(), clock_timestamp())
+         RETURNING id`,
+        [account.id, encryptedAccess, inheritedRefresh, data.scopes, expiresAt]
+      );
+      const newGrant = newGrantRes.rows[0];
+      if (!newGrant) {
+        throw new JiraOAuthRepoError(500, 'INSERT_FAILED', 'Failed to insert Jira OAuth grant');
       }
+      const grantId = newGrant.id;
+
+      // Revoke any active authorization leases bound to prior generations
+      await client.query(
+        `UPDATE jira_authorization_leases
+         SET status = 'revoked', released_at = clock_timestamp()
+         WHERE jira_account_id = $1 AND status = 'active'`,
+        [account.id]
+      );
 
       // Snapshot sites
       if (dedupedSites.length === 0) {
@@ -419,7 +438,8 @@ export class JiraOAuthRepo {
 
       const accRes = await client.query<{ id: string }>(
         `SELECT id FROM jira_accounts
-         WHERE user_id = $1 AND status = 'connected'`,
+         WHERE user_id = $1 AND status = 'connected'
+         FOR SHARE`,
         [userId]
       );
       const accRow = accRes.rows[0];
@@ -503,7 +523,13 @@ export class JiraOAuthRepo {
     const grantRes = await this.pool.query<{ id: string; status: string }>(
       `SELECT id, status FROM jira_oauth_grants
        WHERE account_id = $1
-       ORDER BY created_at DESC
+       ORDER BY
+         CASE
+           WHEN status = 'active' THEN 0
+           WHEN status = 'reconnect_required' THEN 1
+           ELSE 2
+         END,
+         created_at DESC
        LIMIT 1`,
       [account.id]
     );

@@ -52,7 +52,8 @@ describe('service configuration capability with real PostgreSQL sessions and HTT
     const listed = await request(app).get('/api/services').set('Authorization', authorization);
     expect(listed.status).toBe(200);
     expect(listed.body.canConfigure).toBe(user.canConfigure);
-    expect(listed.body.services).toHaveLength(8);
+    expect(listed.body.services).toHaveLength(7);
+    expect(listed.body.services.some((service: any) => service.id === 'jira')).toBe(false);
     expect(listed.text).not.toContain('synthetic-fe07-token');
     const saved = await request(app).post('/api/services/notion/credentials').set('Authorization', authorization)
       .send({ credentials: { token: 'synthetic-fe07-token' }, allowedScope: ['00000000-0000-0000-0000-000000000001'] });

@@ -792,13 +792,13 @@ describe('JiraOAuthRepo (Real PostgreSQL Isolation & Jira03 Semantics)', () => {
       });
 
       // Admin connects Jira and authorizes site
-      const adminGrant = await repo.saveIdentityGrant(adminUser, {
+      const identityGrant = await repo.saveIdentityGrant(adminUser, {
         atlassianAccountId: 'atl-ws-admin',
         accessToken: 'acc-ws-admin',
         expiresInSeconds: 3600,
         scopes: ['read:me', 'offline_access'],
       });
-      await repo.saveSitesGrant(adminUser, {
+      const adminGrant = await repo.saveSitesGrant(adminUser, {
         atlassianAccountId: 'atl-ws-admin',
         accessToken: 'acc-ws-admin-2',
         expiresInSeconds: 3600,
@@ -812,6 +812,7 @@ describe('JiraOAuthRepo (Real PostgreSQL Isolation & Jira03 Semantics)', () => {
           },
         ],
       });
+      expect(adminGrant.grantId).not.toBe(identityGrant.grantId);
 
       // Non-admin member attempts to link site -> rejected with 403 ADMIN_REQUIRED
       await expect(

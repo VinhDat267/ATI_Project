@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import {
+  JIRA_CAPABILITY_DISABLED_IN_G2A,
   validateJiraPlanConnection,
   type JiraPlanConnection,
 } from '@wap/tool-schemas';
@@ -39,6 +40,15 @@ export async function validateJiraApprovalBinding(
       category: 'unavailable',
       status: 503,
       reason: 'Validation aborted by caller',
+    };
+  }
+
+  if (options?.requiredPermissions?.createIssue || options?.requiredPermissions?.addComment) {
+    return {
+      valid: false,
+      category: 'denied',
+      status: 403,
+      reason: `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Jira write approvals are disabled in G2A read-only mode`,
     };
   }
 

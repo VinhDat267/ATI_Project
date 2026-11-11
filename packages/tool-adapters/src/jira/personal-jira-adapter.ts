@@ -3,6 +3,9 @@ import {
   JIRA_ISSUE_PATTERN,
   JIRA_SITE_ID_PATTERN,
   JIRA_CLOUD_ID_PATTERN,
+  JIRA_CAPABILITY_DISABLED_IN_G2A,
+  MYJIRA_TOOLS,
+  isJiraG2AAllowedTool,
   type WorkspaceJiraCapabilitiesResponse,
 } from '@wap/tool-schemas';
 import { BaseAdapter, StepError, type BaseAdapterConfig } from '../base-adapter.js';
@@ -85,6 +88,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
   private readonly workspaceId: string;
   private readonly sitesBySiteId = new Map<string, ScopedSite>();
   private readonly transport: PersonalJiraHttpTransport;
+  private readonly defaultTimeoutMs?: number;
 
   constructor(config: PersonalJiraAdapterConfig) {
     super(config ?? ({} as any));
@@ -115,6 +119,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
     this.userId = config.userId;
     this.workspaceId = config.workspaceId;
     this.rateLimiter = config.rateLimiter ?? sharedLimiter;
+    this.defaultTimeoutMs = config.timeoutMs;
 
     this.transport = new PersonalJiraHttpTransport({
       apiBaseUrl: config.apiBaseUrl,
@@ -189,8 +194,8 @@ export class PersonalJiraAdapter extends BaseAdapter {
     }
   }
 
-  private limit(value: unknown, maximum: number): number {
-    if (value === undefined) return maximum;
+  private limit(value: unknown, maximum: number, defaultValue = maximum): number {
+    if (value === undefined) return defaultValue;
     if (!Number.isInteger(value) || Number(value) < 1 || Number(value) > maximum) {
       throw fail('VALIDATION');
     }
@@ -239,6 +244,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
     const idn = this.identity(issue, site, projectKey);
     if (
       issue.fields?.project?.key !== projectKey ||
+      !this.matchesProjectId(issue.fields?.project, this.resolveProject(site, projectKey)) ||
       !text(issue.fields?.summary, 1, 255) ||
       !text(issue.fields?.status?.name, 1, 255)
     ) {
@@ -296,7 +302,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
     try {
       value = await this.transport.request(
         site.cloudId,
-        '/issue/' + issueKey + '?fields=summary,status,project',
+        '/issue/' + issueKey + '?fields=summary,status,project,priority,issuetype,assignee,updated,duedate',
         false,
         opts
       );
@@ -305,7 +311,14 @@ export class PersonalJiraAdapter extends BaseAdapter {
       throw error;
     }
     if (!record(value) || !record(value.fields?.project)) throw fail('SERVER_ERROR');
-    return value.fields.project.key === projectKey ? this.issueRow(value, site, projectKey) : null;
+    return value.fields.project.key === projectKey && value.key === issueKey &&
+      this.matchesProjectId(value.fields.project, this.resolveProject(site, projectKey))
+      ? this.issueRow(value, site, projectKey)
+      : null;
+  }
+
+  private matchesProjectId(project: any, bound: ScopedProject): boolean {
+    return !bound.id || String(project?.id ?? '') === bound.id;
   }
 
   private async issueTypes(
@@ -369,6 +382,21 @@ export class PersonalJiraAdapter extends BaseAdapter {
     const timeoutMs = context?.timeoutMs;
     const callOpts = { signal, ...(timeoutMs !== undefined ? { timeoutMs } : {}) };
 
+    if (typeof tool === 'string' && tool.startsWith('myjira.')) {
+      const knownMyJiraTool = MYJIRA_TOOLS.some((t) => t.name === tool);
+      if (!knownMyJiraTool) {
+        throw fail('VALIDATION');
+      }
+      if (!isJiraG2AAllowedTool(tool)) {
+        throw new StepError({
+          category: 'AUTH_ERROR',
+          statusCode: 403,
+          retryable: false,
+          message: `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Tool '${tool}' is disabled in Jira G2A read-only mode`,
+        });
+      }
+    }
+
     if (tool === 'myjira.list_sites') {
       this.input(args, ['query'], ['limit']);
       if (!text(args.query, 0, 2000)) throw fail('VALIDATION');
@@ -423,11 +451,16 @@ export class PersonalJiraAdapter extends BaseAdapter {
       this.input(args, ['siteId', 'projectKey'], ['query', 'status', 'priority', 'issueType', 'limit']);
       const site = this.resolveSite(args.siteId);
       const proj = this.resolveProject(site, args.projectKey);
-      const limit = this.limit(args.limit, 20);
+      const limit = this.limit(args.limit, 50, 20);
       if (args.query !== undefined && !text(args.query, 0, 2000)) throw fail('VALIDATION');
       if (args.status !== undefined && !text(args.status, 1, 100)) throw fail('VALIDATION');
       if (args.priority !== undefined && !text(args.priority, 1, 100)) throw fail('VALIDATION');
       if (args.issueType !== undefined && !text(args.issueType, 1, 100)) throw fail('VALIDATION');
+
+      const startedAt = Date.now();
+      const baseBudgetMs = timeoutMs ?? this.defaultTimeoutMs;
+      const effectiveBudgetMs = baseBudgetMs !== undefined ? Math.min(Math.max(1, baseBudgetMs), 8_000) : 8_000;
+      const MAX_PAGES = 3;
 
       const escapeJqlString = (raw: string) => raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       const query = (args.query ?? '').trim();
@@ -435,7 +468,15 @@ export class PersonalJiraAdapter extends BaseAdapter {
       const escaped = lucene.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       const directKey = query.toUpperCase();
       const isDirectKey = JIRA_ISSUE_PATTERN.test(directKey) && directKey.split('-')[0] === proj.key;
-      const direct = isDirectKey ? await this.issueByKey(site, directKey, proj.key, callOpts) : null;
+      const directRemainingMs = Math.max(1, effectiveBudgetMs - (Date.now() - startedAt));
+      const directCandidate = isDirectKey
+        ? await this.issueByKey(site, directKey, proj.key, { signal, timeoutMs: directRemainingMs })
+        : null;
+      const direct = directCandidate &&
+        (args.status === undefined || directCandidate.status.toLowerCase() === args.status.trim().toLowerCase()) &&
+        (args.priority === undefined || directCandidate.priority?.toLowerCase() === args.priority.trim().toLowerCase()) &&
+        (args.issueType === undefined || directCandidate.issueType?.toLowerCase() === args.issueType.trim().toLowerCase())
+        ? directCandidate : null;
 
       let jql = 'project = "' + proj.key + '"';
       if (query) jql += ' AND text ~ "' + escaped + '"';
@@ -444,21 +485,114 @@ export class PersonalJiraAdapter extends BaseAdapter {
       if (args.issueType !== undefined) jql += ' AND issuetype = "' + escapeJqlString(args.issueType.trim()) + '"';
       jql += ' ORDER BY updated DESC';
 
-      const value = await this.transport.request(site.cloudId, '/search/jql', false, {
-        ...callOpts,
-        method: 'POST',
-        body: { jql, maxResults: limit, fields: ['summary', 'status', 'project'] },
-      });
-
-      if (!record(value) || !Array.isArray(value.issues) || value.issues.length > limit) {
-        throw fail('SERVER_ERROR');
+      const collected: Array<ReturnType<PersonalJiraAdapter['issueRow']>> = [];
+      const seenIds = new Set<string>();
+      if (direct) {
+        collected.push(direct);
+        seenIds.add(direct.id);
       }
 
-      const found = value.issues.map((issue: any) => this.issueRow(issue, site, proj.key));
+      let pagesFetched = 0;
+      let nextPageToken: string | undefined;
+      let lastProviderIsLast: boolean | undefined;
+      let interrupted = false;
+      let deadlineStopped = false;
+
+      for (let page = 1; page <= MAX_PAGES; page++) {
+        if (collected.length >= limit) break;
+        const elapsedBeforePage = Date.now() - startedAt;
+        if (page > 1 && elapsedBeforePage >= effectiveBudgetMs) {
+          deadlineStopped = true;
+          break;
+        }
+        const pageTimeoutMs = Math.max(1, effectiveBudgetMs - elapsedBeforePage);
+        const pageMaxResults = Math.min(50, Math.max(1, limit - collected.length));
+
+        let value: any;
+        try {
+          value = await this.transport.request(site.cloudId, '/search/jql', false, {
+            signal,
+            timeoutMs: pageTimeoutMs,
+            method: 'POST',
+            body: {
+              jql,
+              maxResults: pageMaxResults,
+              fields: ['summary', 'status', 'project', 'priority', 'assignee', 'issuetype', 'updated', 'duedate'],
+              ...(nextPageToken ? { nextPageToken } : {}),
+            },
+          });
+        } catch (err) {
+          if (page === 1 || signal?.aborted) {
+            throw err;
+          }
+          interrupted = true;
+          break;
+        }
+
+        if (!record(value) || !Array.isArray(value.issues) || value.issues.length > pageMaxResults) {
+          throw fail('SERVER_ERROR');
+        }
+
+        pagesFetched++;
+        lastProviderIsLast = typeof value.isLast === 'boolean' ? value.isLast : undefined;
+        const rawNextToken =
+          typeof value.nextPageToken === 'string' && value.nextPageToken.trim().length > 0
+            ? value.nextPageToken
+            : undefined;
+
+        for (const issue of value.issues) {
+          const row = this.issueRow(issue, site, proj.key);
+          if (!seenIds.has(row.id) && collected.length < limit) {
+            seenIds.add(row.id);
+            collected.push(row);
+          }
+        }
+
+        nextPageToken = rawNextToken;
+        if (lastProviderIsLast === true || !nextPageToken) {
+          break;
+        }
+      }
+
+      const elapsedMs = Math.max(0, Date.now() - startedAt);
+      let completeness: 'COMPLETE' | 'PARTIAL' | 'UNKNOWN';
+      let truncationReason: string | undefined;
+
+      if (interrupted) {
+        completeness = 'UNKNOWN';
+        truncationReason = 'PAGINATION_INTERRUPTED';
+      } else if (lastProviderIsLast === true && !nextPageToken) {
+        completeness = 'COMPLETE';
+      } else if (nextPageToken) {
+        completeness = 'PARTIAL';
+        if (deadlineStopped || elapsedMs >= effectiveBudgetMs) {
+          truncationReason = 'DEADLINE_EXCEEDED';
+        } else if (collected.length >= limit) {
+          truncationReason = 'ITEM_CAP_REACHED';
+        } else if (pagesFetched >= MAX_PAGES) {
+          truncationReason = 'PAGE_CAP_REACHED';
+        } else {
+          truncationReason = 'MORE_PAGES_AVAILABLE';
+        }
+      } else if (lastProviderIsLast === false) {
+        completeness = 'PARTIAL';
+        truncationReason = collected.length >= limit ? 'ITEM_CAP_REACHED' : 'PROVIDER_NOT_LAST';
+      } else {
+        completeness = 'UNKNOWN';
+        truncationReason = 'PROVIDER_COMPLETENESS_OMITTED';
+      }
+
       return {
-        issues: direct
-          ? [direct, ...found.filter((row: { id: string }) => row.id !== direct.id)].slice(0, limit)
-          : found,
+        issues: collected.slice(0, limit),
+        coverage: {
+          completeness,
+          pagesFetched,
+          itemsReturned: Math.min(collected.length, limit),
+          budgetMs: effectiveBudgetMs,
+          elapsedMs,
+          ...(truncationReason ? { truncationReason } : {}),
+          ...(typeof lastProviderIsLast === 'boolean' ? { providerIsLast: lastProviderIsLast } : {}),
+        },
       };
     }
 
@@ -594,7 +728,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
         throw fail('VALIDATION');
       }
       const initialProjectKey = args.issueKey.split('-')[0];
-      this.resolveProject(site, initialProjectKey);
+      const initialProject = this.resolveProject(site, initialProjectKey);
 
       const issue = await this.transport.request(
         site.cloudId,
@@ -616,7 +750,8 @@ export class PersonalJiraAdapter extends BaseAdapter {
       }
 
       const currentProjectKey = issue.fields.project.key;
-      this.resolveProject(site, currentProjectKey);
+      if (currentProjectKey !== initialProject.key || issue.key !== args.issueKey ||
+          !this.matchesProjectId(issue.fields.project, initialProject)) throw fail('AUTH_ERROR');
       const idn = this.identity(issue, site, currentProjectKey);
 
       const rawComments = Array.isArray(issue.fields?.comment?.comments)

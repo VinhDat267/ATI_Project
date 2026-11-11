@@ -12,6 +12,9 @@ import {
   type JiraAccessTokenProvider,
 } from '@wap/tool-adapters';
 import {
+  isJiraG2AAllowedTool,
+  JIRA_CAPABILITY_DISABLED_IN_G2A,
+  JIRA_LEGACY_SHARED_DISABLED,
   normalizeTelegramChatId,
   TELEGRAM_CHAT_ID_PATTERN,
   type AllowedScope,
@@ -170,6 +173,7 @@ export class AdapterFactory {
       if (serviceName === 'mysheets') this.options.mysheetsTokens?.clear(userId);
       if (serviceName === 'trello') this.options.trelloTokens?.clear?.(userId);
       if (serviceName === 'github') this.options.githubTokens?.clear?.(userId);
+      if (serviceName === 'myjira') (this.options.jiraTokens as any)?.clear?.(userId);
       return;
     }
     this.personalCache.delete(`gmail:${userId}`);
@@ -191,17 +195,16 @@ export class AdapterFactory {
     this.options.mysheetsTokens?.clear(userId);
     this.options.trelloTokens?.clear?.(userId);
     this.options.githubTokens?.clear?.(userId);
+    (this.options.jiraTokens as any)?.clear?.(userId);
   }
 
   async getAdapterForService(serviceName: string, context?: AdapterContext): Promise<any> {
     if (serviceName === 'jira') {
-      if (context?.workspaceMode === 'personal' || context?.connections?.myjira) {
-        throw new StepError({
-          category: 'AUTH_ERROR',
-          message: 'Dịch vụ Jira chung (jira) không khả dụng ở không gian cá nhân; hãy dùng myjira.',
-          retryable: false,
-        });
-      }
+      throw new StepError({
+        category: 'AUTH_ERROR',
+        message: `${JIRA_LEGACY_SHARED_DISABLED}: Dịch vụ Jira dùng chung (jira) đã ngừng hoạt động; hãy dùng kết nối Jira OAuth cá nhân (myjira).`,
+        retryable: false,
+      });
     }
     if (serviceName === 'myjira') return this.myjiraAdapter(context);
     if (serviceName === 'gmail') return this.gmailAdapter(context);
@@ -885,8 +888,14 @@ export class AdapterFactory {
 
     return {
       execute: async (tool: string, args: Record<string, any>, callOpts?: any) => {
+        if (!isJiraG2AAllowedTool(tool)) {
+          throw myjiraError(
+            'AUTH_ERROR',
+            `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Tool '${tool}' is disabled in Jira G2A read-only rollout.`
+          );
+        }
         if (!this.options.jiraDispatchGuard) {
-          return baseAdapter.execute(tool, args, callOpts);
+          throw myjiraError('AUTH_ERROR', 'JIRA_DISPATCH_GUARD_REQUIRED: Missing Jira dispatch guard.');
         }
 
         if (tool === 'myjira.list_sites') {

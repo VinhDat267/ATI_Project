@@ -10,8 +10,8 @@ import { createRuntimeAdapterFactory, type RuntimeMode } from './runtime-policy.
 const CANNED_SHARED_JIRA_SCENARIOS = new Set(['four_service', 'five_service', 'nine_service']);
 
 /** Canned sandbox plans call jira.create_issue. MyJira must not hide that tool or steal the route. */
-export function sandboxKeepsSharedJira(scenario = process.env.SANDBOX_SCENARIO): boolean {
-  return CANNED_SHARED_JIRA_SCENARIOS.has(scenario ?? '');
+export function sandboxKeepsSharedJira(scenario = process.env.SANDBOX_SCENARIO, mode = process.env.RUNTIME_MODE ?? 'sandbox'): boolean {
+  return mode === 'sandbox' && CANNED_SHARED_JIRA_SCENARIOS.has(scenario ?? '');
 }
 
 export const serviceRegistryForRuntime = (
@@ -20,9 +20,10 @@ export const serviceRegistryForRuntime = (
   mysheetsEnabled: boolean = false,
   myjiraEnabled: boolean = false,
 ) => {
-  const personalJira = myjiraEnabled && !sandboxKeepsSharedJira();
+  const keepSharedJira = sandboxKeepsSharedJira();
+  const personalJira = myjiraEnabled && !keepSharedJira;
   return [
-    ...SERVICE_REGISTRY.filter((s) => !personalJira || s.id !== 'jira'),
+    ...SERVICE_REGISTRY.filter((s) => keepSharedJira || s.id !== 'jira'),
     ...(gmailEnabled ? [GMAIL_SERVICE] : []),
     ...(mycalendarEnabled ? [MYCALENDAR_SERVICE] : []),
     ...(mysheetsEnabled ? [MYSHEETS_SERVICE] : []),
@@ -92,13 +93,14 @@ export async function runtimeToolCatalog(
     ];
     return Array.from(new Map(unified.map((t) => [t.name, t])).values());
   }
+  const keepSharedJira = sandboxKeepsSharedJira(process.env.SANDBOX_SCENARIO, mode);
   const baseTools = [
     ...ALL_TOOLS.filter(
       (t) =>
         t.service !== 'trello' &&
         t.service !== 'github' &&
         t.service !== 'telegram' &&
-        (!(options.myjiraEnabled && !sandboxKeepsSharedJira()) || t.service !== 'jira') &&
+        (keepSharedJira || t.service !== 'jira') &&
         (!hasMyCalendar || t.service !== 'calendar') &&
         (!stripSharedSheets || t.service !== 'sheets')
     ),
@@ -180,7 +182,7 @@ export function createToolRuntimeFactory(
   sandbox = createSandboxAdapter,
 ) {
   return createRuntimeAdapterFactory<AdapterContext>(mode, personal,
-    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets' || name === 'myslack' || name === 'trello' || name === 'github' || name === 'telegram' || name === 'myjira') ? personal(name, context) : sandbox(name));
+    (name, context) => (name === 'gmail' || name === 'mycalendar' || name === 'mysheets' || name === 'myslack' || name === 'trello' || name === 'github' || name === 'telegram' || name === 'myjira' || (name === 'jira' && !sandboxKeepsSharedJira())) ? personal(name, context) : sandbox(name));
 }
 
 /** A failed Gmail, MyCalendar, MySheets, Trello, GitHub, Telegram or MyJira request must not become a canned shared-service write. */
@@ -192,19 +194,23 @@ export function mayFallbackToShared(
   myjiraEnabled: boolean = false,
 ): boolean {
   const texts = [...(input.history ?? []).filter((m) => m.role === 'user').map((m) => m.content), input.userMessage];
+  const joined = texts.join('\n');
+  if (!sandboxKeepsSharedJira() && /\b(myjira|jira)\b/i.test(joined)) {
+    return false;
+  }
   const catalog = [
-    ...ALL_TOOLS.filter((t) => !myjiraEnabled || t.service !== 'jira'),
+    ...ALL_TOOLS.filter((t) => sandboxKeepsSharedJira() || t.service !== 'jira'),
     ...(gmailEnabled ? [{ name: 'gmail.intent', service: 'gmail' } as typeof ALL_TOOLS[number]] : []),
     ...(mycalendarEnabled ? [{ name: 'mycalendar.intent', service: 'mycalendar' } as typeof ALL_TOOLS[number]] : []),
     ...(mysheetsEnabled ? [{ name: 'mysheets.intent', service: 'mysheets' } as typeof ALL_TOOLS[number]] : []),
     ...(myjiraEnabled ? [{ name: 'myjira.intent', service: 'myjira' } as typeof ALL_TOOLS[number]] : []),
   ];
   const registry = serviceRegistryForRuntime(gmailEnabled, mycalendarEnabled, mysheetsEnabled, myjiraEnabled);
-  const routed = routeIntent(texts.join('\n'), catalog, registry).services;
+  const routed = routeIntent(joined, catalog, registry).services;
   if (routed.includes('trello') || routed.includes('github') || routed.includes('telegram')) return false;
   if (gmailEnabled && routed.includes('gmail')) return false;
   if (mycalendarEnabled && routed.includes('mycalendar')) return false;
   if (mysheetsEnabled && routed.includes('mysheets')) return false;
-  if (myjiraEnabled && routed.includes('myjira')) return false;
+  if (routed.includes('myjira') || (!sandboxKeepsSharedJira() && routed.includes('jira'))) return false;
   return true;
 }

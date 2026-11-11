@@ -212,7 +212,7 @@ describe('MyJira Connection Routes (JIRA-04 Task 5)', () => {
       const authUrl = new URL(res.body.authUrl);
       const scopeParam = authUrl.searchParams.get('scope')!;
       expect(scopeParam).toContain('read:jira-work');
-      expect(scopeParam).toContain('write:jira-work');
+      expect(scopeParam).not.toContain('write:jira-work');
       expect(scopeParam).toContain('read:me');
       expect(scopeParam).toContain('offline_access');
     });

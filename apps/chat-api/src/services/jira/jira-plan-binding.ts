@@ -1,5 +1,10 @@
 import type pg from 'pg';
 import {
+  getToolDefinition,
+  isJiraG2AAllowedTool,
+  JIRA_CAPABILITY_DISABLED_IN_G2A,
+  JIRA_CROSS_SERVICE_EGRESS_DENIED,
+  JIRA_LEGACY_SHARED_DISABLED,
   validateJiraPlanConnection,
   validateJiraSourceRef,
   type JiraPlanConnection,
@@ -164,7 +169,36 @@ export class JiraPlanBinder {
     }
     const grantId = grantRow.id;
 
-    // 5. Bind each Jira step
+    // 5. Enforce G2A read-only capability policy & cross-service write containment before binding
+    for (const step of steps) {
+      if (step.tool.startsWith('jira.')) {
+        throw new JiraBindingError(
+          `Công cụ Jira dùng chung '${step.tool}' đã ngừng hoạt động (${JIRA_LEGACY_SHARED_DISABLED}).`,
+          JIRA_LEGACY_SHARED_DISABLED
+        );
+      }
+      if (step.tool.startsWith('myjira.') && !isJiraG2AAllowedTool(step.tool)) {
+        throw new JiraBindingError(
+          `Công cụ Jira '${step.tool}' chưa được mở trong giai đoạn G2A chỉ đọc (${JIRA_CAPABILITY_DISABLED_IN_G2A}).`,
+          JIRA_CAPABILITY_DISABLED_IN_G2A
+        );
+      }
+    }
+
+    const hasJiraStep = steps.some((s) => s.tool.startsWith('myjira.') || s.tool.startsWith('jira.'));
+    const hasExternalWriteStep = steps.some((s) => {
+      if (s.tool.startsWith('myjira.') || s.tool.startsWith('jira.')) return false;
+      const def = getToolDefinition(s.tool);
+      return def?.sideEffect === 'write';
+    });
+    if (hasJiraStep && hasExternalWriteStep) {
+      throw new JiraBindingError(
+        `Chính sách bảo mật G2A không cho phép kết hợp dữ liệu Jira với thao tác ghi sang dịch vụ khác (${JIRA_CROSS_SERVICE_EGRESS_DENIED}).`,
+        JIRA_CROSS_SERVICE_EGRESS_DENIED
+      );
+    }
+
+    // 6. Bind each Jira step
     const siteSteps: Record<string, JiraPlanStepScope> = {};
     const jiraSteps = steps.filter((s) => s.tool.startsWith('myjira.'));
 

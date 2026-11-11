@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { JIRA_CAPABILITY_DISABLED_IN_G2A } from '@wap/tool-schemas';
 import type {
   ScheduleResponse,
   TelegramDigestCandidate,
@@ -66,6 +67,19 @@ export const READ_DIGEST_SOURCE_MAP: Record<string, TelegramDigestSource> = {
     label: 'Email chưa đọc',
   },
 };
+
+// Runtime source restrictions live alongside the source catalog, not in the
+// generic runner. Check both identities so mismatched persisted inputs fail closed.
+const DISABLED_READ_DIGEST_SERVICES: ReadonlyMap<string, string> = new Map([
+  ['jira', `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Scheduled Jira digests are disabled in G2A.`],
+  ['myjira', `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Scheduled Jira digests are disabled in G2A.`],
+]);
+
+export function getDigestSourceDisabledReason(source: { service?: string; tool?: string } | null | undefined): string | undefined {
+  const service = typeof source?.service === 'string' ? source.service : '';
+  const toolService = typeof source?.tool === 'string' ? source.tool.split('.')[0] ?? '' : '';
+  return DISABLED_READ_DIGEST_SERVICES.get(service) ?? DISABLED_READ_DIGEST_SERVICES.get(toolService);
+}
 
 function foldVietnamese(input: string): string {
   return input

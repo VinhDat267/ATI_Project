@@ -6,8 +6,10 @@ import {
   ALL_TOOLS,
   GMAIL_SERVICE,
   GMAIL_TOOLS,
+  JIRA_LEGACY_SHARED_DISABLED,
   MYCALENDAR_SERVICE,
   MYCALENDAR_TOOLS,
+  MYJIRA_G2A_TOOLS,
   MYJIRA_SERVICE,
   MYJIRA_TOOLS,
   MYSHEETS_SERVICE,
@@ -380,12 +382,8 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
     next();
   });
 
-  router.use('/jira', (_req, res, next) => {
-    if (options.myjiraAvailable) {
-      res.status(410).json({ error: MYJIRA_PERSONAL_ONLY, code: 'PERSONAL_CONNECTION' });
-      return;
-    }
-    next();
+  router.use('/jira', (_req, res) => {
+    res.status(410).json({ error: MYJIRA_PERSONAL_ONLY, code: JIRA_LEGACY_SHARED_DISABLED });
   });
 
   // Shared token administration is gone for Trello and GitHub (HTTP 410 Gone).
@@ -417,10 +415,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       const { mode, workspaceId, isAdminUser } = getContext(req);
       const userId = (req as any).user?.id;
 
-      let registered = getRegisteredServices();
-      if (options.myjiraAvailable) {
-        registered = registered.filter((s) => s.id !== 'jira');
-      }
+      let registered = getRegisteredServices().filter((s) => s.id !== 'jira');
       if (mode === 'personal') {
         // In personal mode, enterprise service account services are hidden
         registered = registered.filter((s) => !isServiceAccountService(s));
@@ -651,7 +646,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           scopeLabel,
           credentialFields,
           connection: 'personal' as const,
-          tools: MYJIRA_TOOLS.map((tool) => tool.name),
+          tools: MYJIRA_G2A_TOOLS.map((tool) => tool.name),
           configured: connected,
           connected,
           connectionStatus: connected ? 'healthy' : 'unconfigured',

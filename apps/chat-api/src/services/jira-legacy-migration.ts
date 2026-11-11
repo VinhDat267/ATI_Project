@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import { isJiraG2AAllowedTool } from '@wap/tool-schemas';
 
 export const LEGACY_JIRA_PAUSE_REASON = 'legacy_jira_retired';
 
@@ -47,7 +48,7 @@ function extractLegacyJiraTools(planJson: unknown): string[] {
   for (const step of rawSteps) {
     if (step && typeof step === 'object' && typeof (step as { tool?: unknown }).tool === 'string') {
       const tool = (step as { tool: string }).tool;
-      if (tool.startsWith('jira.')) {
+      if (tool.startsWith('jira.') || (tool.startsWith('myjira.') && !isJiraG2AAllowedTool(tool))) {
         tools.push(tool);
       }
     }
@@ -90,7 +91,7 @@ export async function scanAndPauseLegacyJiraSchedules(
   }>(
     `SELECT id, user_id, conv_id, name, request, services, status, pause_reason, version
      FROM schedules
-     WHERE ('jira' = ANY(services) OR request ~* '(?<![a-z0-9_])jira\\.(create_issue|add_comment|search_projects|search_issues)')
+     WHERE ('jira' = ANY(services) OR 'myjira' = ANY(services) OR request ~* '(?<![a-z0-9_])(my)?jira\\.(create_issue|add_comment|update_issue|transition_issue|assign_issue|list_sites|get_issue|search_projects|search_issues)')
        AND status IN ('active', 'paused')
      ORDER BY created_at ASC, id ASC`
   );
@@ -121,7 +122,7 @@ export async function scanAndPauseLegacyJiraSchedules(
      FROM plans p
      JOIN conversations c ON c.id = p.conv_id
      WHERE p.status = 'pending'
-       AND p.plan_json::text LIKE '%"jira.%'
+       AND (p.plan_json::text LIKE '%"jira.%' OR p.plan_json::text LIKE '%"myjira.%')
      ORDER BY p.created_at ASC, p.id ASC`
   );
 

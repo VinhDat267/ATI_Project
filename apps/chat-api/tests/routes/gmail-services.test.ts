@@ -34,10 +34,10 @@ describe('GET /api/services and the shared-key routes with personal Gmail', () =
   });
   afterAll(async () => { await db?.close(); });
 
-  it('lists the 8 registry services (5 shared-key and 3 personal OAuth) and no Gmail while the flag is off', async () => {
+  it('lists the 7 registry services (4 shared-key and 3 personal OAuth) and no Gmail while the flag is off', async () => {
     await connectAs(alice, 'alice.mail@example.test');
     const services = await list(false, alice);
-    expect(services.map((s) => s.id)).toEqual(['trello', 'slack', 'github', 'sheets', 'calendar', 'notion', 'telegram', 'jira']);
+    expect(services.map((s) => s.id)).toEqual(['trello', 'slack', 'github', 'sheets', 'calendar', 'notion', 'telegram']);
     const personalIds = new Set(['trello', 'github', 'telegram']);
     for (const service of services) {
       if (personalIds.has(service.id)) {
@@ -68,7 +68,7 @@ describe('GET /api/services and the shared-key routes with personal Gmail', () =
     await credentials.markReconnectRequired('gmail', alice.id, own.id);
     expect(await gmailOf(alice)).toMatchObject({ personalStatus: 'reconnect_required', connectionStatus: 'unconfigured', email: 'alice.mail@example.test' });
     const nonGmail = (await list(true, alice)).filter((s) => s.id !== 'gmail');
-    expect(nonGmail).toHaveLength(8);
+    expect(nonGmail).toHaveLength(7);
     const personalIds = new Set(['trello', 'github', 'telegram']);
     for (const service of nonGmail) {
       expect(service.connection, service.id).toBe(personalIds.has(service.id) ? 'personal' : 'shared');

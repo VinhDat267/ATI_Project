@@ -53,6 +53,12 @@ export class JiraTokenManager {
   clear(userId?: string): void {
     if (userId) {
       this.inFlight.delete(userId);
+      const prefix = `${userId}:`;
+      for (const key of Array.from(this.inFlight.keys())) {
+        if (key.startsWith(prefix)) {
+          this.inFlight.delete(key);
+        }
+      }
     } else {
       this.inFlight.clear();
     }
@@ -185,8 +191,9 @@ export class JiraTokenManager {
       return dec.token;
     }
 
-    // 3. Single-flight check in current process
-    const existingInFlight = this.inFlight.get(userId);
+    // 3. Single-flight check in current process scoped to (userId, grantId) generation
+    const flightKey = `${userId}:${grantId}`;
+    const existingInFlight = this.inFlight.get(flightKey);
     if (existingInFlight && !options?.forceRefresh) {
       if (options?.signal) {
         return await this.raceWithSignal(existingInFlight, options.signal);
@@ -203,10 +210,10 @@ export class JiraTokenManager {
       options?.signal
     );
 
-    this.inFlight.set(userId, refreshTask);
+    this.inFlight.set(flightKey, refreshTask);
     const cleanup = () => {
-      if (this.inFlight.get(userId) === refreshTask) {
-        this.inFlight.delete(userId);
+      if (this.inFlight.get(flightKey) === refreshTask) {
+        this.inFlight.delete(flightKey);
       }
     };
     refreshTask.finally(cleanup).catch(() => {});
@@ -240,6 +247,26 @@ export class JiraTokenManager {
     try {
       await client.query('BEGIN');
 
+      // Canonical lock order: jira_accounts FOR SHARE -> jira_oauth_grants FOR UPDATE
+      const accLockRes = await client.query<{
+        id: string;
+        status: string;
+        identity_version: number;
+      }>(
+        `SELECT id, status, identity_version
+         FROM jira_accounts
+         WHERE user_id = $1
+         ORDER BY CASE WHEN status = 'connected' THEN 0 ELSE 1 END, updated_at DESC
+         LIMIT 1
+         FOR SHARE`,
+        [userId]
+      );
+      const accRow = accLockRes.rows[0];
+      if (!accRow) {
+        await client.query('ROLLBACK');
+        throw new JiraTokenManagerError('GRANT_NOT_FOUND', 'Grant not found', 404);
+      }
+
       const lockRes = await client.query<{
         account_id: string;
         account_status: string;
@@ -255,9 +282,9 @@ export class JiraTokenManager {
         encrypted_access_token: string | null;
       }>(
         `SELECT
-           a.id as account_id,
-           a.status as account_status,
-           a.identity_version,
+           $3::uuid as account_id,
+           $4::text as account_status,
+           $5::int as identity_version,
            g.id as grant_id,
            g.status as grant_status,
            g.refresh_state,
@@ -268,10 +295,9 @@ export class JiraTokenManager {
            g.encrypted_refresh_token,
            g.encrypted_access_token
          FROM jira_oauth_grants g
-         JOIN jira_accounts a ON a.id = g.account_id
-         WHERE a.user_id = $1 AND g.id = $2
-         FOR UPDATE OF g`,
-        [userId, grantId]
+         WHERE g.account_id = $1 AND g.id = $2
+         FOR UPDATE`,
+        [accRow.id, grantId, accRow.id, accRow.status, accRow.identity_version]
       );
 
       const row = lockRes.rows[0];
@@ -516,21 +542,51 @@ export class JiraTokenManager {
     const newEncryptedRefresh = encryptCredentials({ token: tokens.refreshToken }, this.encryptionKey);
     const newExpiresAt = new Date(Date.now() + Math.max(0, tokens.expiresInSeconds) * 1000);
 
-    const casRes = await this.pool.query(
-      `UPDATE jira_oauth_grants
-       SET encrypted_access_token = $1,
-           encrypted_refresh_token = $2,
-           token_version = token_version + 1,
-           expires_at = $3,
-           refresh_state = 'idle',
-           refresh_attempt_id = NULL,
-           status_reason = NULL,
-           updated_at = clock_timestamp()
-       WHERE id = $4
-         AND refresh_attempt_id = $5
-         AND status = 'active'`,
-      [newEncryptedAccess, newEncryptedRefresh, newExpiresAt, grantId, attemptId]
-    );
+    let casRes: pg.QueryResult;
+    try {
+      casRes = await this.pool.query(
+        `UPDATE jira_oauth_grants
+         SET encrypted_access_token = $1,
+             encrypted_refresh_token = $2,
+             token_version = token_version + 1,
+             expires_at = $3,
+             refresh_state = 'idle',
+             refresh_attempt_id = NULL,
+             status_reason = NULL,
+             updated_at = clock_timestamp()
+         WHERE id = $4
+           AND refresh_attempt_id = $5
+           AND status = 'active'`,
+        [newEncryptedAccess, newEncryptedRefresh, newExpiresAt, grantId, attemptId]
+      );
+    } catch (persistErr: any) {
+      // Upstream already rotated the single-use refresh token; stored refresh token is dead.
+      // Fence grant into reconnect_required and wipe stale ciphertexts so no stuck 'refreshing' state remains.
+      const fenceRes = await this.pool.query(
+        `UPDATE jira_oauth_grants
+         SET status = 'reconnect_required',
+             status_reason = 'PERSIST_FAILED_AFTER_ROTATION',
+             encrypted_access_token = NULL,
+             encrypted_refresh_token = NULL,
+             refresh_state = 'idle',
+             refresh_attempt_id = NULL,
+             updated_at = clock_timestamp()
+         WHERE id = $1
+           AND refresh_attempt_id = $2
+           AND status = 'active'`,
+        [grantId, attemptId]
+      ).catch(() => null);
+
+      if (fenceRes && (fenceRes.rowCount ?? 0) > 0 && this.onReconnectRequired) {
+        this.onReconnectRequired(accountId);
+      }
+
+      throw new JiraTokenManagerError(
+        'RECONNECT_REQUIRED',
+        `Token rotation succeeded upstream but persistence failed (${persistErr?.message ?? 'DB error'}); reconnect required (PERSIST_FAILED_AFTER_ROTATION)`,
+        403
+      );
+    }
 
     if (casRes.rowCount === 0) {
       // Disconnect Wins: grant was revoked/disconnected while refresh was in-flight
