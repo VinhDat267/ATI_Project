@@ -64,6 +64,7 @@ const exceptions = [
   { file: 'apps/chat-api/src/services/github/token-manager.ts', pattern: /^github(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal GitHub OAuth names that service.' },
   { file: 'apps/chat-api/src/services/telegram/connection-reference.ts', pattern: /^telegram(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Telegram connection lookup names that service.' },
   { file: 'apps/chat-api/src/services/notion/connection-reference.ts', pattern: /^notion(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Notion OAuth names that service.' },
+  { file: 'apps/chat-api/src/services/notion/digest-source-authority.ts', pattern: /^notion\.query_database$/, reason: 'Notion digest source authority re-reads the pinned database before sending.' },
   { file: 'apps/chat-api/src/services/notion/token-manager.ts', pattern: /^notion(?:\.[A-Za-z_][\w]*)?$/, reason: 'Personal Notion OAuth names that service.' },
   { file: 'apps/chat-web/src/pages/Cockpit/PlanMoment.tsx', pattern: /^(?:calendar|notion|trello)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Cockpit plan step preview pills for personal OAuth services.' },
   { file: 'apps/chat-web/src/pages/Cockpit/PreviewContents.tsx', pattern: /^(?:trello|notion|sheets|calendar)(?:\.[A-Za-z_][\w]*)?$/, reason: 'Cockpit step preview cards for domain tools.' },
