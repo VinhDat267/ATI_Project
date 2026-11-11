@@ -163,6 +163,21 @@ export async function startFakeGoogleGmail(options = {}) {
     try {
       const url = new URL(request.url, 'http://127.0.0.1');
       if (request.method === 'GET' && url.pathname === '/health') return json(response, 200, { ready: true });
+      if (request.method === 'GET' && url.pathname === '/__stats') {
+        return json(response, 200, {
+          authorizations: stats.authorizations,
+          exchanges: stats.exchanges,
+          refreshes: stats.refreshes,
+          revocations: stats.revocations,
+          profiles: stats.profiles,
+          writes: stats.writes,
+          apiRequests: stats.apiRequests,
+        });
+      }
+      if (request.method === 'DELETE' && url.pathname === '/__stats/requests') {
+        stats.apiRequests.length = 0;
+        return json(response, 200, { cleared: true });
+      }
       if (request.method === 'GET' && url.pathname === '/o/oauth2/v2/auth') {
         stats.authorizations++;
         const params = url.searchParams;
