@@ -68,7 +68,7 @@ describe('JiraOAuthClient (Atlassian 3LO HTTP Client)', () => {
       const scopes = url.searchParams.get('scope')?.split(' ') ?? [];
       expect(scopes).toContain('read:me');
       expect(scopes).toContain('read:jira-work');
-      expect(scopes).toContain('write:jira-work');
+      expect(scopes).not.toContain('write:jira-work');
       expect(scopes).toContain('offline_access');
 
       expect(url.searchParams.has('client_secret')).toBe(false);

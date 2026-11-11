@@ -260,7 +260,7 @@ describe('JIRA-04 End-to-End Acceptance Gates Suite (Task 7)', () => {
       const authUrl2 = new URL(startRes2.body.authUrl);
       const scopesParam = authUrl2.searchParams.get('scope') ?? '';
       expect(scopesParam).toContain('read:jira-work');
-      expect(scopesParam).toContain('write:jira-work');
+      expect(scopesParam).not.toContain('write:jira-work');
       expect(scopesParam).toContain('read:me');
 
       const cookie2 = extractBrowserCookie(startRes2);
@@ -346,7 +346,7 @@ describe('JIRA-04 End-to-End Acceptance Gates Suite (Task 7)', () => {
       expect(delRes.status).toBe(200);
       const delBody: JiraDisconnectResponse = delRes.body;
       expect(delBody.disconnected).toBe(true);
-      expect(delBody.identityVersion).toBe(2);
+      expect(delBody.identityVersion).toBe(3);
       expect(delBody.revokedAt).toBeDefined();
 
       // Verify DB revoked state
@@ -355,7 +355,7 @@ describe('JIRA-04 End-to-End Acceptance Gates Suite (Task 7)', () => {
         throw new Error('Expected accountDbAfter to exist in database');
       }
       expect(accountDbAfter.status).toBe('disconnected');
-      expect(accountDbAfter.identity_version).toBe(2);
+      expect(accountDbAfter.identity_version).toBe(3);
 
       const grantDbQuery = await ctx.pool.query<{ status: string; encrypted_access_token: string | null }>(
         `SELECT status, encrypted_access_token FROM jira_oauth_grants WHERE account_id = $1`,

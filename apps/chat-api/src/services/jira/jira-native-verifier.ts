@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import type pg from 'pg';
 import type { JiraTokenManager } from './jira-token-manager.js';
 import type {
   NativeAdminVerifier,
@@ -10,11 +12,17 @@ export interface JiraNativeVerifierOptions {
   mode?: 'fixture' | 'live';
   fixtureBaseUrl?: string;
   fetchFn?: typeof fetch;
+  oauthClientId?: string;
+  pool?: pg.Pool;
 }
 
 export interface NativeUserPermissionsEvidence {
   actorId: string;
   workspaceId?: string;
+  localAccountId?: string;
+  atlassianAccountId?: string;
+  grantId?: string;
+  identityVersion?: number;
   cloudId: string;
   projectId?: string;
   [key: string]: unknown;
@@ -42,13 +50,37 @@ export class JiraNativeVerifier implements ExtendedNativeVerifier {
   private readonly mode: 'fixture' | 'live';
   private readonly fixtureBaseUrl?: string;
   private readonly fetchFn: typeof fetch;
-  private readonly cache = new Map<string, { expiresAt: number; value: unknown }>();
+  private readonly oauthClientHash: string;
+  private readonly pool?: pg.Pool;
+  private readonly cache = new Map<
+    string,
+    { expiresAt: number; value: unknown; actorId?: string; grantId?: string }
+  >();
 
   clearCache(): void {
     this.cache.clear();
   }
 
-  private getCached<T>(key: string): T | undefined {
+  evictForUser(userId: string): void {
+    if (!userId) return;
+    for (const [key, entry] of Array.from(this.cache.entries())) {
+      if (entry.actorId === userId) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  evictForGrant(grantId: string): void {
+    if (!grantId) return;
+    for (const [key, entry] of Array.from(this.cache.entries())) {
+      if (entry.grantId === grantId) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  private getCached<T>(key: string | null): T | undefined {
+    if (!key) return undefined;
     const entry = this.cache.get(key);
     if (!entry) return undefined;
     if (entry.expiresAt <= Date.now()) {
@@ -58,9 +90,89 @@ export class JiraNativeVerifier implements ExtendedNativeVerifier {
     return entry.value as T;
   }
 
-  private putCached<T>(key: string, value: T): void {
+  private putCached<T>(
+    key: string | null,
+    value: T,
+    meta?: { actorId?: string; grantId?: string }
+  ): void {
+    if (!key) return;
     if (this.cache.size >= 256) this.cache.delete(this.cache.keys().next().value!);
-    this.cache.set(key, { expiresAt: Date.now() + 60_000, value });
+    this.cache.set(key, {
+      expiresAt: Date.now() + 60_000,
+      value,
+      actorId: meta?.actorId,
+      grantId: meta?.grantId,
+    });
+  }
+
+  /**
+   * Builds LOCK-06 10-field authorization cache key:
+   * jira-perm:v2:${oauthClientHash}:${workspaceId}:${actorId}:${localAccountId}:${atlassianAccountId}:${grantId}:${identityVersion}:${cloudId}:${projectId || 'site'}:${permissionKey}
+   */
+  private async resolveCacheIdentity(
+    permissionKey: string,
+    evidence: {
+      actorId: string;
+      workspaceId?: string;
+      localAccountId?: string;
+      atlassianAccountId?: string;
+      grantId?: string;
+      identityVersion?: number;
+      cloudId: string;
+      projectId?: string;
+    }
+  ): Promise<{ key: string | null; actorId: string; grantId?: string }> {
+    let localAccountId = evidence.localAccountId;
+    let atlassianAccountId = evidence.atlassianAccountId;
+    let grantId = evidence.grantId;
+    let identityVersion = evidence.identityVersion;
+
+    if (
+      this.pool &&
+      (!localAccountId || !atlassianAccountId || !grantId || identityVersion === undefined)
+    ) {
+      const dbRes = await this.pool.query<{
+        local_account_id: string;
+        atlassian_account_id: string;
+        identity_version: number;
+        grant_id: string;
+      }>(
+        `SELECT a.id AS local_account_id,
+                a.atlassian_account_id,
+                a.identity_version,
+                g.id AS grant_id
+         FROM jira_accounts a
+         JOIN jira_oauth_grants g ON g.account_id = a.id AND g.status = 'active'
+         WHERE a.user_id = $1 AND a.status = 'connected'
+         ORDER BY g.created_at DESC
+         LIMIT 1`,
+        [evidence.actorId]
+      );
+      const row = dbRes.rows[0];
+      if (!row) {
+        return { key: null, actorId: evidence.actorId };
+      }
+      localAccountId = localAccountId ?? row.local_account_id;
+      atlassianAccountId = atlassianAccountId ?? row.atlassian_account_id;
+      grantId = grantId ?? row.grant_id;
+      identityVersion = identityVersion ?? row.identity_version;
+    }
+
+    const key = [
+      'jira-perm:v2',
+      this.oauthClientHash,
+      String(evidence.workspaceId ?? 'global'),
+      String(evidence.actorId),
+      String(localAccountId ?? 'unset'),
+      String(atlassianAccountId ?? 'unset'),
+      String(grantId ?? 'unset'),
+      String(identityVersion ?? 'unset'),
+      String(evidence.cloudId),
+      String(evidence.projectId || 'site'),
+      permissionKey,
+    ].join(':');
+
+    return { key, actorId: evidence.actorId, grantId };
   }
 
   private async boundedFetch(url: string, init: RequestInit): Promise<{ ok: boolean; status: number; json: () => Promise<any> }> {
@@ -113,6 +225,12 @@ export class JiraNativeVerifier implements ExtendedNativeVerifier {
     }
     this.fixtureBaseUrl = options.fixtureBaseUrl;
     this.fetchFn = options.fetchFn ?? fetch;
+    this.pool = options.pool;
+    const rawClientId =
+      options.oauthClientId ??
+      (options.tokenManager as any)?.client?.clientId ??
+      'default-jira-oauth-client';
+    this.oauthClientHash = createHash('sha256').update(rawClientId).digest('hex').slice(0, 16);
   }
 
   private getBaseUrl(): string {
@@ -139,8 +257,11 @@ export class JiraNativeVerifier implements ExtendedNativeVerifier {
     options?: { signal?: AbortSignal }
   ): Promise<NativeAdminVerifierResult> {
     if (options?.signal?.aborted) throw options.signal.reason ?? new Error('Caller aborted');
-    const cacheKey = JSON.stringify(['admin', evidence.actorId, evidence.localAccountId, evidence.atlassianAccountId, evidence.grantId, evidence.identityVersion, evidence.workspaceId, evidence.cloudId, evidence.operation]);
-    const cached = this.getCached<NativeAdminVerifierResult>(cacheKey);
+    const cacheMeta = await this.resolveCacheIdentity(
+      `ADMINISTER:${evidence.operation}`,
+      evidence
+    );
+    const cached = this.getCached<NativeAdminVerifierResult>(cacheMeta.key);
     if (cached) return cached;
     try {
       const token = await this.tokenManager.getAccessToken(evidence.actorId, {
@@ -252,7 +373,7 @@ export class JiraNativeVerifier implements ExtendedNativeVerifier {
       const verifiedProjectIds = verifiedProjects.map((p: { projectId: string }) => p.projectId);
 
       const result: NativeAdminVerifierResult = { status: 'granted', siteName, siteUrl, verifiedProjectIds, verifiedProjects };
-      this.putCached(cacheKey, result);
+      this.putCached(cacheMeta.key, result, cacheMeta);
       return result;
     } catch (err: any) {
       if (err?.name === 'AbortError' || options?.signal?.aborted) {
@@ -270,8 +391,11 @@ export class JiraNativeVerifier implements ExtendedNativeVerifier {
     options?: { signal?: AbortSignal }
   ): Promise<NativeUserPermissionsResult> {
     if (options?.signal?.aborted) throw options.signal.reason ?? new Error('Caller aborted');
-    const cacheKey = JSON.stringify(['user', evidence.actorId, evidence.localAccountId, evidence.identityVersion, evidence.workspaceId, evidence.cloudId, evidence.projectId ?? null]);
-    const cached = this.getCached<NativeUserPermissionsResult>(cacheKey);
+    const cacheMeta = await this.resolveCacheIdentity(
+      'BROWSE_CREATE_COMMENT',
+      evidence
+    );
+    const cached = this.getCached<NativeUserPermissionsResult>(cacheMeta.key);
     if (cached) return cached;
     try {
     const token = await this.tokenManager.getAccessToken(evidence.actorId, {
@@ -326,7 +450,7 @@ export class JiraNativeVerifier implements ExtendedNativeVerifier {
       canAddComment: resolvePerm('ADD_COMMENTS', 'canAddComment'),
       status: 'granted',
     };
-    if (res.ok) this.putCached(cacheKey, result);
+    if (res.ok) this.putCached(cacheMeta.key, result, cacheMeta);
     return result;
     } catch (error) {
       if (options?.signal?.aborted) throw error;

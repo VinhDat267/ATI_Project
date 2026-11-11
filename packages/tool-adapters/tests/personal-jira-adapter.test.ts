@@ -247,7 +247,7 @@ describe('PersonalJiraAdapter', () => {
           query: 'x" OR project = OTHER',
           limit: 5,
         })
-      ).toEqual({
+      ).toMatchObject({
         issues: [
           {
             siteId: 'opaque_1',
@@ -258,6 +258,10 @@ describe('PersonalJiraAdapter', () => {
             url: 'https://company.atlassian.net/browse/ATI-42',
           },
         ],
+        coverage: {
+          itemsReturned: 1,
+          pagesFetched: 1,
+        },
       });
       expect(seen[0]).toMatchObject({
         method: 'POST',
@@ -330,99 +334,20 @@ describe('PersonalJiraAdapter', () => {
     });
   });
 
-  describe('myjira.create_issue', () => {
-    it('creates issue with standard metadata type and plain ADF', async () => {
-      const result = await make().execute('myjira.create_issue', {
-        siteId: 'opaque_1',
-        projectKey: 'ATI',
-        summary: 'Title',
-        description: '<b>plain</b>\nnext',
+  describe('myjira.create_issue & myjira.add_comment (G2A fail-closed containment)', () => {
+    it.each([
+      ['myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'Title', description: '<b>plain</b>\nnext' }],
+      ['myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'A bug report', issueType: 'Bug' }],
+      ['myjira.add_comment', { siteId: 'opaque_1', issueKey: 'ATI-42', body: 'hello' }],
+    ])('rejects %s before any transport call in G2A read-only mode', async (tool, args) => {
+      seen = [];
+      await expect(make().execute(tool, args as any)).rejects.toMatchObject({
+        category: 'AUTH_ERROR',
+        statusCode: 403,
+        retryable: false,
+        message: expect.stringContaining('JIRA_CAPABILITY_DISABLED_IN_G2A'),
       });
-      expect(result).toEqual({
-        siteId: 'opaque_1',
-        id: '10042',
-        key: 'ATI-42',
-        url: 'https://company.atlassian.net/browse/ATI-42',
-      });
-      expect(seen.map((x) => x.url)).toEqual([
-        `${prefix}/issue/createmeta/ATI/issuetypes?startAt=0&maxResults=50`,
-        `${prefix}/issue`,
-      ]);
-      expect(seen[1]!.body.fields.issuetype).toEqual({ id: '2' });
-      expect(seen[1]!.body.fields.description.content).toEqual([
-        { type: 'paragraph', content: [{ type: 'text', text: '<b>plain</b>' }] },
-        { type: 'paragraph', content: [{ type: 'text', text: 'next' }] },
-      ]);
-    });
-
-    it('selects explicit standard type like Bug and rejects subtask or unknown type with helpful message', async () => {
-      const adapter = make();
-      const res = await adapter.execute('myjira.create_issue', {
-        siteId: 'opaque_1',
-        projectKey: 'ATI',
-        summary: 'A bug report',
-        issueType: 'Bug',
-      });
-      expect(res.key).toBe('ATI-42');
-      expect(seen[1]!.body.fields.issuetype).toEqual({ id: '3' });
-
-      await expect(
-        adapter.execute('myjira.create_issue', {
-          siteId: 'opaque_1',
-          projectKey: 'ATI',
-          summary: 'x',
-          issueType: 'Sub-task',
-        })
-      ).rejects.toMatchObject({
-        category: 'VALIDATION',
-        message: expect.stringContaining('Task, Bug'),
-      });
-
-      await expect(
-        adapter.execute('myjira.create_issue', {
-          siteId: 'opaque_1',
-          projectKey: 'ATI',
-          summary: 'x',
-          issueType: 'Epic',
-        })
-      ).rejects.toMatchObject({
-        category: 'VALIDATION',
-        message: expect.stringContaining('Task, Bug'),
-      });
-    });
-
-    it('handles pagination in createmeta and defaults to first standard type if Task is absent', async () => {
-      reply = ({ url }) => {
-        if (url.includes('startAt=0')) {
-          return {
-            body: {
-              startAt: 0,
-              total: 2,
-              issueTypes: [{ id: '10', name: 'Story', subtask: false }],
-            },
-          };
-        }
-        if (url.includes('startAt=1')) {
-          return {
-            body: {
-              startAt: 1,
-              total: 2,
-              issueTypes: [{ id: '11', name: 'Incident', subtask: false }],
-            },
-          };
-        }
-        if (url.endsWith('/issue')) return { status: 201, body: { id: '10043', key: 'ATI-43' } };
-        return { status: 404, body: {} };
-      };
-
-      const adapter = make();
-      const res = await adapter.execute('myjira.create_issue', {
-        siteId: 'opaque_1',
-        projectKey: 'ATI',
-        summary: 'Auto type',
-      });
-      expect(res.key).toBe('ATI-43');
-      expect(seen[2]!.body.fields.issuetype).toEqual({ id: '10' });
+      expect(seen).toEqual([]);
     });
 
     it('plainTextToAdf formats multiline text with empty paragraphs for blank lines', () => {
@@ -439,107 +364,7 @@ describe('PersonalJiraAdapter', () => {
     });
   });
 
-  describe('myjira.add_comment', () => {
-    it('checks current project before comment and blocks moved issue outside scope', async () => {
-      reply = ({ url }) =>
-        url.includes('/issue/')
-          ? { body: { ...issue, fields: { ...issue.fields, project: { ...project, key: 'OTHER' } } } }
-          : { body: { id: '900' } };
-      await expect(
-        make().execute('myjira.add_comment', { siteId: 'opaque_1', issueKey: 'ATI-42', body: 'hello' })
-      ).rejects.toMatchObject({ category: 'AUTH_ERROR' });
-      expect(seen).toHaveLength(1);
-
-      reply = ({ url }) =>
-        url.endsWith('/comment') ? { status: 201, body: { id: '900' } } : { body: issue };
-      expect(
-        await make().execute('myjira.add_comment', {
-          siteId: 'opaque_1',
-          issueKey: 'ATI-42',
-          body: 'hello',
-        })
-      ).toEqual({
-        siteId: 'opaque_1',
-        id: '900',
-        issueKey: 'ATI-42',
-        url: 'https://company.atlassian.net/browse/ATI-42?focusedCommentId=900',
-      });
-    });
-
-    it('permits comment on issue moved to another project within scope and updates returned key/url', async () => {
-      const movedIssue = {
-        id: '10042',
-        key: 'CORE-99',
-        fields: {
-          project: { id: '10001', key: 'CORE', name: 'Core Engine' },
-        },
-      };
-      reply = ({ url }) => {
-        if (url.includes('/issue/ATI-42')) return { body: movedIssue };
-        if (url.endsWith('/comment')) return { status: 201, body: { id: '901' } };
-        return { status: 404, body: {} };
-      };
-
-      const result = await make().execute('myjira.add_comment', {
-        siteId: 'opaque_1',
-        issueKey: 'ATI-42',
-        body: 'Comment on moved issue',
-      });
-      expect(result).toEqual({
-        siteId: 'opaque_1',
-        id: '901',
-        issueKey: 'CORE-99',
-        url: 'https://company.atlassian.net/browse/CORE-99?focusedCommentId=901',
-      });
-      expect(seen[1]!.url).toBe(`${prefix}/issue/CORE-99/comment`);
-    });
-
-    it('returns 404 NOT_FOUND when issue does not exist during comment lookup', async () => {
-      reply = () => ({ status: 404, body: { errorMessages: ['Issue does not exist'] } });
-      await expect(
-        make().execute('myjira.add_comment', { siteId: 'opaque_1', issueKey: 'ATI-999', body: 'x' })
-      ).rejects.toMatchObject({ category: 'NOT_FOUND', statusCode: 404 });
-    });
-  });
-
-  describe('Uncertain write outcomes (UNKNOWN) and write replay prevention', () => {
-    it('does not replay an indeterminate write or expose token in errors', async () => {
-      reply = ({ url }) =>
-        url.endsWith('/issue')
-          ? { status: 503, body: {} }
-          : { body: { startAt: 0, total: 1, issueTypes: [{ id: '2', name: 'Task', subtask: false }] } };
-      await expect(
-        make().execute('myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'x' })
-      ).rejects.toMatchObject({ category: 'UNKNOWN' });
-      expect(seen.filter((x) => x.url.endsWith('/issue'))).toHaveLength(1);
-    });
-
-    it('treats socket drop / network error during write as UNKNOWN and never retries', async () => {
-      reply = ({ url }) =>
-        url.endsWith('/comment') ? { dropConnection: true } : { body: issue };
-      await expect(
-        make().execute('myjira.add_comment', { siteId: 'opaque_1', issueKey: 'ATI-42', body: 'x' })
-      ).rejects.toMatchObject({ category: 'UNKNOWN' });
-      expect(seen.filter((x) => x.url.endsWith('/comment'))).toHaveLength(1);
-    });
-
-    it('treats malformed response or non-numeric ID on write as UNKNOWN', async () => {
-      reply = ({ url }) =>
-        url.endsWith('/issue')
-          ? { status: 201, body: { id: 'not-a-number', key: 'ATI-42' } }
-          : { body: { startAt: 0, total: 1, issueTypes: [{ id: '2', name: 'Task', subtask: false }] } };
-      await expect(
-        make().execute('myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'x' })
-      ).rejects.toMatchObject({ category: 'UNKNOWN' });
-
-      reply = ({ url }) =>
-        url.endsWith('/issue')
-          ? { status: 201, rawBody: '<html>Not JSON</html>' }
-          : { body: { startAt: 0, total: 1, issueTypes: [{ id: '2', name: 'Task', subtask: false }] } };
-      await expect(
-        make().execute('myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'x' })
-      ).rejects.toMatchObject({ category: 'UNKNOWN' });
-    });
+  describe('Read retries and error mapping', () => {
 
     it('retries read once on HTTP 500 and twice on network error before failing', async () => {
       let attempts500 = 0;
@@ -604,44 +429,6 @@ describe('PersonalJiraAdapter', () => {
       expect(callCount).toBe(2);
     });
 
-    it('does not retry create_issue after HTTP 429 and returns non-retryable RATE_LIMIT', async () => {
-      let createAttempts = 0;
-      reply = ({ url }) => {
-        if (url.endsWith('/issue')) {
-          createAttempts++;
-          return { status: 429, headers: { 'retry-after': '0.05' }, body: { errorMessages: ['Rate limit exceeded'] } };
-        }
-        return { body: { startAt: 0, total: 1, issueTypes: [{ id: '2', name: 'Task', subtask: false }] } };
-      };
-      await expect(
-        make().execute('myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'Bug' })
-      ).rejects.toMatchObject({
-        category: 'RATE_LIMIT',
-        statusCode: 429,
-        retryable: false,
-      });
-      expect(createAttempts).toBe(1);
-    });
-
-    it('does not retry add_comment after HTTP 429 and returns non-retryable RATE_LIMIT', async () => {
-      let commentAttempts = 0;
-      reply = ({ url }) => {
-        if (url.endsWith('/comment')) {
-          commentAttempts++;
-          return { status: 429, headers: { 'retry-after': '0.05' }, body: { errorMessages: ['Rate limit exceeded'] } };
-        }
-        return { body: issue };
-      };
-      await expect(
-        make().execute('myjira.add_comment', { siteId: 'opaque_1', issueKey: 'ATI-42', body: 'Comment' })
-      ).rejects.toMatchObject({
-        category: 'RATE_LIMIT',
-        statusCode: 429,
-        retryable: false,
-      });
-      expect(commentAttempts).toBe(1);
-    });
-
     it('enforces transport own deadline when caller does not pass AbortSignal (read tool times out as NETWORK)', async () => {
       reply = () => ({ hang: true });
       const adapter = make({ timeoutMs: 50 });
@@ -660,39 +447,6 @@ describe('PersonalJiraAdapter', () => {
         adapter.execute('myjira.search_issues', { siteId: 'opaque_1', projectKey: 'ATI' }, { signal: controller.signal })
       ).rejects.toMatchObject({
         category: 'NETWORK',
-      });
-    });
-
-    it('enforces transport own deadline when caller does not pass AbortSignal (write tool times out in-flight as UNKNOWN)', async () => {
-      reply = ({ url }) => {
-        if (url.endsWith('/issue')) {
-          return { hang: true };
-        }
-        return { body: { startAt: 0, total: 1, issueTypes: [{ id: '2', name: 'Task', subtask: false }] } };
-      };
-      const adapter = make({ timeoutMs: 50 });
-      await expect(
-        adapter.execute('myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'Bug' })
-      ).rejects.toMatchObject({
-        category: 'UNKNOWN',
-        retryable: false,
-      });
-    });
-
-    it('enforces transport own deadline when caller passes non-expiring AbortSignal (write tool times out in-flight as UNKNOWN)', async () => {
-      reply = ({ url }) => {
-        if (url.endsWith('/issue')) {
-          return { hang: true };
-        }
-        return { body: { startAt: 0, total: 1, issueTypes: [{ id: '2', name: 'Task', subtask: false }] } };
-      };
-      const adapter = make({ timeoutMs: 50 });
-      const controller = new AbortController();
-      await expect(
-        adapter.execute('myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'Bug' }, { signal: controller.signal })
-      ).rejects.toMatchObject({
-        category: 'UNKNOWN',
-        retryable: false,
       });
     });
 
@@ -785,7 +539,7 @@ describe('PersonalJiraAdapter', () => {
     });
   });
 
-  describe('Input validation for all five tools', () => {
+  describe('Input validation for G2A read tools and fail-closed rejection for disabled tools', () => {
     it.each([
       ['myjira.list_sites', { query: 123 }],
       ['myjira.list_sites', { query: 'x', limit: 0 }],
@@ -796,24 +550,29 @@ describe('PersonalJiraAdapter', () => {
       ['myjira.search_projects', { siteId: 'opaque_1', query: 'x', extra: true }],
       ['myjira.search_issues', { siteId: 'opaque_1' }],
       ['myjira.search_issues', { siteId: 'opaque_1', projectKey: 'invalid-key' }],
-      ['myjira.search_issues', { siteId: 'opaque_1', projectKey: 'ATI', limit: 25 }],
+      ['myjira.search_issues', { siteId: 'opaque_1', projectKey: 'ATI', limit: 51 }],
       ['myjira.search_issues', { siteId: 'opaque_1', projectKey: 'ATI', extra: true }],
-      ['myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: '' }],
-      ['myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'x'.repeat(256) }],
-      ['myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'ok', description: 'x'.repeat(4001) }],
-      ['myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'ok', extra: true }],
-      ['myjira.add_comment', { siteId: 'opaque_1', issueKey: 'invalid', body: 'ok' }],
-      ['myjira.add_comment', { siteId: 'opaque_1', issueKey: 'ATI-1', body: '' }],
-      ['myjira.add_comment', { siteId: 'opaque_1', issueKey: 'ATI-1', body: 'x'.repeat(4001) }],
-      ['myjira.add_comment', { siteId: 'opaque_1', issueKey: 'ATI-1', body: 'ok', extra: true }],
       ['myjira.get_issue', { siteId: 'opaque_1', issueKey: 'bad' }],
-      ['myjira.search_users', { siteId: 'opaque_1', projectKey: 'ATI', query: 'x'.repeat(201) }],
-      ['myjira.transition_issue', { siteId: 'opaque_1', issueKey: 'ATI-1', status: '' }],
-      ['myjira.update_issue', { siteId: 'opaque_1', issueKey: 'ATI-1', dueDate: 'invalid-date' }],
       ['unknown_tool', {}],
     ])('rejects invalid args for %s before transport', async (tool, args) => {
       seen = [];
       await expect(make().execute(tool, args as any)).rejects.toMatchObject({ category: 'VALIDATION' });
+      expect(seen).toEqual([]);
+    });
+
+    it.each([
+      ['myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'ok' }],
+      ['myjira.add_comment', { siteId: 'opaque_1', issueKey: 'ATI-1', body: 'ok' }],
+      ['myjira.search_users', { siteId: 'opaque_1', projectKey: 'ATI', query: 'Nguyen' }],
+      ['myjira.transition_issue', { siteId: 'opaque_1', issueKey: 'ATI-1', status: 'Done' }],
+      ['myjira.update_issue', { siteId: 'opaque_1', issueKey: 'ATI-1', priority: 'High' }],
+    ])('rejects non-G2A myjira capability %s fail-closed with AUTH_ERROR 403 before transport', async (tool, args) => {
+      seen = [];
+      await expect(make().execute(tool, args as any)).rejects.toMatchObject({
+        category: 'AUTH_ERROR',
+        statusCode: 403,
+        message: expect.stringContaining('JIRA_CAPABILITY_DISABLED_IN_G2A'),
+      });
       expect(seen).toEqual([]);
     });
   });
@@ -935,114 +694,20 @@ describe('PersonalJiraAdapter', () => {
       });
     });
 
-    it('searches assignable users for a scoped project via myjira.search_users', async () => {
-      reply = ({ url }) => {
-        if (url.includes('/user/assignable/search')) {
-          return {
-            body: [
-              { accountId: '5b10ac8d82e05b22cc7d4ef5', displayName: 'Nguyen Van A', active: true },
-            ],
-          };
-        }
-        return { status: 404, body: {} };
-      };
-
-      const res = await make().execute('myjira.search_users', {
-        siteId: 'opaque_1',
-        projectKey: 'ATI',
-        query: 'Nguyen',
-      });
-
-      expect(res).toEqual([
-        {
-          id: '5b10ac8d82e05b22cc7d4ef5',
-          siteId: 'opaque_1',
-          accountId: '5b10ac8d82e05b22cc7d4ef5',
-          displayName: 'Nguyen Van A',
-        },
-      ]);
-    });
-
-    it('transitions an issue status and optionally posts a comment via myjira.transition_issue', async () => {
-      reply = ({ url, method }) => {
-        if (url.endsWith('/transitions') && method === 'GET') {
-          return {
-            body: {
-              transitions: [
-                { id: '21', name: 'Start Progress', to: { name: 'In Progress' } },
-                { id: '31', name: 'Resolve Issue', to: { name: 'Done' } },
-              ],
-            },
-          };
-        }
-        if (url.endsWith('/transitions') && method === 'POST') {
-          return { status: 204, rawBody: '' };
-        }
-        return { body: issue };
-      };
-
-      const res = await make().execute('myjira.transition_issue', {
-        siteId: 'opaque_1',
-        issueKey: 'ATI-42',
-        status: 'Done',
-        comment: 'Fixed in PR #272',
-      });
-
-      expect(res).toEqual({
-        siteId: 'opaque_1',
-        id: '10042',
-        key: 'ATI-42',
-        status: 'Done',
-        url: 'https://company.atlassian.net/browse/ATI-42',
-      });
-      const postTransition = seen.find((s) => s.url.endsWith('/transitions') && s.method === 'POST');
-      expect(postTransition?.body).toEqual({
-        transition: { id: '31' },
-        update: {
-          comment: [{ add: { body: plainTextToAdf('Fixed in PR #272') } }],
-        },
-      });
-    });
-
-    it('updates issue fields via myjira.update_issue and rejects empty update payload', async () => {
-      await expect(
-        make().execute('myjira.update_issue', {
-          siteId: 'opaque_1',
-          issueKey: 'ATI-42',
-        })
-      ).rejects.toMatchObject({ category: 'VALIDATION' });
-
-      reply = ({ url, method }) => {
-        if (url.endsWith('/issue/ATI-42') && method === 'PUT') {
-          return { status: 204, rawBody: '' };
-        }
-        return { body: issue };
-      };
-
-      const res = await make().execute('myjira.update_issue', {
-        siteId: 'opaque_1',
-        issueKey: 'ATI-42',
-        priority: 'High',
-        assigneeAccountId: 'acc-99',
-        labels: ['sprint-4', 'backend'],
-        dueDate: '2026-11-15',
-      });
-
-      expect(res).toEqual({
-        siteId: 'opaque_1',
-        id: '10042',
-        key: 'ATI-42',
-        url: 'https://company.atlassian.net/browse/ATI-42',
-      });
-      const putReq = seen.find((s) => s.method === 'PUT');
-      expect(putReq?.body).toEqual({
-        fields: {
-          priority: { name: 'High' },
-          assignee: { id: 'acc-99' },
-          labels: ['sprint-4', 'backend'],
-          duedate: '2026-11-15',
-        },
-      });
+    it('blocks myjira.search_users, myjira.transition_issue, and myjira.update_issue in G2A read-only mode', async () => {
+      seen = [];
+      for (const [tool, args] of [
+        ['myjira.search_users', { siteId: 'opaque_1', projectKey: 'ATI', query: 'Nguyen' }],
+        ['myjira.transition_issue', { siteId: 'opaque_1', issueKey: 'ATI-42', status: 'Done' }],
+        ['myjira.update_issue', { siteId: 'opaque_1', issueKey: 'ATI-42', priority: 'High' }],
+      ] as const) {
+        await expect(make().execute(tool, args as any)).rejects.toMatchObject({
+          category: 'AUTH_ERROR',
+          statusCode: 403,
+          message: expect.stringContaining('JIRA_CAPABILITY_DISABLED_IN_G2A'),
+        });
+      }
+      expect(seen).toEqual([]);
     });
   });
 });

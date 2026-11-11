@@ -7,8 +7,24 @@ import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ScheduleRepo } from '../db/repositories/schedule-repo.js';
 import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
-import { WorkingMemory, unroutable, relevantGroundingUserTexts, type ChatMessage, type ProcessMessageInput, type RoutedIntent, type ReportArtifactStore } from '@wap/planner';
-import type { CalendarDigestCandidate, PersonalSpreadsheetItem, PlanConnections, PlannerResponse, PlanResponse, PlanStep, ScheduleProposalMetadata, ScheduleResponse, ScheduleView, WorkflowContext } from '@wap/tool-schemas';
+import { WorkingMemory, unroutable, relevantGroundingUserTexts, routeIntent, type ChatMessage, type ProcessMessageInput, type RoutedIntent, type ReportArtifactStore } from '@wap/planner';
+import {
+  JIRA_CROSS_SERVICE_EGRESS_DENIED,
+  JIRA_LEGACY_SHARED_DISABLED,
+  JIRA_LLM_EGRESS_DISABLED_IN_G2A,
+  MYJIRA_G2A_TOOLS,
+  MYJIRA_SERVICE,
+  type CalendarDigestCandidate,
+  type PersonalSpreadsheetItem,
+  type PlanConnections,
+  type PlannerResponse,
+  type PlanResponse,
+  type PlanStep,
+  type ScheduleProposalMetadata,
+  type ScheduleResponse,
+  type ScheduleView,
+  type WorkflowContext,
+} from '@wap/tool-schemas';
 import { filterPermittedWorkflowDefaults } from './workflow-context-guard.js';
 import { validateReportEvidenceBinding } from './report-evidence-guard.js';
 import { resourceLabels } from './resource-labels.js';
@@ -25,7 +41,8 @@ import {
   type FetchOrgSheetsMetadataFn,
 } from './schedules/sheets-digest-candidate.js';
 import { isSheetsDigestEmitV2Enabled } from '../config/schedules-runtime.js';
-import { resolveRef } from '@wap/executor';
+import { sandboxKeepsSharedJira } from '../config/gmail-tools-runtime.js';
+import { isWriteTool, resolveRef } from '@wap/executor';
 import type { SlackWriteRuntime } from './slack/slack-write-runtime.js';
 import type { SlackReadProposalService } from './slack/slack-read-proposals.js';
 import { eventsOverlap } from '@wap/tool-adapters';
@@ -180,6 +197,10 @@ export interface ChatServiceOptions {
   jiraHistorySanitizer?: JiraHistorySanitizer;
   /** Policy service for Jira source revalidation (JIRA-05/08). */
   jiraPolicyService?: JiraPolicyService;
+  /** LOCK-03 (D09-LLM-OFF): Jira AI chat egress is disabled by default in G2A. */
+  jiraLlmEgressEnabled?: boolean;
+  /** LOCK-04: Enforces server-side legacy Jira & cross-service Jira write containment. */
+  enforceJiraG2AContainment?: boolean;
   /** Scheduled workflows (SCHEDULES_ENABLED); absent, conversations have no schedule. */
   schedules?: {
     repo: ScheduleRepo;
@@ -228,6 +249,8 @@ export class ChatService {
   private jiraBinder?: JiraPlanBinder;
   private jiraHistorySanitizer?: JiraHistorySanitizer;
   private jiraPolicyService?: JiraPolicyService;
+  private jiraLlmEgressEnabled: boolean;
+  private enforceJiraG2AContainment: boolean;
   private schedules?: ChatServiceOptions['schedules'];
   private getAdapter?: ChatServiceOptions['getAdapter'];
   private lookupTool?: ChatServiceOptions['lookupTool'];
@@ -249,6 +272,9 @@ export class ChatService {
     this.jiraBinder = options.jiraBinder;
     this.jiraHistorySanitizer = options.jiraHistorySanitizer;
     this.jiraPolicyService = options.jiraPolicyService;
+    this.jiraLlmEgressEnabled = options.jiraLlmEgressEnabled ?? false;
+    this.enforceJiraG2AContainment =
+      options.enforceJiraG2AContainment ?? Boolean(options.jiraBinder);
     this.getAdapter = options.getAdapter;
     this.lookupTool = options.lookupTool;
     this.mysheetsLookupTimeoutMs = options.mysheetsLookupTimeoutMs ?? 10_000;
@@ -366,6 +392,32 @@ export class ChatService {
     const usesTelegram = bound.steps.some((step) => step.tool.startsWith('telegram.'));
     const usesNotion = Boolean(this.notionConnection) && bound.steps.some((step) => step.tool.startsWith('notion.'));
     const usesMyJira = bound.steps.some((step) => step.tool.startsWith('myjira.'));
+    const usesLegacyJira = bound.steps.some((step) => step.tool.startsWith('jira.'));
+
+    if (this.enforceJiraG2AContainment && usesLegacyJira) {
+      return {
+        kind: 'refusal',
+        reason: `${JIRA_LEGACY_SHARED_DISABLED}: Dịch vụ Jira dùng chung (jira) đã ngừng hoạt động; hãy dùng kết nối Jira OAuth cá nhân (myjira).`,
+        unavailableServices: [{ id: 'myjira', name: 'Jira' }],
+      };
+    }
+
+    const touchesJira =
+      usesMyJira ||
+      (this.enforceJiraG2AContainment && usesLegacyJira) ||
+      bound.reportEvidence?.kind === 'jira_progress' ||
+      (typeof bound.reportEvidence?.sourceTool === 'string' &&
+        (bound.reportEvidence.sourceTool.startsWith('myjira.') ||
+          bound.reportEvidence.sourceTool.startsWith('jira.')));
+    const hasAnyWriteStep = bound.steps.some((step) => isWriteTool(step.tool));
+    if (!sandboxKeepsSharedJira() && touchesJira && hasAnyWriteStep) {
+      return {
+        kind: 'refusal',
+        reason: `${JIRA_CROSS_SERVICE_EGRESS_DENIED}: Theo chính sách quyền riêng tư giai đoạn G2A (LOCK-03), dữ liệu Jira không được phép ghi hoặc chuyển tiếp sang dịch vụ bên ngoài.`,
+        suggestion: 'Chỉ thực hiện tra cứu đọc trực tiếp trên Jira mà không kết hợp bước ghi sang dịch vụ khác.',
+        unavailableServices: [{ id: 'myjira', name: 'Jira' }],
+      };
+    }
 
     if (!usesGmail && !usesMyCalendar && !usesMySheets && !usesTrello && !usesGitHub && !usesTelegram && !usesNotion && !usesMyJira) return bound;
 
@@ -1530,10 +1582,13 @@ export class ChatService {
         reason: 'Tính năng lịch tự động chưa hỗ trợ tích hợp Jira cá nhân (myjira).',
       };
     }
-    if (actor.workspaceMode === 'personal' && (services.includes('jira') || proposal.request?.toLowerCase().includes('jira'))) {
+    if (!sandboxKeepsSharedJira() && (services.includes('jira') || (!hasMyJiraService && /\bjira\b/i.test(proposal.request ?? '')))) {
       return {
         kind: 'refusal',
-        reason: 'Dịch vụ Jira chung (jira) không khả dụng ở không gian cá nhân; lịch không thể sử dụng Jira.',
+        reason:
+          actor.workspaceMode === 'personal'
+            ? 'Dịch vụ Jira chung (jira) không khả dụng ở không gian cá nhân; lịch không thể sử dụng Jira.'
+            : 'Dịch vụ Jira dùng chung (jira) đã ngừng hoạt động; lịch tự động không thể sử dụng Jira trong giai đoạn G2A.',
       };
     }
     const recurrence = proposal.action === 'resume' ? schedule!.recurrence : proposal.recurrence;
@@ -1745,7 +1800,7 @@ export class ChatService {
   private async actorForConversation(
     conversationId: string,
     userId: string
-  ): Promise<{ userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' }> {
+  ): Promise<{ userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization'; jiraContext?: boolean }> {
     const fallbackMode = this.workspaceRepo ? ('personal' as const) : undefined;
     if (!this.convRepo) return { userId, ...(fallbackMode ? { workspaceMode: fallbackMode } : {}) };
     try {
@@ -1755,6 +1810,7 @@ export class ChatService {
           userId,
           workspaceId: conv.workspace_id ?? null,
           workspaceMode: conv.workspace_mode,
+          jiraContext: conv.jira_context === true,
         };
       }
     } catch {
@@ -2116,6 +2172,28 @@ export class ChatService {
 
     // Retrieve previous messages for conversation context
     const conv = this.convRepo ? await this.convRepo.getConversation(conversationId) : null;
+    const isJiraTurn =
+      (this.enforceJiraG2AContainment || !sandboxKeepsSharedJira()) &&
+      (Boolean(conv?.jira_context) || /\bmyjira\b/i.test(content) ||
+        routeIntent(content, MYJIRA_G2A_TOOLS, [MYJIRA_SERVICE]).services.includes('myjira'));
+    if (isJiraTurn && !this.jiraLlmEgressEnabled) {
+      const refusal: PlannerResponse = {
+        kind: 'refusal',
+        reason: `${JIRA_LLM_EGRESS_DISABLED_IN_G2A}: Trợ lý AI hội thoại cho Jira đang tạm tắt theo chính sách quyền riêng tư giai đoạn G2A (D09-LLM-OFF) nhằm ngăn dữ liệu Jira gửi ra mô hình LLM bên ngoài.`,
+        suggestion:
+          'Bạn vẫn có thể kết nối Jira OAuth 3LO và quản lý/tra cứu danh sách site & project trực tiếp tại trang Cài đặt > Kết nối dịch vụ > Jira.',
+        unavailableServices: [{ id: 'myjira', name: 'Jira' }],
+      };
+      const prepared = await this.prepareResponse(
+        { conversationId, userId, correlation },
+        refusal,
+        new WorkingMemory(),
+        [content]
+      );
+      await prepared.write();
+      prepared.announce();
+      return;
+    }
     const rawPreviousMessages = await this.msgRepo.listMessages(conversationId, 100, 'planning');
     const previousMessages = this.jiraHistorySanitizer
       ? await this.jiraHistorySanitizer.sanitizeMessages(userId, rawPreviousMessages, conv?.workspace_id ?? undefined)
@@ -2236,8 +2314,12 @@ export class ChatService {
     if (!actor.userId || (actor.workspaceMode === 'organization' && !actor.workspaceId)) {
       throw new Error('Scheduler execution requires valid actor and workspace');
     }
-    if (actor.workspaceMode === 'personal' && ((run as any).services?.includes('jira') || run.request?.toLowerCase().includes('jira'))) {
-      throw new Error('Dịch vụ Jira chung (jira) không khả dụng ở không gian cá nhân.');
+    if (!sandboxKeepsSharedJira() && ((run as any).services?.includes('jira') || /\bjira\b/i.test(run.request ?? ''))) {
+      throw new Error(
+        actor.workspaceMode === 'personal'
+          ? 'Dịch vụ Jira chung (jira) không khả dụng ở không gian cá nhân.'
+          : 'Scheduled runs do not support legacy shared Jira (jira) in G2A.'
+      );
     }
     const userMessage = runMessage(run, this.schedules.timeZone);
     const first = (await this.msgRepo.listMessages(convId,100,'planning',signal)).find((m: any) => m.metadata?.type === 'schedule_run' && m.metadata.runId === run.runId);

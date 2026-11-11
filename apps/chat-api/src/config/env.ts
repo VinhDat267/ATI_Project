@@ -143,6 +143,8 @@ export interface EnvConfig {
   MYNOTION_ENABLED?: boolean;
   /** The MYJIRA_ENABLED flag (default off). */
   MYJIRA_ENABLED: boolean;
+  /** LOCK-03 (D09-LLM-OFF): Jira LLM egress is disabled by default in G2A. */
+  JIRA_LLM_EGRESS_ENABLED: boolean;
   JIRA_OAUTH?: JiraOAuthConfig;
   /** The SCHEDULES_ENABLED flag (default on). Schedules also need PostgreSQL. */
   SCHEDULES_ENABLED: boolean;
@@ -294,6 +296,16 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
 
   if (env.MYJIRA_ENABLED && !['on', 'off'].includes(env.MYJIRA_ENABLED)) throw new Error('MYJIRA_ENABLED must be on or off');
   const MYJIRA_ENABLED = env.MYJIRA_ENABLED === 'on';
+  if (
+    env.JIRA_LLM_EGRESS_ENABLED &&
+    !['on', 'off', 'true', 'false', '1', '0'].includes(env.JIRA_LLM_EGRESS_ENABLED)
+  ) {
+    throw new Error('JIRA_LLM_EGRESS_ENABLED must be on or off');
+  }
+  const JIRA_LLM_EGRESS_ENABLED =
+    env.JIRA_LLM_EGRESS_ENABLED === 'on' ||
+    env.JIRA_LLM_EGRESS_ENABLED === 'true' ||
+    env.JIRA_LLM_EGRESS_ENABLED === '1';
   if (isLive && MYJIRA_ENABLED) {
     const required = ['JIRA_OAUTH_CLIENT_ID', 'JIRA_OAUTH_CLIENT_SECRET', 'JIRA_OAUTH_REDIRECT_URI'];
     const missing = required.find((f) => !env[f]?.trim());
@@ -360,6 +372,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     NOTION_OAUTH,
     MYNOTION_ENABLED,
     MYJIRA_ENABLED,
+    JIRA_LLM_EGRESS_ENABLED,
     JIRA_OAUTH,
     SCHEDULES_ENABLED,
     EMAIL_ENABLED,

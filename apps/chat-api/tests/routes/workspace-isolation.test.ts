@@ -228,7 +228,7 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
       expect(personalServices).not.toContain('google-calendar');
       expect(personalServices).not.toContain('google-sheets');
       expect(personalServices).toContain('slack');
-      expect(personalServices).toContain('jira');
+      expect(personalServices).not.toContain('jira');
       expect(resPersonal.body.canConfigure).toBe(true);
 
       // Create an organization
@@ -294,62 +294,56 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
       // Charlie creates Org B
       const orgB = await workspaceRepo.create(charlie.id, 'Org B', false);
 
-      // Alice (admin of Org A) configures jira in Org A
-      const resJira = await request(app)
-        .post('/api/services/jira/credentials')
+      // Alice (admin of Org A) configures slack in Org A
+      const resSlack = await request(app)
+        .post('/api/services/slack/credentials')
         .set('Authorization', `Bearer ${aliceToken}`)
         .set('X-Workspace-Id', orgA.id)
         .send({
           credentials: {
-            siteUrl: 'https://org-a.atlassian.net',
-            email: 'alice@org-a.com',
-            apiToken: 'token123',
+            botToken: 'xoxb-org-a-fixture',
           },
-          allowedScope: ['PROJECT'],
+          allowedScope: ['C1'],
         });
-      expect(resJira.status).toBe(200);
+      expect(resSlack.status).toBe(200);
 
-      // Bob (member of Org A) sees jira configured in Org A
+      // Bob (member of Org A) sees slack configured in Org A
       const bobOrgA = await request(app)
         .get('/api/services')
         .set('Authorization', `Bearer ${bobToken}`)
         .set('X-Workspace-Id', orgA.id);
       expect(bobOrgA.body.canConfigure).toBe(false);
-      const jiraOrgA = bobOrgA.body.services.find((s: any) => s.id === 'jira');
-      expect(jiraOrgA.configured).toBe(true);
+      const slackOrgA = bobOrgA.body.services.find((s: any) => s.id === 'slack');
+      expect(slackOrgA.configured).toBe(true);
 
       // Bob as member cannot reconfigure or delete credentials in Org A
       const bobMutate = await request(app)
-        .post('/api/services/jira/credentials')
+        .post('/api/services/slack/credentials')
         .set('Authorization', `Bearer ${bobToken}`)
         .set('X-Workspace-Id', orgA.id)
         .send({
           credentials: {
-            siteUrl: 'https://hacked.atlassian.net',
-            email: 'bob@org-a.com',
-            apiToken: 'token456',
+            botToken: 'xoxb-member-fixture',
           },
-          allowedScope: ['PROJECT'],
+          allowedScope: ['C1'],
         });
       expect(bobMutate.status).toBe(403);
 
-      // Charlie in Org B sees jira as not configured
+      // Charlie in Org B sees slack as not configured
       const charlieOrgB = await request(app)
         .get('/api/services')
         .set('Authorization', `Bearer ${charlieToken}`)
         .set('X-Workspace-Id', orgB.id);
-      const jiraOrgB = charlieOrgB.body.services.find((s: any) => s.id === 'jira');
-      expect(jiraOrgB.configured).toBe(false);
+      const slackOrgB = charlieOrgB.body.services.find((s: any) => s.id === 'slack');
+      expect(slackOrgB.configured).toBe(false);
 
       // Even if a global legacy credential (workspace_id IS NULL) exists, Org B MUST NOT inherit it
       await credentials.saveCredentials(
-        'jira',
+        'slack',
         encryptCredentials(
           {
-            siteUrl: 'https://legacy.atlassian.net',
-            email: 'legacy@example.com',
-            apiToken: 'legacy-token',
-            allowedScope: { projects: ['LEGACY'] },
+            botToken: 'xoxb-legacy-fixture',
+            allowedScope: { channels: ['CLEGACY'] },
           },
           key
         ),
@@ -360,8 +354,8 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
         .get('/api/services')
         .set('Authorization', `Bearer ${charlieToken}`)
         .set('X-Workspace-Id', orgB.id);
-      const jiraOrgBAfterLegacy = charlieOrgBAfterLegacy.body.services.find((s: any) => s.id === 'jira');
-      expect(jiraOrgBAfterLegacy.configured).toBe(false);
+      const slackOrgBAfterLegacy = charlieOrgBAfterLegacy.body.services.find((s: any) => s.id === 'slack');
+      expect(slackOrgBAfterLegacy.configured).toBe(false);
     });
 
     it('isolates service health-check cache between personal and organization workspaces', async () => {
@@ -892,7 +886,7 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
       expect(adapterB2).toBe(adapterB1);
     });
 
-    it('[AUDIT-OAUTH] blocks Service Account calendar/sheets across AdapterFactory and all /api/services endpoints in personal mode while keeping 5 key-based services', async () => {
+    it('[AUDIT-OAUTH] blocks Service Account calendar/sheets across AdapterFactory and all /api/services endpoints in personal mode while keeping supported shared and OAuth services', async () => {
       const aliceToken = tokenFor(alice);
       const factory = new AdapterFactory({ credentialRepo: credentials, encryptionKey: key });
 
@@ -945,7 +939,8 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
       const ids = listRes.body.services.map((s: any) => s.id);
       expect(ids).not.toContain('calendar');
       expect(ids).not.toContain('sheets');
-      for (const expectedId of ['slack', 'notion', 'jira']) {
+      expect(ids).not.toContain('jira');
+      for (const expectedId of ['slack', 'notion']) {
         const svc = listRes.body.services.find((s: any) => s.id === expectedId);
         expect(svc).toBeDefined();
         expect(svc.connection).toBe('shared');

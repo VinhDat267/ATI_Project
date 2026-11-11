@@ -679,4 +679,22 @@ describe('JIRA-09B: Jira Cockpit UI integration', () => {
     expect(GUIDE_OAUTH_SHOWCASE_CARDS.some((c) => c.service === 'jira')).toBe(true);
     expect(SERVICE_GUIDES.jira.keys.join(' ')).toContain('Site URL');
   });
+
+  it('renders G2A read-only and D09-LLM-OFF policy banner in JiraConnection settings without breaking direct directory UI', async () => {
+    vi.spyOn(jiraApi, 'connection').mockResolvedValue({
+      connected: true,
+      connectionState: 'connected',
+      atlassianAccountId: 'atl-1',
+      displayName: 'Alice',
+      sites: [{ cloudId: 'c1', name: 'Acme', url: 'https://acme.atlassian.net', scopes: ['read:jira-work'] }],
+    } as any);
+    vi.spyOn(jiraApi, 'workspaces').mockResolvedValue({ workspaces: [] } as any);
+
+    render(<JiraConnection user={user} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('jira-g2a-policy-banner')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('jira-g2a-policy-banner')).toHaveTextContent(/D09-LLM-OFF/i);
+    expect(screen.getByTestId('jira-g2a-policy-banner')).toHaveTextContent(/read:jira-work/i);
+  });
 });

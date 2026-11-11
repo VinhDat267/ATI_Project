@@ -6,6 +6,7 @@ import type { JiraLeaseManager } from './jira-lease-manager.js';
 import { isJiraRelatedMessage } from './jira-history-sanitizer.js';
 
 export interface JiraGuardedProviderOptions {
+  jiraLlmEgressEnabled?: boolean;
   pool?: Pool;
   jiraPolicyService?: JiraPolicyService;
   jiraLeaseManager?: JiraLeaseManager;
@@ -13,6 +14,7 @@ export interface JiraGuardedProviderOptions {
     userId: string;
     workspaceId?: string | null;
     workspaceMode?: 'legacy' | 'personal' | 'organization';
+    jiraContext?: boolean;
   };
 }
 
@@ -60,30 +62,95 @@ export class JiraGuardedProvider implements LLMProvider {
     return this.baseProvider.generatePlan(sanitizedInput);
   }
 
-  private async sanitizeBeforeModel(input: LLMGeneratePlanInput): Promise<LLMGeneratePlanInput> {
-    const actor = this.options.actor;
-    if (!actor?.userId || !actor?.workspaceId) {
-      return input;
+  private stripAllJiraFailClosed(input: LLMGeneratePlanInput): LLMGeneratePlanInput {
+    const workingMemory = input.workingMemory;
+    const sanitizedWorkingMemory: Record<string, any> =
+      workingMemory && typeof workingMemory === 'object' ? { ...workingMemory } : {};
+
+    for (const key of Object.keys(sanitizedWorkingMemory)) {
+      if (key.startsWith('jira_')) {
+        delete sanitizedWorkingMemory[key];
+      }
     }
 
-    const policyService = this.options.jiraPolicyService ?? (
-      this.options.pool
-        ? new JiraPolicyService({
-            pool: this.options.pool,
-            verifier: {
-              verifyUserPermissions: async () => ({
-                status: 'granted' as const,
-                canBrowse: true,
-                canCreateIssue: true,
-                canAddComment: true,
-              }),
-            },
-          })
-        : undefined
+    const observed = sanitizedWorkingMemory.__observed as Record<string, unknown[]> | undefined;
+    if (observed && typeof observed === 'object') {
+      const sanitizedObserved: Record<string, unknown[]> = {};
+      for (const [res, list] of Object.entries(observed)) {
+        if (res.startsWith('jira_')) {
+          sanitizedObserved[res] = [];
+        } else if (Array.isArray(list)) {
+          sanitizedObserved[res] = list.filter(
+            (item) =>
+              extractEntitySourceRefs(item).length === 0 &&
+              !Boolean((item as any)?.siteId || (item as any)?.cloudId)
+          );
+        } else {
+          sanitizedObserved[res] = list;
+        }
+      }
+      sanitizedWorkingMemory.__observed = sanitizedObserved;
+    }
+
+    const sanitizedConversationHistory: ChatMessage[] = [];
+    for (let index = 0; index < input.conversationHistory.length; index++) {
+      const msg = input.conversationHistory[index]!;
+      if (msg.role === 'user' && index === 0 && !msg.content.includes('<search_results>')) {
+        sanitizedConversationHistory.push(msg);
+        continue;
+      }
+
+      let meta = (msg as any).metadata;
+      if (typeof meta === 'string') {
+        try {
+          meta = JSON.parse(meta);
+        } catch {
+          meta = null;
+        }
+      }
+
+      const hasRefs =
+        Boolean((msg as any).sourceRef || (msg as any)._sourceRef) ||
+        (Array.isArray((msg as any).sourceRefs) && (msg as any).sourceRefs.length > 0) ||
+        (Array.isArray((msg as any)._sourceRefs) && (msg as any)._sourceRefs.length > 0) ||
+        (meta && Array.isArray(meta.sourceRefs) && meta.sourceRefs.length > 0);
+      const isJiraMsg = msg.role === 'assistant' && isJiraRelatedMessage(msg, meta);
+      const isJiraSearchTurn =
+        msg.role === 'user' &&
+        (msg.content.includes('myjira.') ||
+          (msg.content.includes('<search_results>') && msg.content.includes('jira.')));
+
+      if (hasRefs || isJiraMsg || isJiraSearchTurn) {
+        sanitizedConversationHistory.push({
+          ...msg,
+          content: `[Nội dung Jira đã bị ẩn do quyền truy cập bị thay đổi hoặc thu hồi: authority_unavailable]`,
+        });
+        continue;
+      }
+
+      sanitizedConversationHistory.push(msg);
+    }
+
+    const sanitizedToolCatalog = input.toolCatalog.filter(
+      (t) => !t.name.startsWith('myjira.') && !t.name.startsWith('jira.')
     );
 
-    if (!policyService) {
-      return input;
+    return {
+      ...input,
+      toolCatalog: sanitizedToolCatalog,
+      workingMemory: sanitizedWorkingMemory,
+      conversationHistory: sanitizedConversationHistory,
+    };
+  }
+
+  private async sanitizeBeforeModel(input: LLMGeneratePlanInput): Promise<LLMGeneratePlanInput> {
+    if (this.options.jiraLlmEgressEnabled === false || this.options.actor?.jiraContext === false) {
+      return this.stripAllJiraFailClosed(input);
+    }
+    const actor = this.options.actor;
+    const policyService = this.options.jiraPolicyService;
+    if (!actor?.userId || !actor?.workspaceId || !policyService) {
+      return this.stripAllJiraFailClosed(input);
     }
 
     // Check if the user has at least one active Jira site with an active grant in this workspace (for toolCatalog)

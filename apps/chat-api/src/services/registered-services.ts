@@ -1,5 +1,5 @@
 import { decryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYJIRA_TOOLS, MYSHEETS_TOOLS, NOTION_TOOLS, NOTION_OAUTH_TOOLS, TELEGRAM_TOOLS, TELEGRAM_OAUTH_TOOLS, TRELLO_TOOLS, TRELLO_OAUTH_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYJIRA_G2A_TOOLS, MYJIRA_TOOLS, MYSHEETS_TOOLS, NOTION_TOOLS, NOTION_OAUTH_TOOLS, TELEGRAM_TOOLS, TELEGRAM_OAUTH_TOOLS, TRELLO_TOOLS, TRELLO_OAUTH_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { ServiceTransport } from './transports/types.js';
 import { TRELLO_TRANSPORT } from './transports/trello.js';
@@ -97,7 +97,7 @@ export async function getConfiguredToolCatalog(
   const mode = scope?.workspaceMode ?? 'legacy';
   for (const definition of getRegisteredServices()) {
     if (definition.id === 'trello' || definition.id === 'github' || definition.id === 'telegram') continue;
-    if (scope?.myjiraEnabled && definition.id === 'jira') continue;
+    if (definition.id === 'jira') continue;
     if (mode === 'personal' && isServiceAccountService(definition)) continue;
     let record;
     if (mode === 'personal') {
@@ -176,7 +176,7 @@ export async function getToolCatalogFor(
       tool.service !== 'trello' &&
       tool.service !== 'github' &&
       tool.service !== 'telegram' &&
-      (!options.myjiraEnabled || tool.service !== 'jira')
+      tool.service !== 'jira'
   );
   if (!options.userId) return catalog;
   if (options.gmailEnabled) {
@@ -396,8 +396,12 @@ export async function getToolCatalogFor(
     if (options.myjiraConnection) {
       try {
         const myjira = await options.myjiraConnection(options.userId, options.workspaceId);
-        if (myjira?.status === 'connected' && Array.isArray(myjira.sites) && myjira.sites.length > 0) {
-          catalog = [...catalog, ...MYJIRA_TOOLS];
+        const isConnected =
+          myjira?.status === 'connected' ||
+          myjira?.connectionState === 'connected' ||
+          myjira?.connected === true;
+        if (isConnected && Array.isArray(myjira.sites) && myjira.sites.length > 0) {
+          catalog = [...catalog, ...MYJIRA_G2A_TOOLS];
         }
       } catch {
         // ignore
@@ -406,13 +410,13 @@ export async function getToolCatalogFor(
       try {
         const caps = await options.jiraWorkspaceRepo.getCapabilities(options.workspaceId, options.userId);
         if (caps && Array.isArray(caps.sites) && caps.sites.length > 0) {
-          catalog = [...catalog, ...MYJIRA_TOOLS];
+          catalog = [...catalog, ...MYJIRA_G2A_TOOLS];
         }
       } catch {
         // stale or unauthorized workspace does not add tools
       }
     } else if (options.workspaceId) {
-      catalog = [...catalog, ...MYJIRA_TOOLS];
+      catalog = [...catalog, ...MYJIRA_G2A_TOOLS];
     }
   }
   return catalog;

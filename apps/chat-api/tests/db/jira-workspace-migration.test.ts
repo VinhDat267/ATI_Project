@@ -57,7 +57,9 @@ describe('apps/chat-api — JIRA-03 Workspace Migration & Schema Constraints', (
 
     it('requires dedicated localhost:56534 for local tests when CI is false', () => {
       const origCi = process.env.CI;
+      const origAllow = process.env.ALLOW_ISOLATED_TEST_PORT;
       delete process.env.CI;
+      delete process.env.ALLOW_ISOLATED_TEST_PORT;
       try {
         expect(() =>
           validateDatabaseUrl('postgresql://ati_v3:ati_v3_local_only@127.0.0.1:5432/ati_v3')
@@ -68,6 +70,7 @@ describe('apps/chat-api — JIRA-03 Workspace Migration & Schema Constraints', (
         ).toBe('postgresql://ati_v3:ati_v3_local_only@127.0.0.1:56534/ati_v3');
       } finally {
         if (origCi !== undefined) process.env.CI = origCi;
+        if (origAllow !== undefined) process.env.ALLOW_ISOLATED_TEST_PORT = origAllow;
       }
     });
 

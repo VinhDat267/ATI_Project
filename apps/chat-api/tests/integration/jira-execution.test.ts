@@ -49,7 +49,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     stepRepo = new StepRepo(pool);
     convRepo = new ConversationRepo(pool);
 
-    server = http.createServer((req, res) => {
+    server = http.createServer(async (req, res) => {
       const url = req.url || '';
       const method = req.method || 'GET';
 
@@ -105,7 +105,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
                 fields: {
                   summary: 'Login bug',
                   status: { name: 'Open' },
-                  project: { key: 'PROJ' },
+                  project: { id: '10001', key: 'PROJ' },
                 },
               },
             ],
@@ -123,19 +123,33 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
             JSON.stringify({
               id: '10099',
               key: 'MOVED-99',
-              fields: { project: { key: 'UNAPPROVED_PROJECT' } },
+              fields: {
+                summary: 'Moved Issue',
+                status: { name: 'Open' },
+                project: { key: 'UNAPPROVED_PROJECT' },
+              },
             })
           );
           return;
         }
 
         const issueKey = url.split('/issue/')[1]?.split('?')[0] || 'PROJ-50';
+        if (issueKey === 'PROJ-901') {
+          await pool.query(
+            `UPDATE ati_workspace_jira_sites SET active = false, policy_version = policy_version + 1 WHERE site_name = 'Site 2'`
+          );
+        }
+        const projKey = issueKey.startsWith('BETA-') ? 'BETA' : 'PROJ';
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({
-            id: '10050',
+            id: projKey === 'BETA' ? '10052' : '10050',
             key: issueKey,
-            fields: { project: { key: 'PROJ' } },
+            fields: {
+              summary: `${projKey} Issue`,
+              status: { name: 'Open' },
+              project: { id: projKey === 'BETA' ? '20002' : '10001', key: projKey },
+            },
           })
         );
         return;
@@ -444,7 +458,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     }
   });
 
-  it('executes create_issue and add_comment producing valid receipts with owner, workspace, site, and project', async () => {
+  it('rejects create_issue and add_comment write plans fail-closed in G2A with zero outbound writes', async () => {
     const f = await setupFixture();
     const { executionService } = createTestExecutionService(f);
 
@@ -471,63 +485,31 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     };
 
     const { plan } = await createApprovedPlan(f, steps, siteSteps);
-    await executionService.approveAndStart(plan.id, f.userId);
-
-    let status = executionService.getExecutionStatus(plan.id);
-    for (let i = 0; i < 150 && (!status || status.status === 'executing'); i++) {
-      await new Promise((r) => setTimeout(r, 50));
-      status = executionService.getExecutionStatus(plan.id);
-    }
+    const approveRes = await executionService.approveAndStart(plan.id, f.userId);
+    expect(approveRes.success).toBe(false);
+    expect(approveRes.status).toBe(403);
+    expect(approveRes.error).toContain('JIRA_CAPABILITY_DISABLED_IN_G2A');
 
     const executedSteps = await stepRepo.listSteps(plan.id);
-
-    expect(status?.status).toBe('completed');
-    expect(executedSteps).toHaveLength(2);
-
-    const createRow = executedSteps.find((s) => s.step_id === 'create_1')!;
-    expect(createRow.status).toBe('succeeded');
-    expect(createRow.output_json).toMatchObject({
-      siteId: f.siteId1,
-      id: '10050',
-      key: 'PROJ-50',
-      url: `${serverUrl}/browse/PROJ-50`,
-      _receipt: {
-        ownerId: f.userId,
-        workspaceId: f.workspaceId,
-        siteId: f.siteId1,
-      },
-    });
-
-    const commentRow = executedSteps.find((s) => s.step_id === 'comment_1')!;
-    expect(commentRow.status).toBe('succeeded');
-    expect(commentRow.output_json).toMatchObject({
-      siteId: f.siteId1,
-      id: '20001',
-      issueKey: 'PROJ-50',
-      url: `${serverUrl}/browse/PROJ-50?focusedCommentId=20001`,
-      _receipt: {
-        ownerId: f.userId,
-        workspaceId: f.workspaceId,
-      },
-    });
+    expect(executedSteps).toHaveLength(0);
   });
 
-  it('moved issue recheck halts execution if issue was moved to unapproved project', async () => {
+  it('moved issue recheck halts G2A get_issue execution if issue was moved to unapproved project', async () => {
     const f = await setupFixture();
     const { executionService } = createTestExecutionService(f);
 
     const steps: PlanStep[] = [
       {
-        id: 'comment_moved',
-        tool: 'myjira.add_comment',
-        description: 'Comment on moved issue',
-        args: { siteId: f.siteId1, issueKey: 'MOVED-99', body: 'Should fail' },
+        id: 'get_moved',
+        tool: 'myjira.get_issue',
+        description: 'Read moved issue',
+        args: { siteId: f.siteId1, issueKey: 'MOVED-99' },
         dependsOn: [],
       },
     ];
 
     const siteSteps = {
-      comment_moved: { siteId: f.siteId1, cloudId: f.cloudId1, sitePolicyVersion: 1, projectId: '10001', projectPolicyVersion: 1 },
+      get_moved: { siteId: f.siteId1, cloudId: f.cloudId1, sitePolicyVersion: 1, projectId: '10001', projectPolicyVersion: 1 },
     };
 
     const { plan } = await createApprovedPlan(f, steps, siteSteps);
@@ -545,23 +527,23 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     expect(executedSteps[0]!.error_json.category).toBe('AUTH_ERROR');
   });
 
-  it('executes multi-site plan across two different sites successfully', async () => {
+  it('executes multi-site G2A read plan across two different sites successfully', async () => {
     const f = await setupFixture();
     const { executionService } = createTestExecutionService(f);
 
     const steps: PlanStep[] = [
       {
         id: 'site1_issue',
-        tool: 'myjira.create_issue',
-        description: 'Create issue on Site 1',
-        args: { siteId: f.siteId1, projectKey: 'PROJ', summary: 'Site 1 Task' },
+        tool: 'myjira.get_issue',
+        description: 'Read issue on Site 1',
+        args: { siteId: f.siteId1, issueKey: 'PROJ-50' },
         dependsOn: [],
       },
       {
         id: 'site2_issue',
-        tool: 'myjira.create_issue',
-        description: 'Create issue on Site 2',
-        args: { siteId: f.siteId2, projectKey: 'BETA', summary: 'Site 2 Task' },
+        tool: 'myjira.get_issue',
+        description: 'Read issue on Site 2',
+        args: { siteId: f.siteId2, issueKey: 'BETA-52' },
         dependsOn: ['site1_issue'],
       },
     ];
@@ -594,16 +576,16 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     const steps: PlanStep[] = [
       {
         id: 'step_ok',
-        tool: 'myjira.create_issue',
-        description: 'Create issue on Site 1',
-        args: { siteId: f.siteId1, projectKey: 'PROJ', summary: 'Initial Task' },
+        tool: 'myjira.get_issue',
+        description: 'Read issue on Site 1',
+        args: { siteId: f.siteId1, issueKey: 'PROJ-901' },
         dependsOn: [],
       },
       {
         id: 'step_revoked',
-        tool: 'myjira.create_issue',
-        description: 'Create issue on Site 2',
-        args: { siteId: f.siteId2, projectKey: 'BETA', summary: 'Should be stopped' },
+        tool: 'myjira.get_issue',
+        description: 'Read issue on Site 2',
+        args: { siteId: f.siteId2, issueKey: 'BETA-52' },
         dependsOn: ['step_ok'],
       },
     ];
@@ -637,7 +619,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     expect(step2.status).toBe('failed');
   });
 
-  it('UNKNOWN write error is not retried by recovery', async () => {
+  it('persisted pre-cutover write plan is blocked from continueExecution and continueStep while allowing stop()', async () => {
     const f = await setupFixture();
     const { executionService } = createTestExecutionService(f);
 
@@ -645,7 +627,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
       {
         id: 'write_fail',
         tool: 'myjira.create_issue',
-        description: 'Write that fails with unknown server outcome',
+        description: 'Pre-cutover write plan',
         args: { siteId: f.siteId1, projectKey: 'PROJ', summary: 'FAIL_WITH_UNKNOWN' },
         dependsOn: [],
       },
@@ -656,35 +638,18 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     };
 
     const { plan } = await createApprovedPlan(f, steps, siteSteps);
-    await executionService.approveAndStart(plan.id, f.userId);
+    await pool.query(`UPDATE plans SET status = 'partial', decided_at = clock_timestamp() WHERE id = $1`, [plan.id]);
 
-    let status = executionService.getExecutionStatus(plan.id);
-    for (let i = 0; i < 150 && (!status || status.status === 'executing'); i++) {
-      await new Promise((r) => setTimeout(r, 50));
-      status = executionService.getExecutionStatus(plan.id);
-    }
-
-    expect(status?.status).toBe('partial');
-
-    const snapshot = await executionService.getLatestExecutionSnapshot(plan.conv_id, f.userId);
-    expect(snapshot.recoveryActions).toEqual(['skip', 'stop']);
-    expect(snapshot.recoveryActions).not.toContain('retry');
-
-    const executedSteps = await stepRepo.listSteps(plan.id);
-    expect(executedSteps[0]!.status).toBe('unknown');
-
-    // Attempting retry on an unknown write MUST throw conflict
     await expect(
-      executionService.retryStep(plan.id, 'write_fail', f.userId)
-    ).rejects.toThrow(/Cannot retry a step unless its failure is known/);
+      executionService.continueExecution(plan.id, f.userId)
+    ).rejects.toThrow(/JIRA_CAPABILITY_DISABLED_IN_G2A/);
 
-    // Only skip is permitted
     await expect(
-      executionService.skipStep(plan.id, 'write_fail', f.userId)
+      executionService.stop(plan.id, f.userId)
     ).resolves.toBeDefined();
   });
 
-  it('rejects legacy jira adapter fallback in personal/bound context', async () => {
+  it('rejects legacy jira adapter fallback unconditionally across personal, legacy, and bound contexts', async () => {
     const f = await setupFixture();
     const { adapterFactory } = createTestExecutionService(f);
 
@@ -696,7 +661,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
         workspaceMode: 'personal',
         phase: 'execution',
       })
-    ).rejects.toThrow(/không khả dụng ở không gian cá nhân/);
+    ).rejects.toThrow(/JIRA_LEGACY_SHARED_DISABLED/);
 
     // Requesting legacy 'jira' when personal Jira is bound in connections must be rejected
     await expect(
@@ -718,7 +683,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
           },
         },
       })
-    ).rejects.toThrow(/không khả dụng ở không gian cá nhân/);
+    ).rejects.toThrow(/JIRA_LEGACY_SHARED_DISABLED/);
   });
 
   it('suppresses Jira output via JiraStreamBuffer when lease is revoked before SSE flush', async () => {

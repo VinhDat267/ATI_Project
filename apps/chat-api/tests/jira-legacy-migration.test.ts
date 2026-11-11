@@ -1,15 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import pg from 'pg';
+import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   LEGACY_JIRA_PAUSE_REASON,
   scanAndPauseLegacyJiraSchedules,
 } from '../src/services/jira-legacy-migration.js';
-
-const connectionString =
-  process.env.DATABASE_URL ?? 'postgres://ati_v3:ati_v3_local_only@127.0.0.1:56534/ati_v3';
+import { createIsolatedTestSchema, type IsolatedTestContext } from './helpers/jira-test-db.js';
 
 describe('scanAndPauseLegacyJiraSchedules (real PostgreSQL)', () => {
+  let ctx: IsolatedTestContext;
   let pool: pg.Pool;
   const createdScheduleIds: string[] = [];
   const createdPlanIds: string[] = [];
@@ -17,24 +16,31 @@ describe('scanAndPauseLegacyJiraSchedules (real PostgreSQL)', () => {
   const createdUserIds: string[] = [];
 
   beforeAll(async () => {
-    pool = new pg.Pool({ connectionString });
+    ctx = await createIsolatedTestSchema();
+    await ctx.runAllMigrations();
+    pool = ctx.pool;
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS schedules (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        conv_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        request TEXT NOT NULL,
+        services TEXT[] NOT NULL DEFAULT '{}',
+        cron_expression TEXT NOT NULL DEFAULT '0 9 * * *',
+        timezone TEXT NOT NULL DEFAULT 'Asia/Ho_Chi_Minh',
+        status TEXT NOT NULL DEFAULT 'active',
+        pause_reason TEXT,
+        next_run_at TIMESTAMPTZ,
+        version INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
   });
 
   afterAll(async () => {
-    if (createdScheduleIds.length > 0) {
-      await pool.query('DELETE FROM schedules WHERE id = ANY($1::uuid[])', [createdScheduleIds]);
-    }
-    if (createdPlanIds.length > 0) {
-      await pool.query('DELETE FROM plans WHERE id = ANY($1::uuid[])', [createdPlanIds]);
-    }
-    if (createdConvIds.length > 0) {
-      await pool.query('DELETE FROM messages WHERE conv_id = ANY($1::uuid[])', [createdConvIds]);
-      await pool.query('DELETE FROM conversations WHERE id = ANY($1::uuid[])', [createdConvIds]);
-    }
-    if (createdUserIds.length > 0) {
-      await pool.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [createdUserIds]);
-    }
-    await pool.end();
+    await ctx.cleanup();
   });
 
   async function seedUserAndConversation(label: string) {

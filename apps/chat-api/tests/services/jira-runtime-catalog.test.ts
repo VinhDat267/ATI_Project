@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { routeIntent, WorkingMemory } from '@wap/planner';
-import { MYJIRA_SERVICE, MYJIRA_TOOLS, type PlanResponse } from '@wap/tool-schemas';
+import { MYJIRA_SERVICE, MYJIRA_G2A_TOOLS, type PlanResponse } from '@wap/tool-schemas';
 import {
   serviceRegistryForRuntime,
   runtimeToolCatalog,
@@ -20,9 +20,9 @@ describe('JIRA-08 Runtime Catalog, Factory, Legacy Route Lock & Resource Labels'
     getPersonalConnectionStatus: vi.fn().mockResolvedValue(null),
   };
 
-  it('includes MYJIRA_SERVICE and excludes legacy jira in serviceRegistryForRuntime when myjiraEnabled is true', () => {
+  it('includes MYJIRA_SERVICE when myjiraEnabled is true and retires legacy jira unconditionally outside synthetic sandbox scenarios', () => {
     const offRegistry = serviceRegistryForRuntime(false, false, false, false);
-    expect(offRegistry.some((s) => s.id === 'jira')).toBe(true);
+    expect(offRegistry.some((s) => s.id === 'jira')).toBe(false);
     expect(offRegistry.some((s) => s.id === 'myjira')).toBe(false);
 
     const onRegistry = serviceRegistryForRuntime(false, false, false, true);
@@ -31,7 +31,7 @@ describe('JIRA-08 Runtime Catalog, Factory, Legacy Route Lock & Resource Labels'
     expect(onRegistry.some((s) => s.id === 'jira')).toBe(false);
   });
 
-  it('adds MYJIRA_TOOLS and strips legacy jira.* tools in getToolCatalogFor and runtimeToolCatalog when myjiraEnabled is true', async () => {
+  it('adds MYJIRA_G2A_TOOLS and strips legacy jira.* tools in getToolCatalogFor and runtimeToolCatalog when myjiraEnabled is true', async () => {
     const fakeJiraWorkspaceRepo = {
       getCapabilities: vi.fn().mockResolvedValue({
         workspaceId: 'ws-1',
@@ -58,7 +58,7 @@ describe('JIRA-08 Runtime Catalog, Factory, Legacy Route Lock & Resource Labels'
 
     expect(liveCatalog.some((t) => t.service === 'jira')).toBe(false);
     expect(liveCatalog.filter((t) => t.service === 'myjira').map((t) => t.name)).toEqual(
-      MYJIRA_TOOLS.map((t) => t.name)
+      MYJIRA_G2A_TOOLS.map((t) => t.name)
     );
 
     const sandboxCatalog = await runtimeToolCatalog('sandbox', fakeCredRepo, '0'.repeat(64), {
@@ -72,7 +72,7 @@ describe('JIRA-08 Runtime Catalog, Factory, Legacy Route Lock & Resource Labels'
 
     expect(sandboxCatalog.some((t) => t.service === 'jira')).toBe(false);
     expect(sandboxCatalog.filter((t) => t.service === 'myjira').map((t) => t.name)).toEqual(
-      MYJIRA_TOOLS.map((t) => t.name)
+      MYJIRA_G2A_TOOLS.map((t) => t.name)
     );
   });
 
@@ -122,7 +122,7 @@ describe('JIRA-08 Runtime Catalog, Factory, Legacy Route Lock & Resource Labels'
     expect(sandbox).not.toHaveBeenCalled();
   });
 
-  it('prevents fallback to shared planner when myjiraEnabled is true and prompt targets Jira', () => {
+  it('prevents fallback to shared planner whenever prompt targets Jira regardless of myjiraEnabled', () => {
     const allowedWhenOff = mayFallbackToShared(
       {
         userMessage: 'Tìm các dự án trên Jira site Acme',
@@ -134,7 +134,7 @@ describe('JIRA-08 Runtime Catalog, Factory, Legacy Route Lock & Resource Labels'
       false,
       false
     );
-    expect(allowedWhenOff).toBe(true);
+    expect(allowedWhenOff).toBe(false);
 
     const allowedWhenOn = mayFallbackToShared(
       {

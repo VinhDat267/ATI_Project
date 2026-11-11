@@ -8,8 +8,43 @@ export const MYJIRA_SCOPES = [
   'offline_access',
   'read:me',
   'read:jira-work',
-  'write:jira-work',
 ] as const;
+
+export const JIRA_CAPABILITY_DISABLED_IN_G2A = 'JIRA_CAPABILITY_DISABLED_IN_G2A' as const;
+export const JIRA_LEGACY_SHARED_DISABLED = 'JIRA_LEGACY_SHARED_DISABLED' as const;
+export const JIRA_CROSS_SERVICE_EGRESS_DENIED = 'JIRA_CROSS_SERVICE_EGRESS_DENIED' as const;
+export const JIRA_LLM_EGRESS_DISABLED_IN_G2A = 'JIRA_LLM_EGRESS_DISABLED_IN_G2A' as const;
+
+export const JIRA_G2A_ALLOWED_TOOLS = [
+  'myjira.list_sites',
+  'myjira.search_projects',
+  'myjira.get_issue',
+  'myjira.search_issues',
+] as const;
+
+export type JiraG2AAllowedToolName = (typeof JIRA_G2A_ALLOWED_TOOLS)[number];
+
+export type JiraSearchCoverageCompleteness = 'COMPLETE' | 'PARTIAL' | 'UNKNOWN';
+
+export interface JiraSearchCoverage {
+  completeness: JiraSearchCoverageCompleteness;
+  pagesFetched: number;
+  itemsReturned: number;
+  budgetMs: number;
+  elapsedMs: number;
+  truncationReason?: string;
+  providerIsLast?: boolean;
+}
+
+const JIRA_G2A_ALLOWED_TOOL_SET: ReadonlySet<string> = new Set<string>(JIRA_G2A_ALLOWED_TOOLS);
+
+export function isJiraG2AAllowedTool(tool: string): tool is JiraG2AAllowedToolName {
+  return JIRA_G2A_ALLOWED_TOOL_SET.has(tool);
+}
+
+export function isAnyJiraTool(tool: string): boolean {
+  return typeof tool === 'string' && (tool.startsWith('myjira.') || tool.startsWith('jira.'));
+}
 
 export const MYJIRA_TOOLS: ToolDefinition[] = [
   {
@@ -163,9 +198,9 @@ export const MYJIRA_TOOLS: ToolDefinition[] = [
         limit: {
           type: 'integer',
           minimum: 1,
-          maximum: 20,
+          maximum: 50,
           default: 20,
-          description: 'Số lượng issue tối đa trả về (1-20)',
+          description: 'Số lượng issue tối đa trả về (1-50)',
         },
       },
     },
@@ -193,6 +228,23 @@ export const MYJIRA_TOOLS: ToolDefinition[] = [
               updatedAt: { type: 'string' },
               dueDate: { type: ['string', 'null'] },
             },
+          },
+        },
+        coverage: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['completeness', 'pagesFetched', 'itemsReturned', 'budgetMs', 'elapsedMs'],
+          properties: {
+            completeness: {
+              type: 'string',
+              enum: ['COMPLETE', 'PARTIAL', 'UNKNOWN'],
+            },
+            pagesFetched: { type: 'integer', minimum: 0 },
+            itemsReturned: { type: 'integer', minimum: 0 },
+            budgetMs: { type: 'integer', minimum: 1 },
+            elapsedMs: { type: 'integer', minimum: 0 },
+            truncationReason: { type: 'string' },
+            providerIsLast: { type: 'boolean' },
           },
         },
       },
@@ -590,3 +642,11 @@ export const MYJIRA_TOOLS: ToolDefinition[] = [
 ];
 
 export const MYJIRA_CORE_TOOLS: ToolDefinition[] = MYJIRA_TOOLS.slice(0, 5);
+
+export const MYJIRA_G2A_TOOLS: ToolDefinition[] = JIRA_G2A_ALLOWED_TOOLS.map((name) => {
+  const found = MYJIRA_TOOLS.find((t) => t.name === name);
+  if (!found) {
+    throw new Error(`Missing G2A Jira tool schema definition for ${name}`);
+  }
+  return found;
+});

@@ -17,7 +17,7 @@ import {
 import { DEMO_ADMIN_ID } from './routes/auth-routes.js';
 import { verifyPassword } from './db/repositories/user-repo.js';
 import { createRuntimePlanner, mayUseMemoryStorage } from './config/runtime-policy.js';
-import { createToolRuntimeFactory, gmailServiceRegistry, runtimeToolCatalog, runtimeGmailAdapter, runtimeMyCalendarAdapter, runtimeMySheetsAdapter, runtimeMySheetsEndpoints, serviceRegistryForRuntime, mayFallbackToShared, runtimePlannerSearchMode } from './config/gmail-tools-runtime.js';
+import { createToolRuntimeFactory, gmailServiceRegistry, runtimeToolCatalog, runtimeGmailAdapter, runtimeMyCalendarAdapter, runtimeMySheetsAdapter, runtimeMySheetsEndpoints, serviceRegistryForRuntime, mayFallbackToShared, runtimePlannerSearchMode, sandboxKeepsSharedJira } from './config/gmail-tools-runtime.js';
 import { SSEManager } from './sse/sse-manager.js';
 import { ChatService } from './services/chat-service.js';
 import { ExecutionService } from './services/execution-service.js';
@@ -75,6 +75,7 @@ import { JiraPlanBinder } from './services/jira/jira-plan-binding.js';
 import { JiraLeaseManager } from './services/jira/jira-lease-manager.js';
 import { JiraDispatchGuard } from './services/jira/jira-dispatch-guard.js';
 import { createJiraGuardedProvider } from './services/jira/jira-provider-guard.js';
+import { scanAndPauseLegacyJiraSchedules } from './services/jira-legacy-migration.js';
 import {
   AIPlanner,
   ReportArtifactStore,
@@ -573,7 +574,14 @@ async function bootstrap() {
       })
     : undefined;
   const jiraNativeVerifier = jiraAvailable && jiraTokens
-    ? new JiraNativeVerifier({ tokenManager: jiraTokens })
+    ? new JiraNativeVerifier({
+        tokenManager: jiraTokens,
+        oauthClientId: env.JIRA_OAUTH?.clientId,
+        pool: pool ?? undefined,
+        ...(env.JIRA_OAUTH?.fixtureBaseUrl
+          ? { mode: 'fixture' as const, fixtureBaseUrl: env.JIRA_OAUTH.fixtureBaseUrl }
+          : {}),
+      })
     : undefined;
   if (pool && jiraNativeVerifier) {
     jiraWorkspaceRepo = new JiraWorkspaceRepo(pool, { verifier: jiraNativeVerifier });
@@ -593,6 +601,17 @@ async function bootstrap() {
   const jiraDispatchGuard = jiraAvailable && pool && jiraTokens && jiraLeaseManager
     ? new JiraDispatchGuard(pool, jiraLeaseManager, jiraTokens)
     : undefined;
+  if (pool) {
+    void scanAndPauseLegacyJiraSchedules(pool, { dryRun: true })
+      .then((inv) => {
+        if (inv.pausedSchedules.length > 0 || inv.pendingLegacyPlans.length > 0) {
+          console.warn(
+            `\x1b[33m[chat-api] Jira G2A dry-run inventory:\x1b[0m ${inv.pausedSchedules.length} active Jira schedules, ${inv.pendingLegacyPlans.length} pending write/legacy Jira plans (no DB rows mutated; fail-closed at runtime).`
+          );
+        }
+      })
+      .catch(() => {});
+  }
 
   // 2. Initialize LLM Provider
   let provider: any;
@@ -619,10 +638,16 @@ async function bootstrap() {
     tool: string;
     args: Record<string, unknown>;
     signal?: AbortSignal;
-    actor?: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' };
+    actor?: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization'; jiraContext?: boolean };
   }) => {
     if (!gatherAdapterFactory) throw new Error('Gather adapter factory is not ready');
     const serviceName = tool.split('.')[0]!;
+    if ((serviceName === 'myjira' || serviceName === 'jira') && !sandboxKeepsSharedJira(process.env.SANDBOX_SCENARIO, env.RUNTIME_MODE)) {
+      if (serviceName === 'jira' || !jiraAvailable || !env.JIRA_LLM_EGRESS_ENABLED ||
+          actor?.jiraContext !== true || actor.workspaceMode !== 'organization' || !actor.workspaceId) {
+        throw new Error('JIRA_CAPABILITY_DISABLED_IN_G2A: Jira planning requires approved LLM egress and a Jira workspace conversation.');
+      }
+    }
     // Lookups during planning use the planning member's own connection and active workspace context.
     const defaultMode = workspaceRepo ? ('personal' as const) : undefined;
     if (tool.startsWith('myjira.') && !actor?.workspaceId) {
@@ -652,13 +677,18 @@ async function bootstrap() {
     userId: string;
     workspaceId?: string | null;
     workspaceMode?: 'legacy' | 'personal' | 'organization';
+    jiraContext?: boolean;
   }) => {
+    const jiraPlanningAllowed = Boolean(jiraAvailable && env.JIRA_LLM_EGRESS_ENABLED &&
+      actor?.jiraContext === true && actor.workspaceMode === 'organization' && actor.workspaceId);
     const rawProvider = env.RUNTIME_MODE === 'sandbox' && (process.env.SANDBOX_SCENARIO === 'gmail' || process.env.SANDBOX_SCENARIO === 'mycalendar' || process.env.SANDBOX_SCENARIO === 'mysheets') ? createSandboxProvider(process.env.SANDBOX_SCENARIO) : provider;
-    const guardedProvider = (pool && actor?.userId && actor?.workspaceId)
+    const enforceJiraContainment = !(env.RUNTIME_MODE === 'sandbox' && sandboxKeepsSharedJira());
+    const guardedProvider = enforceJiraContainment
       ? createJiraGuardedProvider(rawProvider, {
-          pool,
+          pool: pool ?? undefined,
           jiraPolicyService,
           jiraLeaseManager,
+          jiraLlmEgressEnabled: env.JIRA_LLM_EGRESS_ENABLED,
           actor,
         })
       : rawProvider;
@@ -686,10 +716,10 @@ async function bootstrap() {
       telegramConnection,
       notionEnabled: notionAvailable,
       notionConnection,
-      myjiraEnabled: jiraAvailable,
+      myjiraEnabled: jiraPlanningAllowed,
       jiraWorkspaceRepo: jiraWorkspaceRepo ?? undefined,
     }),
-    serviceRegistry: serviceRegistryForRuntime(gmailAvailable || isNineServiceSandbox, mycalendarAvailable, mysheetsAvailable, jiraAvailable),
+    serviceRegistry: serviceRegistryForRuntime(gmailAvailable || isNineServiceSandbox, mycalendarAvailable, mysheetsAvailable, jiraPlanningAllowed),
     gatherSearch,
     requireGroundedResources: env.RUNTIME_MODE === 'live',
     timeZone: env.APP_TIME_ZONE,
@@ -748,6 +778,8 @@ async function bootstrap() {
     jiraBinder,
     jiraHistorySanitizer,
     jiraPolicyService,
+    jiraLlmEgressEnabled: env.JIRA_LLM_EGRESS_ENABLED,
+    enforceJiraG2AContainment: !(env.RUNTIME_MODE === 'sandbox' && sandboxKeepsSharedJira()),
     reportEvidenceStore,
     getAdapter: (serviceName, context) => (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
     schedules: schedules
@@ -979,6 +1011,7 @@ async function bootstrap() {
     pool: pool ?? undefined,
     jiraLeaseManager: jiraLeaseManager ?? undefined,
     jiraNativeVerifier: jiraNativeVerifier ?? undefined,
+    enforceJiraG2AContainment: !(env.RUNTIME_MODE === 'sandbox' && sandboxKeepsSharedJira()),
     reportEvidenceStore,
     enforceReportGrounding: true,
   });
@@ -1125,7 +1158,7 @@ async function bootstrap() {
       onConnectionChanged: (userId: string) => {
         realAdapterFactory.clearPersonal(userId, 'myjira');
         jiraTokens?.clear(userId);
-        jiraNativeVerifier?.clearCache();
+        jiraNativeVerifier?.evictForUser(userId);
       },
     } : undefined,
     chatService,

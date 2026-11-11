@@ -166,9 +166,9 @@ describe('JiraPlanBinder (JIRA-08 Task 1 Real PostgreSQL Tests)', () => {
     const steps: PlanStep[] = [
       {
         id: 'step_1',
-        tool: 'myjira.create_issue',
-        description: 'Create issue',
-        args: { siteId: f.siteId, projectKey: f.projectKey, summary: 'Legit Task' },
+        tool: 'myjira.search_issues',
+        description: 'Search issues',
+        args: { siteId: f.siteId, projectKey: f.projectKey, query: 'Legit Task' },
         dependsOn: [],
       },
     ];
@@ -244,16 +244,16 @@ describe('JiraPlanBinder (JIRA-08 Task 1 Real PostgreSQL Tests)', () => {
     const steps: PlanStep[] = [
       {
         id: 'step_1',
-        tool: 'myjira.create_issue',
-        description: 'Create issue on site 1',
-        args: { siteId: f.siteId, projectKey: f.projectKey, summary: 'Task 1' },
+        tool: 'myjira.search_issues',
+        description: 'Search issues on site 1',
+        args: { siteId: f.siteId, projectKey: f.projectKey, query: 'Task 1' },
         dependsOn: [],
       },
       {
         id: 'step_2',
-        tool: 'myjira.create_issue',
-        description: 'Create issue on site 2',
-        args: { siteId: siteId2, projectKey: projectKey2, summary: 'Task 2' },
+        tool: 'myjira.search_issues',
+        description: 'Search issues on site 2',
+        args: { siteId: siteId2, projectKey: projectKey2, query: 'Task 2' },
         dependsOn: ['step_1'],
       },
       {
@@ -305,9 +305,9 @@ describe('JiraPlanBinder (JIRA-08 Task 1 Real PostgreSQL Tests)', () => {
     const steps: PlanStep[] = [
       {
         id: 'step_1',
-        tool: 'myjira.create_issue',
-        description: 'Create issue',
-        args: { siteId: f.siteId, projectKey: f.projectKey, summary: 'Pre-rotation Task' },
+        tool: 'myjira.search_issues',
+        description: 'Search issues',
+        args: { siteId: f.siteId, projectKey: f.projectKey, query: 'Pre-rotation Task' },
         dependsOn: [],
       },
     ];
@@ -562,9 +562,9 @@ describe('JiraPlanBinder (JIRA-08 Task 1 Real PostgreSQL Tests)', () => {
     const steps: PlanStep[] = [
       {
         id: 'step_1',
-        tool: 'myjira.create_issue',
-        description: 'Create issue',
-        args: { siteId: f.siteId, projectKey: f.projectKey, summary: 'Task from Chat' },
+        tool: 'myjira.search_issues',
+        description: 'Search issues',
+        args: { siteId: f.siteId, projectKey: f.projectKey, query: 'Task from Chat' },
         dependsOn: [],
       },
     ];
@@ -605,6 +605,7 @@ describe('JiraPlanBinder (JIRA-08 Task 1 Real PostgreSQL Tests)', () => {
         processMessage: async () => structuredClone(modelResponseWithSpoof),
       } as any,
       jiraBinder: new JiraPlanBinder({ pool }),
+      jiraLlmEgressEnabled: true,
     });
 
     await chatService.handleUserMessage({
