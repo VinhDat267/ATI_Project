@@ -1,5 +1,8 @@
 import type { PlanConnections } from '@wap/tool-schemas';
-import type { NotionConnectionRepo } from '../../db/repositories/notion-connection-repo.js';
+import type {
+  NotionAuthFailureCode,
+  NotionConnectionRepo,
+} from '../../db/repositories/notion-connection-repo.js';
 
 export type NotionConnectionReference = NonNullable<PlanConnections['notion']>;
 
@@ -13,6 +16,7 @@ export interface NotionConnectionLookupResult {
   selectedDatabases: Array<{ id: string; title: string; url?: string }>;
   workspaceName?: string;
   workspaceId?: string;
+  authFailureCode?: NotionAuthFailureCode | null;
 }
 
 export function createNotionConnectionLookup(options: NotionConnectionLookupOptions) {
@@ -26,6 +30,7 @@ export function createNotionConnectionLookup(options: NotionConnectionLookupOpti
         status: 'reconnect_required',
         workspaceName: row.workspace_name,
         workspaceId: row.workspace_id,
+        authFailureCode: row.refresh_in_flight ? 'rotation_unknown' : (row.auth_failure_code ?? null),
         selectedDatabases: [],
       };
     }

@@ -199,6 +199,223 @@ describe('Task 5: Notion OAuth 1-Click UI, Callback View, and Chat Moments', () 
 
       expect(await screen.findByText('Đã kết nối Notion: Acme Notion')).toBeInTheDocument();
     });
+
+    it('renders distinct disconnect semantics for providerRevocation confirmed vs unconfirmed (with Notion integration removal guidance)', async () => {
+      const getSpy = vi
+        .spyOn(apiClient, 'getNotionConnection')
+        .mockResolvedValueOnce({
+          available: true,
+          status: 'connected',
+          activeConnectionId: 'conn-disc-1',
+          workspaceId: 'ws-1',
+          workspaceName: 'Acme Notion',
+          botId: 'bot-1',
+          selectedDatabases: [{ id: '11111111-2222-3333-4444-555555555555', title: 'Roadmap' }],
+          connections: [
+            {
+              id: 'conn-disc-1',
+              status: 'connected',
+              workspaceId: 'ws-1',
+              workspaceName: 'Acme Notion',
+              botId: 'bot-1',
+              isActive: true,
+              selectedDatabases: [{ id: '11111111-2222-3333-4444-555555555555', title: 'Roadmap' }],
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          available: true,
+          status: 'not_connected',
+          connections: [],
+        });
+
+      vi.spyOn(apiClient, 'disconnectNotionConnection').mockResolvedValueOnce({
+        disconnected: true,
+        status: 'disconnected',
+        toolsAvailable: false,
+        providerRevocation: 'confirmed',
+      } as any);
+
+      const { unmount } = render(<NotionConnection user={memberUser} refresh={vi.fn()} />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Ngắt kết nối' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Xác nhận ngắt' }));
+
+      expect(
+        await screen.findByText(/Đã ngắt kết nối Notion và thu hồi quyền truy cập từ Notion/i),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId('notion-revoke-unconfirmed')).toBeNull();
+      unmount();
+
+      // Case 2: providerRevocation === 'unconfirmed' -> shows local disconnect success + separate Notion manual removal guidance
+      getSpy
+        .mockResolvedValueOnce({
+          available: true,
+          status: 'connected',
+          activeConnectionId: 'conn-disc-2',
+          workspaceId: 'ws-2',
+          workspaceName: 'Ops Notion',
+          botId: 'bot-2',
+          selectedDatabases: [{ id: '22222222-3333-4444-5555-666666666666', title: 'Ops DB' }],
+          connections: [
+            {
+              id: 'conn-disc-2',
+              status: 'connected',
+              workspaceId: 'ws-2',
+              workspaceName: 'Ops Notion',
+              botId: 'bot-2',
+              isActive: true,
+              selectedDatabases: [{ id: '22222222-3333-4444-5555-666666666666', title: 'Ops DB' }],
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          available: true,
+          status: 'not_connected',
+          connections: [],
+        });
+
+      vi.spyOn(apiClient, 'disconnectNotionConnection').mockResolvedValueOnce({
+        disconnected: true,
+        status: 'disconnected',
+        toolsAvailable: false,
+        providerRevocation: 'unconfirmed',
+      } as any);
+
+      render(<NotionConnection user={memberUser} refresh={vi.fn()} />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Ngắt kết nối' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Xác nhận ngắt' }));
+
+      expect(await screen.findByText(/Đã ngắt kết nối Notion trên hệ thống/i)).toBeInTheDocument();
+      const unconfirmedWarning = await screen.findByTestId('notion-revoke-unconfirmed');
+      expect(unconfirmedWarning).toBeInTheDocument();
+      expect(unconfirmedWarning).toHaveTextContent(/Settings|Connections|gỡ tích hợp/i);
+      expect(
+        screen.queryByText(/Đã ngắt kết nối Notion và thu hồi quyền truy cập từ Notion/i),
+      ).toBeNull();
+    });
+
+    it('renders non-secret reconnect diagnostics and explicit check recovery button when authFailureCode is refresh_retryable', async () => {
+      vi.spyOn(apiClient, 'getNotionConnection')
+        .mockResolvedValueOnce({
+          available: true,
+          status: 'reconnect_required',
+          activeConnectionId: 'conn-retry-1',
+          workspaceId: 'ws-retry',
+          workspaceName: 'Retry Workspace',
+          authFailureCode: 'refresh_retryable',
+          connections: [
+            {
+              id: 'conn-retry-1',
+              status: 'reconnect_required',
+              workspaceId: 'ws-retry',
+              workspaceName: 'Retry Workspace',
+              botId: 'bot-retry',
+              isActive: true,
+              authFailureCode: 'refresh_retryable',
+              selectedDatabases: [],
+            } as any,
+          ],
+        } as any)
+        .mockResolvedValueOnce({
+          available: true,
+          status: 'connected',
+          activeConnectionId: 'conn-retry-1',
+          workspaceId: 'ws-retry',
+          workspaceName: 'Retry Workspace',
+          selectedDatabases: [{ id: '11111111-2222-3333-4444-555555555555', title: 'Roadmap' }],
+          connections: [],
+        } as any);
+
+      const checkSpy = vi.spyOn(apiClient, 'checkNotionConnection').mockResolvedValueOnce({
+        status: 'connected',
+        healthStatus: 'healthy',
+        latencyMs: 42,
+      } as any);
+
+      render(<NotionConnection user={memberUser} refresh={vi.fn()} />);
+
+      expect(await screen.findByTestId('notion-auth-diagnostic')).toHaveTextContent(
+        /làm mới phiên tạm thời gián đoạn|Kiểm tra/i,
+      );
+      const checkBtn = screen.getByRole('button', { name: /Kiểm tra/i });
+      expect(checkBtn).toHaveAttribute('id', 'notion-check');
+      fireEvent.click(checkBtn);
+
+      await waitFor(() => {
+        expect(checkSpy).toHaveBeenCalledWith('conn-retry-1');
+      });
+    });
+
+    it('refetches status, hides #notion-check, and displays rotation_unknown diagnostic when explicit check recovery fails with 409', async () => {
+      const getSpy = vi
+        .spyOn(apiClient, 'getNotionConnection')
+        .mockResolvedValueOnce({
+          available: true,
+          status: 'reconnect_required',
+          activeConnectionId: 'conn-interrupted-1',
+          workspaceId: 'ws-int',
+          workspaceName: 'Interrupted Workspace',
+          authFailureCode: 'refresh_retryable',
+          connections: [
+            {
+              id: 'conn-interrupted-1',
+              status: 'reconnect_required',
+              workspaceId: 'ws-int',
+              workspaceName: 'Interrupted Workspace',
+              botId: 'bot-int',
+              isActive: true,
+              authFailureCode: 'refresh_retryable',
+              selectedDatabases: [],
+            } as any,
+          ],
+        } as any)
+        .mockResolvedValueOnce({
+          available: true,
+          status: 'reconnect_required',
+          activeConnectionId: 'conn-interrupted-1',
+          workspaceId: 'ws-int',
+          workspaceName: 'Interrupted Workspace',
+          authFailureCode: 'rotation_unknown',
+          connections: [
+            {
+              id: 'conn-interrupted-1',
+              status: 'reconnect_required',
+              workspaceId: 'ws-int',
+              workspaceName: 'Interrupted Workspace',
+              botId: 'bot-int',
+              isActive: true,
+              authFailureCode: 'rotation_unknown',
+              selectedDatabases: [],
+            } as any,
+          ],
+        } as any);
+
+      const checkSpy = vi
+        .spyOn(apiClient, 'checkNotionConnection')
+        .mockRejectedValueOnce(new Error('Phiên làm mới Notion trước đó bị gián đoạn. Vui lòng kết nối lại.'));
+
+      render(<NotionConnection user={memberUser} refresh={vi.fn()} />);
+
+      expect(await screen.findByTestId('notion-auth-diagnostic')).toHaveTextContent(
+        /làm mới phiên tạm thời gián đoạn/i,
+      );
+      const checkBtn = screen.getByRole('button', { name: /Kiểm tra/i });
+      expect(checkBtn).toHaveAttribute('id', 'notion-check');
+      fireEvent.click(checkBtn);
+
+      await waitFor(() => {
+        expect(checkSpy).toHaveBeenCalledWith('conn-interrupted-1');
+        expect(getSpy).toHaveBeenCalledTimes(2);
+      });
+
+      await waitFor(() => {
+        expect(document.querySelector('#notion-check')).toBeNull();
+        expect(screen.getByTestId('notion-auth-diagnostic')).toHaveTextContent(
+          /Không xác nhận được trạng thái làm mới token từ Notion/i,
+        );
+      });
+      expect(screen.getByRole('button', { name: /Kết nối lại Notion/i })).toHaveAttribute('id', 'notion-connect');
+    });
   });
 
   describe('2. NotionCallbackView', () => {
