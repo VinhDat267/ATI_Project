@@ -36,7 +36,8 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
   const fetchFn = options.fetchFn ?? fetch;
   const limiter = options.limiter ?? new GlobalRateLimiter({ maxRequests: 20, windowMs: 1000 });
   return { async execute(toolName: string, input: Record<string, any>, context?: { signal?: AbortSignal }): Promise<any> {
-    let writeDispatched = false;
+    let currentWriteDispatched = false;
+    let hasCommittedOrAmbiguousWrite = false;
     const signal = context?.signal ?? AbortSignal.timeout(15_000);
     try {
       const tool = GMAIL_TOOLS.find(t => t.name === toolName);
@@ -51,6 +52,7 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
       if (['to', 'cc', 'bcc'].reduce((n, key) => n + (args[key]?.length ?? 0), 0) > 20) invalid('Gmail allows at most 20 recipients total');
       async function request(path: string, body?: any): Promise<any> {
         const write = body !== undefined;
+        if (write) currentWriteDispatched = false;
         let refreshed = false, forceRefresh = false, retries = 0;
         for (;;) {
           signal.throwIfAborted();
@@ -60,20 +62,30 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
           signal.throwIfAborted();
           let response: Response;
           try {
-            if (write) writeDispatched = true;
+            if (write) currentWriteDispatched = true;
             response = await fetchFn(`${baseUrl}/gmail/v1/users/me/${path}`, { method: write ? 'POST' : 'GET',
               redirect: 'manual', signal, headers: { Authorization: `Bearer ${token}`, ...(write ? { 'Content-Type': 'application/json' } : {}) },
               ...(write ? { body: JSON.stringify(body) } : {}) });
           } catch {
-            throw new StepError({ category: write ? 'UNKNOWN' : 'NETWORK', message: write ? 'Gmail write result is unknown; check Sent before continuing' : 'Gmail request interrupted' });
+            if (write) hasCommittedOrAmbiguousWrite = true;
+            throw new StepError({
+              category: write ? 'UNKNOWN' : 'NETWORK',
+              message: write ? 'Gmail write result is unknown; check Sent before continuing' : 'Gmail request interrupted',
+              ...(write ? { details: { requestSent: true } } : {}),
+            });
           }
           // 401 is a definitive rejection: no write occurred. A refresh failure
           // before the next attempt is known unsent, unlike an ambiguous response.
-          if (response.status === 401 && !refreshed) { refreshed = true; forceRefresh = true; if (write) writeDispatched = false; continue; }
+          if (response.status === 401 && !refreshed) { refreshed = true; forceRefresh = true; if (write) currentWriteDispatched = false; continue; }
           let data: any;
           try { data = await response.json(); } catch {
             if (response.ok) {
-              throw new StepError({ category: write ? 'UNKNOWN' : 'SERVER_ERROR', message: 'Gmail returned an unreadable response' });
+              if (write) hasCommittedOrAmbiguousWrite = true;
+              throw new StepError({
+                category: write ? 'UNKNOWN' : 'SERVER_ERROR',
+                message: 'Gmail returned an unreadable response',
+                ...(write ? { details: { requestSent: true } } : {}),
+              });
             }
           }
           if (response.ok) {
@@ -83,23 +95,41 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
               path === 'drafts' && (!id(data?.message?.id) || !id(data?.message?.threadId)) ||
               path === 'labels' && typeof data?.name !== 'string' ||
               path.endsWith('/modify') && (!Array.isArray(data?.messages) || data.messages.some((message: any) => !message || typeof message !== 'object' || message.labelIds !== undefined && (!Array.isArray(message.labelIds) || message.labelIds.some((label: unknown) => !id(label))))));
-            if (!data || typeof data !== 'object' || invalidWrite) throw new StepError({ category: write ? 'UNKNOWN' : 'SERVER_ERROR', message: 'Gmail returned an invalid response' });
+            if (!data || typeof data !== 'object' || invalidWrite) {
+              if (write) hasCommittedOrAmbiguousWrite = true;
+              throw new StepError({
+                category: write ? 'UNKNOWN' : 'SERVER_ERROR',
+                message: 'Gmail returned an invalid response',
+                ...(write ? { details: { requestSent: true } } : {}),
+              });
+            }
+            if (write) hasCommittedOrAmbiguousWrite = true;
             return data;
           }
           const reasons = data?.error?.errors?.map((e: any) => e.reason) ?? [];
           const quota = response.status === 429 || response.status === 403 && reasons.some((r: string) => /rateLimitExceeded|userRateLimitExceeded|quotaExceeded|dailyLimitExceeded/i.test(r));
           if (quota && !write && retries++ < 2) { await waitWithSignal(Math.min(5000, retryAfterMs(response.headers.get('retry-after'))), signal); continue; }
           const category = quota ? 'RATE_LIMIT' : [401, 403].includes(response.status) ? 'AUTH_ERROR' : response.status === 404 ? 'NOT_FOUND' : response.status === 400 ? 'VALIDATION' : write ? 'UNKNOWN' : 'SERVER_ERROR';
-          throw new StepError({ category, statusCode: response.status, message: `Gmail request failed (${response.status})` });
+          if (write) {
+            if (category === 'UNKNOWN') hasCommittedOrAmbiguousWrite = true;
+            else currentWriteDispatched = false;
+          }
+          throw new StepError({
+            category,
+            statusCode: response.status,
+            message: `Gmail request failed (${response.status})`,
+            ...(write && category === 'UNKNOWN' ? { details: { requestSent: true } } : {}),
+          });
         }
       }
       const readThread = async (id: string, format = 'full'): Promise<GmailThread> => request(`threads/${encodeURIComponent(id)}?format=${format}`);
+      const isDraft = (message: GmailMessage): boolean => message.labelIds?.includes('DRAFT') === true;
       const summary = (thread: GmailThread) => {
-        const messages = thread.messages ?? [], latest = messages.at(-1) ?? { id: '' };
+        const messages = thread.messages ?? [], latest = messages.filter(m => !isDraft(m)).at(-1) ?? { id: '' };
         const files = [...new Set(messages.flatMap(m => attachments(m.payload).map(a => a.filename).filter(Boolean)))];
         return { id: thread.id, subject: cut(header(latest, 'Subject'), 250), from: header(latest, 'From'), to: headerAddresses(header(latest, 'To')), cc: headerAddresses(header(latest, 'Cc')),
           snippet: cut(latest.snippet ?? '', 200), date: header(latest, 'Date'), labels: [...new Set(messages.flatMap(m => m.labelIds ?? []))], messageCount: messages.length,
-          unread: messages.some(m => m.labelIds?.includes('UNREAD')), hasAttachment: files.length > 0, attachmentNames: files, participants: participants(messages) };
+          unread: messages.some(m => m.labelIds?.includes('UNREAD')), hasAttachment: files.length > 0, attachmentNames: files, hasDraft: messages.some(isDraft), participants: participants(messages) };
       };
       switch (toolName) {
         case 'gmail.search_threads': {
@@ -112,7 +142,7 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
           const thread = await readThread(args.threadId); let remaining = 12000;
           return { id: thread.id, subject: summary(thread).subject, participants: participants(thread.messages ?? []), messages: (thread.messages ?? []).slice(-5).map(m => {
             const body = cut(messageText(m), Math.min(4000, remaining)); remaining -= Array.from(body).length;
-            return { messageId: m.id, from: header(m, 'From'), to: headerAddresses(header(m, 'To')), cc: headerAddresses(header(m, 'Cc')), date: header(m, 'Date'), subject: cut(header(m, 'Subject'), 250), body, attachments: attachments(m.payload) };
+            return { messageId: m.id, from: header(m, 'From'), to: headerAddresses(header(m, 'To')), cc: headerAddresses(header(m, 'Cc')), date: header(m, 'Date'), subject: cut(header(m, 'Subject'), 250), body, attachments: attachments(m.payload), isDraft: isDraft(m) };
           }) };
         }
         case 'gmail.list_labels': {
@@ -127,9 +157,23 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
           const labelSet = new Set<string>();
           const ids: string[] = [];
           for (const id of uniqueIds) {
-            const thread = await request(`threads/${id}/modify`, { ...(args.addLabelIds ? { addLabelIds: args.addLabelIds } : {}), ...(args.removeLabelIds ? { removeLabelIds: args.removeLabelIds } : {}) });
-            ids.push(thread.id);
-            for (const message of thread.messages ?? []) for (const labelId of message.labelIds ?? []) labelSet.add(labelId);
+            try {
+              const thread = await request(`threads/${id}/modify`, { ...(args.addLabelIds ? { addLabelIds: args.addLabelIds } : {}), ...(args.removeLabelIds ? { removeLabelIds: args.removeLabelIds } : {}) });
+              ids.push(thread.id);
+              for (const message of thread.messages ?? []) for (const labelId of message.labelIds ?? []) labelSet.add(labelId);
+            } catch (err) {
+              const cause = err instanceof StepError ? err : new StepError({ category: 'NETWORK', message: 'Gmail operation interrupted before dispatch' });
+              if (hasCommittedOrAmbiguousWrite) {
+                throw new StepError({
+                  category: 'UNKNOWN',
+                  statusCode: cause.statusCode,
+                  retryable: false,
+                  message: cause.message,
+                  details: { requestSent: true, completedThreadIds: [...ids], failedThreadId: id, causeCategory: cause.category },
+                });
+              }
+              throw cause;
+            }
           }
           return { ids, labelIds: [...labelSet] };
         }
@@ -147,15 +191,19 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
             const thread = await readThread(args.threadId);
             const latest: GmailMessage | undefined = (thread.messages ?? []).filter(m => !m.labelIds?.includes('DRAFT')).at(-1);
             if (!latest) invalid('Gmail thread has only drafts; no delivered message to reply to or forward');
-            subject = header(latest, 'Subject'); safeHeader(subject);
+            const originalSubject = safeHeader(header(latest, 'Subject'));
             if (toolName === 'gmail.forward') {
-              subject = /^Fwd:/i.test(subject) ? subject : 'Fwd: ' + subject;
-              body = `${args.note ?? ''}\n\n---------- Forwarded message ----------\nFrom: ${safeHeader(header(latest, 'From'))}\nSubject: ${subject}\n\n${cut(messageText(latest), 12000)}`;
+              subject = /^Fwd:/i.test(originalSubject) ? originalSubject : 'Fwd: ' + originalSubject;
+              body = `${args.note ?? ''}\n\n---------- Forwarded message ----------\nFrom: ${safeHeader(header(latest, 'From'))}\nSubject: ${originalSubject}\n\n${cut(messageText(latest), 12000)}`;
             } else {
-              subject = /^Re:/i.test(subject) ? subject : 'Re: ' + subject;
-              inReplyTo = header(latest, 'Message-ID');
+              const derivedSubject = cut(/^Re:/i.test(originalSubject) ? originalSubject : 'Re: ' + originalSubject, 250);
+              if (toolName === 'gmail.create_draft' && typeof args.subject === 'string' && args.subject.trim().length > 0 && args.subject !== derivedSubject) {
+                invalid('Không thể đổi tiêu đề khi tạo bản nháp trả lời trong luồng thư sẵn có. Tạo bản nháp thư mới nếu muốn đổi tiêu đề.');
+              }
+              subject = derivedSubject;
+              inReplyTo = safeHeader(header(latest, 'Message-ID'));
               if (!/^<[^<>\s]+>$/.test(inReplyTo)) invalid('Gmail message has no valid Message-ID for reply');
-              const previous = header(latest, 'References'); safeHeader(previous);
+              const previous = safeHeader(header(latest, 'References'));
               if (previous && !/^(?:<[^<>\s]+>\s*)+$/.test(previous)) invalid('Invalid Gmail References header');
               references = [...new Set([...(previous.match(/<[^<>\s]+>/g) ?? []), inReplyTo])].join(' ');
             }
@@ -169,7 +217,7 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
       }
     } catch (error) {
       const e = error instanceof StepError ? error : new StepError({ category: 'NETWORK', message: 'Gmail operation interrupted before dispatch' });
-      if (writeDispatched) throw e;
+      if (hasCommittedOrAmbiguousWrite || currentWriteDispatched) throw e;
       throw new StepError({ category: e.category, statusCode: e.statusCode, retryable: e.retryable, message: e.message, details: { requestSent: false } });
     }
   } };

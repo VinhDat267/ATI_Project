@@ -568,11 +568,19 @@ export interface ScheduleDigestCandidate {
   configHash?: string;
 }
 
+export interface GmailDigestBinding {
+  kind: 'gmail';
+  credentialId: string;
+  email: string;
+  oauthClientId: string;
+}
+
 export interface TelegramDigestSource {
   service: string;
   tool: string;
   args?: Record<string, any>;
   label: string;
+  binding?: GmailDigestBinding;
 }
 
 export interface TelegramDigestConfig {
@@ -581,6 +589,7 @@ export interface TelegramDigestConfig {
   username: string;
   chatId: string;
   chatTitle: string;
+  sourceBindingVersion?: 1;
   sources: TelegramDigestSource[];
   recurrence: ScheduleRecurrence;
   timeZone: string;

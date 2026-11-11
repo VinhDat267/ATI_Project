@@ -1,13 +1,16 @@
 import type pg from 'pg';
-import { decryptCredentials, detectCalendarConflicts } from '@wap/tool-adapters';
+import { decryptCredentials, detectCalendarConflicts, StepError } from '@wap/tool-adapters';
 import {
   normalizeTelegramChatId,
   TELEGRAM_CHAT_ID_PATTERN,
+  type GmailDigestBinding,
   type TelegramDigestConfig,
   type TelegramDigestDelivery,
 } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import type { AdapterContext } from '../adapter-factory.js';
+import { GmailOAuthError } from '../gmail/oauth-client.js';
+import { isGoogleConnectionChanged } from '../gmail/token-manager.js';
 import type { TelegramBotClient } from '../telegram/bot-client.js';
 import { localLabel } from './next-occurrence.js';
 import { analyzeSheetKpiMetrics } from './sheets-digest-runner.js';
@@ -17,7 +20,14 @@ import {
   getDigestSourceDisabledReason,
   READ_DIGEST_SOURCE_MAP,
 } from './telegram-digest-candidate.js';
-import { buildPinnedTelegramAdapterContext } from './digest-scope-guard.js';
+import {
+  assertDigestScheduleLiveScopeAndAuth,
+  buildPinnedTelegramAdapterContext,
+} from './digest-scope-guard.js';
+import {
+  assertGmailDigestBinding,
+  validateTelegramDigestGmailConfig,
+} from './gmail-digest-binding.js';
 
 export const TELEGRAM_DELIVERY_UNKNOWN =
   'TELEGRAM_DELIVERY_UNKNOWN: Đã bắt đầu gửi bản tin Telegram nhưng mất kết nối hoặc thiếu biên nhận hợp lệ từ dịch vụ đích. Hệ thống tạm dừng tự động gửi lại để tránh trùng lặp.';
@@ -70,6 +80,7 @@ export interface TelegramDigestRunnerOptions {
   pool?: pg.Pool | Pick<pg.Pool, 'query'> | null;
   credentialRepo: Pick<CredentialRepo, 'getPersonalCredentials'>;
   encryptionKey: string;
+  gmailOAuthClientId?: string;
   adapterFactory: {
     getAdapterForService(serviceName: string, context?: AdapterContext): Promise<any> | any;
   };
@@ -77,6 +88,28 @@ export interface TelegramDigestRunnerOptions {
   timeZone: string;
   summarizeWithAi?: (prompt: string, signal: AbortSignal) => Promise<string | null>;
   aiTimeoutMs?: number;
+  sendTimeoutMs?: number;
+}
+
+function isGmailAuthOrBindingFailure(error: unknown): boolean {
+  if (isGoogleConnectionChanged(error)) return true;
+  if (error instanceof GmailOAuthError && error.kind === 'invalid_grant') return true;
+  if (error instanceof StepError) {
+    if (error.category === 'AUTH_ERROR' || error.statusCode === 401 || error.statusCode === 403) {
+      return true;
+    }
+  }
+  const anyErr = error as Record<string, unknown> | null | undefined;
+  if (anyErr && typeof anyErr === 'object') {
+    if (
+      anyErr.category === 'AUTH_ERROR' ||
+      anyErr.statusCode === 401 ||
+      anyErr.statusCode === 403
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export function summarizeSourceItems(
@@ -241,138 +274,586 @@ export function summarizeSourceItems(
 export class TelegramDigestRunner {
   constructor(private options: TelegramDigestRunnerOptions) {}
 
-  private async claimTelegramDigestDelivery(
+  private async withBoundedEgressAuthority<T>(
     run: DigestRunInput,
-    pinnedCredentialId: string,
+    gmailBinding: GmailDigestBinding | null,
+    targetChatId: string,
+    expectedTelegram: { credentialId: string; telegramUserId: string },
     signal: AbortSignal,
-  ): Promise<
-    | { allowed: true; claimedInDb: boolean }
-    | { allowed: false; outcome: DigestRunOutcome }
-  > {
+    timeoutMs: number,
+    action: (callSignal: AbortSignal) => Promise<T>,
+    options?: { claimDelivery?: boolean; onBeforeClaimSql?: () => void },
+  ): Promise<{ kind: 'ok'; value: T } | { kind: 'outcome'; outcome: DigestRunOutcome }> {
+    signal.throwIfAborted();
     if (!this.options.pool) {
       return {
-        allowed: false,
+        kind: 'outcome',
         outcome: {
-          status: 'digest_failed',
+          status: gmailBinding ? 'blocked' : 'digest_failed',
           error: 'Lịch tự gửi cần kết nối PostgreSQL.',
           pauseSchedule: true,
         },
       };
     }
-    if (typeof (this.options.pool as any).connect !== 'function') {
-      const preSendCheck = await this.options.pool.query(
-        'SELECT version, status FROM schedules WHERE id = $1',
-        [run.scheduleId],
-      );
-      const currentSchedule = preSendCheck.rows[0];
-      if (
-        !currentSchedule ||
-        currentSchedule.version !== run.scheduleVersion ||
-        currentSchedule.status === 'cancelled' ||
-        currentSchedule.status === 'paused'
-      ) {
-        return { allowed: false, outcome: { status: 'discarded' } };
+
+    const safeTimeoutMs = Number.isFinite(timeoutMs) ? Math.max(0, timeoutMs) : 0;
+    const deadlineAt = Date.now() + safeTimeoutMs;
+    const callController = new AbortController();
+    const toError = (reason: unknown, fallback: string): Error =>
+      reason instanceof Error ? reason : new Error(typeof reason === 'string' && reason ? reason : fallback);
+    const getAbortOrTimeoutError = (): Error =>
+      signal.aborted
+        ? toError(signal.reason, 'Aborted')
+        : toError(callController.signal.reason, 'EGRESS_TIMEOUT');
+    const throwIfAbortedOrExpired = (): void => {
+      if (signal.aborted) {
+        if (!callController.signal.aborted) {
+          callController.abort(signal.reason ?? new Error('Aborted'));
+        }
+        throw getAbortOrTimeoutError();
       }
-      return { allowed: true, claimedInDb: false };
-    }
-    const client = await (this.options.pool as pg.Pool).connect();
+      if (Date.now() >= deadlineAt && !callController.signal.aborted) {
+        callController.abort(new Error('EGRESS_TIMEOUT'));
+      }
+      if (callController.signal.aborted) {
+        throw getAbortOrTimeoutError();
+      }
+    };
+
+    const onParentAbort = () => {
+      callController.abort(signal.reason ?? new Error('Aborted'));
+    };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
     try {
-      await client.query('BEGIN');
-      await client.query("SET LOCAL lock_timeout = '10s'");
-      const schedule = (
-        await client.query(
-          `SELECT s.* FROM schedules s JOIN conversations c ON c.id=s.conv_id
-           JOIN users u ON u.id=s.user_id AND u.status='active'
-           WHERE s.id=$1 FOR UPDATE OF c,s`,
-          [run.scheduleId],
-        )
-      ).rows[0];
-      const currentRun = (
-        await client.query(
-          'SELECT status, delivery_started_at FROM schedule_runs WHERE id=$1 AND schedule_id=$2 FOR UPDATE',
-          [run.runId, run.scheduleId],
-        )
-      ).rows[0];
-      signal.throwIfAborted();
+      signal.addEventListener('abort', onParentAbort, { once: true });
+      if (signal.aborted) {
+        onParentAbort();
+        throw getAbortOrTimeoutError();
+      }
+      if (safeTimeoutMs <= 0) {
+        callController.abort(new Error('EGRESS_TIMEOUT'));
+        throw getAbortOrTimeoutError();
+      }
+      timer = setTimeout(() => {
+        callController.abort(new Error('EGRESS_TIMEOUT'));
+      }, safeTimeoutMs);
+
+      if (typeof (this.options.pool as any).connect !== 'function') {
+        if (gmailBinding) {
+          return {
+            kind: 'outcome',
+            outcome: {
+              status: 'blocked',
+              error: 'Lịch Gmail tự gửi cần kết nối giao dịch PostgreSQL.',
+              pauseSchedule: true,
+            },
+          };
+        }
+        if (options?.claimDelivery) {
+          const preSendCheck = await this.options.pool.query(
+            'SELECT version, status FROM schedules WHERE id = $1',
+            [run.scheduleId],
+          );
+          const currentSchedule = preSendCheck.rows?.[0];
+          if (
+            !currentSchedule ||
+            currentSchedule.version !== run.scheduleVersion ||
+            currentSchedule.status === 'cancelled' ||
+            currentSchedule.status === 'paused'
+          ) {
+            return { kind: 'outcome', outcome: { status: 'discarded' } };
+          }
+        }
+        if (run.beforeSendCheck && !(await run.beforeSendCheck())) {
+          return { kind: 'outcome', outcome: { status: 'discarded' } };
+        }
+        throwIfAbortedOrExpired();
+        const value = await action(callController.signal);
+        signal.throwIfAborted();
+        return { kind: 'ok', value };
+      }
+
+      // Verify live Telegram group membership and optional pre-send hook OUTSIDE any PostgreSQL
+      // transaction so zero PostgreSQL connections or locks are ever held across external network I/O.
       if (
-        !schedule ||
-        currentRun?.status !== 'planning' ||
-        currentRun.delivery_started_at !== null ||
-        schedule.user_id !== run.userId ||
-        schedule.kind !== 'telegram_digest' ||
-        schedule.version !== run.scheduleVersion ||
-        schedule.digest_config_hash !== run.digestConfigHash ||
-        schedule.status === 'cancelled' ||
-        schedule.status === 'paused'
+        targetChatId !== expectedTelegram.telegramUserId &&
+        targetChatId.startsWith('-') &&
+        this.options.botClient
       ) {
-        await client.query('COMMIT');
-        return { allowed: false, outcome: { status: 'discarded' } };
-      }
-
-      if (schedule.workspace_mode === 'organization') {
-        if (!schedule.workspace_id) {
-          await client.query('COMMIT');
+        throwIfAbortedOrExpired();
+        let onMemberAbort: (() => void) | undefined;
+        const memberAbortPromise = new Promise<never>((_, reject) => {
+          onMemberAbort = () => reject(getAbortOrTimeoutError());
+          if (callController.signal.aborted) onMemberAbort();
+          else callController.signal.addEventListener('abort', onMemberAbort, { once: true });
+        });
+        let isMember: boolean;
+        try {
+          isMember = await Promise.race([
+            this.options.botClient.getChatMember(
+              targetChatId,
+              expectedTelegram.telegramUserId,
+              callController.signal,
+            ),
+            memberAbortPromise,
+          ]);
+        } finally {
+          if (onMemberAbort) {
+            callController.signal.removeEventListener('abort', onMemberAbort);
+          }
+        }
+        if (!isMember) {
           return {
-            allowed: false,
+            kind: 'outcome',
             outcome: {
               status: 'blocked',
-              error: 'Lịch Tổ chức thiếu định danh không gian làm việc hợp lệ.',
+              error: 'Bạn không còn là thành viên của nhóm Telegram nhận báo cáo.',
               pauseSchedule: true,
             },
           };
         }
-        const memberRes = await client.query(
-          'SELECT status FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
-          [schedule.workspace_id, run.userId],
-        );
-        if (memberRes.rows[0]?.status !== 'active') {
-          await client.query('COMMIT');
-          return {
-            allowed: false,
-            outcome: {
-              status: 'blocked',
-              error: 'Quyền thành viên trong không gian làm việc tổ chức không còn hiệu lực.',
-              pauseSchedule: true,
-            },
-          };
+      }
+
+      if (options?.claimDelivery && run.beforeSendCheck) {
+        throwIfAbortedOrExpired();
+        if (!(await run.beforeSendCheck())) {
+          return { kind: 'outcome', outcome: { status: 'discarded' } };
         }
       }
 
-      const credRes = await client.query(
-        `SELECT status FROM service_credentials
-         WHERE id = $1 AND user_id = $2 AND service = 'telegram'`,
-        [pinnedCredentialId, run.userId],
-      );
-      if (credRes.rows[0]?.status !== 'active') {
-        await client.query('COMMIT');
-        return {
-          allowed: false,
-          outcome: {
-            status: 'blocked',
-            error: 'Kết nối Telegram đã thay đổi hoặc bị ngắt. Hãy kết nối lại.',
-            pauseSchedule: true,
-          },
+      throwIfAbortedOrExpired();
+      const connectPromise = (this.options.pool as pg.Pool).connect();
+      let checkoutHandedOff = false;
+      let checkoutAbandoned = false;
+      const guardedConnect = connectPromise.then((acquired) => {
+        if (
+          checkoutAbandoned ||
+          callController.signal.aborted ||
+          signal.aborted ||
+          Date.now() >= deadlineAt
+        ) {
+          checkoutAbandoned = true;
+          try {
+            acquired.release();
+          } catch {
+            // Ignore release error on abandoned late-acquired client.
+          }
+          throw getAbortOrTimeoutError();
+        }
+        checkoutHandedOff = true;
+        return acquired;
+      });
+      guardedConnect.catch(() => undefined);
+
+      let onCheckoutAbort: (() => void) | undefined;
+      const checkoutAbortPromise = new Promise<never>((_, reject) => {
+        onCheckoutAbort = () => {
+          if (!checkoutHandedOff) {
+            checkoutAbandoned = true;
+          }
+          reject(getAbortOrTimeoutError());
         };
+        if (callController.signal.aborted) {
+          onCheckoutAbort();
+        } else {
+          callController.signal.addEventListener('abort', onCheckoutAbort, { once: true });
+        }
+      });
+
+      let client: pg.PoolClient;
+      try {
+        client = await Promise.race([guardedConnect, checkoutAbortPromise]);
+      } finally {
+        if (onCheckoutAbort) {
+          callController.signal.removeEventListener('abort', onCheckoutAbort);
+        }
       }
 
-      const claimed = await client.query(
-        `UPDATE schedule_runs
-         SET delivery_started_at = now(), updated_at = now()
-         WHERE id = $1 AND schedule_id = $2 AND status = 'planning' AND delivery_started_at IS NULL
-         RETURNING id`,
-        [run.runId, run.scheduleId],
-      );
-      await client.query('COMMIT');
-      if (claimed.rowCount === 0) {
-        return { allowed: false, outcome: { status: 'discarded' } };
+      let txDirty = false;
+      let releaseError: Error | undefined;
+      const swallowTerminatedClientError = () => undefined;
+      const onCheckedOutClientError = (clientErr: unknown) => {
+        if (!releaseError) {
+          releaseError = toError(clientErr, 'CLIENT_CONNECTION_ERROR');
+        }
+      };
+      try {
+        if (typeof (client as any)?.on === 'function') {
+          (client as any).on('error', onCheckedOutClientError);
+        }
+      } catch {
+        // Ignore listener attachment errors on custom/mocked clients.
       }
-      return { allowed: true, claimedInDb: true };
-    } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
-      throw error;
+      const sessionState: { terminated: boolean; promise: Promise<void> | null } = {
+        terminated: false,
+        promise: null,
+      };
+
+      const terminateClientSession = (): Promise<void> => {
+        sessionState.terminated = true;
+        if (!releaseError) {
+          releaseError = new Error('PostgreSQL backend session terminated on abort');
+        }
+        if (!sessionState.promise) {
+          sessionState.promise = (async () => {
+            const rawClient = client as any;
+            try {
+              if (typeof rawClient?.on === 'function') {
+                rawClient.on('error', swallowTerminatedClientError);
+              }
+            } catch {
+              // Ignore listener attachment errors on custom/mocked clients.
+            }
+            const destroyStream = () => {
+              try {
+                rawClient?.connection?.stream?.destroy?.();
+              } catch {
+                // Ignore stream destroy errors.
+              }
+            };
+            const forceDestroyTimer = setTimeout(destroyStream, 50);
+            forceDestroyTimer.unref?.();
+            try {
+              if (typeof rawClient?.end === 'function') {
+                await rawClient.end();
+              } else {
+                destroyStream();
+              }
+            } catch {
+              destroyStream();
+            } finally {
+              clearTimeout(forceDestroyTimer);
+            }
+          })();
+        }
+        return sessionState.promise;
+      };
+
+      const runBoundedSql = async <R extends pg.QueryResultRow = any>(
+        text: string,
+        values?: unknown[],
+      ): Promise<pg.QueryResult<R>> => {
+        throwIfAbortedOrExpired();
+        const onSqlAbort = () => {
+          void terminateClientSession();
+        };
+        callController.signal.addEventListener('abort', onSqlAbort, { once: true });
+        if (callController.signal.aborted) {
+          callController.signal.removeEventListener('abort', onSqlAbort);
+          throw getAbortOrTimeoutError();
+        }
+        try {
+          const res =
+            values === undefined
+              ? await client.query<R>(text)
+              : await client.query<R>(text, values);
+          throwIfAbortedOrExpired();
+          return res;
+        } finally {
+          callController.signal.removeEventListener('abort', onSqlAbort);
+          if (sessionState.promise) {
+            await sessionState.promise;
+          }
+        }
+      };
+
+      const txQueryable = {
+        query: (text: string, values?: unknown[]) => runBoundedSql(text, values),
+      } as unknown as pg.PoolClient;
+
+      try {
+        throwIfAbortedOrExpired();
+        txDirty = true;
+        await runBoundedSql('BEGIN');
+        const remainingMs = Math.max(1, Math.ceil(deadlineAt - Date.now()));
+        const lockTimeoutMs = Math.min(5_000, remainingMs);
+        const statementTimeoutMs = Math.min(15_000, remainingMs);
+        await runBoundedSql(
+          `SET LOCAL lock_timeout = '${lockTimeoutMs}ms'; SET LOCAL statement_timeout = '${statementTimeoutMs}ms'; DO $$ BEGIN PERFORM set_config('client_connection_check_interval', '1ms', true); EXCEPTION WHEN OTHERS THEN NULL; END $$`,
+        );
+
+        // Canonical lock order matching GmailConnectionRepo (users -> service_credentials)
+        // followed by schedule lifecycle rows (conversations -> schedules -> schedule_runs), all NOWAIT.
+        const userRow = (
+          await runBoundedSql<{ id: string; status: string }>(
+            'SELECT id, status FROM users WHERE id = $1 FOR SHARE NOWAIT',
+            [run.userId],
+          )
+        ).rows[0];
+        if (!userRow || userRow.status !== 'active') {
+          await runBoundedSql('COMMIT');
+          txDirty = false;
+          return {
+            kind: 'outcome',
+            outcome: {
+              status: 'blocked',
+              error: 'Tài khoản không còn hoạt động.',
+              pauseSchedule: true,
+            },
+          };
+        }
+
+        if (gmailBinding) {
+          const gmailCheck = await assertGmailDigestBinding(
+            txQueryable,
+            run.userId,
+            gmailBinding,
+            this.options.gmailOAuthClientId,
+            {
+              encryptionKey: this.options.encryptionKey,
+              lock: 'share_nowait',
+            },
+          );
+          if (!gmailCheck.allowed) {
+            await runBoundedSql('COMMIT');
+            txDirty = false;
+            return {
+              kind: 'outcome',
+              outcome: {
+                status: 'blocked',
+                error: gmailCheck.reason,
+                pauseSchedule: true,
+              },
+            };
+          }
+        }
+
+        const convRow = (
+          await runBoundedSql(
+            'SELECT id, user_id, workspace_id, workspace_mode FROM conversations WHERE id = (SELECT conv_id FROM schedules WHERE id = $1) FOR UPDATE NOWAIT',
+            [run.scheduleId],
+          )
+        ).rows[0];
+        const schedule = (
+          await runBoundedSql('SELECT * FROM schedules WHERE id = $1 FOR UPDATE NOWAIT', [run.scheduleId])
+        ).rows[0];
+        const currentRun = (
+          await runBoundedSql(
+            'SELECT id, status, schedule_version, delivery_started_at FROM schedule_runs WHERE id = $1 AND schedule_id = $2 FOR UPDATE NOWAIT',
+            [run.runId, run.scheduleId],
+          )
+        ).rows[0];
+
+        throwIfAbortedOrExpired();
+
+        if (
+          !convRow ||
+          !schedule ||
+          currentRun?.status !== 'planning' ||
+          currentRun.delivery_started_at != null ||
+          schedule.user_id !== run.userId ||
+          schedule.kind !== 'telegram_digest' ||
+          schedule.version !== run.scheduleVersion ||
+          schedule.digest_config_hash !== run.digestConfigHash ||
+          schedule.status === 'cancelled' ||
+          schedule.status === 'paused'
+        ) {
+          await runBoundedSql('COMMIT');
+          txDirty = false;
+          return { kind: 'outcome', outcome: { status: 'discarded' } };
+        }
+
+        // Re-verify live workspace/member/Telegram/Gmail scope using the SAME transaction client (never pool!).
+        const pinnedCtx = await buildPinnedTelegramAdapterContext({
+          pool: txQueryable,
+          scheduleId: run.scheduleId,
+          encryptionKey: this.options.encryptionKey,
+          gmailOAuthClientId: this.options.gmailOAuthClientId,
+        });
+        if (
+          !pinnedCtx.allowed ||
+          pinnedCtx.chatId !== targetChatId ||
+          pinnedCtx.credentialId !== expectedTelegram.credentialId ||
+          pinnedCtx.telegramUserId !== expectedTelegram.telegramUserId
+        ) {
+          await runBoundedSql('COMMIT');
+          txDirty = false;
+          return {
+            kind: 'outcome',
+            outcome: {
+              status: 'blocked',
+              error: 'Kết nối hoặc phạm vi Telegram của lịch chạy không còn hợp lệ.',
+              pauseSchedule: true,
+            },
+          };
+        }
+
+        if (options?.claimDelivery) {
+          options.onBeforeClaimSql?.();
+          const claimed = await runBoundedSql<{ id: string }>(
+            `UPDATE schedule_runs
+             SET delivery_started_at = now(), updated_at = now()
+             WHERE id = $1 AND schedule_id = $2 AND status = 'planning' AND delivery_started_at IS NULL
+             RETURNING id`,
+            [run.runId, run.scheduleId],
+          );
+          if (claimed.rowCount === 0) {
+            await runBoundedSql('COMMIT');
+            txDirty = false;
+            return { kind: 'outcome', outcome: { status: 'discarded' } };
+          }
+        }
+
+        throwIfAbortedOrExpired();
+        const value = await action(callController.signal);
+        await runBoundedSql('COMMIT');
+        txDirty = false;
+        return { kind: 'ok', value };
+      } catch (error: any) {
+        if (txDirty && !sessionState.terminated) {
+          const rollbackGuardMs = callController.signal.aborted
+            ? 100
+            : Math.max(50, Math.min(250, deadlineAt - Date.now()));
+          const rollbackGuardTimer = setTimeout(() => {
+            void terminateClientSession();
+          }, rollbackGuardMs);
+          rollbackGuardTimer.unref?.();
+          const onRollbackAbort = () => {
+            void terminateClientSession();
+          };
+          if (!callController.signal.aborted) {
+            callController.signal.addEventListener('abort', onRollbackAbort, { once: true });
+          }
+          try {
+            await client.query('ROLLBACK');
+            if (!sessionState.terminated) {
+              txDirty = false;
+            }
+          } catch (rbErr: any) {
+            releaseError = toError(rbErr, 'ROLLBACK_FAILED');
+          } finally {
+            clearTimeout(rollbackGuardTimer);
+            callController.signal.removeEventListener('abort', onRollbackAbort);
+            if (sessionState.promise) {
+              await sessionState.promise;
+            }
+          }
+        }
+        if (signal.aborted) {
+          throw getAbortOrTimeoutError();
+        }
+        if (
+          callController.signal.aborted ||
+          Date.now() >= deadlineAt ||
+          /lock timeout|statement timeout/i.test(String(error?.message ?? ''))
+        ) {
+          if (!callController.signal.aborted) {
+            callController.abort(new Error('EGRESS_TIMEOUT'));
+          }
+          throw getAbortOrTimeoutError();
+        }
+        if (error?.code === '55P03') {
+          return {
+            kind: 'outcome',
+            outcome: {
+              status: 'digest_failed',
+              error: 'Tài nguyên kết nối hoặc lịch đang bận cập nhật (chưa gửi bản tin).',
+              pauseSchedule: false,
+            },
+          };
+        }
+        throw error;
+      } finally {
+        const aborted = signal.aborted || callController.signal.aborted;
+        const rawTxStatus = (client as any)._txStatus;
+        const mustNotReuse =
+          Boolean(releaseError) ||
+          aborted ||
+          sessionState.terminated ||
+          txDirty ||
+          Boolean(rawTxStatus && rawTxStatus !== 'I');
+        if (mustNotReuse && !sessionState.terminated) {
+          await terminateClientSession();
+        }
+        if (!releaseError && mustNotReuse) {
+          releaseError = new Error(
+            aborted ? 'Client released after abort' : 'Client still in transaction at release',
+          );
+        }
+        if (sessionState.promise) {
+          await sessionState.promise;
+        }
+        try {
+          if (typeof (client as any)?.removeListener === 'function') {
+            (client as any).removeListener('error', onCheckedOutClientError);
+          }
+        } catch {
+          // Ignore listener removal errors on custom/mocked clients.
+        }
+        client.release(releaseError);
+        if (sessionState.terminated && txDirty) {
+          await new Promise<void>((resolve) => {
+            const drainTimer = setTimeout(resolve, 40);
+            drainTimer.unref?.();
+          });
+        }
+      }
     } finally {
-      client.release();
+      if (timer !== undefined) {
+        clearTimeout(timer);
+      }
+      signal.removeEventListener('abort', onParentAbort);
     }
+  }
+
+  private async claimOrVerifyAuthorityWithRetry<T>(
+    run: DigestRunInput,
+    gmailBinding: GmailDigestBinding | null,
+    targetChatId: string,
+    expectedTelegram: { credentialId: string; telegramUserId: string },
+    signal: AbortSignal,
+    deadlineAt: number,
+    action: (callSignal: AbortSignal) => Promise<T>,
+    options?: { claimDelivery?: boolean; onBeforeClaimSql?: () => void },
+  ): Promise<{ kind: 'ok'; value: T } | { kind: 'outcome'; outcome: DigestRunOutcome }> {
+    const backoffStepsMs = [20, 35, 50];
+    let lastResult: { kind: 'ok'; value: T } | { kind: 'outcome'; outcome: DigestRunOutcome } | undefined;
+    for (let attempt = 0; attempt <= backoffStepsMs.length; attempt++) {
+      const remainingMs = Math.max(0, deadlineAt - Date.now());
+      lastResult = await this.withBoundedEgressAuthority(
+        run,
+        gmailBinding,
+        targetChatId,
+        expectedTelegram,
+        signal,
+        remainingMs,
+        action,
+        options,
+      );
+      const isNowaitContention =
+        lastResult.kind === 'outcome' &&
+        lastResult.outcome.status === 'digest_failed' &&
+        lastResult.outcome.error === 'Tài nguyên kết nối hoặc lịch đang bận cập nhật (chưa gửi bản tin).';
+      if (!isNowaitContention || attempt === backoffStepsMs.length) {
+        return lastResult;
+      }
+      const waitMs = Math.min(backoffStepsMs[attempt]!, Math.max(0, deadlineAt - Date.now() - 10));
+      if (waitMs <= 0) {
+        return lastResult;
+      }
+      await new Promise<void>((resolve, reject) => {
+        const onAbort = () => {
+          clearTimeout(t);
+          reject(
+            signal.reason instanceof Error
+              ? signal.reason
+              : new Error(String(signal.reason ?? 'Aborted')),
+          );
+        };
+        const t = setTimeout(() => {
+          signal.removeEventListener('abort', onAbort);
+          resolve();
+        }, waitMs);
+        t.unref?.();
+        if (signal.aborted) {
+          onAbort();
+        } else {
+          signal.addEventListener('abort', onAbort, { once: true });
+        }
+      });
+    }
+    return lastResult!;
   }
 
   async execute(run: DigestRunInput, signal: AbortSignal): Promise<DigestRunOutcome> {
@@ -382,7 +863,7 @@ export class TelegramDigestRunner {
     // Legacy schedules remain unchanged. Reject the whole run before even
     // reading another source: per-source errors deliberately allow partial delivery.
     const disabledSourceReason = Array.isArray(digestConfig?.sources)
-      ? digestConfig.sources.map(getDigestSourceDisabledReason).find(reason => reason !== undefined)
+      ? digestConfig.sources.map(getDigestSourceDisabledReason).find((reason) => reason !== undefined)
       : undefined;
     if (disabledSourceReason) {
       return { status: 'blocked', error: disabledSourceReason };
@@ -404,13 +885,56 @@ export class TelegramDigestRunner {
       };
     }
 
-    const computedHash = computeTelegramDigestConfigHash(digestConfig);
+    const gmailValidation = validateTelegramDigestGmailConfig(digestConfig);
+    if (gmailValidation.kind === 'gmail_legacy' || gmailValidation.kind === 'invalid') {
+      return {
+        status: 'blocked',
+        error: gmailValidation.reason,
+        pauseSchedule: true,
+      };
+    }
+
+    let computedHash: string;
+    try {
+      computedHash = computeTelegramDigestConfigHash(digestConfig);
+    } catch (err) {
+      return {
+        status: 'blocked',
+        error: err instanceof Error ? err.message : 'Cấu hình báo cáo tự động không hợp lệ.',
+        pauseSchedule: true,
+      };
+    }
     if (computedHash !== digestConfigHash) {
       return {
         status: 'blocked',
         error: 'Cấu hình báo cáo tự động không khớp chữ ký toàn vẹn.',
         pauseSchedule: true,
       };
+    }
+
+    const gmailBinding = gmailValidation.kind === 'gmail_bound' ? gmailValidation.binding : null;
+    if (gmailBinding && !this.options.pool) {
+      return {
+        status: 'blocked',
+        error: 'Lịch Gmail tự gửi cần kết nối PostgreSQL.',
+        pauseSchedule: true,
+      };
+    }
+
+    if (this.options.pool) {
+      const preGuard = await assertDigestScheduleLiveScopeAndAuth({
+        pool: this.options.pool,
+        scheduleId: run.scheduleId,
+        encryptionKey: this.options.encryptionKey,
+        gmailOAuthClientId: this.options.gmailOAuthClientId,
+      });
+      if (!preGuard.allowed) {
+        return {
+          status: 'blocked',
+          error: preGuard.pauseReason ?? 'Kết nối hoặc phạm vi lịch chạy không còn hợp lệ.',
+          pauseSchedule: true,
+        };
+      }
     }
 
     // 1. Verify current personal Telegram connection and scope
@@ -517,19 +1041,43 @@ export class TelegramDigestRunner {
     for (const source of digestConfig.sources) {
       signal.throwIfAborted();
       try {
-        const adapter = await this.options.adapterFactory.getAdapterForService(source.service, {
-          userId,
-          phase: 'planning',
-          workspaceMode: run.workspaceMode,
-          workspaceId: run.workspaceId,
-        });
+        const sourceAdapterContext: AdapterContext =
+          source.service === 'gmail' && gmailBinding
+            ? {
+                userId,
+                phase: 'execution',
+                workspaceMode: run.workspaceMode,
+                workspaceId: run.workspaceId,
+                connections: {
+                  gmail: {
+                    credentialId: gmailBinding.credentialId,
+                    email: gmailBinding.email,
+                  },
+                },
+              }
+            : {
+                userId,
+                phase: 'planning',
+                workspaceMode: run.workspaceMode,
+                workspaceId: run.workspaceId,
+              };
+        const adapter = await this.options.adapterFactory.getAdapterForService(
+          source.service,
+          sourceAdapterContext,
+        );
         const { callArgs, repoSearchTool, sheetListTool, sheetReadTool } = buildTelegramDigestSourceArgs(source, {
           sinceIso,
           untilIso,
         });
 
         let rawResult: unknown;
-        if (source.service === 'mycalendar' && source.tool === 'mycalendar.list_events') {
+        if (source.service === 'gmail') {
+          rawResult = await adapter.execute(
+            'gmail.search_threads',
+            { query: 'in:inbox is:unread' },
+            { signal },
+          );
+        } else if (source.service === 'mycalendar' && source.tool === 'mycalendar.list_events') {
           let allowedCalendars: string[] = [];
           try {
             const mycalRec = await this.options.credentialRepo.getPersonalCredentials('mycalendar', userId);
@@ -674,6 +1222,31 @@ export class TelegramDigestRunner {
         });
         sections.push(`• ${source.label} (${count}):\n${lines.join('\n')}`);
       } catch (err: any) {
+        if (signal.aborted) {
+          throw signal.reason instanceof Error ? signal.reason : err;
+        }
+        if (source.service === 'gmail') {
+          let bindingLost = isGmailAuthOrBindingFailure(err);
+          if (!bindingLost && gmailBinding && this.options.pool) {
+            const recheck = await assertGmailDigestBinding(
+              this.options.pool,
+              userId,
+              gmailBinding,
+              this.options.gmailOAuthClientId,
+              { encryptionKey: this.options.encryptionKey },
+            ).catch(() => null);
+            if (recheck && !recheck.allowed) {
+              bindingLost = true;
+            }
+          }
+          if (bindingLost) {
+            return {
+              status: 'blocked',
+              error: 'Kết nối Gmail nguồn không còn hợp lệ hoặc đã thay đổi. Hãy kiểm tra và xác nhận lại lịch.',
+              pauseSchedule: true,
+            };
+          }
+        }
         failedLabels.push(source.label);
         sourceStatuses.push({
           service: source.service,
@@ -692,29 +1265,87 @@ export class TelegramDigestRunner {
       };
     }
 
-    // 4. Optional AI highlight summary (10s timeout via AbortSignal) & format plain-text digest (max 4000 chars)
+    // 4. Optional AI highlight summary: verify bounded PostgreSQL egress authority first (and commit/release
+    // all PostgreSQL locks BEFORE external LLM HTTP I/O), then execute summarizeWithAi under remaining budget.
     let aiHighlight = '';
     if (this.options.summarizeWithAi) {
-      const aiController = new AbortController();
-      const onParentAbort = () => aiController.abort();
-      signal.addEventListener('abort', onParentAbort, { once: true });
-      const aiTimer = setTimeout(() => aiController.abort(), this.options.aiTimeoutMs ?? 10_000);
+      const aiTimeoutMs = this.options.aiTimeoutMs ?? 10_000;
+      const aiDeadlineAt = Date.now() + (Number.isFinite(aiTimeoutMs) ? Math.max(0, aiTimeoutMs) : 0);
+      let aiAuth: { kind: 'ok'; value: true } | { kind: 'outcome'; outcome: DigestRunOutcome };
       try {
-        const abortPromise = new Promise<null>((resolve) =>
-          aiController.signal.addEventListener('abort', () => resolve(null), { once: true }),
+        aiAuth = await this.claimOrVerifyAuthorityWithRetry(
+          run,
+          gmailBinding,
+          targetChatId,
+          { credentialId: record.id, telegramUserId },
+          signal,
+          aiDeadlineAt,
+          async () => true as const,
         );
-        const rawSummary = await Promise.race([
-          this.options.summarizeWithAi(sections.join('\n\n'), aiController.signal),
-          abortPromise,
-        ]);
-        if (typeof rawSummary === 'string' && rawSummary.trim()) {
-          aiHighlight = `💡 Điểm nổi bật: ${rawSummary.trim().slice(0, 400)}\n\n`;
+      } catch (err) {
+        if (signal.aborted) {
+          throw signal.reason instanceof Error ? signal.reason : err;
         }
-      } catch {
-        aiHighlight = '';
-      } finally {
-        clearTimeout(aiTimer);
-        signal.removeEventListener('abort', onParentAbort);
+        return {
+          status: 'digest_failed',
+          error: 'Không gửi được báo cáo tự động lúc này.',
+          pauseSchedule: false,
+        };
+      }
+      if (aiAuth.kind === 'outcome') {
+        return aiAuth.outcome;
+      }
+
+      const remainingAiMs = Math.max(0, aiDeadlineAt - Date.now());
+      if (remainingAiMs > 0) {
+        const aiController = new AbortController();
+        const onParentAbort = () =>
+          aiController.abort(signal.reason ?? new Error('Aborted'));
+        signal.addEventListener('abort', onParentAbort, { once: true });
+        if (signal.aborted) {
+          signal.removeEventListener('abort', onParentAbort);
+          throw signal.reason instanceof Error
+            ? signal.reason
+            : new Error(String(signal.reason ?? 'Aborted'));
+        }
+        const aiTimer = setTimeout(() => aiController.abort(new Error('AI_TIMEOUT')), remainingAiMs);
+        aiTimer.unref?.();
+        let onAiAbort: (() => void) | undefined;
+        try {
+          const abortPromise = new Promise<null>((resolve, reject) => {
+            onAiAbort = () => {
+              if (signal.aborted) {
+                reject(
+                  signal.reason instanceof Error
+                    ? signal.reason
+                    : new Error(String(signal.reason ?? 'Aborted')),
+                );
+              } else {
+                resolve(null);
+              }
+            };
+            if (aiController.signal.aborted) onAiAbort();
+            else aiController.signal.addEventListener('abort', onAiAbort, { once: true });
+          });
+          const rawSummary = await Promise.race([
+            this.options.summarizeWithAi(sections.join('\n\n'), aiController.signal),
+            abortPromise,
+          ]);
+          if (typeof rawSummary === 'string' && rawSummary.trim()) {
+            aiHighlight = `💡 Điểm nổi bật: ${rawSummary.trim().slice(0, 400)}\n\n`;
+          }
+        } catch (err) {
+          if (signal.aborted) {
+            throw signal.reason instanceof Error ? signal.reason : err;
+          }
+          aiHighlight = '';
+        } finally {
+          clearTimeout(aiTimer);
+          if (onAiAbort) {
+            aiController.signal.removeEventListener('abort', onAiAbort);
+          }
+          signal.removeEventListener('abort', onParentAbort);
+        }
       }
     }
 
@@ -730,37 +1361,23 @@ export class TelegramDigestRunner {
       digestText = codepoints.slice(0, 3994).join('') + '\n...';
     }
 
-    // 5. Pre-send schedule version and status check immediately before calling telegram.send_message
+    // 5 & 6. Prepare Telegram adapter outside transaction (zero recursive pool checkout), atomically verify
+    // bounded PostgreSQL authority + durably commit schedule_runs.delivery_started_at BEFORE outbound HTTP,
+    // release all PostgreSQL locks, then execute telegram.send_message.
     signal.throwIfAborted();
-    if (run.beforeSendCheck) {
+    if (!this.options.pool && run.beforeSendCheck) {
       const stillValid = await run.beforeSendCheck();
       if (!stillValid) {
         return { status: 'discarded' };
       }
     }
 
-    // 6. Send via Telegram adapter with durable atomic claim BEFORE outbound dispatch
-    signal.throwIfAborted();
+    const sendTimeoutMs = this.options.sendTimeoutMs ?? 15_000;
+    const sendDeadlineAt = Date.now() + (Number.isFinite(sendTimeoutMs) ? Math.max(0, sendTimeoutMs) : 0);
     let deliveryStarted = false;
+    let sendDispatched = false;
+
     try {
-      let pinnedCredentialId = digestConfig.credentialId;
-      let pinnedTelegramUserId = digestConfig.telegramUserId;
-      if (this.options.pool) {
-        const pinnedCtx = await buildPinnedTelegramAdapterContext({
-          pool: this.options.pool,
-          scheduleId: run.scheduleId,
-          encryptionKey: this.options.encryptionKey,
-        });
-        if (!pinnedCtx.allowed || pinnedCtx.chatId !== targetChatId) {
-          return {
-            status: 'blocked',
-            error: 'Kết nối hoặc phạm vi Telegram của lịch chạy không còn hợp lệ.',
-            pauseSchedule: true,
-          };
-        }
-        pinnedCredentialId = pinnedCtx.credentialId ?? pinnedCredentialId;
-        pinnedTelegramUserId = pinnedCtx.telegramUserId ?? pinnedTelegramUserId;
-      }
       const telegramAdapter = await this.options.adapterFactory.getAdapterForService('telegram', {
         userId,
         phase: 'execution',
@@ -768,23 +1385,104 @@ export class TelegramDigestRunner {
         workspaceId: run.workspaceId,
         connections: {
           telegram: {
-            credentialId: pinnedCredentialId,
-            telegramUserId: pinnedTelegramUserId,
+            credentialId: record.id,
+            telegramUserId,
             username: digestConfig.username,
             chatIds: [targetChatId],
           },
         },
       });
-      const claim = await this.claimTelegramDigestDelivery(run, pinnedCredentialId, signal);
-      if (!claim.allowed) {
-        return claim.outcome;
+
+      let sendClaim:
+        | { kind: 'ok'; value: { claimedInDb: boolean } }
+        | { kind: 'outcome'; outcome: DigestRunOutcome };
+      let claimSqlIssued = false;
+      try {
+        sendClaim = await this.claimOrVerifyAuthorityWithRetry(
+          run,
+          gmailBinding,
+          targetChatId,
+          { credentialId: record.id, telegramUserId },
+          signal,
+          sendDeadlineAt,
+          async () => ({
+            claimedInDb: typeof (this.options.pool as any)?.connect === 'function',
+          }),
+          {
+            claimDelivery: true,
+            onBeforeClaimSql: () => {
+              claimSqlIssued = true;
+            },
+          },
+        );
+      } catch (claimErr) {
+        // Outbound Telegram HTTP has NOT been initiated yet. Best-effort clear any orphaned
+        // delivery_started_at that may have committed on the wire if COMMIT acknowledgement was lost.
+        if (claimSqlIssued && this.options.pool && typeof (this.options.pool as any).connect === 'function') {
+          await this.options.pool
+            .query(
+              "UPDATE schedule_runs SET delivery_started_at = NULL, updated_at = now() WHERE id = $1 AND schedule_id = $2 AND status = 'planning'",
+              [run.runId, run.scheduleId],
+            )
+            .catch(() => undefined);
+        }
+        if (signal.aborted) {
+          throw signal.reason instanceof Error ? signal.reason : claimErr;
+        }
+        return {
+          status: 'digest_failed',
+          error: 'Không gửi được tin nhắn báo cáo tới Telegram.',
+        };
       }
-      deliveryStarted = claim.claimedInDb;
-      const sendRes = await telegramAdapter.execute(
-        'telegram.send_message',
-        { chatId: targetChatId, text: digestText },
-        { signal, chatId: targetChatId },
+
+      if (sendClaim.kind === 'outcome') {
+        return sendClaim.outcome;
+      }
+      deliveryStarted = sendClaim.value.claimedInDb;
+
+      const remainingSendMs = Math.max(1, sendDeadlineAt - Date.now());
+      const sendController = new AbortController();
+      const onParentSendAbort = () =>
+        sendController.abort(signal.reason ?? new Error('SEND_ABORTED'));
+      signal.addEventListener('abort', onParentSendAbort, { once: true });
+      if (signal.aborted) {
+        onParentSendAbort();
+      }
+      const sendTimer = setTimeout(
+        () => sendController.abort(new Error('EGRESS_TIMEOUT')),
+        remainingSendMs,
       );
+      sendTimer.unref?.();
+      let onSendAbort: (() => void) | undefined;
+      let sendRes: any;
+      try {
+        const abortPromise = new Promise<never>((_, reject) => {
+          onSendAbort = () =>
+            reject(
+              sendController.signal.reason instanceof Error
+                ? sendController.signal.reason
+                : new Error(String(sendController.signal.reason ?? 'SEND_ABORTED')),
+            );
+          if (sendController.signal.aborted) onSendAbort();
+          else sendController.signal.addEventListener('abort', onSendAbort, { once: true });
+        });
+        sendDispatched = true;
+        sendRes = await Promise.race([
+          telegramAdapter.execute(
+            'telegram.send_message',
+            { chatId: targetChatId, text: digestText },
+            { signal: sendController.signal, chatId: targetChatId },
+          ),
+          abortPromise,
+        ]);
+      } finally {
+        clearTimeout(sendTimer);
+        if (onSendAbort) {
+          sendController.signal.removeEventListener('abort', onSendAbort);
+        }
+        signal.removeEventListener('abort', onParentSendAbort);
+      }
+
       const validMessageId =
         typeof sendRes?.messageId === 'number' &&
         Number.isInteger(sendRes.messageId) &&
@@ -795,6 +1493,7 @@ export class TelegramDigestRunner {
           error: TELEGRAM_DELIVERY_UNKNOWN,
         };
       }
+
       return {
         status: 'digest_sent',
         digestText,
@@ -807,7 +1506,7 @@ export class TelegramDigestRunner {
         },
       };
     } catch (err: any) {
-      if (deliveryStarted) {
+      if (deliveryStarted && sendDispatched) {
         if (isDefiniteWriteRejection(err) && this.options.pool) {
           await this.options.pool
             .query(
@@ -825,9 +1524,18 @@ export class TelegramDigestRunner {
           error: `${TELEGRAM_DELIVERY_UNKNOWN} (${err instanceof Error ? err.message : String(err)})`,
         };
       }
+      if (signal.aborted) {
+        throw signal.reason instanceof Error ? signal.reason : err;
+      }
+      if (!sendDispatched || isDefiniteWriteRejection(err)) {
+        return {
+          status: 'digest_failed',
+          error: 'Không gửi được tin nhắn báo cáo tới Telegram.',
+        };
+      }
       return {
-        status: 'digest_failed',
-        error: 'Không gửi được tin nhắn báo cáo tới Telegram.',
+        status: 'delivery_unknown',
+        error: `${TELEGRAM_DELIVERY_UNKNOWN} (${err instanceof Error ? err.message : String(err)})`,
       };
     }
   }

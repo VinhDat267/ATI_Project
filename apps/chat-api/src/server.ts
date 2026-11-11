@@ -317,6 +317,7 @@ async function bootstrap() {
     pool: pool && userRepo ? pool : null,
     timeZone: env.APP_TIME_ZONE,
     encryptionKey: env.ENCRYPTION_KEY,
+    gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
     credentialRepo: credRepo,
     mysheetsEnabled: mysheetsAvailable,
     fetchOrgSheetsMetadata,
@@ -785,9 +786,11 @@ async function bootstrap() {
     schedules: schedules
       ? {
           repo: schedules.service.repo,
+          pool,
           timeZone: env.APP_TIME_ZONE,
           credentialRepo: credRepo,
           encryptionKey: env.ENCRYPTION_KEY,
+          gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
           mysheetsEnabled: mysheetsAvailable,
           fetchOrgSheetsMetadata,
           evaluateDigestCandidate: pool
@@ -985,6 +988,7 @@ async function bootstrap() {
     pool,
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
+    gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
     adapterFactory,
     botClient: telegramBotClient,
     timeZone: env.APP_TIME_ZONE,

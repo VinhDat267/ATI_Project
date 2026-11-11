@@ -57,4 +57,26 @@ describe('Gmail fixture mailbox', () => {
     expect([...knownResourceValues('thread')]).toEqual(GMAIL_THREADS.map(t => t.id));
     expect([...knownResourceValues('label')]).toEqual(['INBOX', 'UNREAD', 'STARRED']);
   });
+  it('projects explicit boolean hasDraft:false on all 8 search_threads summaries and isDraft:false on all 8 get_thread messages matching GMAIL_FAKE', async () => {
+    const summaries = await fixtureSearch({ tool: 'gmail.search_threads', args: { query: 'is:unread', limit: 10 } });
+    expect(summaries).toHaveLength(8);
+    expect(summaries).toEqual(GMAIL_FAKE.tools['gmail.search_threads']!({ query: '', limit: 10 }));
+    expect(validateSchemaValue(summaries, output('gmail.search_threads'), 'output')).toBeNull();
+    for (const summary of summaries) {
+      expect(typeof summary.hasDraft).toBe('boolean');
+      expect(summary.hasDraft).toBe(false);
+    }
+    for (let index = 1; index <= 8; index++) {
+      const threadId = `gmail-thread-${index}`;
+      const detail = await fixtureSearch({ tool: 'gmail.get_thread', args: { threadId } });
+      expect(detail).toEqual(GMAIL_FAKE.tools['gmail.get_thread']!({ threadId }));
+      expect(validateSchemaValue(detail, output('gmail.get_thread'), 'output')).toBeNull();
+      expect(detail).not.toHaveProperty('hasDraft');
+      expect(detail.messages).toHaveLength(1);
+      for (const message of detail.messages) {
+        expect(typeof message.isDraft).toBe('boolean');
+        expect(message.isDraft).toBe(false);
+      }
+    }
+  });
 });

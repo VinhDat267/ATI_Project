@@ -1,10 +1,12 @@
 import { expect, it } from 'vitest';
+import { GMAIL_TOOLS } from '@wap/tool-schemas';
+import { WorkingMemory, validateSchemaValue } from '@wap/planner';
 import { createSandboxAdapter } from '../../src/sandbox/index.js';
+import { GMAIL_THREADS } from '../../src/sandbox/fake-results/gmail.js';
 import { createSandboxProvider } from '../../src/sandbox/scenarios.js';
 import { createToolRuntimeFactory } from '../../src/config/gmail-tools-runtime.js';
 import * as runtime from '../../src/config/gmail-tools-runtime.js';
 import { resourceLabels } from '../../src/services/resource-labels.js';
-import { WorkingMemory } from '@wap/planner';
 
 it('Gmail sandbox has eight Vietnamese threads and injection in body and subject', async () => {
   const adapter = createSandboxAdapter('gmail');
@@ -47,4 +49,28 @@ it('preview labels are computed from user messages or header participants, never
   const plan: any = { kind: 'plan', resourceLabels: { 'recipient:attacker@example.com': 'user' }, steps: [{ tool: 'gmail.reply', args: { threadId: 't', to: ['LAN@example.com'], cc: [' Minh@Example.com ', 'attacker@example.com'] } }] };
   expect(resourceLabels(plan, memory, ['Cc minh@example.COM nhé'])).toEqual({ t: 'Họp ATI', 'recipient:lan@example.com': 'thread:Họp ATI', 'recipient:minh@example.com': 'user' });
   expect(resourceLabels(plan, memory, ['lan@example.com'])['recipient:lan@example.com']).toBe('user');
+});
+it('emits strict boolean hasDraft:false on all 8 search_threads summaries and isDraft:false on all 8 get_thread messages conforming to GMAIL_TOOLS schemas', async () => {
+  expect(GMAIL_THREADS).toHaveLength(8);
+  const adapter = createSandboxAdapter('gmail');
+  const searchSchema = GMAIL_TOOLS.find(t => t.name === 'gmail.search_threads')!.outputSchema;
+  const threadSchema = GMAIL_TOOLS.find(t => t.name === 'gmail.get_thread')!.outputSchema;
+
+  const summaries = await adapter.execute('gmail.search_threads', { query: '', limit: 10 });
+  expect(summaries).toHaveLength(8);
+  expect(validateSchemaValue(summaries, searchSchema, 'output')).toBeNull();
+  for (const summary of summaries) {
+    expect(typeof summary.hasDraft).toBe('boolean');
+    expect(summary.hasDraft).toBe(false);
+  }
+
+  for (let index = 1; index <= 8; index++) {
+    const detail = await adapter.execute('gmail.get_thread', { threadId: `gmail-thread-${index}` });
+    expect(validateSchemaValue(detail, threadSchema, 'output')).toBeNull();
+    expect(detail.messages).toHaveLength(1);
+    for (const msg of detail.messages) {
+      expect(typeof msg.isDraft).toBe('boolean');
+      expect(msg.isDraft).toBe(false);
+    }
+  }
 });

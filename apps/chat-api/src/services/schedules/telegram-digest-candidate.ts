@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { JIRA_CAPABILITY_DISABLED_IN_G2A } from '@wap/tool-schemas';
 import type {
+  GmailDigestBinding,
   ScheduleResponse,
   TelegramDigestCandidate,
   TelegramDigestConfig,
@@ -8,6 +9,10 @@ import type {
 } from '@wap/tool-schemas';
 import type { TelegramConnectionLookupResult } from '../telegram/connection-reference.js';
 import type { GitHubConnectionLookupResult } from '../github/connection-reference.js';
+import {
+  isValidGmailDigestBinding,
+  validateTelegramDigestGmailConfig,
+} from './gmail-digest-binding.js';
 
 export const READ_DIGEST_SOURCE_MAP: Record<string, TelegramDigestSource> = {
   github: {
@@ -112,17 +117,32 @@ function canonicalize(value: unknown): unknown {
 }
 
 export function computeTelegramDigestConfigHash(config: TelegramDigestConfig): string {
+  const gmailValidation = validateTelegramDigestGmailConfig(config);
+  if (gmailValidation.kind === 'invalid') {
+    throw new Error(gmailValidation.reason);
+  }
   const canonical: TelegramDigestConfig = {
     credentialId: config.credentialId,
     telegramUserId: config.telegramUserId,
     username: config.username,
     chatId: config.chatId,
     chatTitle: config.chatTitle,
+    ...(gmailValidation.kind === 'gmail_bound' ? { sourceBindingVersion: 1 as const } : {}),
     sources: config.sources.map((s) => ({
       service: s.service,
       tool: s.tool,
       ...(s.args !== undefined ? { args: s.args } : {}),
       label: s.label,
+      ...(gmailValidation.kind === 'gmail_bound' && s.service === 'gmail' && s.binding
+        ? {
+            binding: {
+              kind: s.binding.kind,
+              credentialId: s.binding.credentialId,
+              email: s.binding.email,
+              oauthClientId: s.binding.oauthClientId,
+            },
+          }
+        : {}),
     })),
     recurrence: config.recurrence,
     timeZone: config.timeZone,
@@ -177,6 +197,7 @@ export interface EvaluateTelegramDigestInput {
   timeZone: string;
   telegramLookup?: TelegramConnectionLookupResult | null;
   githubLookup?: Pick<GitHubConnectionLookupResult, 'status' | 'connection'> | null;
+  gmailBinding?: GmailDigestBinding | null;
   existingDigest?: TelegramDigestConfig | null;
 }
 
@@ -318,17 +339,37 @@ export function evaluateTelegramDigestCandidate(
       for (const repo of [...new Set(repos)]) {
         sources.push({ ...source, args: { repo, query: 'open' }, label: `${source.label} (${repo})` });
       }
+    } else if (service === 'gmail') {
+      if (!isValidGmailDigestBinding(input.gmailBinding)) {
+        return {
+          canAutoDigest: false,
+          disabledReason: 'Hãy kết nối Gmail cá nhân hợp lệ trước khi bật Tự gửi.',
+        };
+      }
+      sources.push({
+        ...source,
+        args: { query: 'in:inbox is:unread' },
+        label: `${source.label} (${input.gmailBinding.email})`,
+        binding: {
+          kind: 'gmail',
+          credentialId: input.gmailBinding.credentialId,
+          email: input.gmailBinding.email,
+          oauthClientId: input.gmailBinding.oauthClientId,
+        },
+      });
     } else {
       sources.push({ ...source });
     }
   }
 
+  const hasGmailSource = sources.some((s) => s.service === 'gmail');
   const config: TelegramDigestConfig = {
     credentialId: connection.credentialId,
     telegramUserId: connection.telegramUserId,
     username: connection.username,
     chatId: targetChat.chatId,
     chatTitle: targetChat.title,
+    ...(hasGmailSource ? { sourceBindingVersion: 1 as const } : {}),
     sources,
     recurrence: proposal.recurrence!,
     timeZone,

@@ -1,8 +1,9 @@
+import { createServer, type Server } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
 import * as adapters from '../src/index.js';
 import { startFakeGoogleGmail, type FakeGoogleGmail } from '../../../scripts/fake-google-gmail.mjs';
 import type { GmailAccessTokenProvider } from '../src/gmail/token-provider.js';
-import { validatePlan } from '@wap/planner';
+import { recordObserved, recordThreadLabels, validatePlan, validateSchemaValue } from '@wap/planner';
 import { GMAIL_TOOLS } from '@wap/tool-schemas';
 import { StepRunner } from '@wap/executor';
 
@@ -282,5 +283,994 @@ describe('Gmail native HTTP adapter', () => {
   it('an already cancelled request is known unsent', async () => {
     const { adapter, server } = await setup();
     await expect(adapter.execute('gmail.send_message', send, { signal: AbortSignal.abort() })).rejects.toMatchObject({ category: 'NETWORK', details: { requestSent: false } }); expect(server.stats.writes).toBe(0);
+  });
+
+  describe('G2 B1 remediation: findings 02, 03, and 04', () => {
+    const rawServers: Server[] = [];
+    afterEach(async () => {
+      await Promise.all(rawServers.splice(0).map(s => new Promise<void>(resolve => {
+        s.closeAllConnections?.();
+        s.close(() => resolve());
+      })));
+    });
+
+    function decodePostedMime(server: FakeGoogleGmail) {
+      const request = server.stats.apiRequests.find(r => r.method === 'POST');
+      expect(request).toBeDefined();
+      const message = request!.body.message ?? request!.body;
+      const mime = Buffer.from(message.raw, 'base64url').toString('utf8');
+      const [headerSection = '', bodySection = ''] = mime.split('\r\n\r\n');
+      const rawSubject = headerSection.replace(/\r\n /g, ' ').match(/^Subject: ([^\r]*)/m)?.[1] ?? '';
+      const subject = rawSubject
+        .replace(/\?=\s+=\?/g, '?==?')
+        .replace(/=\?UTF-8\?B\?([^?]+)\?=/g, (_, b) => Buffer.from(b, 'base64').toString('utf8'));
+      const text = Buffer.from(bodySection.replace(/\r\n/g, ''), 'base64').toString('utf8');
+      return { message, mime, headerSection, subject, text };
+    }
+
+    function seedBatchThreads(server: FakeGoogleGmail) {
+      const baseMsg = server.settings.threads[0]!.messages[0]!;
+      server.settings.threads = [
+        { id: 't1', messages: [{ ...baseMsg, id: 't1-m1', labelIds: ['INBOX', 'UNREAD'] }] },
+        { id: 't2', messages: [{ ...baseMsg, id: 't2-m1', labelIds: ['INBOX', 'UNREAD'] }] },
+        { id: 't3', messages: [{ ...baseMsg, id: 't3-m1', labelIds: ['INBOX', 'UNREAD'] }] },
+      ];
+    }
+
+    it('TDD02: t1 committed then t2=401 then refresh failure => UNKNOWN, requestSent true, completedThreadIds [t1], failedThreadId t2, causeCategory original', async () => {
+      const server = await startFakeGoogleGmail(); servers.push(server);
+      seedBatchThreads(server);
+      const refresh = server.mintRefreshToken();
+      let cachedToken: string | undefined;
+      const tokens: GmailAccessTokenProvider = {
+        async getAccessToken(options) {
+          if (!cachedToken || options?.forceRefresh) {
+            const response = await fetch(server.endpoints.tokenUrl, {
+              method: 'POST',
+              signal: options?.signal,
+              body: new URLSearchParams({
+                client_id: 'gmail-test.apps.googleusercontent.com',
+                client_secret: 'fake-gmail-secret',
+                grant_type: 'refresh_token',
+                refresh_token: refresh,
+              }),
+            });
+            if (!response.ok) {
+              throw new adapters.StepError({
+                category: response.status === 400 ? 'AUTH_ERROR' : 'SERVER_ERROR',
+                statusCode: response.status,
+                message: 'Refresh failed',
+              });
+            }
+            cachedToken = (await response.json()).access_token;
+          }
+          return cachedToken!;
+        },
+      };
+      // Prime initial valid token so t1 commits on real loopback HTTP, then t2 gets 401 and /token fails with 503
+      await tokens.getAccessToken();
+      server.settings.refresh = 'server_error';
+      server.settings.apiResponses = [null as any, { status: 401 }];
+
+      const adapter = adapters.createGmailToolAdapter({ baseUrl: server.origin, tokens });
+      const runner = new StepRunner({ getAdapter: () => adapter });
+      const result = await runner.executeStep(
+        {
+          id: 'batch-1',
+          tool: 'gmail.batch_modify_threads',
+          description: 'Batch star threads',
+          args: { threadIds: ['t1', 't2', 't3'], addLabelIds: ['STARRED'], removeLabelIds: ['UNREAD'] },
+          dependsOn: [],
+        },
+        new Map(),
+      );
+
+      expect(result).toMatchObject({
+        status: 'unknown',
+        output: null,
+        error: {
+          category: 'UNKNOWN',
+          details: {
+            requestSent: true,
+            completedThreadIds: ['t1'],
+            failedThreadId: 't2',
+            causeCategory: 'SERVER_ERROR',
+          },
+        },
+      });
+      expect(server.stats.apiRequests.map(r => r.path)).toEqual(['threads/t1/modify', 'threads/t2/modify']);
+      expect(server.stats.writes).toBe(2);
+      expect(server.stats.refreshes).toBe(2);
+      const serializedDetails = JSON.stringify(result.error?.details ?? {});
+      expect(serializedDetails).not.toContain('ya29.');
+      expect(serializedDetails).not.toContain('Chào nhóm');
+    });
+
+    it.each([
+      [404, 'notFound', 'NOT_FOUND'],
+      [400, 'badRequest', 'VALIDATION'],
+      [403, 'forbidden', 'AUTH_ERROR'],
+      [429, 'rateLimitExceeded', 'RATE_LIMIT'],
+    ])('TDD02: t1 committed then t2=%s (%s) => compound UNKNOWN with completedThreadIds [t1], failedThreadId t2, causeCategory %s', async (status, reason, causeCategory) => {
+      const { adapter, server } = await setup();
+      seedBatchThreads(server);
+      server.settings.apiResponses = [null as any, { status: Number(status), reason: String(reason) }];
+
+      const runner = new StepRunner({ getAdapter: () => adapter });
+      const result = await runner.executeStep(
+        {
+          id: 'batch-later-err',
+          tool: 'gmail.batch_modify_threads',
+          description: 'Batch modify',
+          args: { threadIds: ['t1', 't2', 't3'], addLabelIds: ['STARRED'] },
+          dependsOn: [],
+        },
+        new Map(),
+      );
+
+      expect(result).toMatchObject({
+        status: 'unknown',
+        output: null,
+        error: {
+          category: 'UNKNOWN',
+          details: {
+            requestSent: true,
+            completedThreadIds: ['t1'],
+            failedThreadId: 't2',
+            causeCategory,
+          },
+        },
+      });
+      expect(server.stats.apiRequests.map(r => r.path)).toEqual(['threads/t1/modify', 'threads/t2/modify']);
+      expect(server.stats.writes).toBe(2);
+    });
+
+    it('TDD02: t1 committed then t2=401 followed by second 401 after refresh => compound UNKNOWN with causeCategory AUTH_ERROR', async () => {
+      const { adapter, server } = await setup();
+      seedBatchThreads(server);
+      server.settings.apiResponses = [null as any, { status: 401 }, { status: 401 }];
+
+      const runner = new StepRunner({ getAdapter: () => adapter });
+      const result = await runner.executeStep(
+        {
+          id: 'batch-double-401',
+          tool: 'gmail.batch_modify_threads',
+          description: 'Batch modify',
+          args: { threadIds: ['t1', 't2', 't3'], addLabelIds: ['STARRED'] },
+          dependsOn: [],
+        },
+        new Map(),
+      );
+
+      expect(result).toMatchObject({
+        status: 'unknown',
+        output: null,
+        error: {
+          category: 'UNKNOWN',
+          details: {
+            requestSent: true,
+            completedThreadIds: ['t1'],
+            failedThreadId: 't2',
+            causeCategory: 'AUTH_ERROR',
+          },
+        },
+      });
+      expect(server.stats.writes).toBe(3);
+      expect(server.stats.apiRequests.map(r => r.path)).toEqual([
+        'threads/t1/modify',
+        'threads/t2/modify',
+        'threads/t2/modify',
+      ]);
+    });
+
+    it('TDD02: first 401 on t1 followed by refresh failure before any mutation => failed known unsent', async () => {
+      const server = await startFakeGoogleGmail({ settings: { apiResponses: [{ status: 401 }] } }); servers.push(server);
+      seedBatchThreads(server);
+      const adapter = adapters.createGmailToolAdapter({
+        baseUrl: server.origin,
+        tokens: {
+          async getAccessToken(options) {
+            if (options?.forceRefresh) throw new adapters.StepError({ category: 'SERVER_ERROR', message: 'Refresh failed' });
+            return 'expired-synthetic-token';
+          },
+        },
+      });
+      const runner = new StepRunner({ getAdapter: () => adapter });
+      const result = await runner.executeStep(
+        {
+          id: 'batch-first-401',
+          tool: 'gmail.batch_modify_threads',
+          description: 'Batch modify',
+          args: { threadIds: ['t1', 't2'], addLabelIds: ['STARRED'] },
+          dependsOn: [],
+        },
+        new Map(),
+      );
+
+      expect(result).toMatchObject({
+        status: 'failed',
+        output: null,
+        error: {
+          category: 'SERVER_ERROR',
+          details: { requestSent: false },
+        },
+      });
+      expect(server.stats.writes).toBe(1);
+      expect(server.stats.apiRequests.map(r => r.path)).toEqual(['threads/t1/modify']);
+    });
+
+    it('TDD02: multi-thread batch success preserves { ids, labelIds } including mid-batch 401 refresh recovery', async () => {
+      const { adapter, server, calls } = await setup();
+      seedBatchThreads(server);
+      server.settings.apiResponses = [null as any, { status: 401 }];
+
+      const result = await adapter.execute('gmail.batch_modify_threads', {
+        threadIds: ['t1', 't2', 't1'],
+        addLabelIds: ['STARRED'],
+        removeLabelIds: ['UNREAD'],
+      });
+
+      expect(result).toEqual({ ids: ['t1', 't2'], labelIds: ['INBOX', 'STARRED'] });
+      expect(calls.filter(c => c?.forceRefresh)).toHaveLength(1);
+      expect(server.stats.writes).toBe(3);
+    });
+
+    it('TDD03: normalizes inbound CRLF+WSP folded References, Subject, and From into clean MIME headers', async () => {
+      const { adapter, server } = await setup();
+      server.settings.threads[0]!.messages[0]!.payload.headers = [
+        { name: 'From', value: 'Lan\r\n <lan@example.com>' },
+        { name: 'To', value: 'gmail-owner@example.test' },
+        { name: 'Cc', value: 'Minh <minh@example.com>,\r\n\tHoa <hoa@example.com>' },
+        { name: 'Subject', value: '  Họp nhóm\r\n\tATI  ' },
+        { name: 'Date', value: 'Wed, 14 Oct 2026 09:00:00 +0700' },
+        { name: 'Message-ID', value: '<original@example.com>' },
+        { name: 'References', value: ' <root@example.com>\r\n <ancestor@example.com>\r\n\t<parent@example.com> ' },
+      ];
+
+      const threadView = await adapter.execute('gmail.get_thread', { threadId: 'thread-1' });
+      expect(threadView.subject).toBe('Họp nhóm ATI');
+      expect(threadView.participants).toEqual([
+        'lan@example.com',
+        'gmail-owner@example.test',
+        'minh@example.com',
+        'hoa@example.com',
+      ]);
+
+      await adapter.execute('gmail.reply', { threadId: 'thread-1', to: send.to, body: 'Đã nhận' });
+      const { mime, subject } = decodePostedMime(server);
+      expect(subject).toBe('Re: Họp nhóm ATI');
+      expect(mime).toContain('In-Reply-To: <original@example.com>\r\n');
+      expect(mime).toContain('References: <root@example.com> <ancestor@example.com> <parent@example.com> <original@example.com>\r\n');
+      expect(server.stats.writes).toBe(1);
+    });
+
+    it.each([
+      '  <original@example.com>\t ',
+      '\r\n <original@example.com>\r\n\t',
+    ])('TDD03: accepts padded/folded inbound Message-ID (%j) when inner angle token is valid', async paddedId => {
+      const { adapter, server } = await setup();
+      const headers = server.settings.threads[0]!.messages[0]!.payload.headers;
+      const msgIdHeader = headers.find((h: any) => h.name === 'Message-ID')!;
+      msgIdHeader.value = paddedId;
+
+      await adapter.execute('gmail.reply', { threadId: 'thread-1', to: send.to, body: 'Trả lời' });
+      const { mime } = decodePostedMime(server);
+      expect(mime).toContain('In-Reply-To: <original@example.com>\r\n');
+      expect(server.stats.writes).toBe(1);
+    });
+
+    it.each([
+      ['reply', 'Message-ID', '<original@example.com>\r\nBcc: attacker@example.com'],
+      ['reply', 'Message-ID', '<original@example.com>\n <second@example.com>'],
+      ['reply', 'Message-ID', '<original@example.com>\r <second@example.com>'],
+      ['reply', 'Message-ID', '<original@example.com>\r\n'],
+      ['reply', 'Message-ID', '<original@example.com>\x00'],
+      ['reply', 'References', '<ancestor@example.com>\r\nBcc: attacker@example.com'],
+      ['reply', 'References', '<ancestor@example.com>\r\n \r\nInjected body'],
+      ['reply', 'References', '<ancestor@example.com>\n <parent@example.com>'],
+      ['reply', 'Subject', 'Họp nhóm\r\nBcc: attacker@example.com'],
+      ['forward', 'From', 'Lan <lan@example.com>\r\nBcc: attacker@example.com'],
+    ])('TDD03: rejects malicious leftover CR/LF/NUL in inbound %s %s with 0 POST dispatches', async (tool, headerName, maliciousValue) => {
+      const { adapter, server } = await setup();
+      const headers = server.settings.threads[0]!.messages[0]!.payload.headers;
+      const target = headers.find((h: any) => h.name === headerName)!;
+      target.value = maliciousValue;
+
+      const args = tool === 'forward'
+        ? { threadId: 'thread-1', to: send.to, note: 'Xem' }
+        : { threadId: 'thread-1', to: send.to, body: 'Trả lời' };
+      await expect(adapter.execute(`gmail.${tool}`, args)).rejects.toMatchObject({
+        category: 'VALIDATION',
+        message: 'Gmail header contains CR/LF or NUL',
+        details: { requestSent: false },
+      });
+      expect(server.stats.writes).toBe(0);
+    });
+
+    it.each([
+      ['Message-ID', '<original@example.com> (CFWS comment)'],
+      ['Message-ID', '(comment) <original@example.com>'],
+      ['Message-ID', '<a@example.com> <b@example.com>'],
+      ['Message-ID', 'original@example.com'],
+      ['Message-ID', '<>'],
+      ['References', '<ancestor@example.com> (comment)\r\n <parent@example.com>'],
+      ['References', 'ancestor@example.com'],
+    ])('TDD03: rejects invalid inbound %s token shape (%s) without comment salvage and 0 POST', async (headerName, invalidValue) => {
+      const { adapter, server } = await setup();
+      const headers = server.settings.threads[0]!.messages[0]!.payload.headers;
+      const target = headers.find((h: any) => h.name === headerName)!;
+      target.value = invalidValue;
+
+      await expect(adapter.execute('gmail.reply', { threadId: 'thread-1', to: send.to, body: 'Trả lời' })).rejects.toMatchObject({
+        category: 'VALIDATION',
+        details: { requestSent: false },
+      });
+      expect(server.stats.writes).toBe(0);
+    });
+
+    it.each([
+      ['gmail.send_message', { ...send, subject: 'Chủ đề\r\n gập dòng' }],
+      ['gmail.send_message', { ...send, to: ['lan@example.com\r\n '] }],
+      ['gmail.create_label', { name: 'Nhãn\r\n Mới' }],
+    ])('TDD03: keeps outbound safeHeader strict against folded CRLF+WSP in %s user args', async (tool, args) => {
+      const { adapter, server } = await setup();
+      await expect(adapter.execute(tool, args)).rejects.toMatchObject({
+        category: 'VALIDATION',
+        message: 'Gmail header contains CR/LF or NUL',
+        details: { requestSent: false },
+      });
+      expect(server.stats.apiRequests).toHaveLength(0);
+      expect(server.stats.writes).toBe(0);
+    });
+
+    it.each([
+      'Biên bản chốt ngân sách riêng (Approved by User)',
+      'Họp nhóm ATI',
+      'Re: Chủ đề khác không khớp',
+    ])('TDD04: rejects threaded create_draft with incompatible custom subject (%s) before POST with standalone-draft guidance', async customSubject => {
+      const { adapter, server } = await setup();
+      await expect(
+        adapter.execute('gmail.create_draft', {
+          threadId: 'thread-1',
+          to: send.to,
+          subject: customSubject,
+          body: 'Nội dung nháp trả lời',
+        }),
+      ).rejects.toMatchObject({
+        category: 'VALIDATION',
+        details: { requestSent: false },
+        message: expect.stringContaining('Tạo bản nháp thư mới nếu muốn đổi tiêu đề.'),
+      });
+      expect(server.stats.writes).toBe(0);
+    });
+
+    it.each([
+      undefined,
+      '',
+      '   ',
+      'Re: Họp nhóm ATI',
+    ])('TDD04: threaded create_draft accepts equal/absent/blank subject (%j) and writes canonical derived Re subject', async explicitSubject => {
+      const { adapter, server } = await setup();
+      const result = await adapter.execute('gmail.create_draft', {
+        threadId: 'thread-1',
+        to: send.to,
+        ...(explicitSubject !== undefined ? { subject: explicitSubject } : {}),
+        body: 'Nội dung nháp trả lời',
+      });
+
+      expect(result).toEqual({ id: 'draft-1', messageId: 'draft-message-1', threadId: 'thread-1' });
+      expect(server.stats.writes).toBe(1);
+      const { message, mime, subject } = decodePostedMime(server);
+      expect(message.threadId).toBe('thread-1');
+      expect(subject).toBe('Re: Họp nhóm ATI');
+      expect(mime).toContain('In-Reply-To: <original@example.com>\r\n');
+    });
+
+    it('TDD04: standalone create_draft without threadId preserves custom subject verbatim', async () => {
+      const { adapter, server } = await setup();
+      const customSubject = 'Biên bản chốt ngân sách riêng (Độc lập)';
+      const result = await adapter.execute('gmail.create_draft', {
+        to: send.to,
+        subject: customSubject,
+        body: 'Nội dung nháp mới hoàn toàn',
+      });
+
+      expect(result).toEqual({ id: 'draft-1', messageId: 'draft-message-1', threadId: 'draft-thread' });
+      expect(server.stats.writes).toBe(1);
+      const { message, subject } = decodePostedMime(server);
+      expect(message.threadId).toBeUndefined();
+      expect(subject).toBe(customSubject);
+    });
+
+    it('TDD04: forward quotes originalSubject without added Fwd prefix while outer MIME Subject uses Fwd prefix', async () => {
+      const { adapter, server } = await setup();
+      await adapter.execute('gmail.forward', { threadId: 'thread-1', to: send.to, note: 'Xem nhé' });
+
+      expect(server.stats.writes).toBe(1);
+      const { subject, text } = decodePostedMime(server);
+      expect(subject).toBe('Fwd: Họp nhóm ATI');
+      expect(text).toContain('---------- Forwarded message ----------\r\nFrom: Lan <lan@example.com>\r\nSubject: Họp nhóm ATI\r\n\r\nChào nhóm, họp lúc 9 giờ.');
+      expect(text).not.toContain('Subject: Fwd: Họp nhóm ATI');
+    });
+
+    it.each([
+      'timeout',
+      'reset',
+      'malformed_json',
+      'empty_receipt',
+      'blank_id',
+    ] as const)('B04 negative guard: consumed POST write then %s => UNKNOWN with requestSent true and 1 HTTP dispatch', async failureMode => {
+      let consumedWrites = 0;
+      let socketClosedWhilePending = false;
+      const rawServer = createServer(async (req, res) => {
+        if (req.method === 'POST') {
+          for await (const _chunk of req) { /* consume full request body */ }
+          consumedWrites++;
+          if (failureMode === 'timeout') {
+            req.socket.on('close', () => {
+              if (!res.writableEnded) socketClosedWhilePending = true;
+            });
+            return;
+          }
+          if (failureMode === 'reset') {
+            req.socket.destroy();
+            return;
+          }
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          if (failureMode === 'malformed_json') { res.end('{"truncated'); return; }
+          if (failureMode === 'empty_receipt') { res.end('{}'); return; }
+          res.end(JSON.stringify({ id: '   ', threadId: 'thread-1' }));
+          return;
+        }
+        res.writeHead(404).end();
+      });
+      rawServers.push(rawServer);
+      await new Promise<void>((resolve, reject) => {
+        rawServer.once('error', reject);
+        rawServer.listen(0, '127.0.0.1', () => resolve());
+      });
+      const port = (rawServer.address() as { port: number }).port;
+
+      const adapter = adapters.createGmailToolAdapter({
+        baseUrl: `http://127.0.0.1:${port}`,
+        tokens: { async getAccessToken() { return 'synthetic-live-token'; } },
+      });
+      const runner = new StepRunner({ getAdapter: () => adapter });
+      const result = await runner.executeStep(
+        { id: 'send-neg', tool: 'gmail.send_message', description: 'Send', args: send, dependsOn: [] },
+        new Map(),
+        { timeoutMs: 120 },
+      );
+
+      expect(consumedWrites).toBe(1);
+      if (failureMode === 'timeout') {
+        await new Promise(resolve => setTimeout(resolve, 25));
+        expect(socketClosedWhilePending).toBe(true);
+      }
+      expect(result).toMatchObject({
+        status: 'unknown',
+        output: null,
+        error: {
+          category: 'UNKNOWN',
+          details: { requestSent: true },
+        },
+      });
+    });
+
+    it.each(['AUTH_ERROR', 'SERVER_ERROR', 'NETWORK'] as const)('B04 negative guard: token failure (%s) before write => failed with requestSent false and 0 writes', async category => {
+      const server = await startFakeGoogleGmail(); servers.push(server);
+      const adapter = adapters.createGmailToolAdapter({
+        baseUrl: server.origin,
+        tokens: {
+          async getAccessToken() {
+            throw new adapters.StepError({ category, message: 'Token unavailable' });
+          },
+        },
+      });
+      const runner = new StepRunner({ getAdapter: () => adapter });
+
+      const writeCases: [string, Record<string, any>][] = [
+        ['gmail.send_message', send],
+        ['gmail.batch_modify_threads', { threadIds: ['t1', 't2'], addLabelIds: ['STARRED'] }],
+      ];
+      for (const [tool, args] of writeCases) {
+        const result = await runner.executeStep(
+          { id: 'tok-fail', tool, description: 'Write', args, dependsOn: [] },
+          new Map(),
+        );
+        expect(result).toMatchObject({
+          status: 'failed',
+          output: null,
+          error: {
+            category,
+            details: { requestSent: false },
+          },
+        });
+      }
+      expect(server.stats.writes).toBe(0);
+      expect(server.stats.apiRequests).toHaveLength(0);
+    });
+  });
+
+  describe('G2 C1 remediation: finding 14 read-state projection (isDraft / hasDraft)', () => {
+    const searchOutputSchema = GMAIL_TOOLS.find(t => t.name === 'gmail.search_threads')!.outputSchema;
+    const getThreadOutputSchema = GMAIL_TOOLS.find(t => t.name === 'gmail.get_thread')!.outputSchema;
+
+    it('C04-1: delivered received message followed by saved draft => search summary uses newest non-DRAFT delivered sender/snippet/date/subject with hasDraft true; get_thread retains marked draft', async () => {
+      const { adapter, server } = await setup();
+      server.settings.threads = [{
+        id: 'thread-delivered-then-draft',
+        messages: [
+          {
+            id: 'msg-delivered-1',
+            labelIds: ['INBOX', 'UNREAD'],
+            snippet: 'Nhờ bạn xác nhận ngân sách trước 17h hôm nay.',
+            payload: {
+              mimeType: 'text/plain',
+              headers: [
+                { name: 'From', value: 'Lan <lan@example.com>' },
+                { name: 'To', value: 'gmail-owner@example.test' },
+                { name: 'Cc', value: 'Minh <minh@example.com>' },
+                { name: 'Subject', value: 'Họp chốt ngân sách quý 4' },
+                { name: 'Date', value: 'Wed, 14 Oct 2026 09:00:00 +0700' },
+                { name: 'Message-ID', value: '<msg-delivered-1@example.com>' },
+              ],
+              body: { data: Buffer.from('Nhờ bạn xác nhận ngân sách trước 17h hôm nay.').toString('base64url') },
+            },
+          },
+          {
+            id: 'msg-draft-2',
+            labelIds: ['DRAFT'],
+            snippet: 'Tôi đã phê duyệt ngân sách rồi nhé (NHÁP CHƯA GỬI)',
+            payload: {
+              mimeType: 'text/plain',
+              headers: [
+                { name: 'From', value: 'Owner <gmail-owner@example.test>' },
+                { name: 'To', value: 'lan@example.com' },
+                { name: 'Subject', value: 'Re: Họp chốt ngân sách quý 4 (Bản nháp)' },
+                { name: 'Date', value: 'Wed, 14 Oct 2026 09:30:00 +0700' },
+                { name: 'Message-ID', value: '<msg-draft-2@example.com>' },
+              ],
+              body: { data: Buffer.from('Tôi đã phê duyệt ngân sách rồi nhé (NHÁP CHƯA GỬI)').toString('base64url') },
+            },
+          },
+        ],
+      }];
+
+      const searched = await adapter.execute('gmail.search_threads', { query: 'ngân sách', limit: 5 });
+      expect(searched).toHaveLength(1);
+      expect(searched[0]).toEqual({
+        id: 'thread-delivered-then-draft',
+        subject: 'Họp chốt ngân sách quý 4',
+        from: 'Lan <lan@example.com>',
+        to: ['gmail-owner@example.test'],
+        cc: ['minh@example.com'],
+        snippet: 'Nhờ bạn xác nhận ngân sách trước 17h hôm nay.',
+        date: 'Wed, 14 Oct 2026 09:00:00 +0700',
+        labels: ['INBOX', 'UNREAD', 'DRAFT'],
+        messageCount: 2,
+        unread: true,
+        hasAttachment: false,
+        attachmentNames: [],
+        hasDraft: true,
+        participants: ['lan@example.com', 'gmail-owner@example.test', 'minh@example.com'],
+      });
+      expect(validateSchemaValue(searched, searchOutputSchema, 'output')).toBeNull();
+
+      const threadView = await adapter.execute('gmail.get_thread', { threadId: 'thread-delivered-then-draft' });
+      expect(threadView).toEqual({
+        id: 'thread-delivered-then-draft',
+        subject: 'Họp chốt ngân sách quý 4',
+        participants: ['lan@example.com', 'gmail-owner@example.test', 'minh@example.com'],
+        messages: [
+          {
+            messageId: 'msg-delivered-1',
+            from: 'Lan <lan@example.com>',
+            to: ['gmail-owner@example.test'],
+            cc: ['minh@example.com'],
+            date: 'Wed, 14 Oct 2026 09:00:00 +0700',
+            subject: 'Họp chốt ngân sách quý 4',
+            body: 'Nhờ bạn xác nhận ngân sách trước 17h hôm nay.',
+            attachments: [],
+            isDraft: false,
+          },
+          {
+            messageId: 'msg-draft-2',
+            from: 'Owner <gmail-owner@example.test>',
+            to: ['lan@example.com'],
+            cc: [],
+            date: 'Wed, 14 Oct 2026 09:30:00 +0700',
+            subject: 'Re: Họp chốt ngân sách quý 4 (Bản nháp)',
+            body: 'Tôi đã phê duyệt ngân sách rồi nhé (NHÁP CHƯA GỬI)',
+            attachments: [],
+            isDraft: true,
+          },
+        ],
+      });
+      expect(validateSchemaValue(threadView, getThreadOutputSchema, 'output')).toBeNull();
+    });
+
+    it('C04-2: multi-message thread with older draft and newer delivered message + trailing draft picks newest non-DRAFT delivered message and keeps hasDraft true', async () => {
+      const { adapter, server } = await setup();
+      server.settings.threads = [
+        {
+          id: 'thread-mixed-history',
+          messages: [
+            {
+              id: 'm1-delivered',
+              labelIds: ['INBOX'],
+              snippet: 'Tin đầu tiên từ Lan.',
+              payload: {
+                mimeType: 'text/plain',
+                headers: [
+                  { name: 'From', value: 'Lan <lan@example.com>' },
+                  { name: 'To', value: 'gmail-owner@example.test' },
+                  { name: 'Subject', value: 'Luồng trao đổi dự án' },
+                  { name: 'Date', value: 'Wed, 14 Oct 2026 08:00:00 +0700' },
+                ],
+                body: { data: Buffer.from('Tin đầu tiên từ Lan.').toString('base64url') },
+              },
+            },
+            {
+              id: 'm2-old-draft',
+              labelIds: ['DRAFT'],
+              snippet: 'Nháp cũ chưa xóa.',
+              payload: {
+                mimeType: 'text/plain',
+                headers: [
+                  { name: 'From', value: 'Owner <gmail-owner@example.test>' },
+                  { name: 'To', value: 'lan@example.com' },
+                  { name: 'Subject', value: 'Re: Luồng trao đổi dự án (Nháp 1)' },
+                  { name: 'Date', value: 'Wed, 14 Oct 2026 08:15:00 +0700' },
+                ],
+                body: { data: Buffer.from('Nháp cũ chưa xóa.').toString('base64url') },
+              },
+            },
+            {
+              id: 'm3-newest-delivered',
+              labelIds: ['INBOX', 'UNREAD'],
+              snippet: 'Cập nhật mới nhất từ Minh đã gửi thật.',
+              payload: {
+                mimeType: 'text/plain',
+                headers: [
+                  { name: 'From', value: 'Minh <minh@example.com>' },
+                  { name: 'To', value: 'gmail-owner@example.test' },
+                  { name: 'Cc', value: 'lan@example.com' },
+                  { name: 'Subject', value: 'Re: Luồng trao đổi dự án' },
+                  { name: 'Date', value: 'Wed, 14 Oct 2026 10:05:00 +0700' },
+                ],
+                body: { data: Buffer.from('Cập nhật mới nhất từ Minh đã gửi thật.').toString('base64url') },
+              },
+            },
+          ],
+        },
+      ];
+
+      const [summaryWithMidDraft] = await adapter.execute('gmail.search_threads', { query: 'dự án', limit: 1 });
+      expect(summaryWithMidDraft).toMatchObject({
+        id: 'thread-mixed-history',
+        from: 'Minh <minh@example.com>',
+        to: ['gmail-owner@example.test'],
+        cc: ['lan@example.com'],
+        snippet: 'Cập nhật mới nhất từ Minh đã gửi thật.',
+        date: 'Wed, 14 Oct 2026 10:05:00 +0700',
+        subject: 'Re: Luồng trao đổi dự án',
+        hasDraft: true,
+      });
+
+      const threadView = await adapter.execute('gmail.get_thread', { threadId: 'thread-mixed-history' });
+      expect(threadView.messages.map((m: any) => ({ id: m.messageId, isDraft: m.isDraft }))).toEqual([
+        { id: 'm1-delivered', isDraft: false },
+        { id: 'm2-old-draft', isDraft: true },
+        { id: 'm3-newest-delivered', isDraft: false },
+      ]);
+      expect(validateSchemaValue([summaryWithMidDraft], searchOutputSchema, 'output')).toBeNull();
+      expect(validateSchemaValue(threadView, getThreadOutputSchema, 'output')).toBeNull();
+    });
+
+    it('C04-3: draft-only thread => search summary reports hasDraft true and empty delivered sender/snippet/date/subject without implying sent status; get_thread retains marked draft', async () => {
+      const { adapter, server } = await setup();
+      server.settings.threads = [{
+        id: 'draft-only-thread',
+        messages: [{
+          id: 'standalone-draft-1',
+          labelIds: ['DRAFT'],
+          snippet: 'Bản nháp đề xuất hợp tác chưa từng được gửi đi.',
+          payload: {
+            mimeType: 'text/plain',
+            headers: [
+              { name: 'From', value: 'Owner <gmail-owner@example.test>' },
+              { name: 'To', value: 'lan@example.com' },
+              { name: 'Cc', value: 'minh@example.com' },
+              { name: 'Subject', value: 'Đề xuất hợp tác chưa gửi' },
+              { name: 'Date', value: 'Wed, 14 Oct 2026 11:00:00 +0700' },
+            ],
+            body: { data: Buffer.from('Bản nháp đề xuất hợp tác chưa từng được gửi đi.').toString('base64url') },
+          },
+        }],
+      }];
+
+      const [draftSummary] = await adapter.execute('gmail.search_threads', { query: 'hợp tác', limit: 1 });
+      expect(draftSummary).toEqual({
+        id: 'draft-only-thread',
+        subject: '',
+        from: '',
+        to: [],
+        cc: [],
+        snippet: '',
+        date: '',
+        labels: ['DRAFT'],
+        messageCount: 1,
+        unread: false,
+        hasAttachment: false,
+        attachmentNames: [],
+        hasDraft: true,
+        participants: ['gmail-owner@example.test', 'lan@example.com', 'minh@example.com'],
+      });
+      expect(validateSchemaValue([draftSummary], searchOutputSchema, 'output')).toBeNull();
+
+      const draftThread = await adapter.execute('gmail.get_thread', { threadId: 'draft-only-thread' });
+      expect(draftThread).toEqual({
+        id: 'draft-only-thread',
+        subject: '',
+        participants: ['gmail-owner@example.test', 'lan@example.com', 'minh@example.com'],
+        messages: [{
+          messageId: 'standalone-draft-1',
+          from: 'Owner <gmail-owner@example.test>',
+          to: ['lan@example.com'],
+          cc: ['minh@example.com'],
+          date: 'Wed, 14 Oct 2026 11:00:00 +0700',
+          subject: 'Đề xuất hợp tác chưa gửi',
+          body: 'Bản nháp đề xuất hợp tác chưa từng được gửi đi.',
+          attachments: [],
+          isDraft: true,
+        }],
+      });
+      expect(validateSchemaValue(draftThread, getThreadOutputSchema, 'output')).toBeNull();
+    });
+
+    it('C04-4: no-draft thread emits explicit boolean hasDraft false and per-message isDraft false even when labelIds is omitted', async () => {
+      const { adapter, server } = await setup();
+      server.settings.threads = [{
+        id: 'thread-no-draft',
+        messages: [
+          {
+            id: 'm1',
+            labelIds: ['INBOX'],
+            snippet: 'Thư đến.',
+            payload: {
+              mimeType: 'text/plain',
+              headers: [
+                { name: 'From', value: 'Lan <lan@example.com>' },
+                { name: 'To', value: 'gmail-owner@example.test' },
+                { name: 'Subject', value: 'Thư không có bản nháp' },
+                { name: 'Date', value: 'Wed, 14 Oct 2026 09:00:00 +0700' },
+              ],
+              body: { data: Buffer.from('Thư đến.').toString('base64url') },
+            },
+          },
+          {
+            id: 'm2-no-labels',
+            snippet: 'Phản hồi đã gửi thật (không có labelIds).',
+            payload: {
+              mimeType: 'text/plain',
+              headers: [
+                { name: 'From', value: 'Owner <gmail-owner@example.test>' },
+                { name: 'To', value: 'lan@example.com' },
+                { name: 'Subject', value: 'Re: Thư không có bản nháp' },
+                { name: 'Date', value: 'Wed, 14 Oct 2026 09:10:00 +0700' },
+              ],
+              body: { data: Buffer.from('Phản hồi đã gửi thật (không có labelIds).').toString('base64url') },
+            },
+          },
+        ],
+      }];
+
+      const [summary] = await adapter.execute('gmail.search_threads', { query: 'nháp', limit: 1 });
+      expect(summary.hasDraft).toBe(false);
+      expect(summary.from).toBe('Owner <gmail-owner@example.test>');
+      expect(summary.snippet).toBe('Phản hồi đã gửi thật (không có labelIds).');
+      expect(summary.subject).toBe('Re: Thư không có bản nháp');
+      expect(validateSchemaValue([summary], searchOutputSchema, 'output')).toBeNull();
+
+      const threadView = await adapter.execute('gmail.get_thread', { threadId: 'thread-no-draft' });
+      expect(threadView.messages.map((m: any) => m.isDraft)).toEqual([false, false]);
+      expect(validateSchemaValue(threadView, getThreadOutputSchema, 'output')).toBeNull();
+    });
+
+    it('C04-5: preserves last-5 messages, 4k per-message / 12k total Unicode budgets, 20 header-only participants, and attachment metadata without bytes across delivered + draft messages', async () => {
+      const { adapter, server } = await setup();
+      const longDeliveredSubject = 'Tiêu đề Tiếng Việt 😊 '.repeat(15); // > 250 code points
+      const longDeliveredSnippet = 'Đoạn trích Tiếng Việt 😊 '.repeat(12); // > 200 code points
+      const secretAttachmentBytes = Buffer.from('SECRET_RAW_ATTACHMENT_BYTES_NEVER_RETURNED').toString('base64url');
+      const manyRecipients = Array.from({ length: 25 }, (_, i) => `member${i}@example.com`).join(', ');
+
+      server.settings.threads = [{
+        id: 'thread-bounds-unicode-draft',
+        messages: [
+          ...Array.from({ length: 6 }, (_, i) => ({
+            id: `delivered-${i}`,
+            labelIds: ['INBOX'],
+            snippet: i === 5 ? longDeliveredSnippet : `Snippet ${i}`,
+            payload: {
+              mimeType: 'multipart/mixed',
+              headers: [
+                { name: 'From', value: 'Lan <LAN@example.com>' },
+                { name: 'To', value: manyRecipients },
+                { name: 'Subject', value: i === 5 ? longDeliveredSubject : `Chủ đề ${i}` },
+                { name: 'Date', value: `Wed, 14 Oct 2026 0${i}:00:00 +0700` },
+              ],
+              parts: [
+                {
+                  mimeType: 'text/plain',
+                  body: { data: Buffer.from('😊'.repeat(4500) + ' body-injected@example.com').toString('base64url') },
+                },
+                ...(i === 5 ? [{
+                  mimeType: 'application/pdf',
+                  filename: 'hợp-đồng-📎.pdf',
+                  body: { size: 4096, attachmentId: 'att-secret-delivered', data: secretAttachmentBytes },
+                }] : []),
+              ],
+            },
+          })),
+          {
+            id: 'draft-6',
+            labelIds: ['DRAFT'],
+            snippet: 'NHÁP KHÔNG ĐƯỢC LẤY LÀM SUMMARY SNIPPET',
+            payload: {
+              mimeType: 'multipart/mixed',
+              headers: [
+                { name: 'From', value: 'Owner <gmail-owner@example.test>' },
+                { name: 'To', value: 'lan@example.com' },
+                { name: 'Subject', value: 'NHÁP KHÔNG ĐƯỢC LẤY LÀM SUMMARY SUBJECT' },
+                { name: 'Date', value: 'Wed, 14 Oct 2026 12:00:00 +0700' },
+              ],
+              parts: [
+                {
+                  mimeType: 'text/plain',
+                  body: { data: Buffer.from('📝'.repeat(4500) + ' draft-body@example.com').toString('base64url') },
+                },
+                {
+                  mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                  filename: 'bản-nháp-đính-kèm-📎.docx',
+                  body: { size: 2048, attachmentId: 'att-secret-draft', data: secretAttachmentBytes },
+                },
+              ],
+            },
+          },
+        ],
+      }];
+
+      const [summary] = await adapter.execute('gmail.search_threads', { query: 'hợp-đồng', limit: 1 });
+      expect(summary.hasDraft).toBe(true);
+      expect(summary.from).toBe('Lan <LAN@example.com>');
+      expect(summary.date).toBe('Wed, 14 Oct 2026 05:00:00 +0700');
+      expect(Array.from(summary.subject as string)).toHaveLength(250);
+      expect(summary.subject).not.toContain('\uFFFD');
+      expect(summary.subject).not.toContain('NHÁP');
+      expect(Array.from(summary.snippet as string)).toHaveLength(200);
+      expect(summary.snippet).not.toContain('\uFFFD');
+      expect(summary.snippet).not.toContain('NHÁP');
+      expect(summary.hasAttachment).toBe(true);
+      expect(summary.attachmentNames).toEqual(['hợp-đồng-📎.pdf', 'bản-nháp-đính-kèm-📎.docx']);
+      expect(summary.participants).toHaveLength(20);
+      expect(summary.participants).not.toContain('body-injected@example.com');
+      expect(summary.participants).not.toContain('draft-body@example.com');
+      expect(JSON.stringify(summary)).not.toContain(secretAttachmentBytes);
+      expect(JSON.stringify(summary)).not.toContain('att-secret');
+      expect(validateSchemaValue([summary], searchOutputSchema, 'output')).toBeNull();
+
+      const threadView = await adapter.execute('gmail.get_thread', { threadId: 'thread-bounds-unicode-draft' });
+      expect(threadView.messages).toHaveLength(5);
+      expect(threadView.messages.map((m: any) => ({ id: m.messageId, isDraft: m.isDraft }))).toEqual([
+        { id: 'delivered-2', isDraft: false },
+        { id: 'delivered-3', isDraft: false },
+        { id: 'delivered-4', isDraft: false },
+        { id: 'delivered-5', isDraft: false },
+        { id: 'draft-6', isDraft: true },
+      ]);
+      expect(threadView.messages.every((m: any) => Array.from(m.body as string).length <= 4000 && !m.body.includes('\uFFFD'))).toBe(true);
+      expect(threadView.messages.reduce((sum: number, m: any) => sum + Array.from(m.body as string).length, 0)).toBe(12000);
+      expect(threadView.messages[3]!.attachments).toEqual([{ filename: 'hợp-đồng-📎.pdf', size: 4096 }]);
+      expect(threadView.messages[4]!.attachments).toEqual([{ filename: 'bản-nháp-đính-kèm-📎.docx', size: 2048 }]);
+      expect(threadView.participants).toHaveLength(20);
+      expect(threadView.participants).not.toContain('body-injected@example.com');
+      expect(threadView.participants).not.toContain('draft-body@example.com');
+      const serializedThread = JSON.stringify(threadView);
+      expect(serializedThread).not.toContain(secretAttachmentBytes);
+      expect(serializedThread).not.toContain('SECRET_RAW_ATTACHMENT_BYTES');
+      expect(serializedThread).not.toContain('att-secret');
+      expect(validateSchemaValue(threadView, getThreadOutputSchema, 'output')).toBeNull();
+    });
+
+    it('C04-6: preserves B1 unfolded headers, reply/forward/threaded-draft latest non-DRAFT selection, and planner memory/label consumer contracts on additive output', async () => {
+      const { adapter, server } = await setup();
+      server.settings.threads = [{
+        id: 'thread-b1-and-c1',
+        messages: [
+          {
+            id: 'm1-folded-delivered',
+            labelIds: ['INBOX', 'UNREAD'],
+            snippet: 'Nội dung thư gốc đã nhận.',
+            payload: {
+              mimeType: 'text/plain',
+              headers: [
+                { name: 'From', value: 'Lan\r\n <lan@example.com>' },
+                { name: 'To', value: 'gmail-owner@example.test' },
+                { name: 'Subject', value: '  Họp nhóm\r\n\tATI  ' },
+                { name: 'Date', value: 'Wed, 14 Oct 2026 09:00:00 +0700' },
+                { name: 'Message-ID', value: ' <original@example.com>\r\n\t' },
+                { name: 'References', value: ' <root@example.com>\r\n <ancestor@example.com> ' },
+              ],
+              body: { data: Buffer.from('Nội dung thư gốc đã nhận.').toString('base64url') },
+            },
+          },
+          {
+            id: 'm2-later-draft',
+            labelIds: ['DRAFT'],
+            snippet: 'Nháp trả lời đang soạn dở.',
+            payload: {
+              mimeType: 'text/plain',
+              headers: [
+                { name: 'From', value: 'Owner <gmail-owner@example.test>' },
+                { name: 'To', value: 'lan@example.com' },
+                { name: 'Subject', value: 'Re: Họp nhóm ATI' },
+                { name: 'Date', value: 'Wed, 14 Oct 2026 09:45:00 +0700' },
+                { name: 'Message-ID', value: '<draft-not-for-reply@example.com>' },
+              ],
+              body: { data: Buffer.from('Nháp trả lời đang soạn dở.').toString('base64url') },
+            },
+          },
+        ],
+      }];
+
+      const searched = await adapter.execute('gmail.search_threads', { query: 'Họp', limit: 1 });
+      expect(searched[0]).toMatchObject({
+        id: 'thread-b1-and-c1',
+        subject: 'Họp nhóm ATI',
+        from: 'Lan <lan@example.com>',
+        snippet: 'Nội dung thư gốc đã nhận.',
+        hasDraft: true,
+      });
+      const threadView = await adapter.execute('gmail.get_thread', { threadId: 'thread-b1-and-c1' });
+      expect(threadView.subject).toBe('Họp nhóm ATI');
+      expect(threadView.messages.map((m: any) => m.isDraft)).toEqual([false, true]);
+
+      // Planner working-memory & label projections ignore hasDraft/isDraft and keep only id + participants / delivered subject
+      const observedFromSearch = recordObserved(undefined, 'thread', searched, ['id', 'participants']);
+      expect(observedFromSearch.thread).toEqual([{
+        id: 'thread-b1-and-c1',
+        participants: ['lan@example.com', 'gmail-owner@example.test'],
+      }]);
+      const observedFromThread = recordObserved(undefined, 'thread', [threadView], ['id', 'participants']);
+      expect(observedFromThread.thread).toEqual([{
+        id: 'thread-b1-and-c1',
+        participants: ['lan@example.com', 'gmail-owner@example.test'],
+      }]);
+      expect(recordThreadLabels(undefined, searched)).toEqual({ 'thread-b1-and-c1': 'Họp nhóm ATI' });
+
+      // Reply still selects m1-folded-delivered (latest non-DRAFT), unfolds Message-ID/References, and never replies to m2-later-draft
+      await adapter.execute('gmail.reply', { threadId: 'thread-b1-and-c1', to: send.to, body: 'Phản hồi chính thức' });
+      expect(server.stats.writes).toBe(1);
+      const replyReq = server.stats.apiRequests.find(r => r.method === 'POST')!;
+      const replyMime = Buffer.from(replyReq.body.raw, 'base64url').toString('utf8');
+      expect(replyMime).toContain('In-Reply-To: <original@example.com>\r\n');
+      expect(replyMime).toContain('References: <root@example.com> <ancestor@example.com> <original@example.com>\r\n');
+      expect(replyMime).not.toContain('draft-not-for-reply');
+
+      // B1 custom threaded draft subject mismatch still rejects before POST
+      await expect(
+        adapter.execute('gmail.create_draft', {
+          threadId: 'thread-b1-and-c1',
+          to: send.to,
+          subject: 'Đổi chủ đề trái phép',
+          body: 'Nháp mới',
+        }),
+      ).rejects.toMatchObject({
+        category: 'VALIDATION',
+        details: { requestSent: false },
+      });
+      expect(server.stats.writes).toBe(1);
+    });
   });
 });

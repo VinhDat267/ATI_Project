@@ -162,10 +162,10 @@ export const GMAIL_THREADS = [
 ].map(([subject = '', body = ''], index) => ({
   id: `gmail-thread-${index + 1}`, subject, from: 'Lan <lan@example.com>', to: ['gmail-owner@example.test'], cc: ['minh@example.com'],
   snippet: body, date: '2026-10-14T09:00:00+07:00', labels: ['INBOX', 'UNREAD'], messageCount: 1, unread: true,
-  hasAttachment: index === 1, attachmentNames: index === 1 ? ['báo cáo.pdf'] : [],
+  hasAttachment: index === 1, attachmentNames: index === 1 ? ['báo cáo.pdf'] : [], hasDraft: false,
   participants: ['lan@example.com', 'gmail-owner@example.test', 'minh@example.com'],
   messages: [{ messageId: `gmail-message-${index + 1}`, from: 'lan@example.com', to: ['gmail-owner@example.test'], cc: ['minh@example.com'],
-    subject, date: '2026-10-14T09:00:00+07:00', body, attachments: index === 1 ? [{ filename: 'báo cáo.pdf', size: 1200 }] : [] }],
+    subject, date: '2026-10-14T09:00:00+07:00', body, attachments: index === 1 ? [{ filename: 'báo cáo.pdf', size: 1200 }] : [], isDraft: false }],
 }));
 export const GMAIL_LABELS = ['INBOX', 'UNREAD', 'STARRED'].map(id => ({ id, name: id, type: 'system' }));
 type GmailThread = (typeof GMAIL_THREADS)[number];

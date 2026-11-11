@@ -28,6 +28,7 @@ export interface ScheduleRuntimeOptions {
   pool: pg.Pool | null;
   timeZone: string;
   encryptionKey?: string;
+  gmailOAuthClientId?: string;
   /** Plans one run. Until SCHED-02 connects the planner, every run fails without calling a model. */
   planRun?: PlanRun;
   runDigest?: RunCalendarDigest | RunGithubDigest;
@@ -61,6 +62,7 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
     runner: { planNow: (runId) => runner.planNow(runId) },
     credentialRepo: options.credentialRepo,
     encryptionKey: options.encryptionKey,
+    gmailOAuthClientId: options.gmailOAuthClientId,
     mysheetsEnabled: options.mysheetsEnabled,
     emitV2: options.emitV2,
     fetchOrgSheetsMetadata: options.fetchOrgSheetsMetadata,
@@ -83,6 +85,8 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
   const runner: ScheduleRunner = new ScheduleRunner({
     pool,
     timeZone,
+    encryptionKey: options.encryptionKey,
+    gmailOAuthClientId: options.gmailOAuthClientId,
     planRun: options.planRun ?? notConnected,
     runDigest: options.runDigest,
     runGithubDigest: options.runGithubDigest,

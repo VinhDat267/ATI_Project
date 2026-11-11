@@ -16,14 +16,17 @@ export function bareAddress(value: string): string {
 export interface GmailMessage { id: string; internalDate?: string; labelIds?: string[]; snippet?: string; payload?: GmailPart }
 export interface GmailPart { mimeType?: string; filename?: string; headers?: { name: string; value: string }[]; body?: { data?: string; size?: number; attachmentId?: string }; parts?: GmailPart[] }
 export interface GmailThread { id: string; messages?: GmailMessage[] }
-export const header = (message: GmailMessage, name: string): string => message.payload?.headers?.find(h => h.name.toLowerCase() === name.toLowerCase())?.value ?? '';
+const unfoldHeader = (value: string): string => value.replace(/\r\n[ \t]+/g, ' ').replace(/^[ \t]+|[ \t]+$/g, '');
+export const header = (message: GmailMessage, name: string): string =>
+  unfoldHeader(message.payload?.headers?.find(h => h.name.toLowerCase() === name.toLowerCase())?.value ?? '');
 /** Header addresses only. Display names, comments and quoted commas never become participants. */
 export function headerAddresses(value: string): string[] {
-  if (/[\r\n\x00]/.test(value)) return [];
+  const normalized = unfoldHeader(value);
+  if (/[\r\n\x00]/.test(normalized)) return [];
   const found: string[] = [];
   const mailboxes: { text: string; quoted: boolean }[] = [];
   let text = '', quoted = false, inQuote = false, escaped = false, commentDepth = 0;
-  for (const char of value) {
+  for (const char of normalized) {
     if (escaped) { escaped = false; continue; }
     if ((inQuote || commentDepth > 0) && char === '\\') { escaped = true; continue; }
     if (commentDepth > 0) {
