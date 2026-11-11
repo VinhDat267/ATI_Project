@@ -16,12 +16,16 @@ import {
   TELEGRAM_CHAT_ID_PATTERN,
   type AllowedScope,
   type PlanConnections,
+  type SheetsAppendLeaseStore,
   type WorkspaceJiraCapabilitiesResponse,
   validateJiraSourceRef,
   type JiraSourceRef,
 } from '@wap/tool-schemas';
 import { isWriteTool, type AdapterExecutor } from '@wap/executor';
 import { getRegisteredService, isServiceAccountService } from './registered-services.js';
+import { PostgresSheetsAppendLeaseStore } from './sheets/sheets-append-lease-store.js';
+
+export { PostgresSheetsAppendLeaseStore };
 import type { GmailTokenManager } from './gmail/token-manager.js';
 import type { TelegramBotClient } from './telegram/bot-client.js';
 import type { NotionConnectionRepo } from '../db/repositories/notion-connection-repo.js';
@@ -56,8 +60,14 @@ export interface AdapterFactoryOptions {
   createMyCalendarAdapter?: (input: { userId: string; tokens: GmailAccessTokenProvider; allowedScope: AllowedScope }) => AdapterExecutor;
   mycalendarTokens?: GmailTokenManager;
   /** Builds the MySheets adapter of one member with explicit scope allowlist. */
-  createMySheetsAdapter?: (input: { userId: string; tokens: GmailAccessTokenProvider; allowedScope: AllowedScope }) => AdapterExecutor;
+  createMySheetsAdapter?: (input: {
+    userId: string;
+    tokens: GmailAccessTokenProvider;
+    allowedScope: AllowedScope;
+    appendLeaseStore?: SheetsAppendLeaseStore;
+  }) => AdapterExecutor;
   mysheetsTokens?: GmailTokenManager;
+  sheetsAppendLeaseStore?: SheetsAppendLeaseStore;
   createTrelloAdapter?: (input: { userId: string; accessToken: string; allowedBoardIds: string[] }) => AdapterExecutor;
   trelloTokens?: any;
   trelloTeamRepo?: any;
@@ -119,6 +129,7 @@ export class AdapterFactory {
   private credentialRepo: CredentialRepo;
   private encryptionKey: string;
   private adapterCache = new Map<string, any>();
+  private adapterCacheMeta = new Map<string, { id?: string; config: string }>();
   private personalCache = new Map<string, { credentialId: string; adapter: AdapterExecutor; scopeKey?: string }>();
 
   constructor(private options: AdapterFactoryOptions) {
@@ -132,13 +143,17 @@ export class AdapterFactory {
       return;
     }
     if (workspaceId) {
-      this.adapterCache.delete(`org:${workspaceId}:${serviceName}`);
+      const orgKey = `org:${workspaceId}:${serviceName}`;
+      this.adapterCache.delete(orgKey);
+      this.adapterCacheMeta.delete(orgKey);
       return;
     }
     this.adapterCache.delete(serviceName);
+    this.adapterCacheMeta.delete(serviceName);
     for (const key of Array.from(this.adapterCache.keys())) {
       if (key.endsWith(`:${serviceName}`)) {
         this.adapterCache.delete(key);
+        this.adapterCacheMeta.delete(key);
       }
     }
   }
@@ -147,7 +162,9 @@ export class AdapterFactory {
   clearPersonal(userId: string, serviceName?: string): void {
     if (serviceName) {
       this.personalCache.delete(`${serviceName}:${userId}`);
-      this.adapterCache.delete(`personal-shared:${userId}:${serviceName}`);
+      const sharedPersonalKey = `personal-shared:${userId}:${serviceName}`;
+      this.adapterCache.delete(sharedPersonalKey);
+      this.adapterCacheMeta.delete(sharedPersonalKey);
       if (serviceName === 'gmail') this.options.gmailTokens?.clear(userId);
       if (serviceName === 'mycalendar') this.options.mycalendarTokens?.clear(userId);
       if (serviceName === 'mysheets') this.options.mysheetsTokens?.clear(userId);
@@ -166,6 +183,7 @@ export class AdapterFactory {
     for (const key of Array.from(this.adapterCache.keys())) {
       if (key.startsWith(`personal-shared:${userId}:`)) {
         this.adapterCache.delete(key);
+        this.adapterCacheMeta.delete(key);
       }
     }
     this.options.gmailTokens?.clear(userId);
@@ -201,35 +219,51 @@ export class AdapterFactory {
     }
 
     let cacheKey = serviceName;
-    if (context?.workspaceMode === 'personal' && context.userId) {
-      cacheKey = `personal-shared:${context.userId}:${serviceName}`;
-    } else if (context?.workspaceMode === 'organization' && context.workspaceId) {
-      cacheKey = `org:${context.workspaceId}:${serviceName}`;
+    let trimmedUserId = '';
+    let trimmedWorkspaceId = '';
+    if (context?.workspaceMode === 'personal') {
+      if (isServiceAccountService(serviceName)) {
+        throw new Error(`Dịch vụ ${serviceName} không khả dụng ở không gian cá nhân; hãy dùng mycalendar/mysheets.`);
+      }
+      trimmedUserId = typeof context.userId === 'string' ? context.userId.trim() : '';
+      if (!trimmedUserId) {
+        throw new Error(`Personal credentials require user id for service '${serviceName}'`);
+      }
+      cacheKey = `personal-shared:${trimmedUserId}:${serviceName}`;
+    } else if (context?.workspaceMode === 'organization') {
+      trimmedWorkspaceId = typeof context.workspaceId === 'string' ? context.workspaceId.trim() : '';
+      if (!trimmedWorkspaceId) {
+        throw new Error(`Organization credentials require workspace id for service '${serviceName}'`);
+      }
+      cacheKey = `org:${trimmedWorkspaceId}:${serviceName}`;
     }
 
     const cached = this.adapterCache.get(cacheKey);
-    if (cached) return cached;
+    if (cached && context?.phase !== 'execution') return cached;
 
     const registration = getRegisteredService(serviceName);
     if (!registration) throw new Error(`Unsupported service '${serviceName}'`);
 
     let record: any = null;
     if (context?.workspaceMode === 'personal') {
-      if (isServiceAccountService(serviceName)) {
-        throw new Error(`Dịch vụ ${serviceName} không khả dụng ở không gian cá nhân; hãy dùng mycalendar/mysheets.`);
-      }
-      if (!context.userId) {
-        throw new Error(`Personal credentials require user id for service '${serviceName}'`);
-      }
-      record = await this.credentialRepo.getPersonalCredentials(serviceName, context.userId);
+      record = await this.credentialRepo.getPersonalCredentials(serviceName, trimmedUserId);
     } else if (context?.workspaceMode === 'organization') {
-      record = await this.credentialRepo.getCredentials(serviceName, context.workspaceId ?? null);
+      record = await this.credentialRepo.getCredentials(serviceName, trimmedWorkspaceId);
     } else {
       record = await this.credentialRepo.getCredentials(serviceName);
     }
 
-    if (!record) {
+    if (!record || (record.status !== undefined && record.status !== 'active')) {
+      this.adapterCache.delete(cacheKey);
+      this.adapterCacheMeta.delete(cacheKey);
       throw new Error(`No credentials configured for service '${serviceName}'`);
+    }
+
+    if (cached) {
+      const cachedMeta = this.adapterCacheMeta.get(cacheKey);
+      if (cachedMeta && cachedMeta.id === record.id && cachedMeta.config === record.config) {
+        return cached;
+      }
     }
 
     let decrypted: Record<string, any>;
@@ -252,9 +286,13 @@ export class AdapterFactory {
     if (!registration.definition.credentialFields.every(({ key }) => typeof decrypted[key] === 'string' && String(decrypted[key]).trim())) {
       throw new Error(`Credentials are incomplete for service '${serviceName}'`);
     }
-    const adapter = registration.transport.createAdapter(decrypted, allowedScope);
+    const adapterConfig = this.options.sheetsAppendLeaseStore
+      ? { ...decrypted, appendLeaseStore: this.options.sheetsAppendLeaseStore }
+      : decrypted;
+    const adapter = registration.transport.createAdapter(adapterConfig, allowedScope);
 
     this.adapterCache.set(cacheKey, adapter);
+    this.adapterCacheMeta.set(cacheKey, { id: record.id, config: record.config });
     return adapter;
   }
 
@@ -390,6 +428,9 @@ export class AdapterFactory {
       userId,
       tokens: this.options.mysheetsTokens.forConnection(userId, record.id, refreshToken),
       allowedScope: { spreadsheets: allowedSpreadsheets },
+      ...(this.options.sheetsAppendLeaseStore
+        ? { appendLeaseStore: this.options.sheetsAppendLeaseStore }
+        : {}),
     });
     this.personalCache.set(key, { credentialId: record.id, adapter, scopeKey });
     return adapter;
@@ -409,6 +450,9 @@ export class AdapterFactory {
       }
     }
 
+    if (context?.workspaceMode === 'organization' && (!context.workspaceId || !String(context.workspaceId).trim())) {
+      throw trelloError('AUTH_ERROR', 'Không gian làm việc Tổ chức không hợp lệ.');
+    }
     const scopeId =
       context?.workspaceMode === 'personal' && context.userId
         ? `personal:${context.userId}`

@@ -6,6 +6,27 @@ import { localLabel } from './next-occurrence.js';
 import type { RunToPlan } from './schedule-runner.js';
 
 export const CALENDAR_DELIVERY_UNKNOWN = 'Chưa xác định bản tin lịch đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
+export const MAX_DIGEST_DISPLAY_EVENTS = 20;
+export const MAX_DIGEST_MESSAGE_CHARS = 3900;
+
+export type CalendarCoverageStatus = 'complete' | 'partial' | 'unknown';
+
+export interface CalendarListEventsCoverage {
+  complete: boolean;
+  returned: number;
+  totalAvailable: number | null;
+  reason?: string;
+}
+
+export interface CalendarDigestCoverageItem {
+  calendarId: string;
+  calendarSummary: string;
+  status: CalendarCoverageStatus;
+  returned: number;
+  totalAvailable: number | null;
+  reason?: string;
+  titleClipped?: boolean;
+}
 
 export function escapeDigestText(value: string): string {
   return value
@@ -45,31 +66,21 @@ export interface CalendarDigestExecutorOptions {
   summaryTimeoutMs?: number;
 }
 
-function buildDayWindow(
-  dueAt: Date,
-  windowHours: number,
-  timeZone = 'Asia/Ho_Chi_Minh',
-): { timeMin: string; timeMax: string } {
-  const safeTz = timeZone || 'Asia/Ho_Chi_Minh';
+function localWallParts(
+  at: Date,
+  timeZone: string,
+): {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  isoOffset: string;
+} {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat('en-GB', {
-      timeZone: safeTz,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      timeZoneName: 'longOffset',
-    })
-      .formatToParts(dueAt)
-      .map((p) => [p.type, p.value]),
-  );
-  const startOffset = (parts.timeZoneName ?? 'GMT+07:00').replace(/^GMT/, '') || '+00:00';
-  const startIso = `${parts.year}-${parts.month}-${parts.day}T00:00:00${startOffset}`;
-  const startMs = Date.parse(startIso);
-  const hours = Math.min(Math.max(1, windowHours || 24), 168);
-  const endDate = new Date(startMs + hours * 3_600_000 - 1_000);
-  const endParts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-GB', {
-      timeZone: safeTz,
+      timeZone,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -79,12 +90,210 @@ function buildDayWindow(
       hourCycle: 'h23',
       timeZoneName: 'longOffset',
     })
-      .formatToParts(endDate)
+      .formatToParts(at)
       .map((p) => [p.type, p.value]),
   );
-  const endOffset = (endParts.timeZoneName ?? 'GMT+07:00').replace(/^GMT/, '') || '+00:00';
-  const endIso = `${endParts.year}-${endParts.month}-${endParts.day}T${endParts.hour}:${endParts.minute}:${endParts.second}${endOffset}`;
-  return { timeMin: startIso, timeMax: endIso };
+  const rawOffset = (parts.timeZoneName ?? 'GMT+00:00').replace(/^GMT/, '');
+  const isoOffset = rawOffset === '' || rawOffset === '+0' || rawOffset === '-0' ? '+00:00' : rawOffset;
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+    second: Number(parts.second),
+    isoOffset,
+  };
+}
+
+function formatInstantInTimeZone(at: Date, timeZone: string): string {
+  const p = localWallParts(at, timeZone);
+  const y = String(p.year).padStart(4, '0');
+  const m = String(p.month).padStart(2, '0');
+  const d = String(p.day).padStart(2, '0');
+  const hh = String(p.hour).padStart(2, '0');
+  const mm = String(p.minute).padStart(2, '0');
+  const ss = String(p.second).padStart(2, '0');
+  return `${y}-${m}-${d}T${hh}:${mm}:${ss}${p.isoOffset}`;
+}
+
+function resolveLocalMidnightInstant(year: number, month: number, day: number, timeZone: string): Date {
+  const targetMidnightUtc = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
+  let guessMs = targetMidnightUtc;
+  for (let i = 0; i < 4; i++) {
+    const p = localWallParts(new Date(guessMs), timeZone);
+    const observedUtc = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second, 0);
+    const diffMs = targetMidnightUtc - observedUtc;
+    if (diffMs === 0) break;
+    guessMs += diffMs;
+  }
+  return new Date(guessMs);
+}
+
+export function buildDayWindow(
+  dueAt: Date,
+  windowHours: number,
+  timeZone = 'Asia/Ho_Chi_Minh',
+): { timeMin: string; timeMax: string } {
+  const safeTz = timeZone || 'Asia/Ho_Chi_Minh';
+  const dueLocal = localWallParts(dueAt, safeTz);
+  const startDate = resolveLocalMidnightInstant(dueLocal.year, dueLocal.month, dueLocal.day, safeTz);
+
+  const hours = Math.min(Math.max(1, windowHours || 24), 168);
+  const wholeDays = Math.floor(hours / 24);
+  const remainderHours = hours % 24;
+
+  const targetEndDayUtc = new Date(Date.UTC(dueLocal.year, dueLocal.month - 1, dueLocal.day + wholeDays, 0, 0, 0, 0));
+  const endDayMidnight = resolveLocalMidnightInstant(
+    targetEndDayUtc.getUTCFullYear(),
+    targetEndDayUtc.getUTCMonth() + 1,
+    targetEndDayUtc.getUTCDate(),
+    safeTz,
+  );
+  const endDate = new Date(endDayMidnight.getTime() + remainderHours * 3_600_000);
+
+  return {
+    timeMin: formatInstantInTimeZone(startDate, safeTz),
+    timeMax: formatInstantInTimeZone(endDate, safeTz),
+  };
+}
+
+export function normalizeCalendarReadCoverage(
+  calendarId: string,
+  calendarSummary: string,
+  res: unknown,
+  items: CalendarEventWithConflict[],
+): CalendarDigestCoverageItem {
+  const rawObj = res && typeof res === 'object' ? (res as Record<string, unknown>) : {};
+  const rawCov = rawObj.coverage;
+  const titleClipped = items.some((ev) => typeof ev?.title === 'string' && ev.title.length >= 200);
+
+  if (!rawCov || typeof rawCov !== 'object') {
+    return {
+      calendarId,
+      calendarSummary,
+      status: 'unknown',
+      returned: items.length,
+      totalAvailable: null,
+      reason: 'missing_coverage_metadata',
+      ...(titleClipped ? { titleClipped: true } : {}),
+    };
+  }
+
+  const cov = rawCov as Record<string, unknown>;
+  const completeField = cov.complete;
+  const returnedField = cov.returned;
+  const totalAvailableField = cov.totalAvailable;
+  const reasonField = typeof cov.reason === 'string' && cov.reason.trim() ? cov.reason.trim() : undefined;
+
+  if (typeof completeField !== 'boolean' || typeof returnedField !== 'number' || !Number.isFinite(returnedField)) {
+    return {
+      calendarId,
+      calendarSummary,
+      status: 'unknown',
+      returned: items.length,
+      totalAvailable: null,
+      reason: 'malformed_coverage_metadata',
+      ...(titleClipped ? { titleClipped: true } : {}),
+    };
+  }
+
+  const validTotalAvailable =
+    typeof totalAvailableField === 'number' && Number.isFinite(totalAvailableField) && totalAvailableField >= items.length
+      ? totalAvailableField
+      : null;
+
+  const isVerifiablyComplete =
+    completeField === true &&
+    returnedField === items.length &&
+    items.length <= MAX_DIGEST_DISPLAY_EVENTS &&
+    (validTotalAvailable === null || validTotalAvailable === items.length);
+
+  if (isVerifiablyComplete) {
+    return {
+      calendarId,
+      calendarSummary,
+      status: 'complete',
+      returned: items.length,
+      totalAvailable: validTotalAvailable ?? items.length,
+      ...(reasonField ? { reason: reasonField } : {}),
+      ...(titleClipped ? { titleClipped: true } : {}),
+    };
+  }
+
+  const partialTotalAvailable =
+    validTotalAvailable !== null && validTotalAvailable > items.length ? validTotalAvailable : null;
+
+  return {
+    calendarId,
+    calendarSummary,
+    status: 'partial',
+    returned: items.length,
+    totalAvailable: partialTotalAvailable,
+    reason: reasonField ?? (items.length > MAX_DIGEST_DISPLAY_EVENTS ? 'display_cap_exceeded' : 'incomplete_window'),
+    ...(titleClipped ? { titleClipped: true } : {}),
+  };
+}
+
+function summarizeOverallCoverage(
+  calendarsChecked: number,
+  events: EnrichedDigestEvent[],
+  calendarCoverages?: CalendarDigestCoverageItem[],
+): {
+  overallStatus: CalendarCoverageStatus;
+  items: CalendarDigestCoverageItem[];
+  hasClippedTitles: boolean;
+} {
+  const titleClippedFromEvents = events.some((ev) => typeof ev?.title === 'string' && ev.title.length >= 200);
+  if (!calendarCoverages || calendarCoverages.length === 0) {
+    if (events.length > MAX_DIGEST_DISPLAY_EVENTS) {
+      return {
+        overallStatus: 'partial',
+        items: [],
+        hasClippedTitles: titleClippedFromEvents,
+      };
+    }
+    return {
+      overallStatus: 'unknown',
+      items: [],
+      hasClippedTitles: titleClippedFromEvents,
+    };
+  }
+
+  const hasClippedTitles = titleClippedFromEvents || calendarCoverages.some((c) => c.titleClipped === true);
+  if (calendarCoverages.length < calendarsChecked) {
+    return {
+      overallStatus: 'unknown',
+      items: calendarCoverages,
+      hasClippedTitles,
+    };
+  }
+
+  const hasPartial = calendarCoverages.some((c) => c.status === 'partial');
+  const hasUnknown = calendarCoverages.some((c) => c.status === 'unknown');
+
+  if (hasPartial) {
+    return { overallStatus: 'partial', items: calendarCoverages, hasClippedTitles };
+  }
+  if (hasUnknown) {
+    return { overallStatus: 'unknown', items: calendarCoverages, hasClippedTitles };
+  }
+  return { overallStatus: 'complete', items: calendarCoverages, hasClippedTitles };
+}
+
+function formatEventDetailLine(ev: EnrichedDigestEvent): string {
+  const conflictNote =
+    ev.conflict && ev.conflictsWith?.length
+      ? ` [⚠️ Trùng giờ với: ${ev.conflictsWith.map((t) => escapeDigestText(t)).join(', ')}]`
+      : '';
+  const extras: string[] = [];
+  if (ev.meetLink) extras.push(`🎥 Meet: ${escapeDigestText(ev.meetLink)}`);
+  if (ev.location) extras.push(`📍 ${escapeDigestText(ev.location)}`);
+  if (typeof ev.attendeesCount === 'number' && ev.attendeesCount > 0) {
+    extras.push(`👥 ${ev.attendeesCount} người tham dự`);
+  }
+  const extraSuffix = extras.length > 0 ? ` — ${extras.join(' | ')}` : '';
+  return `- [${escapeDigestText(ev.calendarSummary)}] ${escapeDigestText(ev.title)} (${ev.start} → ${ev.end})${extraSuffix}${conflictNote}`;
 }
 
 export function formatCalendarDigestMessage(input: {
@@ -94,45 +303,131 @@ export function formatCalendarDigestMessage(input: {
   calendarsChecked: number;
   events: EnrichedDigestEvent[];
   summaryText?: string;
+  calendarCoverages?: CalendarDigestCoverageItem[];
 }): { text: string; conflictCount: number } {
-  const { scheduleName, dueAt, timeZone, calendarsChecked, events, summaryText } = input;
+  const { scheduleName, dueAt, timeZone, calendarsChecked, events, summaryText, calendarCoverages } = input;
   const conflicting = events.filter((e) => e.conflict === true);
-  const lines: string[] = [
-    `📅 Bản tin Lịch làm việc: ${escapeDigestText(scheduleName)} (${localLabel(dueAt, timeZone)})`,
-    `• Tổng số sự kiện: ${events.length} trên ${calendarsChecked} lịch`,
-    conflicting.length > 0
-      ? `• ⚠️ Cảnh báo trùng lịch: ${conflicting.length} sự kiện bị giao giờ họp`
-      : '• ✅ Không có xung đột giờ họp',
-  ];
+  const { overallStatus, items: coverageItems, hasClippedTitles } = summarizeOverallCoverage(
+    calendarsChecked,
+    events,
+    calendarCoverages,
+  );
 
-  if (summaryText && summaryText.trim()) {
-    lines.push('', `💡 Tóm tắt nhanh: ${escapeDigestText(summaryText.trim().slice(0, 600))}`);
-  }
+  const candidateDisplayLimit = Math.min(events.length, MAX_DIGEST_DISPLAY_EVENTS);
 
-  if (events.length === 0) {
-    lines.push('', 'Hôm nay bạn không có sự kiện nào trong khung giờ đã chọn.');
-  } else {
-    lines.push('', 'Chi tiết lịch trình:');
-    for (const ev of events.slice(0, 20)) {
-      const conflictNote =
-        ev.conflict && ev.conflictsWith?.length
-          ? ` [⚠️ Trùng giờ với: ${ev.conflictsWith.map((t) => escapeDigestText(t)).join(', ')}]`
-          : '';
-      const extras: string[] = [];
-      if (ev.meetLink) extras.push(`🎥 Meet: ${escapeDigestText(ev.meetLink)}`);
-      if (ev.location) extras.push(`📍 ${escapeDigestText(ev.location)}`);
-      if (typeof ev.attendeesCount === 'number' && ev.attendeesCount > 0) {
-        extras.push(`👥 ${ev.attendeesCount} người tham dự`);
-      }
-      const extraSuffix = extras.length > 0 ? ` — ${extras.join(' | ')}` : '';
+  const buildMessageForDisplayCount = (displayedCount: number): string => {
+    const observedCount = events.length;
+    const isDisplayClipped = displayedCount < observedCount;
+    const canIncludeSummary = overallStatus === 'complete' && !isDisplayClipped;
+
+    const lines: string[] = [
+      `📅 Bản tin Lịch làm việc: ${escapeDigestText(scheduleName)} (${localLabel(dueAt, timeZone)})`,
+    ];
+
+    if (overallStatus === 'complete') {
       lines.push(
-        `- [${escapeDigestText(ev.calendarSummary)}] ${escapeDigestText(ev.title)} (${ev.start} → ${ev.end})${extraSuffix}${conflictNote}`,
+        `• Tổng số sự kiện: ${observedCount} trên ${calendarsChecked} lịch (độ phủ: COMPLETE — đã đọc ${observedCount}/${observedCount}, hiển thị ${displayedCount}/${observedCount})`,
+      );
+    } else if (overallStatus === 'partial') {
+      const allHaveTotal =
+        coverageItems.length === calendarsChecked &&
+        coverageItems.every((c) => typeof c.totalAvailable === 'number' && Number.isFinite(c.totalAvailable));
+      const knownTotalSum = allHaveTotal
+        ? coverageItems.reduce((acc, c) => acc + (c.totalAvailable ?? 0), 0)
+        : null;
+      const totalLabel =
+        knownTotalSum !== null && knownTotalSum > observedCount ? String(knownTotalSum) : 'UNKNOWN';
+      lines.push(
+        `• Số sự kiện ghi nhận: ${observedCount} sự kiện đã đọc trên ${calendarsChecked} lịch (độ phủ: PARTIAL — tổng số thực tế: ${totalLabel}, hiển thị ${displayedCount}/${observedCount})`,
+      );
+    } else {
+      lines.push(
+        `• Số sự kiện ghi nhận: ${observedCount} sự kiện đã đọc trên ${calendarsChecked} lịch (độ phủ: UNKNOWN — tổng số thực tế: UNKNOWN, hiển thị ${displayedCount}/${observedCount})`,
       );
     }
+
+    if (overallStatus !== 'complete' && coverageItems.length > 0) {
+      const perCalNotes = coverageItems.map((c) => {
+        if (c.status === 'complete') {
+          return `${escapeDigestText(c.calendarSummary)}: đầy đủ (${c.returned}/${c.totalAvailable ?? c.returned})`;
+        }
+        if (c.status === 'partial') {
+          const countPart =
+            c.totalAvailable !== null && c.totalAvailable > c.returned
+              ? `${c.returned}/${c.totalAvailable}`
+              : `${c.returned} sự kiện đã đọc`;
+          return `${escapeDigestText(c.calendarSummary)}: một phần (${countPart})`;
+        }
+        return `${escapeDigestText(c.calendarSummary)}: UNKNOWN (${c.returned} sự kiện đã đọc)`;
+      });
+      lines.push(`• ℹ️ Độ phủ từng lịch: ${perCalNotes.join('; ')}`);
+    }
+
+    if (hasClippedTitles) {
+      lines.push('• ℹ️ Một số tiêu đề sự kiện dài từ nguồn dữ liệu đã được rút gọn ở mức 200 ký tự.');
+    }
+
+    if (conflicting.length > 0) {
+      const scopeSuffix =
+        overallStatus === 'complete'
+          ? ''
+          : ` (ghi nhận trong ${observedCount} sự kiện đã đọc — độ phủ ${overallStatus === 'partial' ? 'PARTIAL' : 'UNKNOWN'})`;
+      lines.push(`• ⚠️ Cảnh báo trùng lịch: ${conflicting.length} sự kiện bị giao giờ họp${scopeSuffix}`);
+    } else if (overallStatus === 'complete') {
+      lines.push('• ✅ Không có xung đột giờ họp');
+    } else {
+      const aggTag = overallStatus === 'partial' ? 'PARTIAL' : 'UNKNOWN';
+      lines.push(
+        `• ⚠️ Chưa thể kết luận lịch trống xung đột: 0 trùng giờ trong ${observedCount} sự kiện đã đọc, nhưng độ phủ dữ liệu là ${aggTag} (còn sự kiện chưa quét hoặc chưa rõ độ phủ)`,
+      );
+    }
+
+    if (canIncludeSummary && summaryText && summaryText.trim()) {
+      lines.push('', `💡 Tóm tắt nhanh: ${escapeDigestText(summaryText.trim().slice(0, 600))}`);
+    }
+
+    if (observedCount === 0) {
+      if (overallStatus === 'complete') {
+        lines.push('', 'Hôm nay bạn không có sự kiện nào trong khung giờ đã chọn.');
+      } else {
+        lines.push(
+          '',
+          'Chưa ghi nhận sự kiện trong dữ liệu đã đọc, nhưng độ phủ lịch chưa xác nhận đầy đủ.',
+        );
+      }
+    } else {
+      lines.push('', 'Chi tiết lịch trình:');
+      for (const ev of events.slice(0, displayedCount)) {
+        lines.push(formatEventDetailLine(ev));
+      }
+      if (displayedCount < observedCount) {
+        const omittedCount = observedCount - displayedCount;
+        const omittedConflictCount = events.slice(displayedCount).filter((e) => e.conflict === true).length;
+        const conflictTailNote =
+          omittedConflictCount > 0
+            ? `, bao gồm ${omittedConflictCount} sự kiện trùng giờ ngoài danh sách hiển thị`
+            : '';
+        lines.push(
+          `… Đã lược bớt ${omittedCount} sự kiện ngoài giới hạn hiển thị (hiển thị ${displayedCount}/${observedCount} sự kiện đã đọc${conflictTailNote}).`,
+        );
+      }
+    }
+
+    return lines.join('\n');
+  };
+
+  let displayedCount = candidateDisplayLimit;
+  let text = buildMessageForDisplayCount(displayedCount);
+  while (text.length > MAX_DIGEST_MESSAGE_CHARS && displayedCount > 0) {
+    displayedCount--;
+    text = buildMessageForDisplayCount(displayedCount);
+  }
+  if (text.length > MAX_DIGEST_MESSAGE_CHARS) {
+    text = text.slice(0, MAX_DIGEST_MESSAGE_CHARS);
   }
 
   return {
-    text: lines.join('\n').slice(0, 3900),
+    text,
     conflictCount: conflicting.length,
   };
 }
@@ -200,8 +495,8 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
     const destRow = (
       await options.pool.query(
         destService === 'telegram'
-          ? 'SELECT config, status FROM service_credentials WHERE service = $1 AND (user_id = $2 OR user_id IS NULL) ORDER BY user_id IS NULL ASC LIMIT 1'
-          : 'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL LIMIT 1',
+          ? 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND (user_id = $2 OR user_id IS NULL) ORDER BY user_id IS NULL ASC LIMIT 1'
+          : 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL LIMIT 1',
         destService === 'telegram' ? [destService, run.userId] : [destService],
       )
     ).rows[0];
@@ -213,6 +508,9 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
       };
     }
 
+    let telegramDestBinding:
+      | { credentialId: string; telegramUserId: string; username: string; chatIds: string[] }
+      | undefined;
     try {
       const decryptedDest = options.encryptionKey
         ? decryptCredentials(destRow.config, options.encryptionKey)
@@ -248,6 +546,15 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
             pauseReason: 'Nhóm Telegram nhận bản tin không còn nằm trong phạm vi cho phép.',
           };
         }
+        if (destRow.user_id && destRow.id) {
+          telegramDestBinding = {
+            credentialId: String(destRow.id),
+            telegramUserId:
+              typeof decryptedDest?.telegramUserId === 'string' ? decryptedDest.telegramUserId : '',
+            username: typeof decryptedDest?.username === 'string' ? decryptedDest.username : '',
+            chatIds: [config.destination.chatId],
+          };
+        }
       }
     } catch {
       return {
@@ -262,6 +569,7 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
     const readSignal = AbortSignal.any([signal, readController.signal]);
 
     const rawEvents: EnrichedDigestEvent[] = [];
+    const calendarCoverages: CalendarDigestCoverageItem[] = [];
     try {
       const { timeMin, timeMax } = buildDayWindow(run.dueAt, config.windowHours, options.timeZone);
       const mycalAdapter = await options.getAdapter('mycalendar', {
@@ -288,11 +596,15 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
             calendarId: cal.id,
             timeMin,
             timeMax,
-            limit: 20,
+            limit: MAX_DIGEST_DISPLAY_EVENTS,
           },
           { signal: readSignal },
         );
-        const items: CalendarEventWithConflict[] = Array.isArray(res?.events) ? res.events : [];
+        if (!res || typeof res !== 'object' || !Array.isArray((res as any).events)) {
+          throw new Error('Malformed calendar list_events response');
+        }
+        const items: CalendarEventWithConflict[] = (res as any).events;
+        calendarCoverages.push(normalizeCalendarReadCoverage(cal.id, cal.summary, res, items));
         for (const item of items) {
           rawEvents.push({
             ...item,
@@ -311,11 +623,15 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
     }
 
     const enrichedEvents = detectCalendarConflicts(rawEvents, { annotateConflicts: true });
+    const allCalendarsComplete =
+      calendarCoverages.length === config.calendars.length &&
+      calendarCoverages.every((c) => c.status === 'complete') &&
+      enrichedEvents.length <= MAX_DIGEST_DISPLAY_EVENTS;
 
-    // 3. Optional Bounded AI Summary (10s AbortSignal)
+    // 3. Optional Bounded AI Summary (10s AbortSignal) — suppressed when coverage is partial or unknown
     let summaryText: string | undefined;
     let summaryIncluded = false;
-    if (config.includeSummary && options.summarizeDigest && enrichedEvents.length > 0) {
+    if (allCalendarsComplete && config.includeSummary && options.summarizeDigest && enrichedEvents.length > 0) {
       const summaryController = new AbortController();
       const summaryTimer = setTimeout(() => summaryController.abort(), summaryTimeoutMs);
       const summarySignal = AbortSignal.any([signal, summaryController.signal]);
@@ -348,6 +664,7 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
       calendarsChecked: config.calendars.length,
       events: enrichedEvents,
       summaryText,
+      calendarCoverages,
     });
 
     // 5. Pre-Send Version Check (abort before sending if schedule changed or was cancelled)
@@ -365,6 +682,7 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
         userId: run.userId,
         phase: 'execution',
         actor: { userId: run.userId },
+        ...(telegramDestBinding ? { connections: { telegram: telegramDestBinding } } : {}),
       });
       if (!destAdapter) {
         return {

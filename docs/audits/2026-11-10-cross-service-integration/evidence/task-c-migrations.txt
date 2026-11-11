@@ -1,0 +1,196 @@
+﻿=== MIGRATION INVENTORY ===
+Total SQL files (0001..0035): 47
+Pre-remediation SQL files (<=0032): 44
+Post-0032 remediation SQL files (0033..0035): 0033_sheets_digest_v2_remediation.sql, 0034_github_workspace_scoped_team_scope.sql, 0035_sheets_gas_r2_remediation.sql
+  [01] 0001_v3_core.sql
+  [02] 0002_v3_invariants.sql
+  [03] 0003_auth_sessions.sql
+  [04] 0004_conversation_titles.sql
+  [05] 0005_auth_tokens_outbox.sql
+  [06] 0006_fe03_resource_labels.sql
+  [07] 0007_oauth_states.sql
+  [08] 0008_account_google_email.sql
+  [09] 0009_gmail_personal_connections.sql
+  [10] 0010_schedules.sql
+  [11] 0011_oauth_return_to.sql
+  [12] 0012_mycalendar_personal_connections.sql
+  [13] 0013_mysheets_personal_connections.sql
+  [14] 0014_slack_oauth_connections.sql
+  [15] 0014_trello_oauth.sql
+  [16] 0015_slack_callback_order.sql
+  [17] 0015_workspaces.sql
+  [18] 0016_sheets_automation_and_digest.sql
+  [19] 0016_slack_processing_consents.sql
+  [20] 0017_calendar_automation_digest.sql
+  [21] 0017_slack_source_store.sql
+  [22] 0018_github_oauth_and_digest.sql
+  [23] 0018_slack_derived_lineage_and_purge.sql
+  [24] 0019_jira_workspaces.sql
+  [25] 0019_slack_signed_event_ingress.sql
+  [26] 0019_telegram_oauth_and_digest.sql
+  [27] 0020_notion_oauth_and_digest.sql
+  [28] 0020_slack_lifecycle_validation_leases.sql
+  [29] 0020_telegram_update_inbox.sql
+  [30] 0021_calendar_digest_delivery.sql
+  [31] 0021_jira_oauth_token.sql
+  [32] 0021_slack_message_lineage_manifest.sql
+  [33] 0022_jira_authorization_leases.sql
+  [34] 0022_slack_plan_execution_lineage.sql
+  [35] 0023_slack_schedule_lineage.sql
+  [36] 0024_slack_derived_expiry_proofs.sql
+  [37] 0025_slack_message_origin.sql
+  [38] 0026_slack_plan_origin.sql
+  [39] 0027_slack_schedule_origin.sql
+  [40] 0028_slack_authorization_fanout.sql
+  [41] 0029_slack_write_outbox.sql
+  [42] 0030_slack_assistant_modes.sql
+  [43] 0031_slack_inbox_and_digest.sql
+  [44] 0032_jira_digest_schedule_kind.sql
+  [45] 0033_sheets_digest_v2_remediation.sql
+  [46] 0034_github_workspace_scoped_team_scope.sql
+  [47] 0035_sheets_gas_r2_remediation.sql
+
+--- [FRESH_RUN_1] node db/v3/migrate.mjs on ati_v3_taskc_fresh (exit=0, 3208ms, lines=47) ---
+  First line: Applied 0001_v3_core.sql
+  Last 4 lines:
+    Applied 0032_jira_digest_schedule_kind.sql
+    Applied 0033_sheets_digest_v2_remediation.sql
+    Applied 0034_github_workspace_scoped_team_scope.sql
+    Applied 0035_sheets_gas_r2_remediation.sql
+
+--- [FRESH_RUN_2_IDEMPOTENT] node db/v3/migrate.mjs on ati_v3_taskc_fresh (exit=0, 369ms, lines=47) ---
+  First line: Applied 0001_v3_core.sql
+  Last 4 lines:
+    Applied 0032_jira_digest_schedule_kind.sql
+    Applied 0033_sheets_digest_v2_remediation.sql
+    Applied 0034_github_workspace_scoped_team_scope.sql
+    Applied 0035_sheets_gas_r2_remediation.sql
+
+[FRESH_DB] Verified Schema Objects: {
+  "scheduleRunColumns": [
+    "delivery_followup_run_id:uuid",
+    "delivery_resolution:text",
+    "delivery_resolved_at:timestamp with time zone",
+    "delivery_resolved_by:uuid",
+    "delivery_started_at:timestamp with time zone",
+    "dispatched_config:jsonb",
+    "dispatched_config_hash:text"
+  ],
+  "remediationTables": [
+    "github_team_repos_legacy_archive",
+    "github_team_scope_legacy_archive",
+    "sheets_append_leases",
+    "sheets_digest_v2_migration_audit"
+  ],
+  "triggers": [
+    "trg_schedule_runs_capture_dispatched_config"
+  ]
+}
+
+--- [FRESH_RUN_3_POST_SEED_IDEMPOTENT] node db/v3/migrate.mjs on ati_v3_taskc_fresh (exit=0, 372ms, lines=47) ---
+  First line: Applied 0001_v3_core.sql
+  Last 4 lines:
+    Applied 0032_jira_digest_schedule_kind.sql
+    Applied 0033_sheets_digest_v2_remediation.sql
+    Applied 0034_github_workspace_scoped_team_scope.sql
+    Applied 0035_sheets_gas_r2_remediation.sql
+[FRESH_DB] Post-seed idempotent re-run preserved seeded user count = 1
+
+[UPGRADE_DB] Pre-0033 Schema Objects (expect only delivery_started_at): {"scheduleRunColumns":["delivery_started_at:timestamp with time zone"],"remediationTables":[],"triggers":[]}
+[UPGRADE_DB] Seeded pre-remediation rows: {"userId":"11111111-1111-4111-8111-111111111101","wsId":"22222222-2222-4222-8222-222222222202","schedSheetsV1Id":"55555555-5555-4555-8555-555555555501","schedTrelloId":"55555555-5555-4555-8555-555555555502","schedCalId":"55555555-5555-4555-8555-555555555503","schedOrgSheetsV1Id":"55555555-5555-4555-8555-555555555504","runSheetsHistId":"66666666-6666-4666-8666-666666666601","runTrelloHistId":"66666666-6666-4666-8666-666666666602","runCalHistId":"66666666-6666-4666-8666-666666666603"}
+
+--- [UPGRADE_0032_TO_0035_RUN_1] node db/v3/migrate.mjs on ati_v3_taskc_upgrade (exit=0, 511ms, lines=47) ---
+  First line: Applied 0001_v3_core.sql
+  Last 4 lines:
+    Applied 0032_jira_digest_schedule_kind.sql
+    Applied 0033_sheets_digest_v2_remediation.sql
+    Applied 0034_github_workspace_scoped_team_scope.sql
+    Applied 0035_sheets_gas_r2_remediation.sql
+
+--- [UPGRADE_0032_TO_0035_RUN_2_IDEMPOTENT] node db/v3/migrate.mjs on ati_v3_taskc_upgrade (exit=0, 434ms, lines=47) ---
+  First line: Applied 0001_v3_core.sql
+  Last 4 lines:
+    Applied 0032_jira_digest_schedule_kind.sql
+    Applied 0033_sheets_digest_v2_remediation.sql
+    Applied 0034_github_workspace_scoped_team_scope.sql
+    Applied 0035_sheets_gas_r2_remediation.sql
+
+[UPGRADE_DB] Post-0035 Schema Objects: {
+  "scheduleRunColumns": [
+    "delivery_followup_run_id:uuid",
+    "delivery_resolution:text",
+    "delivery_resolved_at:timestamp with time zone",
+    "delivery_resolved_by:uuid",
+    "delivery_started_at:timestamp with time zone",
+    "dispatched_config:jsonb",
+    "dispatched_config_hash:text"
+  ],
+  "remediationTables": [
+    "github_team_repos_legacy_archive",
+    "github_team_scope_legacy_archive",
+    "sheets_append_leases",
+    "sheets_digest_v2_migration_audit"
+  ],
+  "triggers": [
+    "trg_schedule_runs_capture_dispatched_config"
+  ]
+}
+[UPGRADE_DB] Preserved & Migrated Row Counts: {
+  "users_n": 1,
+  "workspaces_n": 1,
+  "members_n": 1,
+  "creds_n": 6,
+  "convs_n": 4,
+  "schedules_n": 4,
+  "runs_n": 3,
+  "live_default_gh_scope_n": 0,
+  "archived_default_gh_scope_n": 1,
+  "archived_default_gh_repos_n": 1,
+  "sheets_audit_n": 0
+}
+[UPGRADE_DB] Schedule Post-Upgrade States: [
+  {
+    "id": "55555555-5555-4555-8555-555555555503",
+    "name": "Pre-0033 Calendar Digest",
+    "kind": "calendar_digest",
+    "workspace_mode": "personal",
+    "status": "active",
+    "pause_reason": null
+  },
+  {
+    "id": "55555555-5555-4555-8555-555555555504",
+    "name": "Pre-0033 Org Sheets Unpinned v1",
+    "kind": "sheets_digest",
+    "workspace_mode": "organization",
+    "status": "active",
+    "pause_reason": null
+  },
+  {
+    "id": "55555555-5555-4555-8555-555555555501",
+    "name": "Pre-0033 Personal Sheets v1",
+    "kind": "sheets_digest",
+    "workspace_mode": "personal",
+    "status": "active",
+    "pause_reason": null
+  },
+  {
+    "id": "55555555-5555-4555-8555-555555555502",
+    "name": "Pre-0033 Trello Digest",
+    "kind": "trello_digest",
+    "workspace_mode": "personal",
+    "status": "active",
+    "pause_reason": null
+  }
+]
+[UPGRADE_DB] Trigger capture on new sheets_digest run: {"id":"691f1cf7-2d1d-4119-88fd-094f08205a52","has_snapshot":true,"dispatched_config_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+
+--- [MAIN_TEST_DB_MIGRATE] node db/v3/migrate.mjs on ati_v3_taskc (exit=0, 3391ms, lines=47) ---
+  First line: Applied 0001_v3_core.sql
+  Last 4 lines:
+    Applied 0032_jira_digest_schedule_kind.sql
+    Applied 0033_sheets_digest_v2_remediation.sql
+    Applied 0034_github_workspace_scoped_team_scope.sql
+    Applied 0035_sheets_gas_r2_remediation.sql
+
+=== ALL MIGRATION VERIFICATIONS PASSED ===
+

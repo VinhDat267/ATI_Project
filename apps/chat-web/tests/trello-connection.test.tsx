@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, waitFor, act } from '@testing-library/react';
 import { TrelloConnection } from '../src/pages/Settings/TrelloConnection';
 import { apiClient } from '../src/services/api-client';
 import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
@@ -383,6 +383,211 @@ describe('Task 10: Trello connection UI and chat moments', () => {
 
       expect(screen.getByText(/alice_trello/)).toBeInTheDocument();
       expect(screen.getByText(/Sprint Board/)).toBeInTheDocument();
+    });
+  });
+
+  describe('TrelloConnection outage & state model (TRELLO-AUDIT-18 / PROD-04)', () => {
+    it('distinguishes initial loading state from not_connected before status fetch resolves', async () => {
+      let resolveStatus!: (val: any) => void;
+      vi.spyOn(apiClient, 'getTrelloConnection').mockReturnValue(
+        new Promise((resolve) => {
+          resolveStatus = resolve;
+        })
+      );
+
+      render(<TrelloConnection user={memberUser} />);
+
+      expect(screen.getByText('Đang kiểm tra…')).toBeInTheDocument();
+      expect(screen.queryByText('Chưa kết nối')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Kết nối Trello' })).not.toBeInTheDocument();
+
+      await act(async () => {
+        resolveStatus({ status: 'not_connected', boards: [] });
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Chưa kết nối')).toBeInTheDocument();
+      });
+      expect(screen.getByRole('button', { name: 'Kết nối Trello' })).toBeEnabled();
+    });
+
+    it('renders retryable alert on synthetic 503 at status endpoint instead of masking as not_connected, without retry loops', async () => {
+      const statusSpy = vi
+        .spyOn(apiClient, 'getTrelloConnection')
+        .mockRejectedValueOnce(Object.assign(new Error('Trello connection status unavailable'), { status: 503 }))
+        .mockResolvedValueOnce({
+          status: 'connected',
+          username: 'minh',
+          boards: [{ boardId: 'b1', boardName: 'Sprint Board', member: true }],
+        });
+
+      render(<TrelloConnection user={memberUser} />);
+
+      const alert = await screen.findByTestId('trello-status-error');
+      expect(alert).toHaveAttribute('role', 'alert');
+      expect(alert).toHaveTextContent(/Không tải được trạng thái kết nối Trello/);
+      expect(screen.getByText('Tạm thời gián đoạn')).toBeInTheDocument();
+      expect(screen.queryByText('Chưa kết nối')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Kết nối Trello' })).not.toBeInTheDocument();
+      expect(statusSpy).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByTestId('btn-retry-trello-status'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Đã kết nối')).toBeInTheDocument();
+      });
+      expect(screen.getByText(/@minh/)).toBeInTheDocument();
+      expect(screen.getByText('Sprint Board')).toBeInTheDocument();
+      expect(screen.queryByTestId('trello-status-error')).not.toBeInTheDocument();
+      expect(statusSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('renders retryable alert on synthetic 503 at workspaces endpoint instead of empty board state, without retry loops', async () => {
+      vi.spyOn(apiClient, 'getTrelloConnection').mockResolvedValue({
+        status: 'needs_scope',
+        username: 'lead',
+        boards: [],
+      });
+      const wsSpy = vi
+        .spyOn(apiClient, 'getTrelloWorkspaces')
+        .mockRejectedValueOnce(Object.assign(new Error('Trello workspace discovery unavailable'), { status: 503 }))
+        .mockResolvedValueOnce({
+          workspaces: [{ id: 'ws-1', name: 'ATI Team' }],
+        });
+      vi.spyOn(apiClient, 'getTrelloBoards').mockResolvedValue({
+        boards: [{ id: 'b1', name: 'Sprint Board', member: true }],
+      });
+
+      render(<TrelloConnection user={adminUser} />);
+
+      const wsAlert = await screen.findByTestId('trello-workspaces-error');
+      expect(wsAlert).toHaveAttribute('role', 'alert');
+      expect(wsAlert).toHaveTextContent(/Không tải được danh sách Trello Workspace/);
+      expect(screen.queryByText('Không có bảng nào trong workspace này.')).not.toBeInTheDocument();
+      expect(wsSpy).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByTestId('btn-retry-trello-workspaces'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Sprint Board')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('trello-workspaces-error')).not.toBeInTheDocument();
+      expect(wsSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('renders retryable alert on synthetic 503 at boards endpoint instead of empty board state, and preserves real 200 empty board state', async () => {
+      vi.spyOn(apiClient, 'getTrelloConnection').mockResolvedValue({
+        status: 'needs_scope',
+        username: 'lead',
+        boards: [],
+      });
+      vi.spyOn(apiClient, 'getTrelloWorkspaces').mockResolvedValue({
+        workspaces: [
+          { id: 'ws-1', name: 'ATI Team' },
+          { id: 'ws-empty', name: 'Empty Team' },
+        ],
+      });
+      const boardsSpy = vi
+        .spyOn(apiClient, 'getTrelloBoards')
+        .mockImplementation(async (wsId: string) => {
+          if (wsId === 'ws-empty') return { boards: [] };
+          if (boardsSpy.mock.calls.filter((c) => c[0] === 'ws-1').length === 1) {
+            throw Object.assign(new Error('Trello board discovery unavailable'), { status: 503 });
+          }
+          return { boards: [{ id: 'b1', name: 'Sprint Board', member: true }] };
+        });
+
+      render(<TrelloConnection user={adminUser} />);
+
+      const boardAlert = await screen.findByTestId('trello-boards-error');
+      expect(boardAlert).toHaveAttribute('role', 'alert');
+      expect(boardAlert).toHaveTextContent(/Không tải được danh sách bảng Trello/);
+      expect(screen.queryByText('Không có bảng nào trong workspace này.')).not.toBeInTheDocument();
+      expect(boardsSpy).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByTestId('btn-retry-trello-boards'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Sprint Board')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('trello-boards-error')).not.toBeInTheDocument();
+
+      fireEvent.change(document.getElementById('trello-workspace-select')!, {
+        target: { value: 'ws-empty' },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Không có bảng nào trong workspace này.')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('trello-boards-error')).not.toBeInTheDocument();
+    });
+
+    it('retains last good identity with stale indicator on same-scope refresh failure, and clears stale identity on workspace or account switch', async () => {
+      const { setActiveWorkspaceId } = await import('../src/services/workspace-storage');
+      setActiveWorkspaceId('personal');
+
+      let shouldFail = false;
+      vi.spyOn(apiClient, 'getTrelloConnection').mockImplementation(async () => {
+        if (shouldFail) {
+          throw Object.assign(new Error('503 Service Unavailable'), { status: 503 });
+        }
+        return {
+          status: 'connected',
+          username: 'minh_personal',
+          boards: [{ boardId: 'b1', boardName: 'Personal Board', member: true }],
+        };
+      });
+
+      const view = render(<TrelloConnection user={adminUser} />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/@minh_personal/)).toBeInTheDocument();
+      });
+      expect(screen.getByText('Personal Board')).toBeInTheDocument();
+
+      // Same-workspace refresh fails with 503 -> retain identity with stale indicator + alert
+      shouldFail = true;
+      await act(async () => {
+        setActiveWorkspaceId('personal');
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('trello-stale-indicator')).toBeInTheDocument();
+      });
+      expect(screen.getByText(/@minh_personal/)).toBeInTheDocument();
+      expect(screen.getByText('Personal Board')).toBeInTheDocument();
+      expect(screen.getByTestId('trello-status-error')).toHaveAttribute('role', 'alert');
+
+      // Switching to another workspace ('ws-org-2') while outage persists must immediately purge stale identity/boards
+      await act(async () => {
+        setActiveWorkspaceId('ws-org-2');
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText(/@minh_personal/)).not.toBeInTheDocument();
+      });
+      expect(screen.queryByText('Personal Board')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('trello-stale-indicator')).not.toBeInTheDocument();
+      expect(screen.getByTestId('trello-status-error')).toHaveAttribute('role', 'alert');
+
+      // Restore connection for ws-org-2, then switch account (user.id) while failing -> must purge org identity
+      shouldFail = false;
+      fireEvent.click(screen.getByTestId('btn-retry-trello-status'));
+      await waitFor(() => {
+        expect(screen.getByText(/@minh_personal/)).toBeInTheDocument();
+      });
+
+      shouldFail = true;
+      view.rerender(<TrelloConnection user={memberUser} />);
+
+      await waitFor(() => {
+        expect(screen.queryByText(/@minh_personal/)).not.toBeInTheDocument();
+      });
+      expect(screen.queryByText('Personal Board')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('trello-stale-indicator')).not.toBeInTheDocument();
+      await act(async () => {
+        setActiveWorkspaceId('personal');
+      });
     });
   });
 });

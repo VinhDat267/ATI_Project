@@ -36,31 +36,40 @@ export function isUncertainSheetsDeliveryRun(
     getEffectiveDeliveryResolution(run) == null &&
     Boolean(run.deliveryStartedAt) &&
     typeof run.error === 'string' &&
-    run.error.includes('SHEETS_DELIVERY_UNKNOWN')
+    (run.error.includes('SHEETS_DELIVERY_UNKNOWN') ||
+      run.error.includes('TRELLO_DELIVERY_UNKNOWN'))
   );
 }
 
 export function SheetsDeliveryRecoveryControl({
   run,
+  scheduleStatus,
   onResolved,
 }: {
   run: ScheduleRunView;
   isSheetsSchedule?: boolean;
+  scheduleStatus?: ScheduleView['status'] | 'unknown';
   onResolved: (res: {
     run: ScheduleRunView;
     followUpRun: ScheduleRunView | null;
     schedule: ScheduleView;
   }) => void;
 }) {
+  const runIdentity = `${run.id}::${run.deliveryResolution ?? ''}`;
+  const [trackedRunIdentity, setTrackedRunIdentity] = useState(runIdentity);
   const [confirmDuplicateRisk, setConfirmDuplicateRisk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [resolveError, setResolveError] = useState('');
   const locked = useRef(false);
+  const isScheduleNotActive = Boolean(scheduleStatus && scheduleStatus !== 'active');
 
-  useEffect(() => {
+  if (trackedRunIdentity !== runIdentity) {
+    setTrackedRunIdentity(runIdentity);
     setConfirmDuplicateRisk(false);
     setResolveError('');
-  }, [run.id, run.deliveryResolution]);
+  } else if (isScheduleNotActive && confirmDuplicateRisk) {
+    setConfirmDuplicateRisk(false);
+  }
 
   const resolution = getEffectiveDeliveryResolution(run);
   if (resolution) {
@@ -94,7 +103,7 @@ export function SheetsDeliveryRecoveryControl({
 
   const handleResolve = async (mode: 'mark_sent' | 'retry_new_run') => {
     if (locked.current) return;
-    if (mode === 'retry_new_run' && !confirmDuplicateRisk) return;
+    if (mode === 'retry_new_run' && (!confirmDuplicateRisk || isScheduleNotActive)) return;
     locked.current = true;
     setBusy(true);
     setResolveError('');
@@ -135,12 +144,23 @@ export function SheetsDeliveryRecoveryControl({
         <p className="text-[#4B5563]">Xác nhận báo cáo đã tới kênh đích (không gửi lại).</p>
       </div>
       <div className="pt-2 border-t border-amber-200/80 v3-space-y-2">
+        {isScheduleNotActive && (
+          <p
+            data-testid="paused-schedule-retry-warning"
+            role="note"
+            className="p-2 rounded-lg bg-amber-100/80 border border-amber-300 text-amber-950 font-medium"
+          >
+            {scheduleStatus === 'unknown'
+              ? 'Chưa xác minh được trạng thái hoạt động hiện tại của lịch. Vui lòng tải lại để kiểm tra lịch đang bật trước khi tạo lượt gửi bù mới.'
+              : 'Lịch đang tạm dừng hoặc đã hủy. Vui lòng tiếp tục (Chạy tiếp) hoặc cấp quyền lại lịch trước khi tạo lượt gửi bù mới để lượt chạy bù không bị hủy.'}
+          </p>
+        )}
         <label className="flex items-start gap-2 cursor-pointer text-[#111827]">
           <input
             type="checkbox"
             data-testid="checkbox-confirm-duplicate-risk"
             checked={confirmDuplicateRisk}
-            disabled={busy}
+            disabled={busy || isScheduleNotActive}
             onChange={e => setConfirmDuplicateRisk(e.target.checked)}
             className="mt-0.5"
           />
@@ -152,7 +172,7 @@ export function SheetsDeliveryRecoveryControl({
           <button
             type="button"
             data-testid="btn-resolve-retry-new-run"
-            disabled={busy || !confirmDuplicateRisk}
+            disabled={busy || !confirmDuplicateRisk || isScheduleNotActive}
             className={primaryScheduleButton}
             onClick={() => void handleResolve('retry_new_run')}
           >
@@ -171,13 +191,14 @@ export function SheetsDeliveryRecoveryControl({
 }
 
 export function ScheduleRunRecovery({ message, navigate }: { message: ChatMessage; navigate: (path: string) => void }) {
-  const [run, setRun] = useState<ScheduleRunView | null>(null), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const [run, setRun] = useState<ScheduleRunView | null>(null), [scheduleStatus, setScheduleStatus] = useState<ScheduleView['status'] | 'unknown'>('unknown'), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const resolvedRunRef = useRef<ScheduleRunView | null>(null);
   const locked = useRef(false);
   const operation = useRef<AbortController | null>(null);
   useEffect(() => () => operation.current?.abort(), []);
   useEffect(() => {
     resolvedRunRef.current = null;
+    setScheduleStatus('unknown');
     let current = true;
     const convId = useChatStore.getState().conversationId;
     const owns = () => current && useChatStore.getState().conversationId === convId;
@@ -185,11 +206,19 @@ export function ScheduleRunRecovery({ message, navigate }: { message: ChatMessag
     if (store.messages.at(-1)?.id === message.id) { store.setIsPlanning(true, convId); if (convId) store.confirmPlanningRequest(convId, undefined, message.id); }
     let inFlight = false, lastRead = 0, lastState: string | undefined;
     const refresh = async () => {
-      if (!message.metadata?.scheduleId || inFlight || !owns()) return;
+      const scheduleId = message.metadata?.scheduleId;
+      if (!scheduleId || inFlight || !owns()) return;
       inFlight = true;
       try {
-        const data = await apiClient.getScheduleRuns(message.metadata.scheduleId, 50);
+        const [data, schedulesData] = await Promise.all([
+          apiClient.getScheduleRuns(scheduleId, 50),
+          typeof apiClient.getSchedules === 'function'
+            ? Promise.resolve(apiClient.getSchedules()).catch(() => null)
+            : Promise.resolve(null),
+        ]);
         if (!owns()) return;
+        const matchedSchedule = schedulesData?.schedules?.find(item => item.id === scheduleId);
+        setScheduleStatus(matchedSchedule ? matchedSchedule.status : 'unknown');
         const fetched = data.runs.find(row => row.id === message.metadata?.runId) ?? null;
         const value =
           fetched &&
@@ -222,9 +251,17 @@ export function ScheduleRunRecovery({ message, navigate }: { message: ChatMessag
   };
   const canReplan = Boolean(
     run &&
+      scheduleStatus !== 'unknown' &&
+      scheduleStatus !== 'cancelled' &&
       ['expired', 'planning_failed', 'interrupted', 'digest_failed'].includes(run.state) &&
+      !(run.deliveryStartedAt && run.state !== 'digest_failed') &&
       !getEffectiveDeliveryResolution(run) &&
-      !(typeof run.error === 'string' && run.error.includes('SHEETS_DELIVERY_UNKNOWN'))
+      !(
+        typeof run.error === 'string' &&
+        (run.error.includes('SHEETS_DELIVERY_UNKNOWN') ||
+          run.error.includes('TRELLO_DELIVERY_UNKNOWN') ||
+          run.error.includes('SHEETS_APPEND_UNKNOWN_OUTCOME'))
+      )
   );
-  return <div className="mb-5 v3-space-y-2">{run && ['digest_sent', 'needs_attention'].includes(run.state) && <p role="status" className="text-sm font-medium text-[#111827]">{runLabel(run)}</p>}{run && <SheetsDeliveryRecoveryControl run={run} onResolved={res => { resolvedRunRef.current = res.run; setRun(res.run); schedulesChanged(); }} />}{canReplan && run && <><p className="text-sm text-[#6B7280]">{runLabel(run)}</p><button type="button" className={primaryScheduleButton} disabled={busy} onClick={() => void replan()}>Lập lại kế hoạch</button></>}{error && <p role="alert" className="text-sm text-red-700">{error}</p>}</div>;
+  return <div className="mb-5 v3-space-y-2">{run && ['digest_sent', 'needs_attention'].includes(run.state) && <p role="status" className="text-sm font-medium text-[#111827]">{runLabel(run)}</p>}{run && <SheetsDeliveryRecoveryControl run={run} scheduleStatus={scheduleStatus} onResolved={res => { resolvedRunRef.current = res.run; setRun(res.run); setScheduleStatus(res.schedule.status); schedulesChanged(); }} />}{canReplan && run && <><p className="text-sm text-[#6B7280]">{runLabel(run)}</p><button type="button" className={primaryScheduleButton} disabled={busy} onClick={() => void replan()}>Lập lại kế hoạch</button></>}{error && <p role="alert" className="text-sm text-red-700">{error}</p>}</div>;
 }

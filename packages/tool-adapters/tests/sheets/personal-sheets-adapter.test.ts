@@ -4,6 +4,7 @@ import {
   createPersonalSheetsAdapter,
   type PersonalSheetsAdapterConfig,
 } from '../../src/sheets/personal-sheets-adapter.js';
+import { InMemorySheetsAppendLeaseStore } from '../../src/sheets/sheets-shared.js';
 import { StepError, GlobalRateLimiter } from '../../src/index.js';
 import type { GmailAccessTokenProvider } from '../../src/gmail/token-provider.js';
 
@@ -1349,5 +1350,571 @@ describe('PersonalSheetsAdapter', () => {
 
     expect(calls[0]!.url.toString()).toMatch(/^https:\/\/www\.googleapis\.com\/drive\/v3\/files\?/);
     expect(calls[1]!.url.toString()).toMatch(/^https:\/\/www\.googleapis\.com\/upload\/drive\/v3\/files\?/);
+  });
+
+  it('GAS-06: mysheets.aggregate_rows respects vi_VN spreadsheet locale for 1.234 + 2.345 (= 3579) and UNFORMATTED_VALUE typed numbers', async () => {
+    const { adapter } = setup({
+      handler: (url) => {
+        if (url.pathname.includes('/values/')) {
+          return json({
+            range: "'Doanh thu'!A1:B3",
+            values: [
+              ['Mục', 'Số tiền'],
+              ['A', '1.234'],
+              ['B', '2.345'],
+            ],
+          });
+        }
+        return json({
+          properties: { locale: 'vi_VN' },
+          sheets: [{ properties: { sheetId: 0, title: 'Doanh thu' } }],
+        });
+      },
+    });
+
+    const agg = await adapter.execute('mysheets.aggregate_rows', {
+      spreadsheetId,
+      sheet: 'Doanh thu',
+      metrics: [{ column: 'Số tiền', fn: 'sum' }],
+    });
+    expect(agg.totals).toEqual({
+      'Số tiền_sum': 3579,
+    });
+  });
+
+  it('GAS-07: mysheets.aggregate_rows groups by raw unclipped values so keys sharing a >500-char prefix stay distinct and sets truncated: true', async () => {
+    const sharedPrefix = 'KHACH_HANG_PREFIX_'.padEnd(500, 'X');
+    const keyA = `${sharedPrefix}_CHI_NHANH_HA_NOI`;
+    const keyB = `${sharedPrefix}_CHI_NHANH_SAI_GON`;
+
+    const { adapter } = setup({
+      handler: (url) => {
+        if (url.pathname.includes('/values/')) {
+          return json({
+            range: "'Doanh thu'!A1:B3",
+            values: [
+              ['Khách hàng', 'Doanh thu'],
+              [keyA, '100'],
+              [keyB, '250'],
+            ],
+          });
+        }
+        return json({
+          sheets: [{ properties: { sheetId: 0, title: 'Doanh thu' } }],
+        });
+      },
+    });
+
+    const agg = await adapter.execute('mysheets.aggregate_rows', {
+      spreadsheetId,
+      sheet: 'Doanh thu',
+      groupBy: 'Khách hàng',
+      metrics: [{ column: 'Doanh thu', fn: 'sum' }],
+    });
+
+    expect(agg.truncated).toBe(true);
+    expect(agg.groups).toHaveLength(2);
+    expect(agg.groups[0]!.key).not.toBe(agg.groups[1]!.key);
+    expect(agg.groups[0]!.key.length).toBeLessThanOrEqual(500);
+    expect(agg.groups[1]!.key.length).toBeLessThanOrEqual(500);
+    expect(agg.groups.map((g: any) => g.metrics['Doanh thu_sum'])).toEqual([100, 250]);
+  });
+
+  it('GAS-10: concurrent deduplicated mysheets.append_rows calls across two independent adapter instances serialize and write GH#321 once', async () => {
+    const sheetRows: string[][] = [
+      ['Issue', 'Title'],
+      ['GH#100', 'Old'],
+    ];
+    let readCount = 0;
+    let appendCount = 0;
+    let releaseReads!: () => void;
+    const bothRead = new Promise<void>((resolve) => {
+      releaseReads = resolve;
+    });
+
+    const sharedFetchFn = (async (input: any, init: any) => {
+      const url = new URL(String(input));
+      if ((init?.method ?? 'GET') === 'GET' && url.searchParams.get('fields')?.includes('sheets.properties')) {
+        return json({
+          sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }],
+        });
+      }
+      if ((init?.method ?? 'GET') === 'GET' && url.pathname.includes('/values/')) {
+        readCount += 1;
+        if (readCount >= 2) releaseReads();
+        await bothRead;
+        return json({
+          range: 'Sheet1!A1:B20',
+          values: sheetRows.map((r) => [...r]),
+        });
+      }
+      if (init?.method === 'POST' && url.pathname.includes(':append')) {
+        appendCount += 1;
+        const parsed = JSON.parse(String(init.body ?? '{}'));
+        const rows = Array.isArray(parsed.values) ? parsed.values : [];
+        for (const r of rows) {
+          sheetRows.push(Array.isArray(r) ? r.map(String) : []);
+        }
+        return json({
+          spreadsheetId,
+          updates: {
+            updatedRange: `Sheet1!A${sheetRows.length}:B${sheetRows.length}`,
+            updatedRows: rows.length,
+          },
+        });
+      }
+      return json({});
+    }) as unknown as typeof fetch;
+
+    const tokens: GmailAccessTokenProvider = {
+      getAccessToken: async () => 'mock-sheets-token',
+    };
+    const a1 = createPersonalSheetsAdapter({
+      userId,
+      tokens,
+      allowedScope: { spreadsheets: [spreadsheetId] },
+      fetchFn: sharedFetchFn,
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+    });
+    const a2 = createPersonalSheetsAdapter({
+      userId,
+      tokens,
+      allowedScope: { spreadsheets: [spreadsheetId] },
+      fetchFn: sharedFetchFn,
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+    });
+
+    const [r1, r2] = await Promise.all([
+      a1.execute('mysheets.append_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        rows: [['GH#321', 'Fix race']],
+      }),
+      a2.execute('mysheets.append_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        rows: [['GH#321', 'Fix race']],
+      }),
+    ]);
+
+    expect(appendCount).toBe(1);
+    expect(sheetRows).toHaveLength(3);
+    expect([r1.updatedRows, r2.updatedRows].sort()).toEqual([0, 1]);
+    expect([r1.skippedDuplicates ?? 0, r2.skippedDuplicates ?? 0].sort()).toEqual([0, 1]);
+  });
+
+  it('GAS-11: rejects move_drive_file and append_doc_text on unselected external Drive file even when enableDriveWriteTools is true', async () => {
+    const { adapter, calls } = setup({
+      enableDriveWriteTools: true,
+      allowedScope: { spreadsheets: [spreadsheetId] },
+    });
+
+    await expect(
+      adapter.execute('mysheets.move_drive_file', {
+        fileId: 'file_other_B',
+        folderId: 'folder_target_C',
+      })
+    ).rejects.toMatchObject({
+      category: 'AUTH_ERROR',
+      statusCode: 403,
+      details: {
+        code: 'MYSHEETS_DRIVE_TARGET_NOT_ALLOWED',
+        tool: 'mysheets.move_drive_file',
+        resourceId: 'file_other_B',
+        requestSent: false,
+      },
+    });
+
+    await expect(
+      adapter.execute('mysheets.append_doc_text', {
+        documentId: 'file_other_B',
+        text: 'Unauthorized append',
+      })
+    ).rejects.toMatchObject({
+      category: 'AUTH_ERROR',
+      statusCode: 403,
+      details: {
+        code: 'MYSHEETS_DRIVE_TARGET_NOT_ALLOWED',
+        tool: 'mysheets.append_doc_text',
+        resourceId: 'file_other_B',
+        requestSent: false,
+      },
+    });
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it('GAS-10: mysheets.append_rows fails closed on delayed commit, partial batch, >500-row out-of-window, malformed readback, and live dispatched lease; prevents duplicate write when first commit lands after reconciliation attempt', async () => {
+    const leaseStore = new InMemorySheetsAppendLeaseStore();
+    const sheetRows: string[][] = [
+      ['Issue', 'Title'],
+      ['GH#100', 'Initial'],
+    ];
+    let postAttempts = 0;
+    let delayedCommitRows: string[][] = [];
+    let returnMalformedReadback = false;
+
+    const customFetch = (async (input: any, init: any) => {
+      const url = new URL(String(input));
+      if ((init?.method ?? 'GET') === 'GET' && url.searchParams.get('fields')?.includes('sheets.properties')) {
+        return json({ sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }] });
+      }
+      if ((init?.method ?? 'GET') === 'GET' && url.pathname.includes('/values/')) {
+        if (returnMalformedReadback) {
+          return json({ values: 'not-an-array' });
+        }
+        return json({ range: 'Sheet1!A1:B500', values: sheetRows.slice(0, 500).map((r) => [...r]) });
+      }
+      if (init?.method === 'POST' && url.pathname.includes(':append')) {
+        postAttempts += 1;
+        const parsed = JSON.parse(String(init.body ?? '{}'));
+        const incoming = (parsed.values ?? []).map((r: unknown[]) => r.map(String));
+        if (postAttempts === 1) {
+          // Hold commit behind barrier and return 503 (ambiguous outcome while write is still in flight on backend)
+          delayedCommitRows = incoming;
+          return new Response('Service Unavailable', { status: 503 });
+        }
+        for (const r of incoming) {
+          sheetRows.push(r);
+        }
+        return json({
+          spreadsheetId,
+          updates: { updatedRange: `Sheet1!A${sheetRows.length}:B${sheetRows.length}`, updatedRows: incoming.length },
+        });
+      }
+      return json({});
+    }) as unknown as typeof fetch;
+
+    const tokens: GmailAccessTokenProvider = { getAccessToken: async () => 'mock-sheets-token' };
+    const adapter1 = createPersonalSheetsAdapter({
+      userId,
+      tokens,
+      allowedScope: { spreadsheets: [spreadsheetId] },
+      fetchFn: customFetch,
+      appendLeaseStore: leaseStore,
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+    });
+    const adapter2 = createPersonalSheetsAdapter({
+      userId,
+      tokens,
+      allowedScope: { spreadsheets: [spreadsheetId] },
+      fetchFn: customFetch,
+      appendLeaseStore: leaseStore,
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+    });
+
+    await expect(
+      adapter1.execute('mysheets.append_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        deduplicate: true,
+        rows: [['GH#321', 'Ambiguous write']],
+      })
+    ).rejects.toMatchObject({ category: 'UNKNOWN', statusCode: 503 });
+
+    const scopeKey = `${spreadsheetId}::sheet1`;
+    const stateAfterFailure = await leaseStore.getLeaseState?.(scopeKey);
+    expect(stateAfterFailure?.status).toBe('unknown_outcome');
+    expect(stateAfterFailure?.fencingToken).toBe(1);
+
+    // 1. Reconcile BEFORE delayed provider commit lands -> MUST fail closed (not infer aborted!)
+    const prematureReconcile = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+    });
+    expect(prematureReconcile).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: [],
+      scopeKey,
+      inconclusiveReason: 'absent_on_readback',
+    });
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('unknown_outcome');
+
+    // 2. Direct store.reconcileUnknownLease without verify or manual operator decision MUST also fail closed
+    expect(await leaseStore.reconcileUnknownLease({ scopeKey, reason: 'aborted' })).toBe(false);
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('unknown_outcome');
+
+    // 3. Retry after failed reconciliation MUST still be blocked before dispatching any second POST
+    await expect(
+      adapter2.execute('mysheets.append_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        deduplicate: true,
+        rows: [['GH#321', 'Ambiguous write']],
+      })
+    ).rejects.toMatchObject({
+      category: 'UNKNOWN',
+      details: {
+        code: 'SHEETS_APPEND_UNKNOWN_OUTCOME_UNRECONCILED',
+        requestSent: false,
+      },
+    });
+    expect(postAttempts).toBe(1);
+
+    // 4. Now release delayed provider commit AFTER reconciliation attempt and retry
+    sheetRows.push(...delayedCommitRows);
+    expect(sheetRows.filter((r) => r[0] === 'GH#321')).toHaveLength(1);
+
+    // 5. Malformed readback MUST fail closed even if row is on provider
+    returnMalformedReadback = true;
+    const malformedRec = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+    });
+    expect(malformedRec).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      inconclusiveReason: 'malformed_readback',
+    });
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('unknown_outcome');
+    returnMalformedReadback = false;
+
+    // 6. Generation/token mismatch MUST fail closed
+    const wrongGenRec = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+      fencingToken: 999,
+    });
+    expect(wrongGenRec.reconciled).toBe(false);
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('unknown_outcome');
+
+    // 7. Reconcile with terminal provider evidence (row now present in A1:Z500) succeeds
+    const reconciled = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+    });
+    expect(reconciled).toMatchObject({
+      reconciled: true,
+      committedOnProvider: true,
+    });
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('released');
+
+    // 8. Retry after reconciliation acquires fencingToken 2, sees GH#321 already in sheetRows, and skips without a second POST
+    const retryRes = await adapter2.execute('mysheets.append_rows', {
+      spreadsheetId,
+      sheet: 'Sheet1',
+      deduplicate: true,
+      rows: [['GH#321', 'Ambiguous write']],
+    });
+    expect(retryRes).toMatchObject({
+      spreadsheetId,
+      updatedRows: 0,
+      skippedDuplicates: 1,
+    });
+    expect(postAttempts).toBe(1);
+    expect(sheetRows.filter((r) => r[0] === 'GH#321')).toHaveLength(1);
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.fencingToken).toBe(2);
+
+    // 9. Partial multi-row batch boundary: only 1 of 2 rows present -> fails closed
+    const partialHandle = await leaseStore.acquireLease({
+      scopeKey,
+      spreadsheetId,
+      sheetTitle: 'Sheet1',
+      ownerId: 'worker-partial',
+    });
+    await partialHandle.beginWriteDispatch?.({
+      operation: 'append',
+      rowCount: 2,
+      candidateKeys: ['GH#401\u001fPart 1', 'GH#402\u001fPart 2'],
+    });
+    sheetRows.push(['GH#401', 'Part 1']); // Only 1 of 2 rows landed!
+    // While still live 'dispatched', reconcileAppendLease MUST refuse to clear live dispatched lease
+    const inFlightRec = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+      manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
+      acknowledgeDuplicateRisk: true,
+    });
+    expect(inFlightRec).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      inconclusiveReason: 'write_still_in_flight',
+    });
+    await partialHandle.markUnknownOutcome?.('503 mid-batch');
+    await partialHandle.release();
+
+    const partialRec = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+    });
+    expect(partialRec).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: ['GH#401\u001fPart 1'],
+      inconclusiveReason: 'partial_batch',
+    });
+    const stateBeforeManualAttempt = await leaseStore.getLeaseState?.(scopeKey);
+    expect(stateBeforeManualAttempt?.status).toBe('unknown_outcome');
+    expect(stateBeforeManualAttempt?.unknownReason).toBe('503 mid-batch');
+    expect(stateBeforeManualAttempt?.dispatchedMeta).toEqual({
+      operation: 'append',
+      rowCount: 2,
+      candidateKeys: ['GH#401\u001fPart 1', 'GH#402\u001fPart 2'],
+    });
+
+    // Manual operator override (with or without acknowledgement, on adapter or direct store) MUST fail closed
+    const manualWithoutAck = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+      manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
+    });
+    expect(manualWithoutAck).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: ['GH#401\u001fPart 1'],
+      inconclusiveReason: 'partial_batch',
+    });
+    const manualWithAck = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+      manualOperatorDecision: 'operator_acknowledge_duplicate_risk',
+      acknowledgeDuplicateRisk: true,
+    });
+    expect(manualWithAck).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: ['GH#401\u001fPart 1'],
+      inconclusiveReason: 'partial_batch',
+    });
+    expect(
+      await leaseStore.reconcileUnknownLease({
+        scopeKey,
+        manualOperatorDecision: 'operator_confirm_aborted_allow_retry',
+        acknowledgeDuplicateRisk: true,
+        confirmDuplicateRisk: true,
+        verify: async () => true,
+      })
+    ).toBe(false);
+    const stateAfterManualAttempt = await leaseStore.getLeaseState?.(scopeKey);
+    expect(stateAfterManualAttempt).toEqual(stateBeforeManualAttempt);
+
+    // Retry while partial batch remains unreconciled MUST fail closed with 0 additional provider POSTs
+    const postsBeforeBlockedRetry = postAttempts;
+    await expect(
+      adapter2.execute('mysheets.append_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        rows: [
+          ['GH#401', 'Part 1'],
+          ['GH#402', 'Part 2'],
+        ],
+      })
+    ).rejects.toMatchObject({
+      details: {
+        code: 'SHEETS_APPEND_UNKNOWN_OUTCOME_UNRECONCILED',
+        requestSent: false,
+      },
+    });
+    expect(postAttempts).toBe(postsBeforeBlockedRetry);
+
+    // Once the remaining row of the batch lands on the provider, automatic verified readback releases the lease
+    sheetRows.push(['GH#402', 'Part 2']);
+    const verifiedBatchRec = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+    });
+    expect(verifiedBatchRec).toMatchObject({
+      reconciled: true,
+      committedOnProvider: true,
+      matchedSignatures: ['GH#401\u001fPart 1', 'GH#402\u001fPart 2'],
+    });
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('released');
+
+    // 10. >500-row absence / out-of-window boundary: row at index >= 500 (row 501+) fails closed even if manual override is requested
+    while (sheetRows.length <= 500) {
+      sheetRows.push([`GH#FILL_${sheetRows.length}`, `Row ${sheetRows.length}`]);
+    }
+    sheetRows.push(['GH#505', 'Beyond 500 window']);
+    const windowHandle = await leaseStore.acquireLease({
+      scopeKey,
+      spreadsheetId,
+      sheetTitle: 'Sheet1',
+      ownerId: 'worker-window',
+    });
+    await windowHandle.markUnknownOutcome?.('503 at row 502', {
+      operation: 'append',
+      rowCount: 1,
+      candidateKeys: ['GH#505\u001fBeyond 500 window'],
+    });
+    await windowHandle.release();
+
+    const outOfWindowRec = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+    });
+    expect(outOfWindowRec).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: [],
+      inconclusiveReason: 'out_of_window',
+    });
+    const outOfWindowManualRec = await adapter2.reconcileAppendLease({
+      spreadsheetId,
+      sheet: 'Sheet1',
+      manualOperatorDecision: 'operator_confirm_aborted_allow_retry',
+      acknowledgeDuplicateRisk: true,
+    });
+    expect(outOfWindowManualRec).toMatchObject({
+      reconciled: false,
+      committedOnProvider: false,
+      matchedSignatures: [],
+      inconclusiveReason: 'out_of_window',
+    });
+    expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('unknown_outcome');
+  });
+
+  it('GAS-10: mysheets.append_rows fences off provider POST when beginWriteDispatch rejects due to lost lease ownership', async () => {
+    let postCalled = false;
+    const lostLeaseStore = {
+      acquireLease: async (input: any) => ({
+        leaseId: `${input.scopeKey}#stale`,
+        fencingToken: 1,
+        waitedForContention: false,
+        beginWriteDispatch: async () => {
+          throw new StepError({
+            message: 'Sheets append lease lost before provider write dispatch',
+            category: 'NETWORK',
+            retryable: false,
+            details: { code: 'SHEETS_APPEND_LEASE_LOST', requestSent: false },
+          });
+        },
+        markUnknownOutcome: async () => {},
+        release: async () => {},
+      }),
+    };
+
+    const customFetch = (async (input: any, init: any) => {
+      const url = new URL(String(input));
+      if (init?.method === 'POST') {
+        postCalled = true;
+      }
+      if (url.searchParams.get('fields')?.includes('sheets.properties')) {
+        return json({ sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }] });
+      }
+      return json({ range: 'Sheet1!A1:B2', values: [['Issue', 'Title']] });
+    }) as unknown as typeof fetch;
+
+    const adapter = createPersonalSheetsAdapter({
+      userId,
+      tokens: { getAccessToken: async () => 'mock-sheets-token' },
+      allowedScope: { spreadsheets: [spreadsheetId] },
+      fetchFn: customFetch,
+      appendLeaseStore: lostLeaseStore,
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+    });
+
+    await expect(
+      adapter.execute('mysheets.append_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        deduplicate: true,
+        rows: [['GH#999', 'Stale owner write']],
+      })
+    ).rejects.toMatchObject({
+      category: 'NETWORK',
+      details: { code: 'SHEETS_APPEND_LEASE_LOST', requestSent: false },
+    });
+    expect(postCalled).toBe(false);
   });
 });

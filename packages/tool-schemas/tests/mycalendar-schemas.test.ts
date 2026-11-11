@@ -92,4 +92,50 @@ describe('MYCALENDAR_TOOLS and MYCALENDAR_SERVICE', () => {
     });
     expect(meetGrounded.valid).toBe(true);
   });
+
+  it('supports optional IANA timeZone on mycalendar read/write tools and additive coverage on list_events/find_free_slots', () => {
+    const recurringPlanJson = JSON.stringify({
+      kind: 'plan',
+      thinking: 'Tạo sự kiện lặp lại có múi giờ IANA',
+      summary: 'Tạo lịch họp định kỳ',
+      steps: [{
+        id: 's_rec',
+        tool: 'mycalendar.create_event',
+        description: 'Tạo sự kiện lặp lại hàng tuần',
+        dependsOn: [],
+        args: {
+          calendarId: 'shared_team@group.calendar.google.com',
+          summary: 'Weekly Sync',
+          start: '2026-11-16T09:00:00+07:00',
+          end: '2026-11-16T09:30:00+07:00',
+          timeZone: 'Asia/Ho_Chi_Minh',
+          recurrence: 'RRULE:FREQ=WEEKLY;BYDAY=MO',
+        },
+      }],
+    });
+    const validated = validatePlan(recurringPlanJson, [...ALL_TOOLS, ...MYCALENDAR_TOOLS], {
+      grounding: {
+        memory: { mycalendar: [{ id: 'shared_team@group.calendar.google.com', title: 'My Cal' }] },
+        userTexts: ['Tạo lịch Weekly Sync mỗi thứ Hai lúc 9h'],
+      },
+    });
+    expect(validated.valid).toBe(true);
+
+    const listEvents = MYCALENDAR_TOOLS.find(t => t.name === 'mycalendar.list_events')!;
+    const findFreeSlots = MYCALENDAR_TOOLS.find(t => t.name === 'mycalendar.find_free_slots')!;
+    expect(listEvents.outputSchema).toMatchObject({
+      properties: {
+        coverage: {
+          required: ['complete', 'returned', 'totalAvailable'],
+        },
+      },
+    });
+    expect(findFreeSlots.outputSchema).toMatchObject({
+      properties: {
+        coverage: {
+          required: ['complete', 'returned', 'totalAvailable'],
+        },
+      },
+    });
+  });
 });

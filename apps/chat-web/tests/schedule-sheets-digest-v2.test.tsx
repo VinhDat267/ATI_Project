@@ -635,4 +635,252 @@ describe('Task 7 (PR-7): Sheets Digest V2 Preview, Reauthorization CTA & Manual 
       cleanup();
     }
   });
+
+  it('7. GAS-02 & GAS-09: supports opt-out of third-party AI summary in ScheduleMoment and blocks retry_new_run on paused schedule in ScheduleSection', async () => {
+    vi.spyOn(useSchedulesHook, 'useSchedulesEnabled').mockReturnValue(true);
+
+    // Part A: GAS-02 opt-out of includeAiSummary in ScheduleMoment
+    const proposalMsg: ChatMessage = {
+      id: 'msg-reauth-ai-optout-1',
+      role: 'assistant',
+      content: 'Cấp quyền lại lịch',
+      metadata: {
+        type: 'schedule_proposal',
+        scheduleId: pausedReauthSchedule.id,
+        baseVersion: pausedReauthSchedule.version,
+        reauthorize: true,
+        expiresAt: '2026-11-09T01:15:00.000Z',
+        services: ['mysheets', 'gmail'],
+        nextRuns: ['2026-11-10T01:00:00.000Z'],
+        previous: {
+          name: pausedReauthSchedule.name,
+          request: pausedReauthSchedule.request,
+          recurrence: pausedReauthSchedule.recurrence,
+          status: 'paused',
+        },
+        digestCandidate: v2Candidate,
+        proposal: {
+          kind: 'schedule',
+          action: 'update',
+          name: pausedReauthSchedule.name,
+          request: pausedReauthSchedule.request,
+          recurrence: pausedReauthSchedule.recurrence,
+          summary: `Cấp quyền lại lịch "${pausedReauthSchedule.name}" (Google Sheets v2).`,
+        },
+      } as any,
+    };
+
+    const confirmSpy = vi.spyOn(apiClient, 'confirmSchedule').mockResolvedValue({
+      schedule: {
+        ...pausedReauthSchedule,
+        status: 'active',
+        pauseReason: null,
+        version: 4,
+      },
+    });
+
+    render(
+      <ScheduleMoment
+        message={proposalMsg}
+        convId={pausedReauthSchedule.convId}
+        navigate={vi.fn()}
+        onEdit={vi.fn()}
+      />
+    );
+
+    const aiCheckbox = screen.getByTestId('checkbox-sheets-include-ai-summary') as HTMLInputElement;
+    expect(aiCheckbox.checked).toBe(true);
+    fireEvent.click(aiCheckbox);
+    expect(aiCheckbox.checked).toBe(false);
+    expect(screen.getByTestId('sheets-digest-v2-preview')).toHaveTextContent(
+      /Chỉ thống kê số liệu thuần/
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Xác nhận/ }));
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledWith(
+        pausedReauthSchedule.convId,
+        'msg-reauth-ai-optout-1',
+        { approvalMode: 'auto_digest', includeAiSummary: false }
+      );
+    });
+    cleanup();
+
+    // Part B: GAS-09 paused schedule blocks retry_new_run in ScheduleSection while allowing mark_sent
+    const pausedUncertainRun: ScheduleRunView = {
+      id: 'run-paused-uncertain-1',
+      scheduleId: pausedReauthSchedule.id,
+      trigger: 'scheduled',
+      dueAt: '2026-11-09T01:00:00.000Z',
+      createdAt: '2026-11-09T01:00:02.000Z',
+      state: 'needs_attention',
+      missedCount: 0,
+      convId: 'conv-run-paused-uncertain-1',
+      planId: null,
+      planStatus: null,
+      error:
+        'SHEETS_DELIVERY_UNKNOWN: Đã bắt đầu gửi báo cáo sang Gmail nhưng mất kết nối trước khi nhận phản hồi.',
+      deliveryStartedAt: '2026-11-09T01:00:05.000Z',
+      deliveryResolution: null,
+      deliveryResolvedAt: null,
+      deliveryFollowupRunId: null,
+    };
+
+    vi.spyOn(apiClient, 'getSchedules').mockResolvedValue({
+      schedules: [{ ...pausedReauthSchedule, lastRun: pausedUncertainRun }],
+    });
+
+    render(<ScheduleSection user={user} navigate={vi.fn()} />);
+    expect(await screen.findByText('Báo cáo Doanh thu Q4 mỗi sáng')).toBeInTheDocument();
+    expect(screen.getByTestId('paused-schedule-retry-warning')).toHaveTextContent(
+      /Lịch đang tạm dừng hoặc đã hủy/
+    );
+    expect(screen.getByTestId('btn-resolve-retry-new-run')).toBeDisabled();
+    expect(screen.getByTestId('checkbox-confirm-duplicate-risk')).toBeDisabled();
+    expect(screen.getByTestId('btn-resolve-mark-sent')).toBeEnabled();
+  });
+
+  it('8. deterministic regression (CI 42801382748): clicking duplicate-risk checkbox before passive mount effects flush does not reset checked state or lose run-identity reset', async () => {
+    let simulateFrameBudgetExhaustedOnCommit = false;
+    vi.spyOn(useSchedulesHook, 'useSchedulesEnabled').mockImplementation(() => {
+      if (simulateFrameBudgetExhaustedOnCommit) {
+        simulateFrameBudgetExhaustedOnCommit = false;
+        // Exceed React Scheduler's 5ms frameInterval during the async commit render so
+        // shouldYieldToHost() returns true after commitRoot and yields before flushPassiveEffects().
+        const renderDeadline = performance.now() + 6;
+        while (performance.now() < renderDeadline) {
+          // deterministic >5ms frameInterval render budget simulation
+        }
+        // Hold microtask drain after Testing Library's MutationObserver schedules setTimeout(resolve, 0)
+        // for >= 2ms so libuv's next `timers` phase fires setTimeout(resolve, 0) before `check`
+        // fires setImmediate(performWorkUntilDeadline).
+        queueMicrotask(() => {
+          queueMicrotask(() => {
+            queueMicrotask(() => {
+              queueMicrotask(() => {
+                const timerDeadline = Date.now() + 5;
+                while (Date.now() < timerDeadline) {
+                  // deterministic >=1ms timer threshold after asyncWrapper schedules setTimeout(resolve, 0)
+                }
+              });
+            });
+          });
+        });
+      }
+      return true;
+    });
+
+    const uncertainRunA: ScheduleRunView = {
+      id: 'run-uncertain-race-a',
+      scheduleId: 'sched-sheets-active-race',
+      trigger: 'scheduled',
+      dueAt: '2026-11-09T01:00:00.000Z',
+      createdAt: '2026-11-09T01:00:02.000Z',
+      state: 'needs_attention',
+      missedCount: 0,
+      convId: 'conv-run-uncertain-race-a',
+      planId: null,
+      planStatus: null,
+      error:
+        'SHEETS_DELIVERY_UNKNOWN: Đã bắt đầu gửi báo cáo sang Gmail nhưng mất kết nối trước khi nhận phản hồi.',
+      deliveryStartedAt: '2026-11-09T01:00:05.000Z',
+      deliveryResolution: null,
+      deliveryResolvedAt: null,
+      deliveryFollowupRunId: null,
+    };
+
+    const activeScheduleA: ScheduleView = {
+      ...pausedReauthSchedule,
+      id: 'sched-sheets-active-race',
+      status: 'active',
+      pauseReason: null,
+      lastRun: uncertainRunA,
+    };
+
+    vi.spyOn(apiClient, 'getSchedules').mockImplementation(
+      () =>
+        new Promise(resolve => {
+          setImmediate(() => {
+            simulateFrameBudgetExhaustedOnCommit = true;
+            resolve({ schedules: [activeScheduleA] });
+          });
+        })
+    );
+
+    const resolveSpy = vi.spyOn(apiClient, 'resolveScheduleRunDelivery');
+
+    render(<ScheduleSection user={user} navigate={vi.fn()} />);
+
+    expect(
+      await screen.findByText('Báo cáo Doanh thu Q4 mỗi sáng')
+    ).toBeInTheDocument();
+
+    const dupCheckbox = screen.getByTestId('checkbox-confirm-duplicate-risk') as HTMLInputElement;
+    const retryNewRunBtn = screen.getByTestId('btn-resolve-retry-new-run');
+
+    expect(dupCheckbox.checked).toBe(false);
+    expect(retryNewRunBtn).toBeDisabled();
+
+    // Clicking before consent must never call resolveScheduleRunDelivery
+    fireEvent.click(retryNewRunBtn);
+    expect(resolveSpy).not.toHaveBeenCalled();
+
+    // Immediate click while initial passive mount effect was pending must NOT be clobbered back to false
+    fireEvent.click(dupCheckbox);
+    expect(dupCheckbox.checked).toBe(true);
+    expect(retryNewRunBtn).toBeEnabled();
+    expect(resolveSpy).not.toHaveBeenCalled();
+
+    // Verify double-click lock and error state when resolveScheduleRunDelivery rejects once
+    let rejectFirstResolve!: (err: Error) => void;
+    resolveSpy.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectFirstResolve = reject;
+        })
+    );
+
+    fireEvent.click(retryNewRunBtn);
+    fireEvent.click(retryNewRunBtn);
+    expect(resolveSpy).toHaveBeenCalledTimes(1);
+
+    rejectFirstResolve(new Error('Lỗi mạng tạm thời khi tạo lượt gửi bù.'));
+    expect(await screen.findByText('Lỗi mạng tạm thời khi tạo lượt gửi bù.')).toBeInTheDocument();
+    expect(dupCheckbox.checked).toBe(true);
+
+    // Changing run.id on a mounted SheetsDeliveryRecoveryControl (via schedules:changed refresh)
+    // must immediately reset duplicate-risk consent and clear resolveError without leaking across runs
+    const uncertainRunB: ScheduleRunView = {
+      ...uncertainRunA,
+      id: 'run-uncertain-race-b',
+      convId: 'conv-run-uncertain-race-b',
+    };
+    vi.spyOn(apiClient, 'getSchedules').mockResolvedValueOnce({
+      schedules: [{ ...activeScheduleA, lastRun: uncertainRunB }],
+    });
+
+    window.dispatchEvent(new Event('schedules:changed'));
+
+    await waitFor(() => {
+      expect(
+        (screen.getByTestId('checkbox-confirm-duplicate-risk') as HTMLInputElement).checked
+      ).toBe(false);
+    });
+    expect(screen.getByTestId('btn-resolve-retry-new-run')).toBeDisabled();
+    expect(screen.queryByText('Lỗi mạng tạm thời khi tạo lượt gửi bù.')).toBeNull();
+
+    // Switching back to run-uncertain-race-a must also require fresh explicit consent
+    vi.spyOn(apiClient, 'getSchedules').mockResolvedValueOnce({
+      schedules: [activeScheduleA],
+    });
+    window.dispatchEvent(new Event('schedules:changed'));
+
+    await waitFor(() => {
+      expect(apiClient.getSchedules).toHaveBeenCalledTimes(3);
+    });
+    expect(
+      (screen.getByTestId('checkbox-confirm-duplicate-risk') as HTMLInputElement).checked
+    ).toBe(false);
+    expect(screen.getByTestId('btn-resolve-retry-new-run')).toBeDisabled();
+  });
 });

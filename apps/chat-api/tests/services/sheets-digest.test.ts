@@ -198,6 +198,34 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
       emitV2: true,
     });
     expect(multiServiceCandidate.canAutoDigest).toBe(false);
+
+    // Extracts quoted tab name & sheet!A1:B20 range, and preserves explicit non-listed tab without silent fallback
+    const quotedBangCandidate = await analyzeSheetsDigestCandidate({
+      userId: alice.id,
+      request: "Đọc vùng 'KPI Tháng 11'!A1:D25 từ bảng Báo cáo KPI Q4 và gửi vào Slack #bao-cao",
+      recurrence: { type: 'daily', time: '08:00' },
+      services: ['mysheets', 'slack'],
+      credentialRepo,
+      encryptionKey: ENC_KEY,
+      mysheetsEnabled: true,
+      emitV2: true,
+    });
+    expect(quotedBangCandidate.canAutoDigest).toBe(true);
+    expect(quotedBangCandidate.config?.source.sheetName).toBe('KPI Tháng 11');
+    expect(quotedBangCandidate.config?.source.range).toBe('A1:D25');
+
+    const explicitUnlistedTabCandidate = await analyzeSheetsDigestCandidate({
+      userId: alice.id,
+      request: 'Đọc tab Công nợ Q4 từ bảng Báo cáo KPI Q4 và gửi vào Slack #bao-cao',
+      recurrence: { type: 'daily', time: '08:00' },
+      services: ['mysheets', 'slack'],
+      credentialRepo,
+      encryptionKey: ENC_KEY,
+      mysheetsEnabled: true,
+      emitV2: true,
+    });
+    expect(explicitUnlistedTabCandidate.canAutoDigest).toBe(true);
+    expect(explicitUnlistedTabCandidate.config?.source.sheetName).toBe('Công nợ Q4');
   });
 
   it('confirms schedule as kind=sheets_digest when approvalMode=auto_digest and blocks TOCTOU scope revocation', async () => {

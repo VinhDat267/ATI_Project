@@ -1,0 +1,32 @@
+﻿
+ RUN  v4.1.11 C:/Users/VinhDat/orca/workspaces/ATI_Project/ati-v3-cross-service-integration-gate
+
+stdout | apps/chat-api/tests/services/schedules/cross-service-combined-gate.test.ts > Cross-Service Combined Runtime Gate (Sheets R2 + Trello #313 + Calendar #314) > S1–S6: Combined Scheduler, Multi-Process Concurrency, Pause/Cancel, Real OS Kill, Revocation & Fault Isolation > S2: races two independent OS scheduler child processes against the same PostgreSQL schema with atomic single winner and at most 1 outbound delivery per schedule
+[XSVC-PID-EVIDENCE] S2 child workers: w1.pid=33948 (exit=0), w2.pid=10340 (exit=0)
+
+stdout | apps/chat-api/tests/services/schedules/cross-service-combined-gate.test.ts > Cross-Service Combined Runtime Gate (Sheets R2 + Trello #313 + Calendar #314) > S1–S6: Combined Scheduler, Multi-Process Concurrency, Pause/Cancel, Real OS Kill, Revocation & Fault Isolation > S4: performs deterministic OS child SIGKILL after durable delivery_started_at and after durable sheets_append_leases.status=dispatched, proving restart unknown persistence, zero replay, and stale owner fencing
+[XSVC-PID-EVIDENCE] S4a digest victim: pid=33456, kill=process.kill(33456, 'SIGKILL'), exitCode=1, signal=null
+
+stdout | apps/chat-api/tests/services/schedules/cross-service-combined-gate.test.ts > Cross-Service Combined Runtime Gate (Sheets R2 + Trello #313 + Calendar #314) > S1–S6: Combined Scheduler, Multi-Process Concurrency, Pause/Cancel, Real OS Kill, Revocation & Fault Isolation > S4: performs deterministic OS child SIGKILL after durable delivery_started_at and after durable sheets_append_leases.status=dispatched, proving restart unknown persistence, zero replay, and stale owner fencing
+[XSVC-PID-EVIDENCE] S4b append victim: pid=32580, kill=process.kill(32580, 'SIGKILL'), exitCode=1, signal=null
+
+ ✓ apps/chat-api/tests/services/schedules/cross-service-combined-gate.test.ts (15 tests) 37713ms
+       ✓ 0a: applies all 47 SQL files (0001..0035) via node db/v3/migrate.mjs idempotently on a fresh DB  5567ms
+       ✓ 0b: preserves seeded rows across pre-remediation <=0032 (44 files) -> 0035 upgrade via node db/v3/migrate.mjs idempotently  5985ms
+       ✓ S1: executes three simultaneously due Sheets, Trello, and Calendar digests in one scheduling window with isolated routing, credential binding, and receipts  3145ms
+       ✓ S2: races two independent OS scheduler child processes against the same PostgreSQL schema with atomic single winner and at most 1 outbound delivery per schedule  3673ms
+       ✓ S3: enforces pause/cancel before vs after outbound claim barrier without losing confirmed receipts, erasing unknown states, or claiming external recall  2761ms
+       ✓ S4: performs deterministic OS child SIGKILL after durable delivery_started_at and after durable sheets_append_leases.status=dispatched, proving restart unknown persistence, zero replay, and stale owner fencing  6030ms
+       ✓ S5: revokes credentials across Sheets, Trello, and Calendar immediately before ScheduleRunner.tick() and enforces 0 unauthorized outbound requests  763ms
+       ✓ S6: isolates Sheets AbortSignal timeout, Trello malformed "undefined" receipt, Calendar incomplete paginated read, and a healthy Gmail control in a mixed batch  1658ms
+       ✓ N2 & N3: blocks workspace membership revocation, workspace context substitution, conversation owner substitution, and personal credentialId substitution between approval and execution with 0 unauthorized outbound requests  792ms
+       ✓ marks malformed Slack receipt and Trello add_checklist partial write as unknown / reconciliation_required in ExecutionService and blocks automatic retryStep replay  767ms
+       ✓ enforces ScheduleService.resolveRunDelivery auth, duplicate-risk confirmation, pause/config-change guards, immutable dispatched_config snapshot, and single-use CAS  702ms
+       ✓ preserves Calendar incomplete-coverage precheck truthfulness, half-open [start, end) free-slot boundaries across DST/IANA zones, and explicit event timeZone on create/update  324ms
+
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+   Start at  02:05:42
+   Duration  42.75s (transform 3.37s, setup 0ms, import 4.68s, tests 37.71s, environment 0ms)
+
+

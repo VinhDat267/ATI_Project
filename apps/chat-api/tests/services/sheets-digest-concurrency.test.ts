@@ -98,6 +98,46 @@ describe('Task 3 (PR-3): 0033 DDL, Controlled V1/V2 Runner, Mandatory Pre-Send A
   }
 
   describe('1. Migration 0033 DDL & Idempotency', () => {
+    let priorSchema = '';
+    let adminPool: pg.Pool | null = null;
+    let priorPool: pg.Pool | null = null;
+    let files0001To0032: string[] = [];
+
+    beforeAll(async () => {
+      const dbConnStr =
+        process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
+      priorSchema = `sheets_digest_prior_0032_${randomUUID().replaceAll('-', '')}`;
+      adminPool = new pg.Pool({ connectionString: dbConnStr });
+      await adminPool.query(`CREATE SCHEMA "${priorSchema}"`);
+      const priorUrl = new URL(dbConnStr);
+      priorUrl.searchParams.set('options', `-c search_path=${priorSchema}`);
+      priorPool = new pg.Pool({ connectionString: priorUrl.href, max: 4 });
+
+      files0001To0032 = (await readdir(MIGRATIONS_DIR))
+        .filter((f) => {
+          const m = /^(\d{4})_.*\.sql$/.exec(f);
+          return m !== null && Number(m[1]) <= 32;
+        })
+        .sort();
+      for (const f of files0001To0032) {
+        await priorPool.query(await readFile(`${MIGRATIONS_DIR}/${f}`, 'utf8'));
+      }
+    });
+
+    afterAll(async () => {
+      if (priorPool) {
+        await priorPool.end();
+        priorPool = null;
+      }
+      if (adminPool) {
+        if (priorSchema) {
+          await adminPool.query(`DROP SCHEMA IF EXISTS "${priorSchema}" CASCADE`);
+        }
+        await adminPool.end();
+        adminPool = null;
+      }
+    });
+
     it('applies 0033_sheets_digest_v2_remediation.sql idempotently without mutating schedules rows and enforces audit + delivery_resolution constraints', async () => {
       const { personalA } = fixtures;
       const v1Config: SheetsDigestConfigV1 = {
@@ -184,85 +224,128 @@ describe('Task 3 (PR-3): 0033 DDL, Controlled V1/V2 Runner, Mandatory Pre-Send A
 
       // Verify upgrading a prior-schema (0001..0032 only) database with pre-existing schedules & schedule_runs rows
       // and re-applying 0033 idempotently (2nd and 3rd times) with zero data mutation
-      const dbConnStr = process.env.DATABASE_URL || 'postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3';
-      const priorSchema = `sheets_digest_prior_0032_${randomUUID().replaceAll('-', '')}`;
-      const adminPool = new pg.Pool({ connectionString: dbConnStr });
-      await adminPool.query(`CREATE SCHEMA "${priorSchema}"`);
-      const priorUrl = new URL(dbConnStr);
-      priorUrl.searchParams.set('options', `-c search_path=${priorSchema}`);
-      const priorPool = new pg.Pool({ connectionString: priorUrl.href, max: 4 });
-      try {
-        const files0001To0032 = (await readdir(MIGRATIONS_DIR))
-          .filter((f) => /^\d{4}_.*\.sql$/.test(f) && !f.startsWith('0033_'))
-          .sort();
-        for (const f of files0001To0032) {
-          await priorPool.query(await readFile(`${MIGRATIONS_DIR}/${f}`, 'utf8'));
-        }
+      expect(priorPool).not.toBeNull();
+      expect(files0001To0032.length).toBeGreaterThanOrEqual(32);
+      expect(files0001To0032.every((f) => Number(f.slice(0, 4)) <= 32)).toBe(true);
+      expect(
+        files0001To0032.some(
+          (f) => f.startsWith('0033_') || f.startsWith('0034_') || f.startsWith('0035_')
+        )
+      ).toBe(false);
 
-        // Seed user, conversation, schedule, and schedule_run on 0001..0032 schema BEFORE 0033
-        const uRes = await priorPool.query<{ id: string }>(
-          `INSERT INTO users (email, name, password, status, email_verified)
-           VALUES ('prior@example.test', 'Prior User', 'hash', 'active', true)
-           RETURNING id`
-        );
-        const uid = uRes.rows[0]!.id;
-        const cRes = await priorPool.query<{ id: string }>(
-          `INSERT INTO conversations (user_id, status, title, workspace_mode)
-           VALUES ($1, 'chatting', 'Prior Conv', 'personal')
-           RETURNING id`,
-          [uid]
-        );
-        const cid = cRes.rows[0]!.id;
-        const sInserted = await insertTestSheetsDigestSchedule(priorPool, {
-          userId: uid,
-          convId: cid,
-          workspaceMode: 'personal',
-          workspaceId: null,
-          digestConfig: v1Config as unknown as Record<string, unknown>,
-        });
-        const sid = sInserted.id;
-        const rRes = await priorPool.query<{ id: string }>(
-          `INSERT INTO schedule_runs (schedule_id, schedule_version, trigger, due_at, status)
-           VALUES ($1, 1, 'scheduled', '2026-11-03T01:00:00Z', 'planning')
-           RETURNING id`,
-          [sid]
-        );
-        const rid = rRes.rows[0]!.id;
+      // Assert no 0033, 0034, or 0035 columns/tables exist in priorSchema BEFORE applying 0033
+      const pre0033Cols = await priorPool!.query<{ column_name: string }>(
+        `SELECT column_name
+         FROM information_schema.columns
+         WHERE table_schema = $1
+           AND table_name = 'schedule_runs'
+           AND column_name IN (
+             'delivery_resolution',
+             'delivery_resolved_at',
+             'delivery_resolved_by',
+             'delivery_followup_run_id',
+             'dispatched_config',
+             'dispatched_config_hash'
+           )`,
+        [priorSchema]
+      );
+      expect(pre0033Cols.rows).toEqual([]);
+      const pre0033Tables = await priorPool!.query<{ table_name: string }>(
+        `SELECT table_name
+         FROM information_schema.tables
+         WHERE table_schema = $1
+           AND table_name IN (
+             'sheets_digest_v2_migration_audit',
+             'sheets_append_leases',
+             'github_team_scope_legacy_archive',
+             'github_team_repos_legacy_archive'
+           )`,
+        [priorSchema]
+      );
+      expect(pre0033Tables.rows).toEqual([]);
 
-        const priorSchedBefore = (await priorPool.query('SELECT * FROM schedules WHERE id = $1', [sid])).rows;
-        const priorRunBefore = (
-          await priorPool.query(
-            'SELECT id, schedule_id, schedule_version, status FROM schedule_runs WHERE id = $1',
-            [rid]
-          )
-        ).rows;
+      // Seed user, conversation, schedule, and schedule_run on 0001..0032 schema BEFORE 0033
+      const uRes = await priorPool!.query<{ id: string }>(
+        `INSERT INTO users (email, name, password, status, email_verified)
+         VALUES ('prior@example.test', 'Prior User', 'hash', 'active', true)
+         RETURNING id`
+      );
+      const uid = uRes.rows[0]!.id;
+      const cRes = await priorPool!.query<{ id: string }>(
+        `INSERT INTO conversations (user_id, status, title, workspace_mode)
+         VALUES ($1, 'chatting', 'Prior Conv', 'personal')
+         RETURNING id`,
+        [uid]
+      );
+      const cid = cRes.rows[0]!.id;
+      const sInserted = await insertTestSheetsDigestSchedule(priorPool!, {
+        userId: uid,
+        convId: cid,
+        workspaceMode: 'personal',
+        workspaceId: null,
+        digestConfig: v1Config as unknown as Record<string, unknown>,
+      });
+      const sid = sInserted.id;
+      const rRes = await priorPool!.query<{ id: string }>(
+        `INSERT INTO schedule_runs (schedule_id, schedule_version, trigger, due_at, status)
+         VALUES ($1, 1, 'scheduled', '2026-11-03T01:00:00Z', 'planning')
+         RETURNING id`,
+        [sid]
+      );
+      const rid = rRes.rows[0]!.id;
 
-        // Apply 0033 1st, 2nd, and 3rd times on prior-schema DB
-        await priorPool.query(ddlSql);
-        await priorPool.query(ddlSql);
-        await priorPool.query(ddlSql);
+      const priorSchedBefore = (await priorPool!.query('SELECT * FROM schedules WHERE id = $1', [sid])).rows;
+      const priorRunBefore = (
+        await priorPool!.query(
+          'SELECT id, schedule_id, schedule_version, status FROM schedule_runs WHERE id = $1',
+          [rid]
+        )
+      ).rows;
 
-        const priorSchedAfter = (await priorPool.query('SELECT * FROM schedules WHERE id = $1', [sid])).rows;
-        const priorRunAfter = (
-          await priorPool.query(
-            'SELECT id, schedule_id, schedule_version, status, delivery_started_at, delivery_resolution, delivery_resolved_at, delivery_resolved_by, delivery_followup_run_id FROM schedule_runs WHERE id = $1',
-            [rid]
-          )
-        ).rows;
-        expect(priorSchedAfter).toEqual(priorSchedBefore);
-        expect(priorRunAfter[0]).toMatchObject({
-          ...priorRunBefore[0],
-          delivery_started_at: null,
-          delivery_resolution: null,
-          delivery_resolved_at: null,
-          delivery_resolved_by: null,
-          delivery_followup_run_id: null,
-        });
-      } finally {
-        await priorPool.end();
-        await adminPool.query(`DROP SCHEMA IF EXISTS "${priorSchema}" CASCADE`);
-        await adminPool.end();
-      }
+      // Apply 0033 1st, 2nd, and 3rd times on prior-schema DB
+      await priorPool!.query(ddlSql);
+      await priorPool!.query(ddlSql);
+      await priorPool!.query(ddlSql);
+
+      const priorSchedAfter = (await priorPool!.query('SELECT * FROM schedules WHERE id = $1', [sid])).rows;
+      const priorRunAfter = (
+        await priorPool!.query(
+          'SELECT id, schedule_id, schedule_version, status, delivery_started_at, delivery_resolution, delivery_resolved_at, delivery_resolved_by, delivery_followup_run_id FROM schedule_runs WHERE id = $1',
+          [rid]
+        )
+      ).rows;
+      expect(priorSchedAfter).toEqual(priorSchedBefore);
+      expect(priorRunAfter[0]).toMatchObject({
+        ...priorRunBefore[0],
+        delivery_started_at: null,
+        delivery_resolution: null,
+        delivery_resolved_at: null,
+        delivery_resolved_by: null,
+        delivery_followup_run_id: null,
+      });
+
+      // Assert 0034/0035 columns and tables remain absent after 0033 upgrade
+      const post0033Cols = await priorPool!.query<{ column_name: string }>(
+        `SELECT column_name
+         FROM information_schema.columns
+         WHERE table_schema = $1
+           AND table_name = 'schedule_runs'
+           AND column_name IN ('dispatched_config', 'dispatched_config_hash')`,
+        [priorSchema]
+      );
+      expect(post0033Cols.rows).toEqual([]);
+      const post0033Tables = await priorPool!.query<{ table_name: string }>(
+        `SELECT table_name
+         FROM information_schema.tables
+         WHERE table_schema = $1
+           AND table_name IN (
+             'sheets_append_leases',
+             'github_team_scope_legacy_archive',
+             'github_team_repos_legacy_archive'
+           )`,
+        [priorSchema]
+      );
+      expect(post0033Tables.rows).toEqual([]);
     });
   });
 

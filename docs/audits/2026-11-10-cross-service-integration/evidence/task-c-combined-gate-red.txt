@@ -1,0 +1,170 @@
+﻿
+ RUN  v4.1.11 C:/Users/VinhDat/orca/workspaces/ATI_Project/ati-v3-cross-service-integration-gate/apps/chat-api
+
+stdout | tests/services/schedules/cross-service-combined-gate.test.ts > Cross-Service Combined Runtime Gate (Sheets R2 + Trello #313 + Calendar #314) > S1–S6: Combined Scheduler, Multi-Process Concurrency, Pause/Cancel, Real OS Kill, Revocation & Fault Isolation > S2: races two independent OS scheduler child processes against the same PostgreSQL schema with atomic single winner and at most 1 outbound delivery per schedule
+[XSVC-PID-EVIDENCE] S2 child workers: w1.pid=9868 (exit=0), w2.pid=27916 (exit=0)
+
+stdout | tests/services/schedules/cross-service-combined-gate.test.ts > Cross-Service Combined Runtime Gate (Sheets R2 + Trello #313 + Calendar #314) > S1–S6: Combined Scheduler, Multi-Process Concurrency, Pause/Cancel, Real OS Kill, Revocation & Fault Isolation > S4: performs deterministic OS child SIGKILL after durable delivery_started_at and after durable sheets_append_leases.status=dispatched, proving restart unknown persistence, zero replay, and stale owner fencing
+[XSVC-PID-EVIDENCE] S4a digest victim: pid=27656, kill=process.kill(27656, 'SIGKILL'), exitCode=1, signal=null
+
+stdout | tests/services/schedules/cross-service-combined-gate.test.ts > Cross-Service Combined Runtime Gate (Sheets R2 + Trello #313 + Calendar #314) > S1–S6: Combined Scheduler, Multi-Process Concurrency, Pause/Cancel, Real OS Kill, Revocation & Fault Isolation > S4: performs deterministic OS child SIGKILL after durable delivery_started_at and after durable sheets_append_leases.status=dispatched, proving restart unknown persistence, zero replay, and stale owner fencing
+[XSVC-PID-EVIDENCE] S4b append victim: pid=34456, kill=process.kill(34456, 'SIGKILL'), exitCode=1, signal=null
+
+ ❯ tests/services/schedules/cross-service-combined-gate.test.ts (15 tests | 6 failed) 31290ms
+       ✓ 0a: applies all 47 SQL files (0001..0035) via node db/v3/migrate.mjs idempotently on a fresh DB  4002ms
+       ✓ 0b: preserves seeded rows across pre-remediation <=0032 (44 files) -> 0035 upgrade via node db/v3/migrate.mjs idempotently  3905ms
+       × S1: executes three simultaneously due Sheets, Trello, and Calendar digests in one scheduling window with isolated routing, credential binding, and receipts 1083ms
+       × S2: races two independent OS scheduler child processes against the same PostgreSQL schema with atomic single winner and at most 1 outbound delivery per schedule 1934ms
+       ✓ S3: enforces pause/cancel before vs after outbound claim barrier without losing confirmed receipts, erasing unknown states, or claiming external recall  2143ms
+       ✓ S4: performs deterministic OS child SIGKILL after durable delivery_started_at and after durable sheets_append_leases.status=dispatched, proving restart unknown persistence, zero replay, and stale owner fencing  4124ms
+       ✓ S5: revokes credentials across Sheets, Trello, and Calendar immediately before ScheduleRunner.tick() and enforces 0 unauthorized outbound requests  1015ms
+       × S6: isolates Sheets AbortSignal timeout, Trello malformed "undefined" receipt, Calendar incomplete paginated read, and a healthy Gmail control in a mixed batch 4998ms
+       × N1: blocks blank organization workspaceId in both AdapterFactory (even with warm legacy cache) and ExecutionService with 0 unauthorized outbound requests 150ms
+       × N2 & N3: blocks workspace membership revocation, workspace context substitution, conversation owner substitution, and personal credentialId substitution between approval and execution with 0 unauthorized outbound requests 644ms
+       × N4: enforces immediate pre-dispatch credential revocation across warm org Sheets/Slack and personal MySheets/Trello/MyCalendar caches with 0 unauthorized outbound requests 191ms
+       ✓ N5, N6 & N7: enforces Trello traversal/board/card/list parent scopes and out-of-allowlist Sheets & Calendar targets with 0 unauthorized outbound requests (distinguishing bounded authorized metadata prechecks) 209ms
+       ✓ marks malformed Slack receipt and Trello add_checklist partial write as unknown / reconciliation_required in ExecutionService and blocks automatic retryStep replay  1493ms
+       ✓ enforces ScheduleService.resolveRunDelivery auth, duplicate-risk confirmation, pause/config-change guards, immutable dispatched_config snapshot, and single-use CAS  1221ms
+       ✓ preserves Calendar incomplete-coverage precheck truthfulness, half-open [start, end) free-slot boundaries across DST/IANA zones, and explicit event timeZone on create/update  397ms
+node.exe : 
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/services/schedules/cross-service-combined-gate.test.ts > Cross-Service Combined 
+Runtime Gate (Sheets R2 + Trello #313 + Calendar #314) > S1–S6: Combined Scheduler, Multi-Process Concurrency, 
+Pause/Cancel, Real OS Kill, Revocation & Fault Isolation > S1: executes three simultaneously due Sheets, Trello, and 
+Calendar digests in one scheduling window with isolated routing, credential binding, and receipts
+AssertionError: expected 'digest_failed' to be 'digest_sent' // Object.is equality
+
+Expected: "digest_sent"
+Received: "digest_failed"
+
+ ❯ tests/services/schedules/cross-service-combined-gate.test.ts:926:34
+    924|       expect(trelloRun.delivery.ts).toMatch(/^1762822800\./);
+    925|
+    926|       expect(calendarRun.status).toBe('digest_sent');
+       |                                  ^
+    927|       expect(calendarRun.delivery.destinationService).toBe('telegram');
+    928|       expect(calendarRun.delivery.channelId).toBe(triad.telegramChatId…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  tests/services/schedules/cross-service-combined-gate.test.ts > Cross-Service Combined 
+Runtime Gate (Sheets R2 + Trello #313 + Calendar #314) > S1–S6: Combined Scheduler, Multi-Process Concurrency, 
+Pause/Cancel, Real OS Kill, Revocation & Fault Isolation > S2: races two independent OS scheduler child processes 
+against the same PostgreSQL schema with atomic single winner and at most 1 outbound delivery per schedule
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/services/schedules/cross-service-combined-gate.test.ts:1052:61
+    1050|       ).rows;
+    1051|       expect(runs).toHaveLength(3);
+    1052|       expect(runs.every((r) => r.status === 'digest_sent')).toBe(true);
+       |                                                             ^
+    1053|
+    1054|       expect(calls.filter((c) => c.pathname === '/gmail/gmail/v1/users…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  tests/services/schedules/cross-service-combined-gate.test.ts > Cross-Service Combined 
+Runtime Gate (Sheets R2 + Trello #313 + Calendar #314) > S1–S6: Combined Scheduler, Multi-Process Concurrency, 
+Pause/Cancel, Real OS Kill, Revocation & Fault Isolation > S6: isolates Sheets AbortSignal timeout, Trello malformed 
+"undefined" receipt, Calendar incomplete paginated read, and a healthy Gmail control in a mixed batch
+AssertionError: expected 'digest_failed' to be 'digest_sent' // Object.is equality
+
+Expected: "digest_sent"
+Received: "digest_failed"
+
+ ❯ tests/services/schedules/cross-service-combined-gate.test.ts:1694:38
+    1692|
+    1693|       // 3. Calendar -> Telegram paginated incomplete read -> truthful…
+    1694|       expect(partialCalendar.status).toBe('digest_sent');
+       |                                      ^
+    1695|       expect(partialCalendar.delivery.destinationService).toBe('telegr…
+    1696|       expect(partialCalendar.delivery.channelId).toBe(triad.telegramCh…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  tests/services/schedules/cross-service-combined-gate.test.ts > Cross-Service Combined 
+Runtime Gate (Sheets R2 + Trello #313 + Calendar #314) > Negative Authorization Matrix (ExecutionService + 
+AdapterFactory + Real Loopback Adapters) > N1: blocks blank organization workspaceId in both AdapterFactory (even 
+with warm legacy cache) and ExecutionService with 0 unauthorized outbound requests
+AssertionError: promise resolved "{ unexpectedlyResolvedAdapter: 'Slac…' }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "unexpectedlyResolvedAdapter": "SlackAdapter",
+  }
+
+ ❯ tests/services/schedules/cross-service-combined-gate.test.ts:1744:10
+    1742|             })
+    1743|             .then((a) => ({ unexpectedlyResolvedAdapter: a.constructor…
+    1744|         ).rejects.toThrow(/Organization credentials require workspace …
+       |          ^
+    1745|       }
+    1746|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  tests/services/schedules/cross-service-combined-gate.test.ts > Cross-Service Combined 
+Runtime Gate (Sheets R2 + Trello #313 + Calendar #314) > Negative Authorization Matrix (ExecutionService + 
+AdapterFactory + Real Loopback Adapters) > N2 & N3: blocks workspace membership revocation, workspace context 
+substitution, conversation owner substitution, and personal credentialId substitution between approval and execution with 0 
+unauthorized outbound requests
+AssertionError: expected 'completed' not to be 'completed' // Object.is equality
+ ❯ tests/services/schedules/cross-service-combined-gate.test.ts:1853:30
+    1851|       );
+    1852|       const settledOrg = await waitForPlanSettlement(stack.executionSe…
+    1853|       expect(settledOrg).not.toBe('completed');
+       |                              ^
+    1854|       expect(calls.filter((c) => c.pathname === '/slack/api/chat.postM…
+    1855|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  tests/services/schedules/cross-service-combined-gate.test.ts > Cross-Service Combined 
+Runtime Gate (Sheets R2 + Trello #313 + Calendar #314) > Negative Authorization Matrix (ExecutionService + 
+AdapterFactory + Real Loopback Adapters) > N4: enforces immediate pre-dispatch credential revocation across warm org 
+Sheets/Slack and personal MySheets/Trello/MyCalendar caches with 0 unauthorized outbound requests
+AssertionError: promise resolved "{ unexpectedlyResolvedAdapter: 'Shee…' }" instead of rejecting
+
+- Expected
++ Received
+
+- Error {
+-   "message": "rejected promise",
++ {
++   "unexpectedlyResolvedAdapter": "SheetsAdapter",
+  }
+
+ ❯ tests/services/schedules/cross-service-combined-gate.test.ts:2114:8
+    2112|           })
+    2113|           .then((a) => ({ unexpectedlyResolvedAdapter: a.constructor.n…
+    2114|       ).rejects.toThrow();
+       |        ^
+    2115|       await expect(
+    2116|         stack.adapterFactory
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  6 failed | 9 passed (15)
+   Start at  01:46:48
+   Duration  33.98s (transform 1.77s, setup 0ms, import 2.44s, tests 31.29s, environment 0ms)
+
+

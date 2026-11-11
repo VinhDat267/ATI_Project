@@ -11,9 +11,9 @@ import type { ScheduleChange } from './schedule-service.js';
 import { SHEETS_DELIVERY_UNKNOWN, type SheetsDigestRunner } from './sheets-digest-runner.js';
 import type { DigestRunOutcome as GithubDigestRunOutcome, RunGithubDigest } from './github-digest-runner.js';
 import { GITHUB_DELIVERY_UNKNOWN } from './github-digest-runner.js';
-import type { TrelloDigestRunOutcome, RunTrelloDigest } from './trello-digest-runner.js';
+import { TRELLO_DELIVERY_UNKNOWN, type TrelloDigestRunOutcome, type RunTrelloDigest } from './trello-digest-runner.js';
 import type { NotionDigestRunOutcome, RunNotionDigest } from './notion-digest-runner.js';
-import type { DigestRunInput, DigestRunOutcome } from './telegram-digest-runner.js';
+import { TELEGRAM_DELIVERY_UNKNOWN, type DigestRunInput, type DigestRunOutcome } from './telegram-digest-runner.js';
 import { assertDigestScheduleLiveScopeAndAuth } from './digest-scope-guard.js';
 
 export interface RunToPlan {
@@ -96,6 +96,9 @@ export async function reconcileScheduleRuns(pool: pg.Pool): Promise<void> {
          status = CASE WHEN r.delivery_started_at IS NOT NULL THEN 'needs_attention' ELSE 'interrupted' END,
          error = CASE
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'sheets_digest' THEN $3
+           WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'trello_digest' THEN $4
+           WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'telegram_digest' THEN $5
+           WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'github_digest' THEN $6
            WHEN r.delivery_started_at IS NOT NULL THEN $2
            ELSE $1
          END,
@@ -103,7 +106,14 @@ export async function reconcileScheduleRuns(pool: pg.Pool): Promise<void> {
        FROM schedules s
        WHERE r.schedule_id = s.id AND r.status = 'planning'
        RETURNING r.conv_id, r.error`,
-      [INTERRUPTED, CALENDAR_DELIVERY_UNKNOWN, SHEETS_DELIVERY_UNKNOWN]
+      [
+        INTERRUPTED,
+        CALENDAR_DELIVERY_UNKNOWN,
+        SHEETS_DELIVERY_UNKNOWN,
+        TRELLO_DELIVERY_UNKNOWN,
+        TELEGRAM_DELIVERY_UNKNOWN,
+        GITHUB_DELIVERY_UNKNOWN,
+      ],
     );
     for (const row of res.rows) {
       if (!row.conv_id) continue;
@@ -332,7 +342,7 @@ export class ScheduleRunner {
         schedule_created_at: checked.row.created_at,
         schedule_updated_at: checked.row.updated_at,
       };
-      if (run.status !== 'planning') return null;
+      if (run.status !== 'planning' || run.delivery_started_at != null) return null;
       if (!checked.allowed || !runChecked.allowed || run.schedule_version !== checked.row.version || checked.row.status === 'cancelled') {
         await client.query("UPDATE schedule_runs SET status='discarded',plan_id=NULL,error=$2,updated_at=now() WHERE id=$1", [runId, DISCARDED]);
         return null;
@@ -340,17 +350,43 @@ export class ScheduleRunner {
       const segments = checked.segments;
       const dueAt = new Date(run.due_at);
       const label = localLabel(dueAt, timeZone);
-      const convId = (await client.query(
-        "INSERT INTO conversations(user_id, status, title, workspace_id, workspace_mode) VALUES($1, 'chatting', $2, $3, $4) RETURNING id",
-        [run.user_id, `Lịch: ${run.name} · ${label}`, run.workspace_id ?? null, run.workspace_mode ?? 'legacy'],
-      )).rows[0].id as string;
       const metadata: ScheduleRunMessageMetadata = { type: 'schedule_run', scheduleId: run.schedule_id, runId: run.id, name: run.name, dueAt: dueAt.toISOString(), trigger: run.trigger };
-      await client.query('UPDATE schedule_runs SET conv_id=$2, updated_at=now() WHERE id=$1', [runId, convId]);
-      await registerScheduleFields(client, this.registry, 'conversations', convId, run.user_id, segments, ['title']);
-      const content = runMessage({ name: run.name, request: run.request, dueAt }, timeZone);
-      const first = segments.length
-        ? await this.messages.createSlackRunMessage(convId, content, metadata, { segments, selectors: ['content', 'metadata.name'] }, client)
-        : await this.messages.createMessage(convId, 'user', content, metadata, client);
+      let convId: string;
+      let firstMessageId: string;
+      const existingConvId =
+        typeof runChecked.row.conv_id === 'string' && runChecked.row.conv_id.trim()
+          ? runChecked.row.conv_id
+          : null;
+      if (existingConvId) {
+        convId = existingConvId;
+        const existingFirst = (
+          await client.query(
+            "SELECT id FROM messages WHERE conv_id=$1 AND metadata->>'type'='schedule_run' ORDER BY created_at, id LIMIT 1",
+            [convId],
+          )
+        ).rows[0];
+        if (existingFirst?.id) {
+          firstMessageId = existingFirst.id as string;
+        } else {
+          const content = runMessage({ name: run.name, request: run.request, dueAt }, timeZone);
+          const first = segments.length
+            ? await this.messages.createSlackRunMessage(convId, content, metadata, { segments, selectors: ['content', 'metadata.name'] }, client)
+            : await this.messages.createMessage(convId, 'user', content, metadata, client);
+          firstMessageId = first.id;
+        }
+      } else {
+        convId = (await client.query(
+          "INSERT INTO conversations(user_id, status, title, workspace_id, workspace_mode) VALUES($1, 'chatting', $2, $3, $4) RETURNING id",
+          [run.user_id, `Lịch: ${run.name} · ${label}`, run.workspace_id ?? null, run.workspace_mode ?? 'legacy'],
+        )).rows[0].id as string;
+        await client.query('UPDATE schedule_runs SET conv_id=$2, updated_at=now() WHERE id=$1', [runId, convId]);
+        await registerScheduleFields(client, this.registry, 'conversations', convId, run.user_id, segments, ['title']);
+        const content = runMessage({ name: run.name, request: run.request, dueAt }, timeZone);
+        const first = segments.length
+          ? await this.messages.createSlackRunMessage(convId, content, metadata, { segments, selectors: ['content', 'metadata.name'] }, client)
+          : await this.messages.createMessage(convId, 'user', content, metadata, client);
+        firstMessageId = first.id;
+      }
       const toPlan: RunToPlan = {
         runId: run.id,
         scheduleId: run.schedule_id,
@@ -388,7 +424,7 @@ export class ScheduleRunner {
       return {
         toPlan: tagScheduleContext(toPlan, segments),
         convId,
-        messageId: first.id,
+        messageId: firstMessageId,
         scheduleRow,
         kind: (run.kind ?? 'plan_approval') as ScheduleKind,
         recurrence: run.recurrence as ScheduleRecurrence,
@@ -655,6 +691,22 @@ export class ScheduleRunner {
         return { ended: unknownErr, changes, assistantMessageId: undefined, text: undefined };
       }
 
+      // GAS-04: Preserve admitted run's confirmed send and receipt even if schedule was paused/cancelled/edited after claim.
+      if (outcome.status === 'digest_sent') {
+        const msg = await this.messages.createMessage(
+          started.convId,
+          'assistant',
+          outcome.text,
+          { type: 'sheets_digest_sent', delivery: outcome.delivery, ...replyTo },
+          client
+        );
+        await client.query(
+          "UPDATE schedule_runs SET status='digest_sent', delivery=$2::jsonb, updated_at=now() WHERE id=$1",
+          [runId, JSON.stringify(outcome.delivery)]
+        );
+        return { ended: 'digest_sent', changes, assistantMessageId: msg.id, text: outcome.text };
+      }
+
       if (stoppedError) {
         await this.messages.createMessage(
           started.convId,
@@ -703,45 +755,30 @@ export class ScheduleRunner {
         return { ended: outcome.pauseReason, changes, assistantMessageId: undefined, text: undefined };
       }
 
-      if (outcome.status === 'digest_failed') {
-        await this.messages.createMessage(
-          started.convId,
-          'system',
-          `Lỗi: ${outcome.error}`,
-          { type: 'planning_error', ...replyTo },
-          client
-        );
-        await client.query(
-          "UPDATE schedule_runs SET status='digest_failed', error=$2, updated_at=now() WHERE id=$1",
-          [runId, outcome.error]
-        );
-        const recent = await client.query(
-          'SELECT status FROM schedule_runs WHERE schedule_id=$1 ORDER BY created_at DESC, id DESC LIMIT 3',
-          [schedule.id]
-        );
-        if (recent.rows.length === 3 && recent.rows.every((r) => r.status === 'digest_failed')) {
-          const paused = await this.pause(
-            client,
-            schedule.id,
-            'Tự dừng sau 3 lần gửi báo cáo tự động liên tiếp thất bại.'
-          );
-          changes.push(await this.options.recordState(client, paused, now));
-        }
-        return { ended: outcome.error, changes, assistantMessageId: undefined, text: undefined };
-      }
-
-      const msg = await this.messages.createMessage(
+      await this.messages.createMessage(
         started.convId,
-        'assistant',
-        outcome.text,
-        { type: 'sheets_digest_sent', delivery: outcome.delivery, ...replyTo },
+        'system',
+        `Lỗi: ${outcome.error}`,
+        { type: 'planning_error', ...replyTo },
         client
       );
       await client.query(
-        "UPDATE schedule_runs SET status='digest_sent', delivery=$2::jsonb, updated_at=now() WHERE id=$1",
-        [runId, JSON.stringify(outcome.delivery)]
+        "UPDATE schedule_runs SET status='digest_failed', error=$2, updated_at=now() WHERE id=$1",
+        [runId, outcome.error]
       );
-      return { ended: 'digest_sent', changes, assistantMessageId: msg.id, text: outcome.text };
+      const recent = await client.query(
+        'SELECT status FROM schedule_runs WHERE schedule_id=$1 ORDER BY created_at DESC, id DESC LIMIT 3',
+        [schedule.id]
+      );
+      if (recent.rows.length === 3 && recent.rows.every((r) => r.status === 'digest_failed')) {
+        const paused = await this.pause(
+          client,
+          schedule.id,
+          'Tự dừng sau 3 lần gửi báo cáo tự động liên tiếp thất bại.'
+        );
+        changes.push(await this.options.recordState(client, paused, now));
+      }
+      return { ended: outcome.error, changes, assistantMessageId: undefined, text: undefined };
     });
 
     this.announce(result.changes);
@@ -946,8 +983,18 @@ export class ScheduleRunner {
       const replyTo = { replyToMessageId: started.messageId };
       const changes: ScheduleChange[] = [];
 
+      if (outcome?.state === 'discarded') {
+        if (run.delivery_started_at != null) {
+          return null;
+        }
+        await this.messages.createMessage(started.convId, 'system', DISCARDED, { type: 'schedule_discarded', ...replyTo }, client);
+        await client.query("UPDATE schedule_runs SET status='discarded', updated_at=now() WHERE id=$1", [runId]);
+        return { kind: 'error' as const, error: DISCARDED, changes };
+      }
+
       if (outcome?.state === 'delivery_unknown' || (run.delivery_started_at && outcome?.state !== 'digest_sent')) {
-        const unknownErr = outcome?.state === 'delivery_unknown' ? outcome.error : GITHUB_DELIVERY_UNKNOWN;
+        const defaultUnknownErr = schedule.kind === 'trello_digest' ? TRELLO_DELIVERY_UNKNOWN : GITHUB_DELIVERY_UNKNOWN;
+        const unknownErr = outcome?.state === 'delivery_unknown' ? outcome.error : defaultUnknownErr;
         await this.messages.createMessage(started.convId, 'system', `Lỗi: ${unknownErr}`, { type: 'planning_error', ...replyTo }, client);
         await client.query("UPDATE schedule_runs SET status='needs_attention', error=$2, updated_at=now() WHERE id=$1", [runId, unknownErr]);
         return { kind: 'error' as const, error: unknownErr, changes };
@@ -957,12 +1004,6 @@ export class ScheduleRunner {
         await this.messages.createMessage(started.convId, 'system', `Lỗi: ${STOPPED}`, { type: 'planning_error', ...replyTo }, client);
         await client.query("UPDATE schedule_runs SET status='interrupted', error=$2, updated_at=now() WHERE id=$1", [runId, STOPPED]);
         return { kind: 'error' as const, error: STOPPED, changes };
-      }
-
-      if (outcome?.state === 'discarded') {
-        await this.messages.createMessage(started.convId, 'system', DISCARDED, { type: 'schedule_discarded', ...replyTo }, client);
-        await client.query("UPDATE schedule_runs SET status='discarded', updated_at=now() WHERE id=$1", [runId]);
-        return { kind: 'error' as const, error: DISCARDED, changes };
       }
 
       if (outcome?.state === 'blocked') {
@@ -1095,17 +1136,55 @@ export class ScheduleRunner {
 
     await inTransaction(pool, async (client) => {
       const schedule = (
-        await client.query('SELECT * FROM schedules WHERE id=$1 FOR UPDATE', [started.toPlan.scheduleId])
+        await client.query(
+          'SELECT s.* FROM schedules s JOIN conversations c ON c.id = s.conv_id WHERE s.id=$1 FOR UPDATE OF c, s',
+          [started.toPlan.scheduleId],
+        )
       ).rows[0] as ScheduleRow | undefined;
-      const run = (await client.query('SELECT status FROM schedule_runs WHERE id=$1 FOR UPDATE', [runId])).rows[0];
+      const run = (
+        await client.query('SELECT status, delivery_started_at FROM schedule_runs WHERE id=$1 FOR UPDATE', [runId])
+      ).rows[0];
       if (!schedule || run?.status !== 'planning') return;
 
-      // A confirmed send remains a delivery even if the member changes the schedule
-      // after dispatch. Only results that did not send may be discarded.
-      if (outcome.status === 'discarded' || (outcome.status !== 'digest_sent' && (
-        schedule.version !== started.toPlan.scheduleVersion ||
-        schedule.status === 'cancelled' || schedule.status === 'paused'
-      ))) {
+      if (outcome.status === 'discarded') {
+        if (run.delivery_started_at != null) {
+          return;
+        }
+        await this.messages.createMessage(
+          started.convId,
+          'system',
+          DISCARDED,
+          { type: 'schedule_discarded', ...replyTo },
+          client,
+        );
+        await client.query("UPDATE schedule_runs SET status='discarded', updated_at=now() WHERE id=$1", [runId]);
+        return;
+      }
+
+      if (outcome.status === 'delivery_unknown' || (run.delivery_started_at != null && outcome.status !== 'digest_sent')) {
+        const unknownErr = outcome.status === 'delivery_unknown' ? outcome.error : TELEGRAM_DELIVERY_UNKNOWN;
+        await this.messages.createMessage(
+          started.convId,
+          'system',
+          `Lỗi: ${unknownErr}`,
+          { type: 'planning_error', ...replyTo },
+          client,
+        );
+        await client.query(
+          "UPDATE schedule_runs SET status='needs_attention', error=$2, updated_at=now() WHERE id=$1",
+          [runId, unknownErr],
+        );
+        return;
+      }
+
+      // A confirmed send or unknown delivery remains preserved even if the member changes the schedule
+      // after dispatch. Only results that did not claim delivery_started_at may be discarded.
+      if (
+        outcome.status !== 'digest_sent' &&
+        (schedule.version !== started.toPlan.scheduleVersion ||
+          schedule.status === 'cancelled' ||
+          schedule.status === 'paused')
+      ) {
         await this.messages.createMessage(
           started.convId,
           'system',

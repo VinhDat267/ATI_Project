@@ -524,7 +524,12 @@ describe('PersonalCalendarAdapter', () => {
 
   it('allows mycalendar.list_events with only natural language query (without explicit timeMin/timeMax)', async () => {
     const { adapter, calls } = setup({
-      handler: () => json({ items: [fixtureEvent] }),
+      handler: (url) => {
+        if (!url.pathname.endsWith('/events')) {
+          return json({ id: calendarId, summary: 'Personal', timeZone: 'Asia/Ho_Chi_Minh' });
+        }
+        return json({ items: [fixtureEvent] });
+      },
     });
 
     const listed = await adapter.execute('mycalendar.list_events', {
@@ -533,9 +538,10 @@ describe('PersonalCalendarAdapter', () => {
     });
 
     expect(listed.events).toHaveLength(1);
-    expect(calls).toHaveLength(1);
-    const timeMin = calls[0]!.url.searchParams.get('timeMin')!;
-    const timeMax = calls[0]!.url.searchParams.get('timeMax')!;
+    const eventCalls = calls.filter((c) => c.url.pathname.endsWith('/events'));
+    expect(eventCalls).toHaveLength(1);
+    const timeMin = eventCalls[0]!.url.searchParams.get('timeMin')!;
+    const timeMax = eventCalls[0]!.url.searchParams.get('timeMax')!;
     expect(timeMin).toMatch(/T00:00:00\+07:00$/);
     expect(timeMax).toMatch(/T00:00:00\+07:00$/);
     expect(Date.parse(timeMax) - Date.parse(timeMin)).toBe(86_400_000);
@@ -624,6 +630,9 @@ describe('PersonalCalendarAdapter', () => {
   it('supports recurrence (WEEKDAYS, DAILY, WEEKLY, MONTHLY, or RRULE:...) in create_event and update_event and rejects invalid recurrence', async () => {
     const { adapter, calls } = setup({
       handler: (_url, init) => {
+        if (!init.body) {
+          return json({ id: calendarId, summary: 'Personal', timeZone: 'Asia/Ho_Chi_Minh' });
+        }
         const parsed = JSON.parse(String(init.body));
         return json({
           ...fixtureEvent,
@@ -638,8 +647,11 @@ describe('PersonalCalendarAdapter', () => {
     });
 
     expect(created.recurrence).toBe('RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR');
-    const createBody = JSON.parse(String(calls[0]!.init.body));
+    const writeCalls = calls.filter((c) => Boolean(c.init.body));
+    const createBody = JSON.parse(String(writeCalls[0]!.init.body));
     expect(createBody.recurrence).toEqual(['RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR']);
+    expect(createBody.start.timeZone).toBe('Asia/Ho_Chi_Minh');
+    expect(createBody.end.timeZone).toBe('Asia/Ho_Chi_Minh');
 
     const updated = await adapter.execute('mycalendar.update_event', {
       calendarId,
@@ -766,7 +778,12 @@ describe('PersonalCalendarAdapter', () => {
     };
 
     const { adapter } = setup({
-      handler: () => json({ items: [busy1, busy2] }),
+      handler: (url) => {
+        if (!url.pathname.endsWith('/events')) {
+          return json({ id: calendarId, summary: 'Personal', timeZone: 'Asia/Ho_Chi_Minh' });
+        }
+        return json({ items: [busy1, busy2] });
+      },
     });
 
     const result = await adapter.execute('mycalendar.find_free_slots', {

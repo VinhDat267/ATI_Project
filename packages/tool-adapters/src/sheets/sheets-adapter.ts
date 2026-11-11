@@ -1,4 +1,9 @@
 import { BaseAdapter, StepError, type BaseAdapterConfig } from '../base-adapter.js';
+import type {
+  SheetsAppendDispatchMetadata,
+  SheetsAppendLeaseStore,
+  SheetsAppendManualRecoveryDecision,
+} from '@wap/tool-schemas';
 import { GoogleServiceAccount, type GoogleServiceAccountCredentials } from '../google/service-account.js';
 import { SHEETS_MAX_CELL_CHARS, SHEETS_MAX_COLUMNS, clipText } from '../bounds.js';
 import {
@@ -8,7 +13,9 @@ import {
   bounded,
   buildDeleteRowRequests,
   buildPartialCellUpdates,
+  buildRowDedupSignature,
   computeSheetAggregation,
+  executeAppendLeaseReconciliation,
   executeReadDigestWindow,
   extractTabHeaders,
   filterDuplicateRows,
@@ -20,6 +27,7 @@ import {
   resolveReadRange,
   safeRows,
   sharedLimiter,
+  sharedProcessSheetsAppendLeaseStore,
   SHEETS_API_BASE,
   spreadsheetPattern,
   spreadsheetUrl,
@@ -32,6 +40,7 @@ import {
 export interface SheetsAdapterConfig extends BaseAdapterConfig {
   credentials: GoogleServiceAccountCredentials;
   fetchFn?: typeof fetch;
+  appendLeaseStore?: SheetsAppendLeaseStore;
 }
 export const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 const apiBase = SHEETS_API_BASE;
@@ -42,10 +51,15 @@ export class SheetsAdapter extends BaseAdapter {
   private readonly auth: GoogleServiceAccount;
   private readonly fetchFn: typeof fetch;
   private readonly account: string;
+  private readonly appendLeaseStore: SheetsAppendLeaseStore;
+  private readonly hasCustomAppendLeaseStore: boolean;
+  private readonly spreadsheetLocales = new Map<string, string>();
   constructor(config: SheetsAdapterConfig) {
     super(config);
     this.account = config.credentials.clientEmail;
     this.fetchFn = config.fetchFn ?? globalThis.fetch;
+    this.appendLeaseStore = config.appendLeaseStore ?? sharedProcessSheetsAppendLeaseStore;
+    this.hasCustomAppendLeaseStore = Boolean(config.appendLeaseStore);
     this.auth = new GoogleServiceAccount({ credentials: config.credentials, fetchFn: this.fetchFn });
   }
 
@@ -62,7 +76,13 @@ export class SheetsAdapter extends BaseAdapter {
     this.assertAllowedScope('spreadsheets', value);
     return value;
   }
-  private async request(path: string, signal?: AbortSignal, body?: unknown): Promise<any> {
+  private async request(
+    path: string,
+    signal?: AbortSignal,
+    body?: unknown,
+    onDispatch?: (dispatched: boolean) => void,
+    beforeDispatch?: () => Promise<void>
+  ): Promise<any> {
     if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
     const writing = body !== undefined;
     const token = await this.auth.getAccessToken(SHEETS_SCOPE, signal);
@@ -76,7 +96,11 @@ export class SheetsAdapter extends BaseAdapter {
         throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
       }
       if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
+      if (writing && beforeDispatch) {
+        await beforeDispatch();
+      }
       try {
+        if (writing) onDispatch?.(true);
         response = await this.fetchFn(apiBase + path, {
           method: writing ? 'POST' : 'GET', signal, redirect: 'error',
           headers: { Authorization: 'Bearer ' + token, ...(writing ? { 'Content-Type': 'application/json' } : {}) },
@@ -90,6 +114,7 @@ export class SheetsAdapter extends BaseAdapter {
         rateRetries++;
         try { await this.waitForRetryAfter(response.headers.get('Retry-After'), signal); }
         catch { throw new StepError({ message: 'Sheets rate-limit retry cancelled', category: 'RATE_LIMIT', statusCode: 429, retryable: false }); }
+        if (writing) onDispatch?.(false);
         continue;
       }
       if (!writing && response.status >= 500 && serverRetries === 0) { serverRetries++; continue; }
@@ -160,17 +185,20 @@ export class SheetsAdapter extends BaseAdapter {
       }
       const quotedSheet = /\s|'/.test(sheet) ? "'" + sheet.replaceAll("'", "''") + "'" : sheet;
       const readRange = `${quotedSheet}!A1:Z500`;
-      const value = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
+      const value = await this.request(
+        id + '/values/' + encodeURIComponent(readRange) + '?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING',
+        signal
+      );
       const rawValues: unknown[][] = Array.isArray(value?.values) ? value.values : [];
       const rowTruncated =
         rawValues.length > 500 ||
         rawValues.slice(0, 500).some((r) => Array.isArray(r) && r.length > SHEETS_MAX_COLUMNS);
       const rawRows = rawValues.slice(0, 500).map((row: unknown[]) =>
-        (Array.isArray(row) ? row : []).slice(0, SHEETS_MAX_COLUMNS).map((cell) =>
-          cell == null ? '' : String(cell)
-        )
+        (Array.isArray(row) ? row : []).slice(0, SHEETS_MAX_COLUMNS)
       );
-      return filterSearchedRows(sheet, rawRows, args, limit, rowTruncated);
+      return filterSearchedRows(sheet, rawRows, args, limit, rowTruncated, {
+        locale: this.spreadsheetLocales.get(id),
+      });
     }
     if (toolName === 'sheets.aggregate_rows') {
       const id = this.checkedId(args.spreadsheetId);
@@ -185,88 +213,182 @@ export class SheetsAdapter extends BaseAdapter {
       }
       const quotedSheet = /\s|'/.test(sheet) ? "'" + sheet.replaceAll("'", "''") + "'" : sheet;
       const readRange = `${quotedSheet}!A1:Z500`;
-      const value = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
-      const rawRows = (Array.isArray(value?.values) ? value.values : []).slice(0, 500).map((row: unknown[]) =>
-        (Array.isArray(row) ? row : []).slice(0, SHEETS_MAX_COLUMNS).map((cell) =>
-          cell == null ? '' : String(cell)
-        )
+      const value = await this.request(
+        id + '/values/' + encodeURIComponent(readRange) + '?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING',
+        signal
       );
-      return computeSheetAggregation(sheet, rawRows, args);
+      const rawValues: unknown[][] = Array.isArray(value?.values) ? value.values : [];
+      const rowTruncated =
+        rawValues.length > 500 ||
+        rawValues.slice(0, 500).some((r) => Array.isArray(r) && r.length > SHEETS_MAX_COLUMNS);
+      const rawRows = rawValues.slice(0, 500).map((row: unknown[]) =>
+        (Array.isArray(row) ? row : []).slice(0, SHEETS_MAX_COLUMNS)
+      );
+      return computeSheetAggregation(sheet, rawRows, args, {
+        locale: this.spreadsheetLocales.get(id),
+        rowTruncated,
+      });
     }
     if (toolName === 'sheets.append_rows') {
       const id = this.checkedId(args.spreadsheetId);
       const sheet = titleText(args.sheet);
       const needsHeaderLookup = args.records !== undefined || args.keyColumn !== undefined;
       let rawRows = needsHeaderLookup ? [] : validateRawRows(args.rows);
-      if (!needsHeaderLookup) {
-        resolveDeduplicationPolicy(rawRows, args);
-      }
+      const preliminaryPolicy = needsHeaderLookup
+        ? { enabled: true, keyColumns: null, onDuplicate: 'skip' as const }
+        : resolveDeduplicationPolicy(rawRows, args);
       const tabs = await this.tabs(id, signal);
       if (!tabs.some(tab => tab.title === sheet)) throw new StepError({ message: 'Sheets tab not found in the allowed spreadsheet', category: 'NOT_FOUND', statusCode: 404 });
       const quotedSheet = /\s|'/.test(sheet) ? "'" + sheet.replaceAll("'", "''") + "'" : sheet;
       const range = "'" + sheet.replaceAll("'", "''") + "'!A1";
-      let existingRows: unknown[][] | undefined;
-      let headers: string[] = [];
-      if (needsHeaderLookup) {
-        const readRange = `${quotedSheet}!A1:Z500`;
-        const existingData = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
-        const fetchedRows: unknown[][] = Array.isArray(existingData?.values) ? existingData.values : [];
-        existingRows = fetchedRows;
-        headers = Array.isArray(fetchedRows[0])
-          ? fetchedRows[0].map((c) => (c == null ? '' : String(c).trim()))
-          : [];
-        rawRows = args.records !== undefined ? mapRecordsToRows(args.records, headers) : validateRawRows(args.rows);
-      }
-      const dedupPolicy = resolveDeduplicationPolicy(rawRows, args, headers);
-      let rowsToWrite = rawRows;
-      let skippedDuplicates = 0;
-      let batchUpdatedRows = 0;
-      let lastUpdatedRange = `${quotedSheet}!A1`;
-      if (dedupPolicy.enabled) {
-        if (!existingRows) {
-          const readRange = `${quotedSheet}!A1:Z500`;
-          const existingData = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
-          existingRows = Array.isArray(existingData?.values) ? (existingData.values as unknown[][]) : [];
-        }
-        const filtered = filterDuplicateRows(rawRows, existingRows ?? [], dedupPolicy.keyColumns, dedupPolicy.onDuplicate);
-        rowsToWrite = filtered.newRows;
-        skippedDuplicates = filtered.skippedDuplicates;
-        if (filtered.updates.length > 0) {
-          const batchData = filtered.updates.map((u) => ({
-            range: `${quotedSheet}!A${u.rowNumber}`,
-            majorDimension: 'ROWS',
-            values: safeRows([u.row]),
-          }));
-          const batchRes = await this.request(id + '/values:batchUpdate', signal, {
-            valueInputOption: 'USER_ENTERED',
-            data: batchData,
-          });
-          const respRange = batchRes?.responses?.[batchRes.responses.length - 1]?.updatedRange;
-          if (typeof respRange === 'string') lastUpdatedRange = respRange;
-          batchUpdatedRows = Number.isInteger(batchRes?.totalUpdatedRows)
-            ? batchRes.totalUpdatedRows
-            : filtered.updates.length;
-        }
-        if (rowsToWrite.length === 0) {
-          return {
+      const readRange = `${quotedSheet}!A1:Z500`;
+
+      const needsSerializedReadWrite =
+        needsHeaderLookup || preliminaryPolicy.enabled || this.hasCustomAppendLeaseStore;
+      const lease = needsSerializedReadWrite
+        ? await this.appendLeaseStore.acquireLease({
+            scopeKey: `${id}::${sheet.trim().toLowerCase()}`,
             spreadsheetId: id,
-            updatedRange: lastUpdatedRange,
-            updatedRows: batchUpdatedRows,
-            skippedDuplicates,
-            url: this.url(id),
-          };
+            sheetTitle: sheet,
+            ownerId: `sheets:${this.account}`,
+            signal,
+            onContention: async () => {
+              await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
+            },
+          })
+        : null;
+
+      let writeDispatched = false;
+      let batchMutationCommitted = false;
+      let activeDispatchMeta: SheetsAppendDispatchMetadata | undefined;
+
+      try {
+        let existingRows: unknown[][] | undefined;
+        let headers: string[] = [];
+        if (needsHeaderLookup) {
+          const existingData = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
+          const fetchedRows: unknown[][] = Array.isArray(existingData?.values) ? existingData.values : [];
+          existingRows = fetchedRows;
+          headers = Array.isArray(fetchedRows[0])
+            ? fetchedRows[0].map((c) => (c == null ? '' : String(c).trim()))
+            : [];
+          rawRows = args.records !== undefined ? mapRecordsToRows(args.records, headers) : validateRawRows(args.rows);
         }
+        const dedupPolicy = resolveDeduplicationPolicy(rawRows, args, headers);
+        let rowsToWrite = rawRows;
+        let skippedDuplicates = 0;
+        let batchUpdatedRows = 0;
+        let lastUpdatedRange = `${quotedSheet}!A1`;
+        if (dedupPolicy.enabled) {
+          if (!existingRows) {
+            const existingData = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
+            existingRows = Array.isArray(existingData?.values) ? (existingData.values as unknown[][]) : [];
+          }
+          const filtered = filterDuplicateRows(rawRows, existingRows ?? [], dedupPolicy.keyColumns, dedupPolicy.onDuplicate);
+          rowsToWrite = filtered.newRows;
+          skippedDuplicates = filtered.skippedDuplicates;
+          if (filtered.updates.length > 0) {
+            const batchData = filtered.updates.map((u) => ({
+              range: `${quotedSheet}!A${u.rowNumber}`,
+              majorDimension: 'ROWS',
+              values: safeRows([u.row]),
+            }));
+            const allLogicalKeys = [
+              ...filtered.updates.map((u) => buildRowDedupSignature(u.row, null)),
+              ...safeRows(rowsToWrite).map((r) => buildRowDedupSignature(r, null)),
+            ];
+            const batchDispatchMeta: SheetsAppendDispatchMetadata = {
+              operation: 'upsert',
+              rowCount: allLogicalKeys.length,
+              candidateKeys: allLogicalKeys,
+              keyColumns: dedupPolicy.keyColumns,
+            };
+            activeDispatchMeta = batchDispatchMeta;
+            const batchRes = await this.request(
+              id + '/values:batchUpdate',
+              signal,
+              {
+                valueInputOption: 'USER_ENTERED',
+                data: batchData,
+              },
+              (dispatched) => {
+                writeDispatched = dispatched;
+              },
+              async () => {
+                await lease?.beginWriteDispatch?.(batchDispatchMeta);
+              }
+            );
+            const respRange = batchRes?.responses?.[batchRes.responses.length - 1]?.updatedRange;
+            if (typeof respRange === 'string') lastUpdatedRange = respRange;
+            batchUpdatedRows = Number.isInteger(batchRes?.totalUpdatedRows)
+              ? batchRes.totalUpdatedRows
+              : filtered.updates.length;
+            batchMutationCommitted = true;
+            await lease?.completeWrite?.();
+          }
+          if (rowsToWrite.length === 0) {
+            return {
+              spreadsheetId: id,
+              updatedRange: lastUpdatedRange,
+              updatedRows: batchUpdatedRows,
+              skippedDuplicates,
+              url: this.url(id),
+            };
+          }
+        }
+        const rows = safeRows(rowsToWrite);
+        const appendCandidateKeys = activeDispatchMeta?.candidateKeys ?? rows.map((r) => buildRowDedupSignature(r, null));
+        const appendDispatchMeta: SheetsAppendDispatchMetadata = {
+          operation: 'append',
+          rowCount: appendCandidateKeys.length,
+          candidateKeys: appendCandidateKeys,
+          keyColumns: dedupPolicy.keyColumns,
+        };
+        const value = await this.request(
+          id + '/values/' + encodeURIComponent(range) + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS',
+          signal,
+          { majorDimension: 'ROWS', values: rows },
+          (dispatched) => {
+            writeDispatched = dispatched;
+          },
+          async () => {
+            activeDispatchMeta = appendDispatchMeta;
+            await lease?.beginWriteDispatch?.(appendDispatchMeta);
+          }
+        );
+        if (value?.spreadsheetId !== id || typeof value.updates?.updatedRange !== 'string' || !Number.isInteger(value.updates?.updatedRows) || value.updates.updatedRows < 0) badResponse(true);
+        await lease?.completeWrite?.();
+        return {
+          spreadsheetId: id,
+          updatedRange: value.updates.updatedRange,
+          updatedRows: batchUpdatedRows + value.updates.updatedRows,
+          ...(dedupPolicy.enabled ? { skippedDuplicates } : {}),
+          url: this.url(id),
+        };
+      } catch (err) {
+        if (lease) {
+          const isLostLeasePreMutation =
+            !batchMutationCommitted &&
+            err instanceof StepError &&
+            err.details?.code === 'SHEETS_APPEND_LEASE_LOST';
+          if (!isLostLeasePreMutation) {
+            const isAmbiguousWriteOutcome =
+              batchMutationCommitted ||
+              (err instanceof StepError ? err.category === 'UNKNOWN' : writeDispatched);
+            if (isAmbiguousWriteOutcome) {
+              await lease.markUnknownOutcome?.(
+                err instanceof Error ? err.message : 'Ambiguous Sheets append write outcome',
+                activeDispatchMeta
+              );
+            } else {
+              await lease.abortUncommittedWrite?.();
+            }
+          }
+        }
+        throw err;
+      } finally {
+        await lease?.release();
       }
-      const rows = safeRows(rowsToWrite);
-      const value = await this.request(id + '/values/' + encodeURIComponent(range) + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS', signal, { majorDimension: 'ROWS', values: rows });
-      if (value?.spreadsheetId !== id || typeof value.updates?.updatedRange !== 'string' || !Number.isInteger(value.updates?.updatedRows) || value.updates.updatedRows < 0) badResponse(true);
-      return {
-        spreadsheetId: id,
-        updatedRange: value.updates.updatedRange,
-        updatedRows: batchUpdatedRows + value.updates.updatedRows,
-        ...(dedupPolicy.enabled ? { skippedDuplicates } : {}),
-        url: this.url(id),
-      };
     }
     if (toolName === 'sheets.update_rows') {
       const id = this.checkedId(args.spreadsheetId);
@@ -430,9 +552,44 @@ export class SheetsAdapter extends BaseAdapter {
       context?.signal
     );
   }
+  async reconcileAppendLease(input: {
+    spreadsheetId: string;
+    sheet: string;
+    leaseId?: string;
+    fencingToken?: number;
+    manualOperatorDecision?: SheetsAppendManualRecoveryDecision;
+    acknowledgeDuplicateRisk?: boolean;
+    confirmDuplicateRisk?: boolean;
+    signal?: AbortSignal;
+  }): Promise<{
+    reconciled: boolean;
+    committedOnProvider: boolean;
+    matchedSignatures: string[];
+    scopeKey: string;
+    inconclusiveReason?: string;
+  }> {
+    const id = this.checkedId(input?.spreadsheetId);
+    const sheet = titleText(input?.sheet);
+    return executeAppendLeaseReconciliation({
+      spreadsheetId: id,
+      sheet,
+      leaseId: input.leaseId,
+      fencingToken: input.fencingToken,
+      manualOperatorDecision: input.manualOperatorDecision,
+      acknowledgeDuplicateRisk: input.acknowledgeDuplicateRisk,
+      confirmDuplicateRisk: input.confirmDuplicateRisk,
+      signal: input.signal,
+      appendLeaseStore: this.appendLeaseStore,
+      fetchSheetValues: (readRange, sig) =>
+        this.request(id + '/values/' + encodeURIComponent(readRange), sig),
+    });
+  }
   private url(id: string): string { return 'https://docs.google.com/spreadsheets/d/' + id + '/edit'; }
   private async tabs(id: string, signal?: AbortSignal): Promise<Array<{ id: number; title: string; spreadsheetId: string; headers?: string[] }>> {
     const value = await this.request(id + '?fields=' + encodeURIComponent('sheets.properties(sheetId,title)'), signal);
+    if (typeof value?.properties?.locale === 'string' && value.properties.locale.trim()) {
+      this.spreadsheetLocales.set(id, value.properties.locale.trim());
+    }
     if (!Array.isArray(value?.sheets) || value.sheets.some((tab: any) => !Number.isSafeInteger(tab.properties?.sheetId) || typeof tab.properties?.title !== 'string')) badResponse();
     return value.sheets.map((tab: any) => {
       const headers = extractTabHeaders(tab);

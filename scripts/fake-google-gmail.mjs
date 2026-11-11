@@ -163,6 +163,21 @@ export async function startFakeGoogleGmail(options = {}) {
     try {
       const url = new URL(request.url, 'http://127.0.0.1');
       if (request.method === 'GET' && url.pathname === '/health') return json(response, 200, { ready: true });
+      if (request.method === 'GET' && url.pathname === '/__stats') {
+        return json(response, 200, {
+          authorizations: stats.authorizations,
+          exchanges: stats.exchanges,
+          refreshes: stats.refreshes,
+          revocations: stats.revocations,
+          profiles: stats.profiles,
+          writes: stats.writes,
+          apiRequests: stats.apiRequests,
+        });
+      }
+      if (request.method === 'DELETE' && url.pathname === '/__stats/requests') {
+        stats.apiRequests.length = 0;
+        return json(response, 200, { cleared: true });
+      }
       if (request.method === 'GET' && url.pathname === '/o/oauth2/v2/auth') {
         stats.authorizations++;
         const params = url.searchParams;
@@ -325,8 +340,15 @@ export async function startFakeGoogleGmail(options = {}) {
           if (request.method === 'POST' && !eventId) {
             let raw = ''; for await (const chunk of request) raw += chunk;
             const body = JSON.parse(raw || '{}');
-            stats.writes++;
             stats.apiRequests.push({ method: 'POST', path: `calendars/${calId}/events`, query: Object.fromEntries(url.searchParams), body });
+            if (Array.isArray(body.recurrence) && body.recurrence.length > 0) {
+              const startTz = typeof body.start?.timeZone === 'string' ? body.start.timeZone.trim() : '';
+              const endTz = typeof body.end?.timeZone === 'string' ? body.end.timeZone.trim() : '';
+              if (!startTz || !endTz || startTz !== endTz) {
+                return json(response, 400, { error: { code: 400, message: 'Missing or mismatched timeZone for recurring event' } });
+              }
+            }
+            stats.writes++;
             const id = `event-${stats.writes}`;
             const wantMeet = url.searchParams.get('conferenceDataVersion') === '1' || Boolean(body.conferenceData);
             return json(response, 200, {
@@ -357,8 +379,15 @@ export async function startFakeGoogleGmail(options = {}) {
           if (request.method === 'PATCH' && eventId) {
             let raw = ''; for await (const chunk of request) raw += chunk;
             const body = JSON.parse(raw || '{}');
-            stats.writes++;
             stats.apiRequests.push({ method: 'PATCH', path: `calendars/${calId}/events/${eventId}`, query: Object.fromEntries(url.searchParams), body });
+            if (Array.isArray(body.recurrence) && body.recurrence.length > 0) {
+              const startTz = typeof body.start?.timeZone === 'string' ? body.start.timeZone.trim() : '';
+              const endTz = typeof body.end?.timeZone === 'string' ? body.end.timeZone.trim() : '';
+              if (!startTz || !endTz || startTz !== endTz) {
+                return json(response, 400, { error: { code: 400, message: 'Missing or mismatched timeZone for recurring event' } });
+              }
+            }
+            stats.writes++;
             return json(response, 200, {
               id: eventId,
               summary: body.summary ?? 'Họp việc riêng (Đã cập nhật)',

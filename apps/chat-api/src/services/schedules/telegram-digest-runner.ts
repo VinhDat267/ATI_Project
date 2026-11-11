@@ -18,6 +18,15 @@ import {
 } from './telegram-digest-candidate.js';
 import { buildPinnedTelegramAdapterContext } from './digest-scope-guard.js';
 
+export const TELEGRAM_DELIVERY_UNKNOWN =
+  'TELEGRAM_DELIVERY_UNKNOWN: Đã bắt đầu gửi bản tin Telegram nhưng mất kết nối hoặc thiếu biên nhận hợp lệ từ dịch vụ đích. Hệ thống tạm dừng tự động gửi lại để tránh trùng lặp.';
+
+function isDefiniteWriteRejection(error: unknown): boolean {
+  const details = (error as { details?: { requestSent?: unknown } } | null)?.details;
+  if (details && details.requestSent === false) return true;
+  return false;
+}
+
 export interface DigestRunInput {
   runId: string;
   scheduleId: string;
@@ -29,6 +38,8 @@ export interface DigestRunInput {
   trigger: 'scheduled' | 'manual' | 'replan';
   digestConfig: TelegramDigestConfig | null;
   digestConfigHash: string | null;
+  workspaceMode?: 'legacy' | 'personal' | 'organization';
+  workspaceId?: string | null;
   beforeSendCheck?: () => Promise<boolean>;
 }
 
@@ -45,7 +56,8 @@ export type DigestRunOutcome =
       pauseSchedule?: boolean;
     }
   | {
-      status: 'discarded';
+      status: 'delivery_unknown';
+      error: string;
     }
   | {
       status: 'digest_failed';
@@ -228,44 +240,132 @@ export function summarizeSourceItems(
 export class TelegramDigestRunner {
   constructor(private options: TelegramDigestRunnerOptions) {}
 
-  private async dispatch(
+  private async claimTelegramDigestDelivery(
     run: DigestRunInput,
+    pinnedCredentialId: string,
     signal: AbortSignal,
-    send: () => Promise<DigestRunOutcome>,
-  ): Promise<DigestRunOutcome> {
+  ): Promise<
+    | { allowed: true; claimedInDb: boolean }
+    | { allowed: false; outcome: DigestRunOutcome }
+  > {
     if (!this.options.pool) {
-      return { status: 'digest_failed', error: 'Lịch tự gửi cần kết nối PostgreSQL.', pauseSchedule: true };
+      return {
+        allowed: false,
+        outcome: {
+          status: 'digest_failed',
+          error: 'Lịch tự gửi cần kết nối PostgreSQL.',
+          pauseSchedule: true,
+        },
+      };
     }
     if (typeof (this.options.pool as any).connect !== 'function') {
-      return send();
+      const preSendCheck = await this.options.pool.query(
+        'SELECT version, status FROM schedules WHERE id = $1',
+        [run.scheduleId],
+      );
+      const currentSchedule = preSendCheck.rows[0];
+      if (
+        !currentSchedule ||
+        currentSchedule.version !== run.scheduleVersion ||
+        currentSchedule.status === 'cancelled' ||
+        currentSchedule.status === 'paused'
+      ) {
+        return { allowed: false, outcome: { status: 'discarded' } };
+      }
+      return { allowed: true, claimedInDb: false };
     }
     const client = await (this.options.pool as pg.Pool).connect();
     try {
       await client.query('BEGIN');
       await client.query("SET LOCAL lock_timeout = '10s'");
-      // Use the same conversation/schedule lock as schedule management. A cancellation
-      // that commits first prevents dispatch; a later cancellation waits for this send.
-      const schedule = (await client.query(
-        `SELECT s.* FROM schedules s JOIN conversations c ON c.id=s.conv_id
-         JOIN users u ON u.id=s.user_id AND u.status='active'
-         WHERE s.id=$1 FOR UPDATE OF c,s`,
-        [run.scheduleId],
-      )).rows[0];
-      const currentRun = (await client.query(
-        'SELECT status FROM schedule_runs WHERE id=$1 AND schedule_id=$2 FOR UPDATE',
-        [run.runId, run.scheduleId],
-      )).rows[0];
+      const schedule = (
+        await client.query(
+          `SELECT s.* FROM schedules s JOIN conversations c ON c.id=s.conv_id
+           JOIN users u ON u.id=s.user_id AND u.status='active'
+           WHERE s.id=$1 FOR UPDATE OF c,s`,
+          [run.scheduleId],
+        )
+      ).rows[0];
+      const currentRun = (
+        await client.query(
+          'SELECT status, delivery_started_at FROM schedule_runs WHERE id=$1 AND schedule_id=$2 FOR UPDATE',
+          [run.runId, run.scheduleId],
+        )
+      ).rows[0];
       signal.throwIfAborted();
-      if (!schedule || currentRun?.status !== 'planning' ||
-        schedule.user_id !== run.userId || schedule.kind !== 'telegram_digest' ||
-        schedule.version !== run.scheduleVersion || schedule.digest_config_hash !== run.digestConfigHash ||
-        schedule.status === 'cancelled' || schedule.status === 'paused') {
+      if (
+        !schedule ||
+        currentRun?.status !== 'planning' ||
+        currentRun.delivery_started_at !== null ||
+        schedule.user_id !== run.userId ||
+        schedule.kind !== 'telegram_digest' ||
+        schedule.version !== run.scheduleVersion ||
+        schedule.digest_config_hash !== run.digestConfigHash ||
+        schedule.status === 'cancelled' ||
+        schedule.status === 'paused'
+      ) {
         await client.query('COMMIT');
-        return { status: 'discarded' };
+        return { allowed: false, outcome: { status: 'discarded' } };
       }
-      const outcome = await send();
+
+      if (schedule.workspace_mode === 'organization') {
+        if (!schedule.workspace_id) {
+          await client.query('COMMIT');
+          return {
+            allowed: false,
+            outcome: {
+              status: 'blocked',
+              error: 'Lịch Tổ chức thiếu định danh không gian làm việc hợp lệ.',
+              pauseSchedule: true,
+            },
+          };
+        }
+        const memberRes = await client.query(
+          'SELECT status FROM workspace_members WHERE workspace_id = $1 AND user_id = $2',
+          [schedule.workspace_id, run.userId],
+        );
+        if (memberRes.rows[0]?.status !== 'active') {
+          await client.query('COMMIT');
+          return {
+            allowed: false,
+            outcome: {
+              status: 'blocked',
+              error: 'Quyền thành viên trong không gian làm việc tổ chức không còn hiệu lực.',
+              pauseSchedule: true,
+            },
+          };
+        }
+      }
+
+      const credRes = await client.query(
+        `SELECT status FROM service_credentials
+         WHERE id = $1 AND user_id = $2 AND service = 'telegram'`,
+        [pinnedCredentialId, run.userId],
+      );
+      if (credRes.rows[0]?.status !== 'active') {
+        await client.query('COMMIT');
+        return {
+          allowed: false,
+          outcome: {
+            status: 'blocked',
+            error: 'Kết nối Telegram đã thay đổi hoặc bị ngắt. Hãy kết nối lại.',
+            pauseSchedule: true,
+          },
+        };
+      }
+
+      const claimed = await client.query(
+        `UPDATE schedule_runs
+         SET delivery_started_at = now(), updated_at = now()
+         WHERE id = $1 AND schedule_id = $2 AND status = 'planning' AND delivery_started_at IS NULL
+         RETURNING id`,
+        [run.runId, run.scheduleId],
+      );
       await client.query('COMMIT');
-      return outcome;
+      if (claimed.rowCount === 0) {
+        return { allowed: false, outcome: { status: 'discarded' } };
+      }
+      return { allowed: true, claimedInDb: true };
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
@@ -277,6 +377,14 @@ export class TelegramDigestRunner {
   async execute(run: DigestRunInput, signal: AbortSignal): Promise<DigestRunOutcome> {
     signal.throwIfAborted();
     const { digestConfig, digestConfigHash, userId } = run;
+
+    if (run.workspaceMode === 'organization' && (!run.workspaceId || !run.workspaceId.trim())) {
+      return {
+        status: 'blocked',
+        error: 'Thiếu thông tin không gian làm việc tổ chức (workspaceId) hợp lệ.',
+        pauseSchedule: true,
+      };
+    }
 
     if (!digestConfig || !digestConfigHash) {
       return {
@@ -402,6 +510,8 @@ export class TelegramDigestRunner {
         const adapter = await this.options.adapterFactory.getAdapterForService(source.service, {
           userId,
           phase: 'planning',
+          workspaceMode: run.workspaceMode,
+          workspaceId: run.workspaceId,
         });
         const { callArgs, repoSearchTool, sheetListTool, sheetReadTool } = buildTelegramDigestSourceArgs(source, {
           sinceIso,
@@ -617,24 +727,11 @@ export class TelegramDigestRunner {
       if (!stillValid) {
         return { status: 'discarded' };
       }
-    } else if (this.options.pool) {
-      const preSendCheck = await this.options.pool.query(
-        'SELECT version, status FROM schedules WHERE id = $1',
-        [run.scheduleId],
-      );
-      const currentSchedule = preSendCheck.rows[0];
-      if (
-        !currentSchedule ||
-        currentSchedule.version !== run.scheduleVersion ||
-        currentSchedule.status === 'cancelled' ||
-        currentSchedule.status === 'paused'
-      ) {
-        return { status: 'discarded' };
-      }
     }
 
-    // 6. Send via Telegram adapter with execution context (once sent, never transition to discarded)
+    // 6. Send via Telegram adapter with durable atomic claim BEFORE outbound dispatch
     signal.throwIfAborted();
+    let deliveryStarted = false;
     try {
       let pinnedCredentialId = digestConfig.credentialId;
       let pinnedTelegramUserId = digestConfig.telegramUserId;
@@ -657,6 +754,8 @@ export class TelegramDigestRunner {
       const telegramAdapter = await this.options.adapterFactory.getAdapterForService('telegram', {
         userId,
         phase: 'execution',
+        workspaceMode: run.workspaceMode,
+        workspaceId: run.workspaceId,
         connections: {
           telegram: {
             credentialId: pinnedCredentialId,
@@ -666,25 +765,56 @@ export class TelegramDigestRunner {
           },
         },
       });
-      return await this.dispatch(run, signal, async () => {
-        const sendRes = await telegramAdapter.execute(
-          'telegram.send_message',
-          { chatId: targetChatId, text: digestText },
-          { signal, chatId: targetChatId },
-        );
+      const claim = await this.claimTelegramDigestDelivery(run, pinnedCredentialId, signal);
+      if (!claim.allowed) {
+        return claim.outcome;
+      }
+      deliveryStarted = claim.claimedInDb;
+      const sendRes = await telegramAdapter.execute(
+        'telegram.send_message',
+        { chatId: targetChatId, text: digestText },
+        { signal, chatId: targetChatId },
+      );
+      const validMessageId =
+        typeof sendRes?.messageId === 'number' &&
+        Number.isInteger(sendRes.messageId) &&
+        sendRes.messageId > 0;
+      if (!validMessageId) {
         return {
-          status: 'digest_sent',
-          digestText,
-          delivery: {
-            chatId: targetChatId,
-            chatTitle: digestConfig.chatTitle,
-            ...(typeof sendRes?.messageId === 'number' ? { messageId: sendRes.messageId } : {}),
-            sentAt: new Date().toISOString(),
-            sources: sourceStatuses,
-          },
+          status: 'delivery_unknown',
+          error: TELEGRAM_DELIVERY_UNKNOWN,
         };
-      });
-    } catch {
+      }
+      return {
+        status: 'digest_sent',
+        digestText,
+        delivery: {
+          chatId: targetChatId,
+          chatTitle: digestConfig.chatTitle,
+          messageId: sendRes.messageId,
+          sentAt: new Date().toISOString(),
+          sources: sourceStatuses,
+        },
+      };
+    } catch (err: any) {
+      if (deliveryStarted) {
+        if (isDefiniteWriteRejection(err) && this.options.pool) {
+          await this.options.pool
+            .query(
+              "UPDATE schedule_runs SET delivery_started_at = NULL, updated_at = now() WHERE id = $1 AND status = 'planning'",
+              [run.runId],
+            )
+            .catch(() => undefined);
+          return {
+            status: 'digest_failed',
+            error: 'Không gửi được tin nhắn báo cáo tới Telegram.',
+          };
+        }
+        return {
+          status: 'delivery_unknown',
+          error: `${TELEGRAM_DELIVERY_UNKNOWN} (${err instanceof Error ? err.message : String(err)})`,
+        };
+      }
       return {
         status: 'digest_failed',
         error: 'Không gửi được tin nhắn báo cáo tới Telegram.',

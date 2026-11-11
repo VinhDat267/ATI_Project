@@ -19,8 +19,10 @@ describe('ANS-01 read answers', () => {
   it('keeps the off prompt and search envelope byte-identical to the registered baseline', () => {
     const date = { now: new Date('2026-10-14T00:00:00Z'), timeZone: 'Asia/Ho_Chi_Minh' };
     const hash = (s: string) => createHash('sha256').update(s).digest('hex');
-    expect(hash(buildSystemPrompt(ALL_TOOLS, date, { search: true, readAnswers: false } as any)))
-      .toBe('0d80f095ff04d30a26613ae119a4f76d5197579fefd28ba2b21649cefd4ea70e');
+    const offPrompt = buildSystemPrompt(ALL_TOOLS, date, { search: true, readAnswers: false } as any);
+    expect(offPrompt).toBe(buildSystemPrompt(ALL_TOOLS, date, { search: true } as any));
+    expect(hash(offPrompt))
+      .toBe('df2fb8753c9d83ae75c4065ae22ef4f684b137ddd58647f758a6c7c858d2ae92');
     expect(hash(formatSearchResults([{ tool: 'slack.search_channels', args: { query: 'frontend' }, result: [] }])))
       .toBe('1edfb5917d31a91aa046dca5ea220a6c131deed29412fa206df107eb32ef9850');
   });

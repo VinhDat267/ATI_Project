@@ -17,6 +17,21 @@ interface Cached {
   expiresAt: number;
 }
 
+/**
+ * Manages personal Trello OAuth access/refresh tokens with in-process single-flight
+ * refresh deduplication (`inflight` map) and compare-and-swap rotation in PostgreSQL
+ * (`CredentialRepo.rotatePersonalSecret`).
+ *
+ * Supported deployment boundary (Audit Risk R1):
+ * - Single-instance `chat-api` runtime: concurrent token refreshes for the same
+ *   `(userId, credentialId)` share the in-memory `inflight` promise so only one
+ *   refresh request is issued per grant generation.
+ * - Multi-replica horizontal scaling: two independent `TrelloTokenManager` instances
+ *   in separate OS processes do not share `inflight`; if both attempt refresh
+ *   simultaneously, single-use refresh token rotation at the provider or CAS
+ *   mismatch in `rotatePersonalSecret` will fail closed and mark the credential
+ *   `reconnect_required` until distributed refresh locking is introduced.
+ */
 export class TrelloTokenManager {
   private cache = new Map<string, Cached>();
   private inflight = new Map<string, Promise<Cached>>();

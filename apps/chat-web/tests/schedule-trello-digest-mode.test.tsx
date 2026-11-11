@@ -3,6 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { ScheduleMoment } from '../src/pages/Cockpit/ScheduleMoment';
+import { ScheduleRunRecovery } from '../src/pages/Cockpit/ScheduleRunRecovery';
 import { ScheduleSection } from '../src/pages/History/ScheduleSection';
 import { apiClient } from '../src/services/api-client';
 import * as useSchedulesHook from '../src/hooks/use-schedules';
@@ -186,5 +187,117 @@ describe('Trello Digest ScheduleMoment & ScheduleSection UI', () => {
     expect(badge).toHaveAttribute('data-schedule-kind', 'trello_digest');
     expect(screen.getByText('Đã gửi · 6 mục')).toBeInTheDocument();
     expect(screen.getByText('(#team)')).toBeInTheDocument();
+  });
+
+  it('shows honest unknown delivery state for trello_digest needs_attention without inventing replan actions, and supports explicit TRELLO_DELIVERY_UNKNOWN resolution when provided by API (TRELLO-AUDIT-10 / AUTO-06)', async () => {
+    vi.spyOn(useSchedulesHook, 'useSchedulesEnabled').mockReturnValue(true);
+    const unknownRun = {
+      id: 'run-trello-unknown-1',
+      scheduleId: 'sched-trello-digest-1',
+      dueAt: '2026-11-02T01:30:00.000Z',
+      createdAt: '2026-11-02T01:30:05.000Z',
+      trigger: 'scheduled' as const,
+      state: 'needs_attention' as const,
+      convId: 'conv-run-1',
+      planId: null,
+      planStatus: null,
+      missedCount: 1,
+      error: 'Không rõ tin báo cáo đã tới kênh đích hay chưa; vui lòng kiểm tra kênh trước khi tạo lại.',
+      delivery: null,
+    };
+
+    vi.spyOn(apiClient, 'getSchedules').mockResolvedValue({
+      schedules: [
+        {
+          id: 'sched-trello-digest-1',
+          convId: 'conv-1',
+          name: 'Báo cáo Trello sáng',
+          request: 'Mỗi sáng 8h30 tổng hợp thẻ quá hạn trên bảng Frontend gửi vào Slack #team',
+          recurrence: { type: 'daily', time: '08:30' },
+          services: ['trello', 'slack'],
+          status: 'paused',
+          pauseReason: 'Không rõ trạng thái gửi của lượt tự gửi trước; cần kiểm tra kênh đích trước khi bật lại.',
+          version: 2,
+          nextRuns: [],
+          kind: 'trello_digest',
+          lastRun: unknownRun,
+        },
+      ],
+    });
+    vi.spyOn(apiClient, 'getScheduleRuns').mockResolvedValue({
+      runs: [unknownRun],
+    });
+
+    const { unmount } = render(<ScheduleSection user={user} navigate={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Báo cáo Trello sáng')).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText(/Đã tạm dừng: Không rõ trạng thái gửi của lượt tự gửi trước/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('alert')
+    ).toHaveTextContent('Không rõ tin báo cáo đã tới kênh đích hay chưa');
+    expect(screen.queryByRole('button', { name: 'Lập lại kế hoạch' })).not.toBeInTheDocument();
+
+    unmount();
+
+    const recoveryMessage: ChatMessage = {
+      id: 'msg-run-recovery-1',
+      role: 'assistant',
+      content: 'Trạng thái lượt chạy',
+      metadata: {
+        type: 'schedule_run',
+        scheduleId: 'sched-trello-digest-1',
+        runId: 'run-trello-unknown-1',
+      },
+    };
+
+    const { unmount: unmountRecovery } = render(
+      <ScheduleRunRecovery message={recoveryMessage} navigate={vi.fn()} />
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('status')
+      ).toHaveTextContent('Không rõ tin báo cáo đã tới kênh đích hay chưa');
+    });
+    expect(screen.queryByRole('button', { name: 'Lập lại kế hoạch' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('sheets-delivery-recovery-panel')).not.toBeInTheDocument();
+
+    unmountRecovery();
+
+    // When backend API contract explicitly marks TRELLO_DELIVERY_UNKNOWN with deliveryStartedAt
+    const contractRun = {
+      ...unknownRun,
+      id: 'run-trello-unknown-2',
+      deliveryStartedAt: '2026-11-02T01:30:06.000Z',
+      error: 'TRELLO_DELIVERY_UNKNOWN: Mất kết nối khi gửi báo cáo vào kênh đích.',
+    };
+    vi.spyOn(apiClient, 'getScheduleRuns').mockResolvedValue({
+      runs: [contractRun],
+    });
+
+    render(
+      <ScheduleRunRecovery
+        message={{
+          ...recoveryMessage,
+          id: 'msg-run-recovery-2',
+          metadata: {
+            type: 'schedule_run',
+            scheduleId: 'sched-trello-digest-1',
+            runId: 'run-trello-unknown-2',
+          },
+        }}
+        navigate={vi.fn()}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sheets-delivery-recovery-panel')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('button', { name: 'Lập lại kế hoạch' })).not.toBeInTheDocument();
   });
 });
