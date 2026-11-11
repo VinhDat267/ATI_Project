@@ -353,8 +353,9 @@ export class ScheduleService {
       if (preview?.type === 'schedule_proposal' &&
           (preview.proposal?.action === 'create' || preview.proposal?.action === 'update')) {
         const cfg = (preview.digestCandidate as TelegramDigestCandidate | NotionDigestCandidate | undefined)?.config;
-        const binding = cfg && typeof cfg === 'object' &&
-          ('sources' in cfg ? approvedTelegramNotionBinding(cfg) : approvedSlackNotionBinding(cfg));
+        const binding = cfg && typeof cfg === 'object'
+          ? 'sources' in cfg ? approvedTelegramNotionBinding(cfg) : approvedSlackNotionBinding(cfg)
+          : undefined;
         if (binding?.ownerId === userId) {
           try {
             await verifyNotionSource(userId, binding, AbortSignal.timeout(10_000), async () => undefined);
