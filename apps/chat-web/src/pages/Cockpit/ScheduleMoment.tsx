@@ -308,7 +308,9 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                     <p>• Nguồn dữ liệu: {digestCandidate.config.sources.map((s: any) => s.label ?? s.service).join(', ')}</p>
                   )}
                   <p>• Nơi nhận: Telegram · {digestCandidate.config.chatTitle}</p>
-                  <p>• Cam kết an toàn: Chỉ đọc dữ liệu từ các công cụ nguồn, tự động phân tích KPI/trùng lịch và gửi 1 bản tin tóm tắt vào đúng cuộc trò chuyện đã khóa.</p>
+                  <p>• {digestCandidate.config.sources?.some((source: { service: string }) => source.service === 'notion')
+                    ? 'Lịch chỉ đọc database Notion đã duyệt và gửi bản tin vào cuộc trò chuyện đã chọn.'
+                    : 'Lịch đọc dữ liệu từ nguồn đã chọn và gửi bản tin vào cuộc trò chuyện đã chọn.'}</p>
                 </div>
               )}
               <p className="text-sm text-[#4B5563] leading-relaxed">
@@ -438,11 +440,11 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                   <p className="font-semibold text-[#111827]">Tự gửi bản tin, không cần duyệt lại</p>
                   {canAutoDigest && digestCandidate?.config ? (
                     <p className="text-xs text-[#4B5563] break-words">
-                      {`Database: ${Array.isArray(digestCandidate.config.databases) ? digestCandidate.config.databases.map((d: any) => typeof d === 'string' ? d : d?.title ?? d?.id).join(', ') : ''} · ${
+                      {`Notion ${digestCandidate.config.workspaceName ?? ''} · Database: ${Array.isArray(digestCandidate.config.databases) ? digestCandidate.config.databases.map((d: any) => typeof d === 'string' ? d : d?.title ?? d?.id).join(', ') : ''} · ${
                         digestCandidate.config.delivery?.service === 'telegram' || digestCandidate.config.telegramChatId
                           ? `Telegram: ${digestCandidate.config.delivery?.label || digestCandidate.config.telegramChatTitle || digestCandidate.config.delivery?.chatId || digestCandidate.config.telegramChatId}`
                           : `Kênh Slack: #${String(digestCandidate.config.delivery?.label ?? digestCandidate.config.channelName ?? '').replace(/^#/, '')}`
-                      } · Nội dung: Trang mới cập nhật, trạng thái & thuộc tính (+ tóm tắt AI)`}
+                      } · Nội dung: Trang đọc được, trạng thái và thuộc tính`}
                     </p>
                   ) : (
                     <p className="text-xs text-[#6B7280] break-words">

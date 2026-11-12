@@ -27,6 +27,7 @@ import { evaluateCalendarDigestCandidate } from './services/schedules/calendar-d
 import { createCalendarDigestExecutor } from './services/schedules/calendar-digest-runner.js';
 import { createGithubDigestRunner, type RunGithubDigest } from './services/schedules/github-digest-runner.js';
 import { createTrelloDigestRunner, buildTrelloAiPromptPayload, type RunTrelloDigest } from './services/schedules/trello-digest-runner.js';
+import { NotionDigestSourceAuthority, NotionDigestSourceDenied } from './services/notion/digest-source-authority.js';
 import { createNotionDigestRunner, type RunNotionDigest } from './services/schedules/notion-digest-runner.js';
 import { AdapterFactory, PostgresSheetsAppendLeaseStore, type AdapterContext } from './services/adapter-factory.js';
 import { GmailConnectionRepo } from './db/repositories/gmail-connection-repo.js';
@@ -320,6 +321,10 @@ async function bootstrap() {
     credentialRepo: credRepo,
     mysheetsEnabled: mysheetsAvailable,
     fetchOrgSheetsMetadata,
+    verifyNotionSource: async (ownerId, binding, signal, check) => {
+      if (!notionDigestSources) throw new NotionDigestSourceDenied();
+      return notionDigestSources.withSource(ownerId, binding, signal, check);
+    },
     createSheetsDigestAdapter: (serviceId, userId, config, scheduleContext) => {
       const workspaceMode = scheduleContext
         ? scheduleContext.workspaceMode
@@ -561,6 +566,9 @@ async function bootstrap() {
     ? new NotionTokenManager(notionRepo, notionOAuthClient, env.ENCRYPTION_KEY, (userId) => realAdapterFactory.clearPersonal(userId, 'notion'))
     : undefined;
   const notionConnection = notionAvailable && notionRepo ? createNotionConnectionLookup({ repo: notionRepo }) : undefined;
+  const notionDigestSources = notionRepo && notionTokens && notionOAuthClient
+    ? new NotionDigestSourceAuthority(notionRepo, notionTokens, notionOAuthClient, env.ENCRYPTION_KEY)
+    : undefined;
 
   const jiraAvailable = Boolean(env.MYJIRA_ENABLED && env.JIRA_OAUTH && pool);
   const jiraOAuthClient = jiraAvailable ? new JiraOAuthClient(env.JIRA_OAUTH!) : undefined;
@@ -775,6 +783,7 @@ async function bootstrap() {
     githubConnection,
     telegramConnection,
     notionConnection,
+    notionDigestSources,
     jiraBinder,
     jiraHistorySanitizer,
     jiraPolicyService,
@@ -962,22 +971,8 @@ async function bootstrap() {
     });
     notionDigestRunnerImpl = createNotionDigestRunner({
       pool,
-      notionConnection,
-      telegramConnection,
+      notionSources: notionDigestSources,
       getAdapter: (serviceName, context) => adapterFactory.getAdapterForService(serviceName, context),
-      summarizeDigest: async ({ workspaceName, databases, pages }, signal) => {
-        if (pages.length === 0) return null;
-        const prompt = [
-          `Hãy tóm tắt ngắn gọn bằng tiếng Việt (tối đa 2 câu, tập trung vào trang quan trọng nhất hoặc điểm nghẽn cần chú ý) cho bản tin Notion của workspace ${workspaceName} (database: ${databases.map((d) => d.title).join(', ')}).`,
-          `- Các trang hiện có (${pages.length}): ${pages.slice(0, 15).map((p) => `[${p.databaseTitle}] ${p.title}`).join('; ')}`,
-        ].join('\n');
-        if (typeof provider?.generateText !== 'function') return null;
-        return provider.generateText(
-          'Bạn là trợ lý quản lý tri thức phát hiện điểm quan trọng trên Notion. Chỉ trả lời văn bản thuần túy bằng tiếng Việt, ngắn gọn tối đa 2 câu.',
-          prompt,
-          signal,
-        );
-      },
     });
   }
 
@@ -987,6 +982,7 @@ async function bootstrap() {
     encryptionKey: env.ENCRYPTION_KEY,
     adapterFactory,
     botClient: telegramBotClient,
+    notionSources: notionDigestSources,
     timeZone: env.APP_TIME_ZONE,
     summarizeWithAi: async (sectionsText, signal) => {
       if (typeof provider?.generateText !== 'function') return null;

@@ -4,10 +4,15 @@ import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { encryptCredentials } from '@wap/tool-adapters';
+import { NotionConnectionRepo } from '../../../src/db/repositories/notion-connection-repo.js';
+import { NotionDigestSourceAuthority } from '../../../src/services/notion/digest-source-authority.js';
+import { NotionOAuthClient } from '../../../src/services/notion/oauth-client.js';
+import { NotionTokenManager } from '../../../src/services/notion/token-manager.js';
+import { fingerprintSecret, startNotionLoopbackServer, waitForOwnerLockWaiter } from '../../helpers/notion-oauth-test-env.js';
 import { CredentialRepo } from '../../../src/db/repositories/credential-repo.js';
 import { ScheduleService } from '../../../src/services/schedules/schedule-service.js';
 import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
-import { computeTelegramDigestConfigHash, READ_DIGEST_SOURCE_MAP } from '../../../src/services/schedules/telegram-digest-candidate.js';
+import { computeTelegramDigestConfigHash, evaluateTelegramDigestCandidate, READ_DIGEST_SOURCE_MAP } from '../../../src/services/schedules/telegram-digest-candidate.js';
 import { TelegramDigestRunner, summarizeSourceItems } from '../../../src/services/schedules/telegram-digest-runner.js';
 import { certifyScheduleFixture } from '../../../src/services/slack/slack-schedule-origin.js';
 import type { TelegramDigestConfig } from '@wap/tool-schemas';
@@ -90,6 +95,205 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
     await certifyScheduleFixture(pool, res.rows[0].id);
     return res.rows[0];
   }
+
+  it('blocks an old Notion schedule before resolving its current default connection', async () => {
+    await credRepo.saveCredentials('telegram', encryptCredentials({
+      telegramUserId: '777888999',
+      username: 'runneruser',
+      selectedChats: [{ chatId: '777888999', title: 'Private chat', type: 'private' }],
+    }, ENCRYPTION_KEY), USER_ID);
+    const credential = (await credRepo.getPersonalCredentials('telegram', USER_ID))!;
+    const config: TelegramDigestConfig = {
+      credentialId: credential.id,
+      telegramUserId: '777888999',
+      username: 'runneruser',
+      chatId: '777888999',
+      chatTitle: 'Private chat',
+      sources: [{ service: 'notion', tool: 'notion.search_pages', label: 'Notion' }],
+      recurrence: { type: 'daily', time: '08:00' },
+      timeZone: 'Asia/Ho_Chi_Minh',
+    };
+    const schedule = await seedDigestSchedule(config);
+    const getAdapterForService = vi.fn(async () => ({
+      execute: async () => ({ pages: [{ title: 'Page from the current default connection' }] }),
+    }));
+    const summarizeWithAi = vi.fn(async () => null);
+    const runner = new TelegramDigestRunner({
+      credentialRepo: credRepo, encryptionKey: ENCRYPTION_KEY, timeZone: config.timeZone,
+      adapterFactory: { getAdapterForService }, summarizeWithAi,
+    });
+
+    const result = await runner.execute({
+      runId: randomUUID(), scheduleId: schedule.id, scheduleVersion: schedule.version,
+      userId: USER_ID, name: schedule.name, request: schedule.request, dueAt: now, trigger: 'scheduled',
+      digestConfig: schedule.digest_config, digestConfigHash: schedule.digest_config_hash,
+    }, AbortSignal.timeout(3000));
+
+    expect(result).toMatchObject({ status: 'blocked', pauseSchedule: true });
+    expect(getAdapterForService).not.toHaveBeenCalled();
+    expect(summarizeWithAi).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'unchanged', 'source-replaced', 'unshared', 'revoked-before-send', 'revoke-waits-for-send',
+    'one-pool-client', 'source-replaced-before-confirm', 'archived-before-send',
+  ] as const)(
+    'reads only approved workspace A after default switches to B (%s)',
+    async (change) => {
+      const dbId = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+      const sourceId = 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
+      const otherSourceId = 'cccccccc-3333-4333-8333-cccccccccccc';
+      const pageId = 'dddddddd-4444-4444-8444-dddddddddddd';
+      const singleClientPool = change === 'one-pool-client'
+        ? new pg.Pool({ ...pool.options, max: 1, connectionTimeoutMillis: 1000 })
+        : undefined;
+      const runPool = singleClientPool ?? pool;
+      const notionRepo = new NotionConnectionRepo(runPool);
+      const loopback = await startNotionLoopbackServer();
+      try {
+        const oauthConfig = loopback.oauthConfig('notion-app');
+        const oauth = new NotionOAuthClient(oauthConfig);
+        const tokens = new NotionTokenManager(notionRepo, oauth, ENCRYPTION_KEY);
+        const authority = new NotionDigestSourceAuthority(notionRepo, tokens, oauth, ENCRYPTION_KEY);
+        async function seedConnection(label: string, isDefault: boolean) {
+          const credentials = encryptCredentials({ accessToken: `fixture-access-${label}`, refreshToken: '' }, ENCRYPTION_KEY);
+          return (await pool.query(
+            `INSERT INTO notion_connections(user_id,app_id,workspace_id,workspace_name,actor_id,bot_id,
+              config,allowed_databases,selected_databases,is_default)
+             VALUES($1,'notion-app',$2,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+            [USER_ID, label, `actor-${label}`, `bot-${label}`, credentials, [dbId],
+              JSON.stringify([{ id: dbId, title: 'Sprint' }]), isDefault],
+          )).rows[0].id as string;
+        }
+        const a = await seedConnection('A', true);
+        const b = await seedConnection('B', false);
+        const metadata = (id: string) => ({
+          object: 'database', id: dbId, title: [{ plain_text: 'Sprint' }], data_sources: [{ id }],
+        });
+        loopback.enqueue('GET', `/databases/${dbId}`, { kind: 'json', body: metadata(sourceId) });
+        const binding = await authority.prepare(USER_ID, 'Tổng hợp Notion Sprint', AbortSignal.timeout(3000));
+        expect(binding.credentialId).toBe(a);
+        expect(binding.databases).toEqual([{ databaseId: dbId, dataSourceId: sourceId, title: 'Sprint' }]);
+        await notionRepo.setActiveWorkspace(USER_ID, b);
+        expect((await notionRepo.getActive(USER_ID))?.id).toBe(b);
+
+        const selectedChats = [{ chatId: '777888999', title: 'Private chat', type: 'private' as const }];
+        const credential = await credRepo.saveCredentials('telegram', encryptCredentials({
+          telegramUserId: '777888999', username: 'runneruser', selectedChats,
+        }, ENCRYPTION_KEY), USER_ID);
+        const proposal = { kind: 'schedule' as const, action: 'create' as const, summary: 'Tổng hợp Notion', request: 'Tổng hợp Notion Sprint gửi Telegram',
+          recurrence: { type: 'daily' as const, time: '08:00' } };
+        const candidate = evaluateTelegramDigestCandidate({
+          proposal, services: ['notion', 'telegram'], timeZone: 'Asia/Ho_Chi_Minh', notionBinding: binding,
+          telegramLookup: {
+            status: 'connected', selectedChats,
+            connection: { credentialId: credential.id, telegramUserId: '777888999', username: 'runneruser', chatIds: ['777888999'] },
+          },
+        });
+        expect(candidate.canAutoDigest).toBe(true);
+        const convId = (await pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [USER_ID])).rows[0].id;
+        const messageId = (await pool.query(
+          "INSERT INTO messages(conv_id,role,content,metadata) VALUES($1,'assistant','Notion preview',$2) RETURNING id",
+          [convId, JSON.stringify({ type: 'schedule_proposal', proposal: { ...proposal, name: 'Sprint' },
+            services: ['notion', 'telegram'], nextRuns: [], scheduleId: null, baseVersion: null, digestCandidate: candidate })],
+        )).rows[0].id;
+        loopback.enqueue('GET', `/databases/${dbId}`, {
+          kind: 'json', body: metadata(change === 'source-replaced-before-confirm' ? otherSourceId : sourceId),
+        });
+        const confirming = new ScheduleService({
+          pool, timeZone: candidate.config!.timeZone, verifyNotionSource: authority.withSource.bind(authority),
+        }).confirmProposal({ userId: USER_ID, convId, messageId, now, approvalMode: 'auto_digest' });
+        if (change === 'source-replaced-before-confirm') {
+          await expect(confirming).rejects.toMatchObject({ code: 'REAUTHORIZATION_REQUIRED' });
+          expect((await pool.query('SELECT id FROM schedules WHERE conv_id=$1', [convId])).rowCount).toBe(0);
+          return;
+        }
+        const confirmed = await confirming;
+        const schedule = (await pool.query('SELECT * FROM schedules WHERE id=$1', [confirmed.schedule.id])).rows[0];
+        expect(schedule.kind).toBe('telegram_digest');
+        expect(schedule.digest_config.sources[0].notionBinding).toEqual(binding);
+        const runId = (await pool.query(
+          `INSERT INTO schedule_runs(schedule_id,schedule_version,trigger,due_at,status)
+           VALUES($1,$2,'scheduled',$3,'planning') RETURNING id`, [schedule.id, schedule.version, now],
+        )).rows[0].id;
+        loopback.enqueue('GET', `/databases/${dbId}`, {
+          kind: 'json', status: change === 'unshared' ? 404 : 200,
+          body: metadata(change === 'source-replaced' ? otherSourceId : sourceId),
+        });
+        loopback.enqueue('GET', `/data_sources/${sourceId}`, { kind: 'json', body: {
+          object: 'data_source', id: sourceId, parent: { type: 'database_id', database_id: dbId },
+          properties: { Name: { type: 'title' } },
+        } });
+        loopback.enqueue('POST', `/data_sources/${sourceId}/query`, { kind: 'json', body: {
+          object: 'list',
+          results: [{ object: 'page', id: pageId, url: 'https://www.notion.so/fixture',
+            parent: { type: 'data_source_id', data_source_id: sourceId },
+            properties: { Name: { type: 'title', title: [{ plain_text: 'Approved A page' }] } } }],
+          has_more: false,
+        } });
+        const shouldSend = change === 'unchanged' || change === 'revoke-waits-for-send' || change === 'one-pool-client';
+        if (shouldSend || change === 'archived-before-send') {
+          loopback.enqueue('GET', `/databases/${dbId}`, {
+            kind: 'json', body: { ...metadata(sourceId), in_trash: change === 'archived-before-send' },
+          });
+        }
+
+        let disconnect: ReturnType<NotionConnectionRepo['disconnect']> | undefined;
+        const send = vi.fn(async (_tool: string, args: { text: string }) => {
+          expect(args.text).toContain('Approved A page');
+          if (change === 'revoke-waits-for-send') {
+            disconnect = notionRepo.disconnect(USER_ID, a);
+            const locks = await waitForOwnerLockWaiter(pool, USER_ID);
+            expect(locks.waitingCount).toBeGreaterThan(0);
+            expect((await notionRepo.getActive(USER_ID, a))?.status).toBe('active');
+          }
+          return { messageId: 42 };
+        });
+        const ai = vi.fn(async () => 'unexpected model call');
+        const runner = new TelegramDigestRunner({
+          pool: runPool, credentialRepo: credRepo, encryptionKey: ENCRYPTION_KEY, timeZone: candidate.config!.timeZone,
+          adapterFactory: { getAdapterForService: async (name) => {
+            expect(name).toBe('telegram');
+            if (change === 'revoked-before-send') await notionRepo.disconnect(USER_ID, a);
+            return { execute: send };
+          } },
+          notionSources: authority, summarizeWithAi: ai,
+        });
+        const result = await runner.execute({
+          runId, scheduleId: schedule.id, scheduleVersion: schedule.version,
+          userId: USER_ID, name: schedule.name, request: schedule.request, dueAt: now, trigger: 'scheduled',
+          digestConfig: schedule.digest_config, digestConfigHash: schedule.digest_config_hash,
+        }, AbortSignal.timeout(6000));
+
+        if (disconnect) {
+          await disconnect;
+          expect(await notionRepo.getActive(USER_ID, a)).toBeNull();
+        }
+        expect(result.status, JSON.stringify(result)).toBe(shouldSend ? 'digest_sent' : 'blocked');
+        expect(send).toHaveBeenCalledTimes(shouldSend ? 1 : 0);
+        expect(ai).not.toHaveBeenCalled();
+        expect(loopback.ledger.every((call) => call.bearerFingerprint === fingerprintSecret('fixture-access-A'))).toBe(true);
+        expect(loopback.countPath(`/data_sources/${otherSourceId}/query`)).toBe(0);
+        expect(loopback.countPath(`/data_sources/${sourceId}/query`)).toBe(change === 'source-replaced' || change === 'unshared' ? 0 : 1);
+        const dispatch = (await pool.query(
+          'SELECT delivery_started_at, dispatched_config, dispatched_config_hash FROM schedule_runs WHERE id=$1', [runId],
+        )).rows[0];
+        if (shouldSend) {
+          expect(dispatch.delivery_started_at).toBeInstanceOf(Date);
+          expect(dispatch.dispatched_config.sources[0].notionBinding).toEqual(binding);
+          expect(dispatch.dispatched_config_hash).toBe(candidate.configHash);
+        } else {
+          expect(dispatch.delivery_started_at).toBeNull();
+          expect(dispatch.dispatched_config).toBeNull();
+        }
+      } finally {
+        await loopback.close();
+        await singleClientPool?.end();
+        await pool.query('DELETE FROM notion_connections WHERE user_id=$1', [USER_ID]);
+      }
+    },
+    15_000,
+  );
 
   it('executes multi-source read digest (with partial error fallback) and sends 1 Telegram message, recording digest_sent and delivery JSONB', async () => {
     await credRepo.saveCredentials(

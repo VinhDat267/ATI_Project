@@ -3,9 +3,14 @@ import { BaseAdapter, StepError, type BaseAdapterConfig } from '../base-adapter.
 import { GlobalRateLimiter, waitWithSignal } from '../rate-limiter.js';
 import { NOTION_MAX_PROPERTY_CHARS, clipText } from '../bounds.js';
 
-export interface NotionAdapterConfig extends BaseAdapterConfig { credentials: { token: string }; fetchFn?: typeof fetch }
+export interface NotionAdapterConfig extends BaseAdapterConfig {
+  credentials: { token: string };
+  fetchFn?: typeof fetch;
+  apiBaseUrl?: string;
+  expectedDataSources?: ReadonlyMap<string, string>;
+}
 export const NOTION_VERSION = '2026-03-11';
-const apiBase = 'https://api.notion.com/v1/';
+const defaultApiBaseUrl = 'https://api.notion.com/v1';
 const sharedLimiter = new GlobalRateLimiter({ maxRequests: 3, windowMs: 1000 });
 function invalid(message: string): never { throw new StepError({ message: 'Notion ' + message, category: 'VALIDATION' }); }
 function denied(): never { throw new StepError({ message: 'Notion resource is outside the allowed database scope', category: 'AUTH_ERROR', statusCode: 403 }); }
@@ -195,8 +200,12 @@ export class NotionAdapter extends BaseAdapter {
   readonly service = 'notion';
   private readonly token: string;
   private readonly fetchFn: typeof fetch;
+  private readonly apiBaseUrl: string;
+  private readonly expectedDataSources?: ReadonlyMap<string, string>;
   constructor(config: NotionAdapterConfig) {
     super(config); this.token = config.credentials.token; this.fetchFn = config.fetchFn ?? globalThis.fetch;
+    this.apiBaseUrl = (config.apiBaseUrl ?? defaultApiBaseUrl).replace(/\/$/, '');
+    this.expectedDataSources = config.expectedDataSources;
   }
   private databaseIds(): string[] {
     const values = this.allowedScope?.databases;
@@ -216,7 +225,7 @@ export class NotionAdapter extends BaseAdapter {
       catch (error) { throw new StepError({ message: 'Notion request stopped before dispatch', category: error instanceof StepError ? error.category : 'NETWORK' }); }
       if (signal?.aborted) throw new StepError({ message: 'Notion request cancelled before dispatch', category: 'NETWORK' });
       let response: Response;
-      try { response = await this.fetchFn(apiBase + path, { method, signal, redirect: 'error', headers: {
+      try { response = await this.fetchFn(this.apiBaseUrl + '/' + path, { method, signal, redirect: 'error', headers: {
         Authorization: 'Bearer ' + this.token, 'Notion-Version': NOTION_VERSION, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }); }
       catch {
@@ -263,7 +272,9 @@ export class NotionAdapter extends BaseAdapter {
   private async schema(id: string, signal?: AbortSignal): Promise<{ id: string; properties: Record<string, any>; title: string }> {
     const db = await this.database(id, signal);
     if (!Array.isArray(db.data_sources) || db.data_sources.length !== 1) invalid('database must have exactly one data source; choose an unambiguous database');
-    const sourceId = uuid(db.data_sources[0]?.id, true); const source = await this.dataSource(sourceId, signal);
+    const sourceId = uuid(db.data_sources[0]?.id, true);
+    if (this.expectedDataSources && this.expectedDataSources.get(id) !== sourceId) denied();
+    const source = await this.dataSource(sourceId, signal);
     if (uuid(source.parent.database_id, true) !== id) denied();
     if (!source.properties || typeof source.properties !== 'object' || Array.isArray(source.properties)) badResponse();
     const titles = Object.entries<any>(source.properties).filter(([, value]) => value?.type === 'title');

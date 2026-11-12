@@ -33,6 +33,7 @@ import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedu
 import { evaluateGithubDigestCandidate } from './schedules/github-digest-candidate.js';
 import { evaluateTelegramDigestCandidate } from './schedules/telegram-digest-candidate.js';
 import { evaluateTrelloDigestCandidate } from './schedules/trello-digest-candidate.js';
+import type { NotionDigestSourceAuthority } from './notion/digest-source-authority.js';
 import { evaluateNotionDigestCandidate } from './schedules/notion-digest-candidate.js';
 import { evaluateJiraDigestCandidate, type EvaluateJiraDigestInput } from './schedules/jira-digest-candidate.js';
 import {
@@ -189,6 +190,7 @@ export interface ChatServiceOptions {
   telegramConnection?: (userId: string) => Promise<any>;
   /** The caller's active Notion connection lookup; absent when Notion OAuth is off or not connected. */
   notionConnection?: (userId: string) => Promise<any>;
+  notionDigestSources?: Pick<NotionDigestSourceAuthority, 'prepare'>;
   /** The caller's active Jira OAuth 3LO read-only digest connection lookup in organization workspace mode. */
   myjiraDigestConnection?: EvaluateJiraDigestInput['jiraConnection'];
   /** Server-side binder for Jira plans (JIRA-08); absent, personal Jira plans are refused. */
@@ -245,6 +247,7 @@ export class ChatService {
   private githubConnection?: ChatServiceOptions['githubConnection'];
   private telegramConnection?: ChatServiceOptions['telegramConnection'];
   private notionConnection?: ChatServiceOptions['notionConnection'];
+  private notionDigestSources?: ChatServiceOptions['notionDigestSources'];
   private myjiraDigestConnection?: ChatServiceOptions['myjiraDigestConnection'];
   private jiraBinder?: JiraPlanBinder;
   private jiraHistorySanitizer?: JiraHistorySanitizer;
@@ -268,6 +271,7 @@ export class ChatService {
     this.githubConnection = options.githubConnection;
     this.telegramConnection = options.telegramConnection;
     this.notionConnection = options.notionConnection;
+    this.notionDigestSources = options.notionDigestSources;
     this.myjiraDigestConnection = options.myjiraDigestConnection;
     this.jiraBinder = options.jiraBinder;
     this.jiraHistorySanitizer = options.jiraHistorySanitizer;
@@ -1706,11 +1710,16 @@ export class ChatService {
       const ghLookup = services.includes('github') && this.githubConnection
         ? await this.githubConnection(actor.userId, githubScopeId).catch(() => null)
         : null;
+      const notionBinding = services.includes('notion') && new Set(services).size === 2 &&
+          trustedScope.workspaceMode !== 'organization' && proposal.request && tgLookup?.status === 'connected'
+        ? await this.notionDigestSources?.prepare(actor.userId, proposal.request, AbortSignal.timeout(10_000)).catch(() => undefined)
+        : undefined;
       digestCandidate = evaluateTelegramDigestCandidate({
         proposal,
         services,
         timeZone: this.schedules.timeZone,
         telegramLookup: tgLookup,
+        notionBinding,
         githubLookup: ghLookup,
       });
     } else if (
@@ -1756,15 +1765,15 @@ export class ChatService {
       proposal.request &&
       recurrence &&
       services.includes('notion') &&
-      this.notionConnection
+      this.notionDigestSources
     ) {
       digestCandidate = await evaluateNotionDigestCandidate({
         userId: actor.userId,
         request: proposal.request,
         services,
         recurrence,
-        notionConnection: this.notionConnection,
-        telegramConnection: this.telegramConnection,
+        workspaceMode: trustedScope.workspaceMode,
+        notionSources: this.notionDigestSources,
         getAdapter: this.getAdapter,
       });
     } else if (

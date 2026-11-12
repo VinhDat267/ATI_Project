@@ -1,3 +1,4 @@
+import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   evaluateNotionDigestCandidate,
@@ -17,6 +18,14 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
   const recurrence = { type: 'daily' as const, time: '08:30' };
   const dbId1 = 'aabbccdd-1122-3344-5566-77889900aabb';
 
+  const credentialId = 'eeeeeeee-5555-4555-8555-eeeeeeeeeeee';
+  const bindingFor = (ownerId: string, id = credentialId) => ({
+    version: 1 as const, ownerId, credentialId: id, workspaceId: 'ws-notion-1',
+    workspaceName: 'ATI Notion', appId: 'notion-app', actorId: 'actor-notion-1',
+    botId: 'bot-notion-1', identityVersion: 1,
+    databases: [{ databaseId: dbId1, dataSourceId: 'ffffffff-6666-4666-8666-ffffffffffff', title: 'Kế hoạch Sprint' }],
+  });
+
   describe('1. evaluateNotionDigestCandidate', () => {
     it('returns canAutoDigest: true when request reads Notion database and sends to an allowed Slack channel', async () => {
       const candidate = await evaluateNotionDigestCandidate({
@@ -24,20 +33,7 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
         request: 'Mỗi sáng tổng hợp các trang trên database Kế hoạch Sprint gửi vào kênh #dev',
         services: ['notion', 'slack'],
         recurrence,
-        notionConnection: async () => ({
-          status: 'connected',
-          connection: {
-            credentialId: 'cred-notion-1',
-            workspaceId: 'ws-notion-1',
-            workspaceName: 'ATI Notion',
-            botId: 'bot-notion-1',
-            identityVersion: 2,
-            databaseIds: [dbId1],
-          },
-          selectedDatabases: [
-            { id: dbId1, title: 'Kế hoạch Sprint', url: 'https://www.notion.so/aabbccdd11223344556677889900aabb' },
-          ],
-        }),
+        notionSources: { prepare: async () => bindingFor(userId) },
         getAdapter: async (serviceName: string) => {
           if (serviceName === 'slack') {
             return {
@@ -49,17 +45,11 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       });
 
       expect(candidate.canAutoDigest).toBe(true);
-      expect(candidate.config).toEqual({
-        credentialId: 'cred-notion-1',
-        workspaceId: 'ws-notion-1',
-        workspaceName: 'ATI Notion',
-        botId: 'bot-notion-1',
-        identityVersion: 2,
-        databases: [
-          { id: dbId1, title: 'Kế hoạch Sprint', url: 'https://www.notion.so/aabbccdd11223344556677889900aabb' },
-        ],
+      expect(candidate.config).toMatchObject({
+        notionBinding: bindingFor(userId),
+        credentialId,
+        databases: [{ id: dbId1, title: 'Kế hoạch Sprint' }],
         channelId: 'C_DEV',
-        channelName: 'dev',
       });
       expect(candidate.configHash).toMatch(/^[0-9a-f]{64}$/);
     });
@@ -70,18 +60,6 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
         request: 'Mỗi sáng tạo trang mới trong database Kế hoạch Sprint và báo vào kênh #dev',
         services: ['notion', 'slack'],
         recurrence,
-        notionConnection: async () => ({
-          status: 'connected',
-          connection: {
-            credentialId: 'cred-notion-1',
-            workspaceId: 'ws-notion-1',
-            workspaceName: 'ATI Notion',
-            botId: 'bot-notion-1',
-            identityVersion: 2,
-            databaseIds: [dbId1],
-          },
-          selectedDatabases: [{ id: dbId1, title: 'Kế hoạch Sprint' }],
-        }),
       });
 
       expect(candidate.canAutoDigest).toBe(false);
@@ -89,168 +67,22 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
     });
   });
 
-  describe('2. createNotionDigestRunner', () => {
-    it('queries Notion databases, includes AI summary with AbortSignal, and sends Slack digest', async () => {
-      const config = {
-        credentialId: 'cred-notion-1',
-        workspaceId: 'ws-notion-1',
-        workspaceName: 'ATI Notion',
-        botId: 'bot-notion-1',
-        identityVersion: 2,
-        databases: [
-          { id: dbId1, title: 'Kế hoạch Sprint', url: 'https://www.notion.so/aabbccdd11223344556677889900aabb' },
-        ],
-        channelId: 'C_DEV',
-        channelName: 'dev',
-      };
-      const configHash = computeNotionDigestConfigHash({ config, recurrence, userId });
-
-      const slackSendSpy = vi.fn().mockResolvedValue({ ts: '1700000000.009' });
-      const runner = createNotionDigestRunner({
-        pool: {
-          query: vi.fn().mockResolvedValue({
-            rowCount: 1,
-            rows: [{ version: 1, status: 'active' }],
-          }),
-        } as any,
-        notionConnection: async () => ({
-          status: 'connected',
-          connection: {
-            credentialId: 'cred-notion-1',
-            workspaceId: 'ws-notion-1',
-            workspaceName: 'ATI Notion',
-            botId: 'bot-notion-1',
-            identityVersion: 2,
-            databaseIds: [dbId1],
-          },
-        }),
-        getAdapter: async (serviceName: string) => {
-          if (serviceName === 'notion') {
-            return {
-              execute: vi.fn().mockResolvedValue({
-                databaseId: dbId1,
-                pages: [
-                  {
-                    id: 'page-1',
-                    title: 'Thiết kế kiến trúc OAuth Notion',
-                    url: 'https://www.notion.so/page-1',
-                    properties: { Status: 'In Progress', Priority: 'High' },
-                  },
-                  {
-                    id: 'page-2',
-                    title: 'Viết kiểm thử E2E',
-                    url: 'https://www.notion.so/page-2',
-                    properties: { Status: 'Todo', Priority: 'Medium' },
-                  },
-                ],
-              }),
-            };
-          }
-          if (serviceName === 'slack') {
-            return {
-              execute: vi.fn().mockImplementation(async (tool: string, args: any) => {
-                if (tool === 'slack.search_channels') {
-                  return [{ id: 'C_DEV', name: 'dev' }];
-                }
-                if (tool === 'slack.send_message') {
-                  return slackSendSpy(args);
-                }
-              }),
-            };
-          }
-          return null;
-        },
-        summarizeDigest: async (_input, signal) => {
-          expect(signal).toBeInstanceOf(AbortSignal);
-          return 'Trang Thiết kế kiến trúc OAuth Notion đang ở trạng thái In Progress (High).';
-        },
-      });
-
-      const outcome = await runner(
-        {
-          runId: 'run-n-1',
-          scheduleId: 'sched-n-1',
-          scheduleVersion: 1,
-          userId,
-          name: 'Báo cáo Notion sáng',
-          request: 'Báo cáo Notion mỗi sáng',
-          dueAt: new Date('2026-11-03T08:30:00.000Z'),
-          trigger: 'scheduled',
-          recurrence,
-          digestConfig: config,
-          digestConfigHash: configHash,
-        },
-        'conv-n-1',
-        new AbortController().signal
-      );
-
-      expect(outcome.state).toBe('digest_sent');
-      if (outcome.state === 'digest_sent') {
-        expect(outcome.delivery).toEqual({
-          channelId: 'C_DEV',
-          channelName: 'dev',
-          ts: '1700000000.009',
-          counts: {
-            databasesChecked: 1,
-            totalPages: 2,
-          },
-        });
-        expect(outcome.text).toContain('Bản tin Notion tự động của Planora');
-        expect(outcome.text).toContain('Nhận xét AI:');
-        expect(outcome.text).toContain('Thiết kế kiến trúc OAuth Notion');
-        expect(outcome.text).toContain('Viết kiểm thử E2E');
-      }
-      expect(slackSendSpy).toHaveBeenCalledTimes(1);
-    });
-
-    it('blocks when identityVersion or databaseIds scope changed since approval', async () => {
-      const config = {
-        credentialId: 'cred-notion-1',
-        workspaceId: 'ws-notion-1',
-        workspaceName: 'ATI Notion',
-        botId: 'bot-notion-1',
-        identityVersion: 2,
-        databases: [{ id: dbId1, title: 'Kế hoạch Sprint' }],
-        channelId: 'C_DEV',
-        channelName: 'dev',
-      };
-      const configHash = computeNotionDigestConfigHash({ config, recurrence, userId });
-
-      const runner = createNotionDigestRunner({
-        pool: { query: vi.fn() } as any,
-        notionConnection: async () => ({
-          status: 'connected',
-          connection: {
-            credentialId: 'cred-notion-1',
-            workspaceId: 'ws-notion-1',
-            workspaceName: 'ATI Notion',
-            botId: 'bot-notion-1',
-            identityVersion: 3, // Reconnected!
-            databaseIds: [dbId1],
-          },
-        }),
-      });
-
-      const outcome = await runner(
-        {
-          runId: 'run-n-2',
-          scheduleId: 'sched-n-1',
-          scheduleVersion: 1,
-          userId,
-          name: 'Báo cáo Notion sáng',
-          request: 'Báo cáo Notion mỗi sáng',
-          dueAt: new Date('2026-11-03T08:30:00.000Z'),
-          trigger: 'scheduled',
-          recurrence,
-          digestConfig: config,
-          digestConfigHash: configHash,
-        },
-        'conv-n-1',
-        new AbortController().signal
-      );
-
-      expect(outcome.state).toBe('blocked');
-    });
+  it('blocks an older Slack Notion digest before reading or looking up the destination', async () => {
+    const config = {
+      credentialId, workspaceId: 'ws-notion-1', workspaceName: 'ATI Notion',
+      botId: 'bot-notion-1', identityVersion: 1,
+      databases: [{ id: dbId1, title: 'Kế hoạch Sprint' }], channelId: 'C_DEV', channelName: 'dev',
+    };
+    const getAdapter = vi.fn();
+    const runner = createNotionDigestRunner({ pool: { query: vi.fn() } as any, getAdapter });
+    const outcome = await runner({
+      runId: 'run-n-1', scheduleId: 'sched-n-1', scheduleVersion: 1, userId,
+      name: 'Báo cáo Notion', request: 'Báo cáo Notion mỗi sáng',
+      dueAt: new Date('2026-11-03T08:30:00.000Z'), trigger: 'scheduled',
+      recurrence, digestConfig: config, digestConfigHash: computeNotionDigestConfigHash({ config, recurrence, userId }),
+    }, 'conv-n-1', AbortSignal.timeout(1000));
+    expect(outcome.state).toBe('blocked');
+    expect(getAdapter).not.toHaveBeenCalled();
   });
 
   describe('3. Telegram summarizeSourceItems for Notion', () => {
@@ -339,6 +171,23 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       await db?.close();
     });
 
+    async function withSource<T>(
+      _ownerId: string, _binding: unknown, _signal: AbortSignal, action: (client: pg.PoolClient) => Promise<T>,
+    ): Promise<T> {
+      const client = await db.pool.connect();
+      try { return await action(client); }
+      finally { client.release(); }
+    }
+
+    async function sourceFor(ownerId: string) {
+      const row = (await db.pool.query(
+        `INSERT INTO notion_connections(user_id,app_id,workspace_id,workspace_name,actor_id,bot_id,config,allowed_databases)
+         VALUES($1,'notion-app','ws-notion-1','ATI Notion',$3,'bot-notion-1','fixture-ciphertext',$2)
+         RETURNING id`, [ownerId, [dbId1], ownerId],
+      )).rows[0];
+      return { ...bindingFor(ownerId, row.id), actorId: ownerId };
+    }
+
     it('confirms a notion_digest proposal in PostgreSQL and executes it on ScheduleRunner.tick()', async () => {
       const user = await db.person('NotionDigestOwner');
       const convRes = await db.pool.query(
@@ -347,8 +196,10 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       );
       const convId = convRes.rows[0].id as string;
 
+      const notionBinding = await sourceFor(user.id);
       const config = {
-        credentialId: 'cred-notion-1',
+        notionBinding,
+        credentialId: notionBinding.credentialId,
         workspaceId: 'ws-notion-1',
         workspaceName: 'ATI Notion',
         botId: 'bot-notion-1',
@@ -411,16 +262,18 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
         approvedAt: '2026-11-02T10:00:00.000Z',
       });
 
-      const runNotionDigest = vi.fn().mockResolvedValue({
-        state: 'digest_sent',
-        delivery: {
-          channelId: 'C_DEV',
-          channelName: 'dev',
-          ts: '1700000000.009',
-          counts: { databasesChecked: 1, totalPages: 3 },
+      const pages = [{ id: 'page1', title: 'Trang Sprint', url: 'https://www.notion.so/page1' }];
+      const sendSlack = vi.fn(async () => ({ ts: '1700000000.009' }));
+      const runNotionDigest = vi.fn(createNotionDigestRunner({
+        pool: db.pool,
+        notionSources: {
+          read: async () => ({ pages, pagesByDatabase: new Map([[dbId1, pages]]) }),
+          withSource,
         },
-        text: '*Bản tin Notion tự động của Planora*',
-      });
+        getAdapter: async () => ({ execute: async (tool: string) => tool === 'slack.search_channels'
+          ? [{ id: 'C_DEV', name: 'dev' }]
+          : sendSlack() }),
+      }));
 
       const runner = new ScheduleRunner({
         pool: db.pool,
@@ -436,6 +289,7 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       await runner.tick();
 
       expect(runNotionDigest).toHaveBeenCalledTimes(1);
+      expect(sendSlack).toHaveBeenCalledTimes(1);
       const runs = await service.listRuns(
         user.id,
         confirmed.schedule.id,
@@ -448,11 +302,11 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
         channelId: 'C_DEV',
         channelName: 'dev',
         ts: '1700000000.009',
-        counts: { databasesChecked: 1, totalPages: 3 },
+        counts: { databasesChecked: 1, totalPages: 1 },
       });
     });
 
-    it('marks run as needs_attention on ambiguous delivery failure and discards when schedule is cancelled before delivery', async () => {
+    it.each(['cancelled', 'run-locked'] as const)('does not dispatch when the Slack delivery claim is %s', async (reason) => {
       const user = await db.person('NotionDigestSafetyOwner');
       const convRes = await db.pool.query(
         "INSERT INTO conversations(user_id, status, title) VALUES($1, 'chatting', 'Lịch Notion Safety') RETURNING id",
@@ -460,8 +314,10 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       );
       const convId = convRes.rows[0].id as string;
 
+      const notionBinding = await sourceFor(user.id);
       const config = {
-        credentialId: 'cred-notion-1',
+        notionBinding,
+        credentialId: notionBinding.credentialId,
         workspaceId: 'ws-notion-1',
         workspaceName: 'ATI Notion',
         botId: 'bot-notion-1',
@@ -503,6 +359,7 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       });
 
       let slackSendCallsAfterCancel = 0;
+      let lockedRun: pg.PoolClient | undefined;
       const runner = new ScheduleRunner({
         pool: db.pool,
         timeZone: 'Asia/Ho_Chi_Minh',
@@ -512,32 +369,37 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
         },
         runNotionDigest: createNotionDigestRunner({
           pool: db.pool,
-          notionConnection: async () => ({
-            status: 'connected',
-            connection: {
-              credentialId: 'cred-notion-1',
-              workspaceId: 'ws-notion-1',
-              workspaceName: 'ATI Notion',
-              botId: 'bot-notion-1',
-              identityVersion: 1,
-              databaseIds: [dbId1],
+          notionSources: {
+            read: async () => {
+              if (reason === 'cancelled') {
+                await service.setStatus({
+                  userId: user.id, scheduleId: confirmed.schedule.id, action: 'cancel',
+                  version: confirmed.schedule.version, now: new Date('2026-11-03T01:31:05.000Z'),
+                });
+              } else {
+                lockedRun = await db.pool.connect();
+                await lockedRun.query('BEGIN');
+                const locked = await lockedRun.query(
+                  "SELECT id FROM schedule_runs WHERE schedule_id=$1 AND status='planning' FOR UPDATE",
+                  [confirmed.schedule.id],
+                );
+                expect(locked.rowCount).toBe(1);
+              }
+              return { pages: [], pagesByDatabase: new Map() };
             },
-          }),
+            withSource: async (ownerId, binding, signal, action) => {
+              try {
+                return await withSource(ownerId, binding, signal, action);
+              } finally {
+                if (lockedRun) {
+                  await lockedRun.query('ROLLBACK');
+                  lockedRun.release();
+                  lockedRun = undefined;
+                }
+              }
+            },
+          },
           getAdapter: async (serviceName: string) => {
-            if (serviceName === 'notion') {
-              return {
-                execute: vi.fn().mockImplementation(async () => {
-                  await service.setStatus({
-                    userId: user.id,
-                    scheduleId: confirmed.schedule.id,
-                    action: 'cancel',
-                    version: confirmed.schedule.version,
-                    now: new Date('2026-11-03T01:31:05.000Z'),
-                  });
-                  return { pages: [] };
-                }),
-              };
-            }
             if (serviceName === 'slack') {
               return {
                 execute: vi.fn().mockImplementation(async (tool: string) => {
@@ -555,8 +417,17 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
         recordState: (client, row, now) => service.recordState(client, row, now),
       });
 
-      await runner.tick();
-      expect(slackSendCallsAfterCancel).toBe(0);
+      try {
+        await runner.tick();
+        expect(slackSendCallsAfterCancel).toBe(0);
+        const runs = await service.listRuns(user.id, confirmed.schedule.id, 5, new Date('2026-11-03T01:32:00.000Z'));
+        expect(runs[0]?.state).toBe(reason === 'cancelled' ? 'discarded' : 'digest_failed');
+      } finally {
+        if (lockedRun) {
+          await lockedRun.query('ROLLBACK');
+          lockedRun.release();
+        }
+      }
     });
   });
 });
