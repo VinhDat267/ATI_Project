@@ -463,4 +463,66 @@ describe('service credential and health boundary', () => {
       allowedScope: ['org/private-repo'],
     });
   });
+
+  it('keeps notion shared (without personalStatus) when notion.repo is passed without notion.oauth', async () => {
+    const getActive = vi.fn().mockResolvedValue(null);
+    const appWithoutOAuth = createApp({
+      jwtSecret: secret,
+      credentialRepo: {
+        getCredentials: async () => null,
+        getPersonalCredentials: async () => null,
+      } as any,
+      encryptionKey: key,
+      notion: {
+        repo: { getActive } as any,
+      },
+    });
+
+    const resWithoutOAuth = await request(appWithoutOAuth)
+      .get('/api/services')
+      .set('Authorization', `Bearer ${token}`);
+    expect(resWithoutOAuth.status).toBe(200);
+    const notionShared = resWithoutOAuth.body.services.find((s: any) => s.id === 'notion');
+    expect(notionShared).toMatchObject({
+      id: 'notion',
+      connection: 'shared',
+      connected: false,
+      configured: false,
+      connectionStatus: 'unconfigured',
+    });
+    expect(notionShared.personalStatus).toBeUndefined();
+    expect(getActive).not.toHaveBeenCalled();
+
+    const appWithOAuth = createApp({
+      jwtSecret: secret,
+      credentialRepo: {
+        getCredentials: async () => null,
+        getPersonalCredentials: async () => null,
+      } as any,
+      encryptionKey: key,
+      notion: {
+        oauth: {
+          clientId: 'notion-client-id',
+          clientSecret: 'notion-client-secret',
+          redirectUri: 'http://localhost:5174/api/connections/notion/callback',
+          authorizationUrl: 'https://api.notion.com/v1/oauth/authorize',
+          apiBaseUrl: 'https://api.notion.com',
+        },
+        repo: { getActive } as any,
+      },
+    });
+
+    const resWithOAuth = await request(appWithOAuth)
+      .get('/api/services')
+      .set('Authorization', `Bearer ${token}`);
+    expect(resWithOAuth.status).toBe(200);
+    const notionPersonal = resWithOAuth.body.services.find((s: any) => s.id === 'notion');
+    expect(notionPersonal).toMatchObject({
+      id: 'notion',
+      connection: 'personal',
+      connected: false,
+      personalStatus: 'not_connected',
+    });
+    expect(getActive).toHaveBeenCalledWith('user-a');
+  });
 });

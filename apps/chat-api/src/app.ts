@@ -482,7 +482,8 @@ export function createApp(options: AppOptions): Express {
         options.github?.oauthClient ??
         (options.github?.oauth ? new GitHubOAuthClient(options.github.oauth, options.github.fetchFn) : undefined),
       githubTokens,
-      notionConnectionRepo: options.notionConnectionRepo ?? notionCfg?.repo,
+      notionConnectionRepo:
+        options.notionConnectionRepo ?? (notionCfg?.oauth ? notionCfg.repo : undefined),
       notionConnection: options.notionConnection })
   );
 
