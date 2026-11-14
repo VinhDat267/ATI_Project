@@ -21,7 +21,8 @@ export function createJiraStepError(
   category: ErrorCategory,
   statusCode?: number,
   customMessage?: string,
-  retryable = false
+  retryable = false,
+  details?: Record<string, unknown>
 ): StepError {
   const message = customMessage ?? (
     category === 'UNKNOWN'
@@ -33,6 +34,7 @@ export function createJiraStepError(
     statusCode,
     retryable,
     message,
+    ...(details ? { details } : {}),
   });
 }
 
@@ -59,11 +61,13 @@ export class PersonalJiraHttpTransport {
     writing: boolean,
     options?: { signal?: AbortSignal; method?: string; body?: unknown; timeoutMs?: number }
   ): Promise<any> {
+    const preWriteDetails = { requestSent: false };
+    const nonWritingDetails = writing ? undefined : preWriteDetails;
     const deadlineMs = options?.timeoutMs ?? this.defaultTimeoutMs ?? (writing ? 30_000 : 15_000);
     const deadlineSignal = AbortSignal.timeout(deadlineMs);
     const signal = options?.signal ? AbortSignal.any([options.signal, deadlineSignal]) : deadlineSignal;
     if (signal?.aborted) {
-      throw createJiraStepError('NETWORK', undefined, 'Jira request cancelled before dispatch');
+      throw createJiraStepError('NETWORK', undefined, 'Jira request cancelled before dispatch', false, preWriteDetails);
     }
 
     const limiterKey = 'myjira:' + this.userId + ':' + cloudId;
@@ -71,19 +75,27 @@ export class PersonalJiraHttpTransport {
       try {
         const acquired = await this.rateLimiter.waitForSlot(limiterKey, 30_000, 50, signal);
         if (!acquired) {
-          throw createJiraStepError('RATE_LIMIT', 429, 'Rate limiter slot timeout', !writing);
+          throw createJiraStepError('RATE_LIMIT', 429, 'Rate limiter slot timeout', !writing, preWriteDetails);
         }
       } catch (error) {
         if (signal?.aborted) {
-          throw createJiraStepError('NETWORK', undefined, 'Jira request stopped before dispatch');
+          throw createJiraStepError('NETWORK', undefined, 'Jira request stopped before dispatch', false, preWriteDetails);
         }
-        if (error instanceof StepError) throw error;
-        throw createJiraStepError('RATE_LIMIT', 429, 'Rate limiter wait failed', !writing);
+        if (error instanceof StepError) {
+          throw new StepError({
+            category: error.category,
+            statusCode: error.statusCode,
+            retryable: error.retryable,
+            message: error.message,
+            details: { ...(error.details ?? {}), requestSent: false },
+          });
+        }
+        throw createJiraStepError('RATE_LIMIT', 429, 'Rate limiter wait failed', !writing, preWriteDetails);
       }
     }
 
     if (signal?.aborted) {
-      throw createJiraStepError('NETWORK', undefined, 'Jira request cancelled before dispatch');
+      throw createJiraStepError('NETWORK', undefined, 'Jira request cancelled before dispatch', false, preWriteDetails);
     }
 
     const cleanPath = path.startsWith('/') ? path : '/' + path;
@@ -97,32 +109,40 @@ export class PersonalJiraHttpTransport {
 
     for (;;) {
       if (signal?.aborted) {
-        throw createJiraStepError('NETWORK', undefined, 'Jira request cancelled before dispatch');
+        throw createJiraStepError('NETWORK', undefined, 'Jira request cancelled before dispatch', false, preWriteDetails);
       }
 
       let token: string;
       try {
         const provider = this.tokens as any;
         if (!provider || typeof provider.getAccessToken !== 'function') {
-          throw createJiraStepError('VALIDATION', undefined, 'PersonalJiraAdapter requires a tokens provider');
+          throw createJiraStepError('VALIDATION', undefined, 'PersonalJiraAdapter requires a tokens provider', false, preWriteDetails);
         }
         token = provider.getAccessToken.length >= 2
           ? await provider.getAccessToken(this.userId, { signal, forceRefresh })
           : await provider.getAccessToken({ signal, forceRefresh });
         if (typeof token !== 'string' || !token.trim()) {
-          throw createJiraStepError('AUTH_ERROR', 401, 'Jira token acquisition returned empty token');
+          throw createJiraStepError('AUTH_ERROR', 401, 'Jira token acquisition returned empty token', false, preWriteDetails);
         }
       } catch (err) {
         if (signal?.aborted) {
-          throw createJiraStepError('NETWORK', undefined, 'Jira request cancelled during token refresh');
+          throw createJiraStepError('NETWORK', undefined, 'Jira request cancelled during token refresh', false, preWriteDetails);
         }
-        if (err instanceof StepError) throw err;
-        throw createJiraStepError('AUTH_ERROR', 401, 'Jira token acquisition failed');
+        if (err instanceof StepError) {
+          throw new StepError({
+            category: err.category,
+            statusCode: err.statusCode,
+            retryable: err.retryable,
+            message: err.message,
+            details: { ...(err.details ?? {}), requestSent: false },
+          });
+        }
+        throw createJiraStepError('AUTH_ERROR', 401, 'Jira token acquisition failed', false, preWriteDetails);
       }
       forceRefresh = false;
 
       if (signal?.aborted) {
-        throw createJiraStepError('NETWORK', undefined, 'Jira request cancelled before dispatch');
+        throw createJiraStepError('NETWORK', undefined, 'Jira request cancelled before dispatch', false, preWriteDetails);
       }
 
       let response: Response;
@@ -143,10 +163,10 @@ export class PersonalJiraHttpTransport {
           throw createJiraStepError('UNKNOWN', undefined, 'Jira write outcome is unknown; verify before writing again.');
         }
         if (signal?.aborted) {
-          throw createJiraStepError('NETWORK', undefined, 'Jira request aborted');
+          throw createJiraStepError('NETWORK', undefined, 'Jira request aborted', false, nonWritingDetails);
         }
         if (networkRetries++ < 2) continue;
-        throw createJiraStepError('NETWORK', undefined, 'Jira transport failed');
+        throw createJiraStepError('NETWORK', undefined, 'Jira transport failed', false, nonWritingDetails);
       }
 
       let value: any;
@@ -154,7 +174,7 @@ export class PersonalJiraHttpTransport {
         value = response.status === 204 ? {} : await response.json();
       } catch {
         if (response.ok) {
-          throw createJiraStepError(writing ? 'UNKNOWN' : 'SERVER_ERROR', response.status);
+          throw createJiraStepError(writing ? 'UNKNOWN' : 'SERVER_ERROR', response.status, undefined, false, nonWritingDetails);
         }
       }
 
@@ -164,7 +184,7 @@ export class PersonalJiraHttpTransport {
           forceRefresh = true;
           continue;
         }
-        throw createJiraStepError('AUTH_ERROR', 401);
+        throw createJiraStepError('AUTH_ERROR', 401, undefined, false, nonWritingDetails);
       }
 
       if (
@@ -179,7 +199,7 @@ export class PersonalJiraHttpTransport {
       }
 
       if (response.status === 403) {
-        throw createJiraStepError('AUTH_ERROR', 403);
+        throw createJiraStepError('AUTH_ERROR', 403, undefined, false, nonWritingDetails);
       }
 
       if (response.status === 429) {
@@ -193,15 +213,15 @@ export class PersonalJiraHttpTransport {
               await waitWithSignal(delay, signal);
               continue;
             } catch {
-              throw createJiraStepError('RATE_LIMIT', 429, 'Rate limit wait cancelled', false);
+              throw createJiraStepError('RATE_LIMIT', 429, 'Rate limit wait cancelled', false, nonWritingDetails);
             }
           }
         }
-        throw createJiraStepError('RATE_LIMIT', 429, 'Rate limit exceeded', !writing);
+        throw createJiraStepError('RATE_LIMIT', 429, 'Rate limit exceeded', !writing, nonWritingDetails);
       }
 
       if (response.status === 404) {
-        throw createJiraStepError('NOT_FOUND', 404);
+        throw createJiraStepError('NOT_FOUND', 404, undefined, false, nonWritingDetails);
       }
 
       if (response.status >= 500) {
@@ -211,14 +231,14 @@ export class PersonalJiraHttpTransport {
         if (serverRetries++ < 1 && !signal?.aborted) {
           continue;
         }
-        throw createJiraStepError('SERVER_ERROR', response.status);
+        throw createJiraStepError('SERVER_ERROR', response.status, undefined, false, nonWritingDetails);
       }
 
       if (!response.ok) {
         if (response.status >= 400 && response.status < 500) {
-          throw createJiraStepError('VALIDATION', response.status);
+          throw createJiraStepError('VALIDATION', response.status, undefined, false, nonWritingDetails);
         }
-        throw createJiraStepError(writing ? 'UNKNOWN' : 'SERVER_ERROR', response.status);
+        throw createJiraStepError(writing ? 'UNKNOWN' : 'SERVER_ERROR', response.status, undefined, false, nonWritingDetails);
       }
 
       return value;

@@ -24,7 +24,8 @@ export function resolveRef(ref: string, stepOutputs: StepOutputs): any {
       ? stepData
       : { output: stepData };
 
-  const parts = path.split('.');
+  const normalizedPath = path.replace(/\[(\d+)\]/g, '.$1');
+  const parts = normalizedPath.split('.');
   for (const part of parts) {
     if (
       current === null ||

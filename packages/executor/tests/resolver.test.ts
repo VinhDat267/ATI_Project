@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveArgs, resolveValue } from '../src/index.js';
+import { resolveArgs, resolveRef, resolveValue } from '../src/index.js';
 
 describe('packages/executor (Task 12: Reference Resolver)', () => {
   const outputs = new Map<string, any>([
@@ -107,6 +107,51 @@ describe('packages/executor (Task 12: Reference Resolver)', () => {
 
     expect(() => resolveArgs(args, outputs)).toThrow(
       /property 'output.nonexistent.field' not found on step 'step_1'/i
+    );
+  });
+
+  it('resolves bracket array indexing in $ref and $template (AUD-W4-06)', () => {
+    const arrayOutputs = new Map<string, any>([
+      [
+        'step_1',
+        [
+          { id: 'item_0', url: 'https://example.test/items/0' },
+          { id: 'item_1', url: 'https://example.test/items/1' },
+        ],
+      ],
+      [
+        'step_2',
+        {
+          issues: [
+            { id: 'iss_10', key: 'ATI-10', url: 'https://jira.example.test/browse/ATI-10' },
+          ],
+        },
+      ],
+    ]);
+
+    expect(resolveRef('step_1.output[0].id', arrayOutputs)).toBe('item_0');
+    expect(resolveRef('step_1.output[1].url', arrayOutputs)).toBe('https://example.test/items/1');
+    expect(resolveRef('step_2.output.issues[0].key', arrayOutputs)).toBe('ATI-10');
+
+    const resolved = resolveArgs(
+      {
+        targetId: { $ref: 'step_1.output[0].id' },
+        issueKey: { $ref: 'step_2.output.issues[0].key' },
+        summary: {
+          $template: 'First item ${step_1.output[0].id} at ${step_1.output[0].url} (${step_2.output.issues[0].url})',
+        },
+      },
+      arrayOutputs,
+    );
+
+    expect(resolved).toEqual({
+      targetId: 'item_0',
+      issueKey: 'ATI-10',
+      summary: 'First item item_0 at https://example.test/items/0 (https://jira.example.test/browse/ATI-10)',
+    });
+
+    expect(() => resolveRef('step_1.output[5].id', arrayOutputs)).toThrow(
+      /Property 'output\[5\]\.id' not found on step 'step_1'/,
     );
   });
 });

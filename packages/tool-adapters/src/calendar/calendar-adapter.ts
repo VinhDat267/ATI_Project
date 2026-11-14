@@ -285,14 +285,34 @@ export class CalendarAdapter extends BaseAdapter {
     this.calendars(); this.assertAllowedScope('calendars', value); return value;
   }
   private async request(path: string, signal?: AbortSignal, body?: object): Promise<any> {
-    if (signal?.aborted) throw new StepError({ message: 'Calendar request cancelled before dispatch', category: 'NETWORK' });
+    if (signal?.aborted) throw new StepError({ message: 'Calendar request cancelled before dispatch', category: 'NETWORK', details: { requestSent: false } });
     const writing = body !== undefined;
-    const token = await this.auth.getAccessToken(CALENDAR_SCOPE, signal);
+    let token: string;
+    try {
+      token = await this.auth.getAccessToken(CALENDAR_SCOPE, signal);
+    } catch (error) {
+      if (error instanceof StepError) {
+        throw new StepError({
+          message: error.message,
+          category: error.category,
+          statusCode: error.statusCode,
+          retryable: error.retryable,
+          details: { ...(error.details ?? {}), requestSent: false },
+        });
+      }
+      throw new StepError({ message: 'Calendar request stopped before dispatch', category: 'NETWORK', details: { requestSent: false } });
+    }
     let networkRetries = 0; let serverRetries = 0; let rateRetries = 0;
     for (;;) {
       try { await this.waitForTransportSlot(this.rateLimiter ?? sharedLimiter, 'calendar:' + this.account, signal); }
-      catch (error) { throw new StepError({ message: 'Calendar request stopped before dispatch', category: error instanceof StepError ? error.category : 'NETWORK' }); }
-      if (signal?.aborted) throw new StepError({ message: 'Calendar request cancelled before dispatch', category: 'NETWORK' });
+      catch (error) {
+        throw new StepError({
+          message: 'Calendar request stopped before dispatch',
+          category: error instanceof StepError ? error.category : 'NETWORK',
+          details: { ...(error instanceof StepError && error.details ? error.details : {}), requestSent: false },
+        });
+      }
+      if (signal?.aborted) throw new StepError({ message: 'Calendar request cancelled before dispatch', category: 'NETWORK', details: { requestSent: false } });
       let response: Response;
       try { response = await this.fetchFn(apiBase + path, {
         method: writing ? 'POST' : 'GET', signal, redirect: 'error',

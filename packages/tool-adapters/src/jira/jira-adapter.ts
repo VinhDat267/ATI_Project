@@ -8,8 +8,9 @@ export interface JiraAdapterConfig extends BaseAdapterConfig {
 }
 // Conservative process-local pacing; provider burst limits remain authoritative.
 const sharedLimiter = new GlobalRateLimiter({ maxRequests: 5, windowMs: 1000 });
-const fail = (category: ErrorCategory, statusCode?: number) => new StepError({ category, statusCode, retryable: false,
-  message: category === 'UNKNOWN' ? 'Jira write outcome is unknown; verify before writing again.' : 'Jira request failed: ' + category });
+const fail = (category: ErrorCategory, statusCode?: number, details?: Record<string, unknown>) => new StepError({ category, statusCode, retryable: false,
+  message: category === 'UNKNOWN' ? 'Jira write outcome is unknown; verify before writing again.' : 'Jira request failed: ' + category,
+  ...(details ? { details } : {}) });
 const record = (v: unknown): v is Record<string, any> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const text = (v: unknown, min: number, max: number): v is string => typeof v === 'string' && Array.from(v).length >= min && Array.from(v).length <= max;
 const identifier = (v: unknown): v is string => typeof v === 'string' && /^\d+$/.test(v);
@@ -85,20 +86,37 @@ export class JiraAdapter extends BaseAdapter {
     }
     if (tool === 'jira.create_issue') {
       this.input(args, ['projectKey', 'summary', 'description', 'issueType']); const key = this.project(args.projectKey);
-      if (!text(args.summary, 1, 255) || (args.description !== undefined && !text(args.description, 0, 4000)) || (args.issueType !== undefined && !text(args.issueType, 1, 255))) throw fail('VALIDATION');
-      const types = await this.issueTypes(key, signal); const standard = types.filter(type => type.subtask === false);
-      const selected = args.issueType !== undefined ? standard.find(type => type.name === args.issueType) : standard.find(type => type.name === 'Task') ?? standard[0];
-      if (!selected) throw new StepError({ category: 'VALIDATION', message: 'Jira issueType must be a standard project type. Valid types: ' + standard.map(type => type.name).join(', ') });
+      if (!text(args.summary, 1, 255) || (args.description !== undefined && !text(args.description, 0, 4000)) || (args.issueType !== undefined && !text(args.issueType, 1, 255))) throw fail('VALIDATION', undefined, { requestSent: false });
+      let selected: { id: string; name: string; subtask: boolean } | undefined;
+      try {
+        const types = await this.issueTypes(key, signal); const standard = types.filter(type => type.subtask === false);
+        selected = args.issueType !== undefined ? standard.find(type => type.name === args.issueType) : standard.find(type => type.name === 'Task') ?? standard[0];
+        if (!selected) throw new StepError({ category: 'VALIDATION', message: 'Jira issueType must be a standard project type. Valid types: ' + standard.map(type => type.name).join(', '), details: { requestSent: false } });
+      } catch (err) {
+        if (err instanceof StepError) {
+          throw new StepError({ category: err.category, statusCode: err.statusCode, retryable: err.retryable, message: err.message, details: { ...(err.details ?? {}), requestSent: false } });
+        }
+        throw fail('NETWORK', undefined, { requestSent: false });
+      }
       const value = await this.request('/issue', true, signal, 'POST', { fields: { project: { key }, summary: args.summary, issuetype: { id: selected.id }, ...(args.description !== undefined ? { description: adf(args.description) } : {}) } });
       return this.identity(value, key, true);
     }
     if (tool === 'jira.add_comment') {
       this.input(args, ['issueKey', 'body']);
-      if (typeof args.issueKey !== 'string' || !JIRA_ISSUE_PATTERN.test(args.issueKey) || !text(args.body, 1, 4000)) throw fail('VALIDATION');
+      if (typeof args.issueKey !== 'string' || !JIRA_ISSUE_PATTERN.test(args.issueKey) || !text(args.body, 1, 4000)) throw fail('VALIDATION', undefined, { requestSent: false });
       this.project(args.issueKey.split('-')[0]);
-      const issue = await this.request('/issue/' + args.issueKey + '?fields=project', false, signal);
-      // Parent/key can change after a move: re-check the actual parent before write, use the current key.
-      const key = this.project(issue?.fields?.project?.key); const identity = this.identity(issue, key);
+      let identity: { id: string; key: string; url: string };
+      try {
+        const issue = await this.request('/issue/' + args.issueKey + '?fields=project', false, signal);
+        // Parent/key can change after a move: re-check the actual parent before write, use the current key.
+        const key = this.project(issue?.fields?.project?.key);
+        identity = this.identity(issue, key);
+      } catch (err) {
+        if (err instanceof StepError) {
+          throw new StepError({ category: err.category, statusCode: err.statusCode, retryable: err.retryable, message: err.message, details: { ...(err.details ?? {}), requestSent: false } });
+        }
+        throw fail('NETWORK', undefined, { requestSent: false });
+      }
       const value = await this.request('/issue/' + identity.key + '/comment', true, signal, 'POST', { body: adf(args.body) });
       if (!record(value) || !identifier(value.id)) throw fail('UNKNOWN');
       return { id: value.id, issueKey: identity.key, url: identity.url + '?focusedCommentId=' + value.id };
@@ -147,10 +165,10 @@ export class JiraAdapter extends BaseAdapter {
   private async request(path: string, writing: boolean, signal?: AbortSignal, method = 'GET', body?: object): Promise<any> {
     let network = 0; let server = 0; let rate = 0;
     for (;;) {
-      if (signal?.aborted) throw fail('NETWORK');
+      if (signal?.aborted) throw fail('NETWORK', undefined, { requestSent: false });
       try { await this.waitForTransportSlot(this.rateLimiter!, this.site + ':' + this.authorization, signal); }
-      catch { throw fail(signal?.aborted ? 'NETWORK' : 'RATE_LIMIT'); }
-      if (signal?.aborted) throw fail('NETWORK');
+      catch { throw fail(signal?.aborted ? 'NETWORK' : 'RATE_LIMIT', undefined, { requestSent: false }); }
+      if (signal?.aborted) throw fail('NETWORK', undefined, { requestSent: false });
       let response: Response;
       try { response = await this.fetchFn(this.site + '/rest/api/3' + path, { method, signal, redirect: 'error', headers: { Accept: 'application/json', Authorization: this.authorization, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }); }
       catch { if (!writing && !signal?.aborted && network++ < 2) continue; throw fail(writing ? 'UNKNOWN' : 'NETWORK'); }

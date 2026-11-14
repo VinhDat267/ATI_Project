@@ -57,7 +57,7 @@ function validRepository(value: unknown): value is string {
 }
 
 function validation(message: string): never {
-  throw new StepError({ message, category: 'VALIDATION', retryable: false });
+  throw new StepError({ message, category: 'VALIDATION', retryable: false, details: { requestSent: false } });
 }
 
 function text(value: unknown, field: string): string {
@@ -142,7 +142,7 @@ export class GitHubAdapter extends BaseAdapter {
   private allowedRepositories(): string[] {
     const repos = this.allowedScope?.repos;
     if (!Array.isArray(repos) || repos.length === 0 || repos.some((repo) => !validRepository(repo))) {
-      throw new StepError({ message: 'GitHub requires an explicit repository allowlist', category: 'AUTH_ERROR', statusCode: 403, retryable: false });
+      throw new StepError({ message: 'GitHub requires an explicit repository allowlist', category: 'AUTH_ERROR', statusCode: 403, retryable: false, details: { requestSent: false } });
     }
     return repos;
   }
@@ -154,7 +154,7 @@ export class GitHubAdapter extends BaseAdapter {
       try {
         this.assertAllowedScope('repos', contextRepo);
       } catch {
-        throw new StepError({ message: `GitHub repository '${contextRepo}' is outside allowed scope`, category: 'AUTH_ERROR', statusCode: 403, retryable: false });
+        throw new StepError({ message: `GitHub repository '${contextRepo}' is outside allowed scope`, category: 'AUTH_ERROR', statusCode: 403, retryable: false, details: { requestSent: false } });
       }
     }
     if (!validRepository(value)) validation('GitHub repo must be owner/repo');
@@ -162,7 +162,7 @@ export class GitHubAdapter extends BaseAdapter {
     try {
       this.assertAllowedScope('repos', value);
     } catch {
-      throw new StepError({ message: `GitHub repository '${value}' is outside allowed scope`, category: 'AUTH_ERROR', statusCode: 403, retryable: false });
+      throw new StepError({ message: `GitHub repository '${value}' is outside allowed scope`, category: 'AUTH_ERROR', statusCode: 403, retryable: false, details: { requestSent: false } });
     }
     return value;
   }
@@ -170,10 +170,33 @@ export class GitHubAdapter extends BaseAdapter {
   private async request<T>(path: string, signal?: AbortSignal, body?: unknown, method?: 'GET' | 'POST' | 'PATCH'): Promise<T> {
     const writing = body !== undefined;
     if (signal?.aborted) {
-      throw new StepError({ message: 'GitHub request was cancelled before dispatch', category: 'NETWORK', retryable: false });
+      throw new StepError({ message: 'GitHub request was cancelled before dispatch', category: 'NETWORK', retryable: false, details: { requestSent: false } });
     }
     const limiter = this.rateLimiter ?? sharedGitHubLimiter;
-    await this.waitForTransportSlot(limiter, this.service, signal);
+    try {
+      await this.waitForTransportSlot(limiter, this.service, signal);
+    } catch (error) {
+      if (error instanceof StepError) {
+        throw new StepError({
+          message: error.message,
+          category: signal?.aborted ? 'NETWORK' : error.category,
+          statusCode: error.statusCode,
+          retryable: error.retryable,
+          cause: error.cause ?? error,
+          details: { ...(error.details ?? {}), requestSent: false },
+        });
+      }
+      throw new StepError({
+        message: 'GitHub request was cancelled before dispatch',
+        category: 'NETWORK',
+        retryable: false,
+        cause: error,
+        details: { requestSent: false },
+      });
+    }
+    if (signal?.aborted) {
+      throw new StepError({ message: 'GitHub request was cancelled before dispatch', category: 'NETWORK', retryable: false, details: { requestSent: false } });
+    }
     const init: RequestInit = {
       method: method ?? (writing ? 'POST' : 'GET'),
       headers: {
@@ -193,7 +216,10 @@ export class GitHubAdapter extends BaseAdapter {
       } catch (cause) {
         throw new StepError({
           message: writing ? 'GitHub write result is unknown after transport failure' : 'GitHub read request failed',
-          category: writing ? 'UNKNOWN' : 'NETWORK', retryable: !writing, cause,
+          category: writing ? 'UNKNOWN' : 'NETWORK',
+          retryable: !writing,
+          cause,
+          ...(!writing ? { details: { requestSent: false } } : {}),
         });
       }
       const rateLimited = response.status === 429 ||
@@ -204,7 +230,13 @@ export class GitHubAdapter extends BaseAdapter {
         continue;
       }
       if (rateLimited) {
-        throw new StepError({ message: 'GitHub rate limit exceeded', category: 'RATE_LIMIT', statusCode: response.status, retryable: !writing });
+        throw new StepError({
+          message: 'GitHub rate limit exceeded',
+          category: 'RATE_LIMIT',
+          statusCode: response.status,
+          retryable: !writing,
+          ...(!writing ? { details: { requestSent: false } } : {}),
+        });
       }
       break;
     }
@@ -214,14 +246,23 @@ export class GitHubAdapter extends BaseAdapter {
         : status === 404 ? 'NOT_FOUND'
         : status === 400 || status === 422 ? 'VALIDATION'
         : writing ? 'UNKNOWN' : 'SERVER_ERROR';
-      throw new StepError({ message: `GitHub request failed with HTTP ${status}`, category, statusCode: status, retryable: !writing && status >= 500 });
+      throw new StepError({
+        message: `GitHub request failed with HTTP ${status}`,
+        category,
+        statusCode: status,
+        retryable: !writing && status >= 500,
+        ...(!writing ? { details: { requestSent: false } } : {}),
+      });
     }
     try {
       return await response.json() as T;
     } catch (cause) {
       throw new StepError({
         message: writing ? 'GitHub write result is unknown after an unreadable response' : 'GitHub returned an unreadable response',
-        category: writing ? 'UNKNOWN' : 'SERVER_ERROR', retryable: false, cause,
+        category: writing ? 'UNKNOWN' : 'SERVER_ERROR',
+        retryable: false,
+        cause,
+        ...(!writing ? { details: { requestSent: false } } : {}),
       });
     }
   }
