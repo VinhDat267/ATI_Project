@@ -93,6 +93,25 @@ export class SheetsAdapter extends BaseAdapter {
     });
   }
 
+  private withPartialWriteFlag(err: unknown): never {
+    if (err instanceof StepError) {
+      const { requestSent: _ignored, ...rest } = (err.details ?? {}) as Record<string, unknown>;
+      throw new StepError({
+        message: err.message,
+        category: 'UNKNOWN',
+        statusCode: err.statusCode,
+        retryable: false,
+        details: { ...rest, partialWrite: true, requestSent: true },
+      });
+    }
+    throw new StepError({
+      message: 'Sheets write outcome is unknown after partial mutation',
+      category: 'UNKNOWN',
+      retryable: false,
+      details: { partialWrite: true, requestSent: true },
+    });
+  }
+
   private async request(
     path: string,
     signal?: AbortSignal,
@@ -100,24 +119,19 @@ export class SheetsAdapter extends BaseAdapter {
     onDispatch?: (dispatched: boolean) => void,
     beforeDispatch?: () => Promise<void>
   ): Promise<any> {
-    if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK', details: { requestSent: false } });
+    if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
     const writing = body !== undefined;
-    let token: string;
-    try {
-      token = await this.auth.getAccessToken(SHEETS_SCOPE, signal);
-    } catch (error) {
-      this.withPreWriteFlag(error);
-    }
+    const token = await this.auth.getAccessToken(SHEETS_SCOPE, signal);
     let response: Response;
     let rateRetries = 0; let networkRetries = 0; let serverRetries = 0;
     for (;;) {
       try { await this.waitForTransportSlot(this.rateLimiter ?? sharedLimiter, 'sheets:' + this.account, signal); }
       catch (error) {
         // The limiter message carries its key (the service-account email); keep only the category.
-        if (error instanceof StepError) throw new StepError({ message: 'Sheets request stopped before dispatch', category: error.category, statusCode: error.statusCode, retryable: error.retryable, details: { ...(error.details ?? {}), requestSent: false } });
-        throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK', details: { requestSent: false } });
+        if (error instanceof StepError) throw new StepError({ message: 'Sheets request stopped before dispatch', category: error.category, statusCode: error.statusCode, retryable: error.retryable, ...(error.details ? { details: error.details } : {}) });
+        throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
       }
-      if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK', details: { requestSent: false } });
+      if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
       if (writing && beforeDispatch) {
         await beforeDispatch();
       }
@@ -413,7 +427,10 @@ export class SheetsAdapter extends BaseAdapter {
         await lease?.release();
       }
       } catch (err) {
-        if (!writeDispatched && !batchMutationCommitted) {
+        if (batchMutationCommitted) {
+          this.withPartialWriteFlag(err);
+        }
+        if (!writeDispatched) {
           this.withPreWriteFlag(err);
         }
         throw err;
@@ -533,6 +550,7 @@ export class SheetsAdapter extends BaseAdapter {
     }
     if (toolName === 'sheets.create_sheet') {
       let writeDispatched = false;
+      let sheetCreated = false;
       try {
         const id = this.checkedId(args.spreadsheetId);
         const title = titleText(args.title);
@@ -563,9 +581,10 @@ export class SheetsAdapter extends BaseAdapter {
               requests: [{ addSheet: { properties: { title } } }],
             },
             (dispatched) => {
-              if (dispatched) writeDispatched = true;
+              writeDispatched = dispatched;
             }
           );
+          sheetCreated = true;
           const props = createRes?.replies?.[0]?.addSheet?.properties;
           sheetId = Number.isSafeInteger(props?.sheetId) ? props.sheetId : 0;
           actualTitle = typeof props?.title === 'string' ? props.title : title;
@@ -615,6 +634,9 @@ export class SheetsAdapter extends BaseAdapter {
           url: this.url(id),
         };
       } catch (err) {
+        if (sheetCreated) {
+          this.withPartialWriteFlag(err);
+        }
         if (!writeDispatched) {
           this.withPreWriteFlag(err);
         }

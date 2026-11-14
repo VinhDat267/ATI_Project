@@ -5,6 +5,7 @@ import {
   GitHubAdapter,
   GlobalRateLimiter,
   JiraAdapter,
+  PersonalJiraAdapter,
   PersonalJiraHttpTransport,
   SheetsAdapter,
   TelegramAdapter,
@@ -317,9 +318,182 @@ describe('Pre-dispatch abort & pre-write GET failure write safety (PR 5)', () =>
       expect(res.status).toBe('failed');
       expect(res.error?.details?.requestSent).toBe(false);
     }
+
+    // Pre-aborted signal on all 4 Sheets write tools
+    const aborted = new AbortController();
+    aborted.abort();
+    const fetchNever = vi.fn();
+    const sheetsAbort = new SheetsAdapter({
+      credentials: googleCredentials,
+      allowedScope: { spreadsheets: [spreadsheetId] },
+      fetchFn: fetchNever as any,
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+    });
+    const abortRunner = new StepRunner({ getAdapter: () => sheetsAbort });
+    for (const [tool, args] of [
+      ['sheets.append_rows', { spreadsheetId, sheet: 'Tasks', rows: [['a', 'b']] }],
+      [
+        'sheets.update_rows',
+        { spreadsheetId, sheet: 'Tasks', updates: [{ keyColumn: 'ID', keyValue: '1', values: { Status: 'Done' } }] },
+      ],
+      ['sheets.delete_rows', { spreadsheetId, sheet: 'Tasks', rowNumbers: [2] }],
+      ['sheets.create_sheet', { spreadsheetId, title: 'NewTab', headers: ['ColA'] }],
+    ] as const) {
+      const res = await abortRunner.executeStep(
+        { id: `sh_abort_${tool}`, tool, description: tool, dependsOn: [], args: args as any },
+        new Map(),
+        { signal: aborted.signal },
+      );
+      expect(res.status).toBe('failed');
+      expect(res.error?.details?.requestSent).toBe(false);
+    }
+    expect(fetchNever).not.toHaveBeenCalled();
+
+    // Post-first-write pre-dispatch abort on compound writes MUST remain UNKNOWN (never requestSent: false)
+    const appendAbortAfterUpsert = new AbortController();
+    const fetchAppendPartial = vi.fn(async (url: any, init: any) => {
+      const u = String(url);
+      if (u === 'https://oauth2.googleapis.com/token') {
+        return new Response(
+          JSON.stringify({ access_token: 'tok', token_type: 'Bearer', expires_in: 3600 }),
+          { status: 200 },
+        );
+      }
+      if ((init?.method ?? 'GET') === 'GET' && u.includes('fields=sheets')) {
+        return new Response(
+          JSON.stringify({ sheets: [{ properties: { sheetId: 0, title: 'Tasks' } }] }),
+          { status: 200 },
+        );
+      }
+      if ((init?.method ?? 'GET') === 'GET' && u.includes('/values/')) {
+        return new Response(
+          JSON.stringify({ values: [['ID', 'Status'], ['1', 'Open']] }),
+          { status: 200 },
+        );
+      }
+      if (u.includes('/values:batchUpdate')) {
+        appendAbortAfterUpsert.abort();
+        return new Response(
+          JSON.stringify({ totalUpdatedRows: 1, responses: [{ updatedRange: 'Tasks!A2:B2' }] }),
+          { status: 200 },
+        );
+      }
+      throw new Error('Second mutating POST must not dispatch after abort');
+    });
+    const sheetsAppendPartial = new SheetsAdapter({
+      credentials: googleCredentials,
+      allowedScope: { spreadsheets: [spreadsheetId] },
+      fetchFn: fetchAppendPartial as any,
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+    });
+    const partialAppendRes = await new StepRunner({ getAdapter: () => sheetsAppendPartial }).executeStep(
+      {
+        id: 'sh_append_partial',
+        tool: 'sheets.append_rows',
+        description: 'Upsert then abort before append',
+        dependsOn: [],
+        args: {
+          spreadsheetId,
+          sheet: 'Tasks',
+          rows: [
+            ['1', 'Done'],
+            ['2', 'Open'],
+          ],
+          keyColumn: 'ID',
+          onDuplicate: 'update',
+        },
+      },
+      new Map(),
+      { signal: appendAbortAfterUpsert.signal },
+    );
+    expect(partialAppendRes.status).toBe('unknown');
+    expect(partialAppendRes.error?.details?.requestSent).not.toBe(false);
+    expect(partialAppendRes.error?.details?.partialWrite).toBe(true);
+
+    // create_sheet: addSheet commits, then signal aborts before header values:batchUpdate -> MUST be unknown
+    const createAbortAfterAddSheet = new AbortController();
+    const fetchCreatePartial = vi.fn(async (url: any, init: any) => {
+      const u = String(url);
+      if (u === 'https://oauth2.googleapis.com/token') {
+        return new Response(
+          JSON.stringify({ access_token: 'tok', token_type: 'Bearer', expires_in: 3600 }),
+          { status: 200 },
+        );
+      }
+      if ((init?.method ?? 'GET') === 'GET' && u.includes('fields=sheets')) {
+        return new Response(
+          JSON.stringify({ sheets: [{ properties: { sheetId: 0, title: 'Tasks' } }] }),
+          { status: 200 },
+        );
+      }
+      if (u.includes(`${spreadsheetId}:batchUpdate`)) {
+        createAbortAfterAddSheet.abort();
+        return new Response(
+          JSON.stringify({ replies: [{ addSheet: { properties: { sheetId: 42, title: 'NewTab' } } }] }),
+          { status: 200 },
+        );
+      }
+      throw new Error('Header batchUpdate must not dispatch after abort');
+    });
+    const sheetsCreatePartial = new SheetsAdapter({
+      credentials: googleCredentials,
+      allowedScope: { spreadsheets: [spreadsheetId] },
+      fetchFn: fetchCreatePartial as any,
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+    });
+    const partialCreateRes = await new StepRunner({ getAdapter: () => sheetsCreatePartial }).executeStep(
+      {
+        id: 'sh_create_partial',
+        tool: 'sheets.create_sheet',
+        description: 'addSheet then abort before header write',
+        dependsOn: [],
+        args: { spreadsheetId, title: 'NewTab', headers: ['ID', 'Title'] },
+      },
+      new Map(),
+      { signal: createAbortAfterAddSheet.signal },
+    );
+    expect(partialCreateRes.status).toBe('unknown');
+    expect(partialCreateRes.error?.details?.requestSent).not.toBe(false);
+    expect(partialCreateRes.error?.details?.partialWrite).toBe(true);
+
+    // Post-dispatch HTTP 500 on write MUST still produce status: 'unknown' without requestSent: false
+    const fetchPost500 = vi.fn(async (url: any, init: any) => {
+      const u = String(url);
+      if (u === 'https://oauth2.googleapis.com/token') {
+        return new Response(
+          JSON.stringify({ access_token: 'tok', token_type: 'Bearer', expires_in: 3600 }),
+          { status: 200 },
+        );
+      }
+      if ((init?.method ?? 'GET') === 'GET') {
+        return new Response(
+          JSON.stringify({ sheets: [{ properties: { sheetId: 0, title: 'Tasks' } }] }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ error: 'internal error' }), { status: 500 });
+    });
+    const sheetsPost500 = new SheetsAdapter({
+      credentials: googleCredentials,
+      allowedScope: { spreadsheets: [spreadsheetId] },
+      fetchFn: fetchPost500 as any,
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 60_000 }),
+    });
+    const post500Res = await new StepRunner({ getAdapter: () => sheetsPost500 }).executeStep(
+      {
+        id: 'sh_post_500',
+        tool: 'sheets.append_rows',
+        description: 'Post-dispatch 500',
+        dependsOn: [],
+        args: { spreadsheetId, sheet: 'Tasks', rows: [['a', 'b']] },
+      },
+      new Map(),
+    );
+    expect(post500Res.status).toBe('unknown');
+    expect(post500Res.error?.details?.requestSent).not.toBe(false);
   });
 
-  it('JiraAdapter & PersonalJiraHttpTransport: pre-dispatch abort and pre-write GET failures set requestSent=false and transition StepRunner to failed', async () => {
+  it('JiraAdapter, PersonalJiraAdapter & PersonalJiraHttpTransport: pre-dispatch abort -> failed(requestSent=false) and post-dispatch 500 -> unknown', async () => {
     const jiraCreds = {
       siteUrl: 'https://ati-test.atlassian.net',
       email: 'fixture@example.test',
@@ -388,5 +562,108 @@ describe('Pre-dispatch abort & pre-write GET failure write safety (PR 5)', () =>
       details: { requestSent: false },
     });
     expect(fetchNever).not.toHaveBeenCalled();
+
+    // 3. PersonalJiraAdapter via StepRunner: pre-dispatch G2A write rejection & aborted get_issue -> failed(requestSent=false)
+    const caps = {
+      workspaceId: 'ws-1',
+      sites: [
+        {
+          siteId: 'opaque_1',
+          cloudId: '12345678-1234-1234-1234-123456789abc',
+          name: 'Company Atlassian',
+          url: 'https://company.atlassian.net',
+          projects: [{ id: '10000', key: 'ATI', name: 'ATI Project' }],
+        },
+      ],
+    };
+    const pjAbort = new PersonalJiraAdapter({
+      userId: 'u1',
+      workspaceId: 'ws-1',
+      capabilities: caps,
+      tokens: { getAccessToken: async () => 'pj_tok' },
+      fetchFn: fetchNever as any,
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 1000, windowMs: 1000 }),
+    });
+    const aborted = new AbortController();
+    aborted.abort();
+    const pjWriteRes = await new StepRunner({ getAdapter: () => pjAbort }).executeStep(
+      {
+        id: 'pj_write_g2a',
+        tool: 'myjira.add_comment',
+        description: 'G2A disabled comment',
+        dependsOn: [],
+        args: { siteId: 'opaque_1', issueKey: 'ATI-1', body: 'Hello' },
+      },
+      new Map(),
+      { signal: aborted.signal },
+    );
+    expect(pjWriteRes.status).toBe('failed');
+    expect(pjWriteRes.error?.details?.requestSent).toBe(false);
+    await expect(
+      pjAbort.execute('myjira.get_issue', { siteId: 'opaque_1', issueKey: 'ATI-1' }, { signal: aborted.signal }),
+    ).rejects.toMatchObject({
+      category: 'NETWORK',
+      details: { requestSent: false },
+    });
+    expect(fetchNever).not.toHaveBeenCalled();
+
+    // 4. Post-dispatch HTTP 500 on PersonalJiraHttpTransport writing=true & CalendarAdapter write -> UNKNOWN / unknown without requestSent: false
+    const fetchPost500 = vi.fn(async () => new Response(JSON.stringify({ error: 'boom' }), { status: 500 }));
+    const transportWrite500 = new PersonalJiraHttpTransport({
+      userId: 'u1',
+      tokens: { getAccessToken: async () => 'pj_tok' },
+      fetchFn: fetchPost500 as any,
+    });
+    await expect(
+      transportWrite500.request('12345678-1234-1234-1234-123456789abc', '/issue', true, {
+        method: 'POST',
+        body: { fields: {} },
+      }),
+    ).rejects.toMatchObject({
+      category: 'UNKNOWN',
+    });
+    await transportWrite500
+      .request('12345678-1234-1234-1234-123456789abc', '/issue', true, {
+        method: 'POST',
+        body: { fields: {} },
+      })
+      .catch((err) => {
+        expect(err?.details?.requestSent).not.toBe(false);
+      });
+
+    const fetchCalPost500 = vi.fn(async (url: any, init: any) => {
+      if (String(url) === 'https://oauth2.googleapis.com/token') {
+        return new Response(
+          JSON.stringify({ access_token: 'tok', token_type: 'Bearer', expires_in: 3600 }),
+          { status: 200 },
+        );
+      }
+      if ((init?.method ?? 'GET') === 'POST') {
+        return new Response('server error', { status: 500 });
+      }
+      throw new Error('unexpected GET');
+    });
+    const calPost500 = new CalendarAdapter({
+      credentials: googleCredentials,
+      allowedScope: { calendars: ['ati@group.calendar.google.com'] },
+      fetchFn: fetchCalPost500 as any,
+    });
+    const calPost500Res = await new StepRunner({ getAdapter: () => calPost500 }).executeStep(
+      {
+        id: 'cal_post_500',
+        tool: 'calendar.create_event',
+        description: 'Post-dispatch 500',
+        dependsOn: [],
+        args: {
+          calendarId: 'ati@group.calendar.google.com',
+          summary: 'Sync',
+          start: '2026-10-09T15:00:00+07:00',
+          end: '2026-10-09T16:00:00+07:00',
+        },
+      },
+      new Map(),
+    );
+    expect(calPost500Res.status).toBe('unknown');
+    expect(calPost500Res.error?.details?.requestSent).not.toBe(false);
   });
 });

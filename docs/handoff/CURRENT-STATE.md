@@ -13,11 +13,11 @@
 
 | Dịch vụ | Trạng thái | Gần nhất | Còn thiếu |
 |---|---|---|---|
-| Trello | OAuth cá nhân, chọn workspace và bảng; digest sang Slack/Telegram; chuẩn hóa `requestSent: false` pre-dispatch | `fix/pre-dispatch-abort-and-core-resolver` | Nghiệm thu thật |
+| Trello | OAuth cá nhân, chọn workspace và bảng; digest sang Slack/Telegram; chuẩn hóa `requestSent: false` pre-dispatch | #325 | Nghiệm thu thật |
 | Slack | Bot dùng chung; có `slack.read_messages` | — | Slack cá nhân (`myslack`) chưa có trong runtime registry |
-| GitHub | OAuth cá nhân, 9 tool; scope theo workspace (#305); chuẩn hóa `requestSent: false` pre-dispatch | `fix/pre-dispatch-abort-and-core-resolver` | Credential phải `active`, nghiệm thu thật |
-| Sheets / MySheets | Sheets Digest v2 (#289–#299), khóa chặn ghi Drive (#300); chuẩn hóa `requestSent: false` pre-dispatch | `fix/pre-dispatch-abort-and-core-resolver` | Runbook staging GAS-03 chưa chạy |
-| Calendar / MyCalendar | Remediation v2 (#315); chuẩn hóa `requestSent: false` pre-dispatch | `fix/pre-dispatch-abort-and-core-resolver` | Test chập chờn ở trên; nghiệm thu thật |
+| GitHub | OAuth cá nhân, 9 tool; scope theo workspace (#305); chuẩn hóa `requestSent: false` pre-dispatch | #325 | Credential phải `active`, nghiệm thu thật |
+| Sheets / MySheets | Sheets Digest v2 (#289–#299), khóa chặn ghi Drive (#300); chuẩn hóa `requestSent: false` pre-dispatch (SheetsAdapter) | #325 | Runbook staging GAS-03 chưa chạy |
+| Calendar / MyCalendar | Remediation v2 (#315); chuẩn hóa `requestSent: false` pre-dispatch (CalendarAdapter) | #325 | Test chập chờn ở trên; nghiệm thu thật |
 | Notion | OAuth bền vững (#317) | **PR #319** (ràng buộc nguồn digest): CI đỏ ở `static-guard` | Khoảng 10 lỗi audit còn mở (độ phủ dữ liệu, bộ lọc ngày/trạng thái, biên nhận Slack, phân trang tìm database, Privacy); nghiệm thu thật |
 | Telegram | Bot cá nhân; chặn digest sai binding (#303); chuẩn hóa `requestSent: false` pre-dispatch | #325 | Nghiệm thu thật |
 | Jira / MyJira | G2A read containment (#318); chuẩn hóa `requestSent: false` pre-dispatch | #325 | Chỉ dùng trong "Không gian Chung" (site `ati-workflow-test`) |
