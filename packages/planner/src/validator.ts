@@ -102,6 +102,8 @@ export function validateSchemaValue(value: unknown, schema: Record<string, any>,
     }
   } else if (schema.type === 'array') {
     if (!Array.isArray(value)) return `${path} must be an array`;
+    if (typeof schema.minItems === 'number' && value.length < schema.minItems) return `${path} must contain at least ${schema.minItems} items`;
+    if (typeof schema.maxItems === 'number' && value.length > schema.maxItems) return `${path} must contain at most ${schema.maxItems} items`;
     if (schema.items) {
       for (const [index, item] of value.entries()) {
         const error = validateSchemaValue(item, schema.items, `${path}[${index}]`);

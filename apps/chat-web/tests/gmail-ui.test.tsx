@@ -118,10 +118,17 @@ it.each([false, true])('keeps the personal action available when a shared servic
   else expect(screen.getByText(/Chỉ quản trị viên/)).toBeTruthy();
 });
 it.each([false, true])('keeps privacy truthful with Gmail enabled=%s', async enabled => {
-  vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({ runtimeMode: 'sandbox', gmailEnabled: enabled });
+  vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({ runtimeMode: 'sandbox', gmailEnabled: enabled, mycalendarEnabled: enabled, mysheetsEnabled: enabled });
   render(<PrivacyPage navigate={() => {}} />);
   await waitFor(() => expect(apiClient.getRuntime).toHaveBeenCalled());
+  await act(async () => {});
   expect(screen.queryByText(/ATI không đọc Gmail/)).toBeNull();
+  expect(screen.getByText(/Khi chưa kết nối dịch vụ cá nhân, Planora không truy cập Drive hay lịch cá nhân/i)).toBeTruthy();
   expect(screen.getByText(/hộp thư bạn tự kết nối/)).toBeTruthy();
-  if (enabled) await screen.findByText(/9router/);
+  if (enabled) {
+    expect(screen.getByRole('region', { name: /Dữ liệu Gmail/i }).textContent).not.toMatch(/9router/i);
+    expect((await screen.findAllByText(/nhà cung cấp mô hình AI bên thứ ba đã cấu hình/)).length).toBeGreaterThanOrEqual(2);
+  } else {
+    expect(document.body.textContent).not.toMatch(/9router/i);
+  }
 });

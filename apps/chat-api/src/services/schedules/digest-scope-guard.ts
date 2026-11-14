@@ -1,7 +1,13 @@
 import type pg from 'pg';
 import { decryptCredentials } from '@wap/tool-adapters';
-import { normalizeTelegramChatId, TELEGRAM_CHAT_ID_PATTERN } from '@wap/tool-schemas';
+import { normalizeTelegramChatId, TELEGRAM_CHAT_ID_PATTERN, type TelegramDigestConfig } from '@wap/tool-schemas';
 import { isUuid } from '../../db/repositories/uuid.js';
+import {
+  assertGmailDigestBinding,
+  validateTelegramDigestGmailConfig,
+  type GmailBindingGuardCode,
+} from './gmail-digest-binding.js';
+import { computeTelegramDigestConfigHash } from './telegram-digest-candidate.js';
 
 type Queryable = pg.Pool | Pick<pg.Pool, 'query'>;
 
@@ -14,12 +20,16 @@ export type DigestScopeGuardCode =
   | 'DIGEST_CREDENTIAL_SERVICE_MISMATCH'
   | 'DIGEST_CREDENTIAL_INACTIVE'
   | 'DIGEST_SCOPE_NOT_CONFIGURED'
-  | 'DIGEST_SCOPE_REVOKED';
+  | 'DIGEST_SCOPE_REVOKED'
+  | 'DIGEST_GMAIL_LEGACY_UNBOUND'
+  | GmailBindingGuardCode;
 
 export interface DigestScopeGuardInput {
   pool: Queryable;
   scheduleId: string;
   claimedWorkspaceId?: string | null;
+  encryptionKey?: string;
+  gmailOAuthClientId?: string;
 }
 
 export interface DigestScopeGuardResult {
@@ -53,7 +63,9 @@ interface ScheduleGuardRow {
   workspace_id: string | null;
   workspace_mode: string | null;
   kind: string | null;
+  services: string[] | null;
   digest_config: Record<string, unknown> | null;
+  digest_config_hash: string | null;
   user_status: string | null;
 }
 
@@ -136,7 +148,7 @@ async function loadScheduleRow(pool: Queryable, scheduleId: string): Promise<Sch
   if (!isUuid(scheduleId)) return undefined;
   return (
     await pool.query<ScheduleGuardRow>(
-      `SELECT s.id, s.user_id, s.workspace_id, s.workspace_mode, s.kind, s.digest_config, u.status AS user_status
+      `SELECT s.id, s.user_id, s.workspace_id, s.workspace_mode, s.kind, s.services, s.digest_config, s.digest_config_hash, u.status AS user_status
          FROM schedules s
          JOIN users u ON u.id = s.user_id
         WHERE s.id = $1`,
@@ -252,6 +264,59 @@ export async function assertDigestScheduleLiveScopeAndAuth(
     }
   }
 
+  if (row.kind === 'telegram_digest') {
+    const gmailCheck = validateTelegramDigestGmailConfig(cfg);
+    if (gmailCheck.kind === 'gmail_legacy') {
+      return deny('DIGEST_GMAIL_LEGACY_UNBOUND', gmailCheck.reason, trustedWorkspaceId, trustedWorkspaceMode);
+    }
+    if (gmailCheck.kind === 'invalid') {
+      return deny('DIGEST_GMAIL_CONFIG_INVALID', gmailCheck.reason, trustedWorkspaceId, trustedWorkspaceMode);
+    }
+    if (
+      Array.isArray(row.services) &&
+      row.services.includes('gmail') &&
+      gmailCheck.kind !== 'gmail_bound'
+    ) {
+      return deny(
+        'DIGEST_GMAIL_CONFIG_INVALID',
+        'Cấu hình nguồn Gmail trong lịch không hợp lệ.',
+        trustedWorkspaceId,
+        trustedWorkspaceMode,
+      );
+    }
+    if (gmailCheck.kind === 'gmail_bound') {
+      let expectedHash: string | null = null;
+      try {
+        expectedHash = computeTelegramDigestConfigHash(cfg as unknown as TelegramDigestConfig);
+      } catch {
+        expectedHash = null;
+      }
+      if (!row.digest_config_hash || !expectedHash || expectedHash !== row.digest_config_hash) {
+        return deny(
+          'DIGEST_GMAIL_CONFIG_INVALID',
+          'Chữ ký toàn vẹn cấu hình bản tin Gmail không hợp lệ.',
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        );
+      }
+      const gmailBindingCheck = await assertGmailDigestBinding(
+        pool,
+        row.user_id,
+        gmailCheck.binding,
+        input.gmailOAuthClientId,
+        { encryptionKey: input.encryptionKey },
+      );
+      if (!gmailBindingCheck.allowed) {
+        return deny(
+          gmailBindingCheck.code,
+          gmailBindingCheck.reason,
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        );
+      }
+    }
+  }
+
   return { allowed: true, trustedWorkspaceId, trustedWorkspaceMode };
 }
 
@@ -265,8 +330,14 @@ export async function buildPinnedTelegramAdapterContext(input: {
   pool: Queryable;
   scheduleId: string;
   encryptionKey: string;
+  gmailOAuthClientId?: string;
 }): Promise<PinnedTelegramAdapterContextResult> {
-  const guard = await assertDigestScheduleLiveScopeAndAuth({ pool: input.pool, scheduleId: input.scheduleId });
+  const guard = await assertDigestScheduleLiveScopeAndAuth({
+    pool: input.pool,
+    scheduleId: input.scheduleId,
+    encryptionKey: input.encryptionKey,
+    gmailOAuthClientId: input.gmailOAuthClientId,
+  });
   const base = { trustedWorkspaceId: guard.trustedWorkspaceId, trustedWorkspaceMode: guard.trustedWorkspaceMode };
   if (!guard.allowed) return { allowed: false, code: guard.code, ...base };
 

@@ -17,6 +17,7 @@ import {
 import { isSheetsDigestEmitV2Enabled } from '../../config/schedules-runtime.js';
 import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
+import { hasGoogleCredentialOrigin } from '../gmail/credential-origin.js';
 
 const WRITE_INTENT_RE =
   /\b(?:thêm\s+dòng|ghi\s+vào|append|chèn\s+dòng|cập\s+nhật\s+bảng|sửa\s+ô|xóa\s+dòng|xoá\s+dòng|đồng\s+bộ\s+vào\s+sheets|ghi\s+thêm)\b/iu;
@@ -468,6 +469,7 @@ export interface AnalyzeSheetsDigestInput {
   services: string[];
   credentialRepo?: CredentialRepo;
   encryptionKey?: string;
+  gmailOAuthClientId?: string;
   mysheetsEnabled?: boolean;
   fetchOrgSheetsMetadata?: FetchOrgSheetsMetadataFn;
   emitV2?: boolean;
@@ -486,6 +488,7 @@ export async function analyzeSheetsDigestCandidate(
     services,
     credentialRepo,
     encryptionKey,
+    gmailOAuthClientId,
     mysheetsEnabled,
     fetchOrgSheetsMetadata,
     signal,
@@ -1060,6 +1063,15 @@ export async function analyzeSheetsDigestCandidate(
         reason: 'Hãy kết nối Gmail cá nhân trước khi bật tự gửi báo cáo qua email.',
       };
     }
+    if (
+      gmailOAuthClientId &&
+      !hasGoogleCredentialOrigin(gmailRec.config, encryptionKey, gmailOAuthClientId)
+    ) {
+      return {
+        canAutoDigest: false,
+        reason: 'Kết nối Gmail cá nhân không khớp cấu hình OAuth hiện tại. Hãy kết nối lại.',
+      };
+    }
     let dec: any = {};
     try {
       dec = decryptCredentials(gmailRec.config, encryptionKey);
@@ -1242,6 +1254,7 @@ export interface VerifySheetsDigestCandidateInTxInput {
   expectedHash?: string | null;
   trustedScope: { workspaceMode: SheetsDigestWorkspaceMode; workspaceId: string | null };
   encryptionKey?: string;
+  gmailOAuthClientId?: string;
   mysheetsEnabled?: boolean;
 }
 
@@ -1252,7 +1265,7 @@ export async function verifySheetsDigestCandidateInTx(
   | { ok: true; config: SheetsDigestConfigV2; configHash: string }
   | { ok: false; reason: string }
 > {
-  const { userId, recurrence, config, expectedHash, trustedScope, encryptionKey, mysheetsEnabled } =
+  const { userId, recurrence, config, expectedHash, trustedScope, encryptionKey, gmailOAuthClientId, mysheetsEnabled } =
     input;
 
   if (!encryptionKey || !isSheetsDigestConfigV2(config)) {
@@ -1480,6 +1493,15 @@ export async function verifySheetsDigestCandidateInTx(
       return {
         ok: false,
         reason: 'Kết nối Gmail cá nhân không còn hoạt động hoặc đã thay đổi.',
+      };
+    }
+    if (
+      gmailOAuthClientId &&
+      !hasGoogleCredentialOrigin(destRow.config, encryptionKey, gmailOAuthClientId)
+    ) {
+      return {
+        ok: false,
+        reason: 'Kết nối Gmail cá nhân không khớp cấu hình OAuth hiện tại. Hãy kết nối lại.',
       };
     }
     if (

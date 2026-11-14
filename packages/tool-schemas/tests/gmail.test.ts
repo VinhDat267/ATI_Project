@@ -123,3 +123,134 @@ describe('Gmail service definition', () => {
       expect(GMAIL_SERVICE.intentKeywords.some((keyword) => text.toLowerCase().includes(keyword))).toBe(false);
     });
 });
+
+describe('G2 C1 remediation: finding 14 additive draft-state read schemas', () => {
+  it('defines additive boolean hasDraft on gmail.search_threads summaries while preserving legacy consumer compatibility', () => {
+    const search = tool('gmail.search_threads');
+    expect(search.observedFields).toEqual(['id', 'participants']);
+    expect(search.outputSchema.items.properties.hasDraft).toEqual({ type: 'boolean' });
+    expect(search.outputSchema.items.required).toEqual([
+      'id', 'subject', 'from', 'snippet', 'date', 'messageCount', 'unread', 'participants',
+    ]);
+
+    const validateSearch = ajv.compile(search.outputSchema);
+    const baseSummary = {
+      id: 'thread-1',
+      subject: 'Họp nhóm ATI',
+      from: 'Lan <lan@example.com>',
+      to: ['gmail-owner@example.test'],
+      cc: ['minh@example.com'],
+      snippet: 'Chào nhóm, họp lúc 9 giờ.',
+      date: 'Wed, 14 Oct 2026 09:00:00 +0700',
+      labels: ['INBOX', 'UNREAD', 'DRAFT'],
+      messageCount: 2,
+      unread: true,
+      hasAttachment: false,
+      attachmentNames: [],
+      participants: ['lan@example.com', 'gmail-owner@example.test', 'minh@example.com'],
+    };
+
+    expect(validateSearch([{ ...baseSummary, hasDraft: true }])).toBe(true);
+    expect(validateSearch([{ ...baseSummary, hasDraft: false }])).toBe(true);
+    // Draft-only summary: empty delivered subject/from/snippet/date + hasDraft: true
+    expect(validateSearch([{
+      ...baseSummary,
+      id: 'draft-only',
+      subject: '',
+      from: '',
+      to: [],
+      cc: [],
+      snippet: '',
+      date: '',
+      labels: ['DRAFT'],
+      messageCount: 1,
+      unread: false,
+      hasDraft: true,
+    }])).toBe(true);
+    // Legacy summary objects without hasDraft remain valid for additive consumer compatibility
+    expect(validateSearch([baseSummary])).toBe(true);
+
+    for (const invalidHasDraft of ['true', 1, null, {}]) {
+      expect(validateSearch([{ ...baseSummary, hasDraft: invalidHasDraft }]), JSON.stringify(invalidHasDraft)).toBe(false);
+    }
+    expect(validateSearch([{ ...baseSummary, hasDraft: true, unknownExtra: true }])).toBe(false);
+  });
+
+  it('defines additive boolean isDraft on gmail.get_thread messages while preserving bounds and no-attachment-bytes contract', () => {
+    const getThread = tool('gmail.get_thread');
+    expect(getThread.observedFields).toEqual(['id', 'participants']);
+    const messageItemSchema = getThread.outputSchema.properties.messages.items;
+    expect(getThread.outputSchema.properties.messages.maxItems).toBe(5);
+    expect(messageItemSchema.properties.body.maxLength).toBe(4000);
+    expect(messageItemSchema.properties.isDraft).toEqual({ type: 'boolean' });
+    expect(messageItemSchema.required).toEqual(['messageId', 'from', 'date', 'subject', 'body']);
+
+    const validateThread = ajv.compile(getThread.outputSchema);
+    const deliveredMsg = {
+      messageId: 'm1',
+      from: 'Lan <lan@example.com>',
+      to: ['gmail-owner@example.test'],
+      cc: ['minh@example.com'],
+      date: 'Wed, 14 Oct 2026 09:00:00 +0700',
+      subject: 'Họp nhóm ATI',
+      body: 'Chào nhóm, họp lúc 9 giờ.',
+      attachments: [{ filename: 'báo cáo.pdf', size: 1200 }],
+      isDraft: false,
+    };
+    const draftMsg = {
+      messageId: 'm2-draft',
+      from: 'Owner <gmail-owner@example.test>',
+      to: ['lan@example.com'],
+      cc: [],
+      date: 'Wed, 14 Oct 2026 09:30:00 +0700',
+      subject: 'Re: Họp nhóm ATI',
+      body: 'Bản nháp chưa gửi.',
+      attachments: [],
+      isDraft: true,
+    };
+
+    expect(validateThread({
+      id: 'thread-1',
+      subject: 'Họp nhóm ATI',
+      participants: ['lan@example.com', 'gmail-owner@example.test', 'minh@example.com'],
+      messages: [deliveredMsg, draftMsg],
+    })).toBe(true);
+
+    // Draft-only thread: empty delivered thread subject + retained marked draft message
+    expect(validateThread({
+      id: 'draft-only',
+      subject: '',
+      participants: ['gmail-owner@example.test', 'lan@example.com'],
+      messages: [draftMsg],
+    })).toBe(true);
+
+    // Legacy message objects without isDraft remain valid for additive consumer compatibility
+    const { isDraft: _omitted, ...legacyMsg } = deliveredMsg;
+    expect(validateThread({
+      id: 'thread-legacy',
+      subject: 'Họp nhóm ATI',
+      participants: ['lan@example.com'],
+      messages: [legacyMsg],
+    })).toBe(true);
+
+    for (const invalidIsDraft of ['false', 0, null, []]) {
+      expect(validateThread({
+        id: 'thread-invalid',
+        subject: 'Họp nhóm ATI',
+        participants: ['lan@example.com'],
+        messages: [{ ...deliveredMsg, isDraft: invalidIsDraft }],
+      }), JSON.stringify(invalidIsDraft)).toBe(false);
+    }
+
+    // Attachment bytes / attachmentId remain strictly rejected by additionalProperties: false
+    expect(validateThread({
+      id: 'thread-att-bytes',
+      subject: 'Họp nhóm ATI',
+      participants: ['lan@example.com'],
+      messages: [{
+        ...deliveredMsg,
+        attachments: [{ filename: 'báo cáo.pdf', size: 1200, data: 'c2VjcmV0' }],
+      }],
+    })).toBe(false);
+  });
+});

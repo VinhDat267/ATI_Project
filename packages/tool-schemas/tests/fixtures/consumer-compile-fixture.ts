@@ -706,5 +706,7 @@ createJiraApiError('write_indeterminate', 'Failed', { retryable: true });
 // @ts-expect-error - createJiraApiError rejects unknown error category
 createJiraApiError('unknown_category', 'Failed');
 
+import './gmail-digest-binding-compile-fixture.js';
+
 // Export dummy value to ensure fixture is treated as a valid module
 export const CONTRACTS_COMPILE_FIXTURE_LOADED = true;

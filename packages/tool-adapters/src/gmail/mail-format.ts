@@ -16,14 +16,17 @@ export function bareAddress(value: string): string {
 export interface GmailMessage { id: string; internalDate?: string; labelIds?: string[]; snippet?: string; payload?: GmailPart }
 export interface GmailPart { mimeType?: string; filename?: string; headers?: { name: string; value: string }[]; body?: { data?: string; size?: number; attachmentId?: string }; parts?: GmailPart[] }
 export interface GmailThread { id: string; messages?: GmailMessage[] }
-export const header = (message: GmailMessage, name: string): string => message.payload?.headers?.find(h => h.name.toLowerCase() === name.toLowerCase())?.value ?? '';
+const unfoldHeader = (value: string): string => value.replace(/\r\n[ \t]+/g, ' ').replace(/^[ \t]+|[ \t]+$/g, '');
+export const header = (message: GmailMessage, name: string): string =>
+  unfoldHeader(message.payload?.headers?.find(h => h.name.toLowerCase() === name.toLowerCase())?.value ?? '');
 /** Header addresses only. Display names, comments and quoted commas never become participants. */
 export function headerAddresses(value: string): string[] {
-  if (/[\r\n\x00]/.test(value)) return [];
+  const normalized = unfoldHeader(value);
+  if (/[\r\n\x00]/.test(normalized)) return [];
   const found: string[] = [];
   const mailboxes: { text: string; quoted: boolean }[] = [];
   let text = '', quoted = false, inQuote = false, escaped = false, commentDepth = 0;
-  for (const char of value) {
+  for (const char of normalized) {
     if (escaped) { escaped = false; continue; }
     if ((inQuote || commentDepth > 0) && char === '\\') { escaped = true; continue; }
     if (commentDepth > 0) {
@@ -48,20 +51,40 @@ export function headerAddresses(value: string): string[] {
   return found;
 }
 export function participants(messages: GmailMessage[]): string[] {
-  return [...new Set(messages.flatMap(m => ['From', 'To', 'Cc'].flatMap(n => headerAddresses(header(m, n)))))].slice(0, 20);
+  const newestFirst = [...messages]
+    .reverse()
+    .flatMap(m => ['From', 'To', 'Cc'].flatMap(n => headerAddresses(header(m, n))));
+  const keep = new Set([...new Set(newestFirst)].slice(0, 20));
+  const forward = [...new Set(messages.flatMap(m => ['From', 'To', 'Cc'].flatMap(n => headerAddresses(header(m, n)))))];
+  return forward.filter(address => keep.has(address));
 }
 export function messageText(message: GmailMessage): string {
   const plain: string[] = [], html: string[] = [];
   function visit(part?: GmailPart) {
     if (!part || part.filename || part.body?.attachmentId) return;
-    if (part.body?.data && (part.mimeType === 'text/plain' || part.mimeType === 'text/html')) {
+    const mime = part.mimeType?.split(';')[0]?.trim().toLowerCase();
+    if (part.body?.data && (mime === 'text/plain' || mime === 'text/html')) {
       const value = Buffer.from(part.body.data, 'base64url').toString('utf8');
-      (part.mimeType === 'text/plain' ? plain : html).push(value);
+      (mime === 'text/plain' ? plain : html).push(value);
     }
     part.parts?.forEach(visit);
   }
   visit(message.payload);
-  return plain.length ? plain.join('\n') : html.join('\n').replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '').replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&amp;/gi, '&').replace(/&quot;/gi, '"').replace(/&#39;/g, "'");
+  if (plain.length) return plain.join('\n');
+  return html
+    .join('\n')
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(?:p|div|li|tr|h[1-6]|blockquote|section|article|header|footer|table|ul|ol)\s*>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 export function attachments(part?: GmailPart): { filename: string; size: number }[] {
   if (!part) return [];

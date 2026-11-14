@@ -115,6 +115,13 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     await expect(page).toHaveURL(new RegExp(`${conversationPath}$`));
     await expect(page.getByText('Gửi từ: gmail-owner@example.test', { exact: true })).toBeVisible();
     await expect(destinationLine).toHaveText(`Đích đến: ${longTitle}`);
+    const inlinePreview = page.locator('#plan-cards-container').getByTestId('gmail-preview-card');
+    await expect(inlinePreview).toBeVisible();
+    await expect(inlinePreview).toContainText('lan@example.com');
+    await expect(inlinePreview).toContainText("lấy từ luồng thư 'Họp nhóm ATI'");
+    await expect(inlinePreview).toContainText('Bcc');
+    await expect(inlinePreview).toContainText('Mình đồng ý, hẹn gặp lúc 9 giờ.');
+    await expect(inlinePreview).toContainText('tin nhắn đã gửi mới nhất');
     expect(await destinationLine.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.getByRole('button', { name: 'Xem trước', exact: true }).click();
