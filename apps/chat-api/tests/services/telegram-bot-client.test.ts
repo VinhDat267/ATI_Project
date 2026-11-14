@@ -232,7 +232,7 @@ describe('TelegramBotClient', () => {
     expect(neverFetch).not.toHaveBeenCalled();
   });
 
-  it('preserves ordinary chat messages across verifyPairing, discoverGroups, and multi-page readUpdatesForChat', async () => {
+  it('caches only chat messages polled during a scoped multi-page read', async () => {
     const state = 'p'.repeat(43);
     const groupId = '-100555444333';
     const updates: any[] = [
@@ -257,19 +257,6 @@ describe('TelegramBotClient', () => {
         },
       },
     ];
-    for (let i = 0; i < 105; i++) {
-      updates.push({
-        update_id: 3 + i,
-        message: {
-          message_id: 10 + i,
-          date: 1791000100 + i,
-          from: { id: 103, is_bot: false, username: 'chi' },
-          chat: { id: Number(groupId), title: 'Nhom Dev', type: 'supergroup' },
-          text: i === 104 ? 'Canh bao sprint moi' : `Chat ${i}`,
-        },
-      });
-    }
-
     const seenOffsets: Array<number | undefined> = [];
     const client = new TelegramBotClient(config, async (_url, init) => {
       const body = JSON.parse(String(init?.body ?? '{}'));
@@ -286,11 +273,24 @@ describe('TelegramBotClient', () => {
     const groups = await client.discoverGroups(AbortSignal.timeout(5000));
     expect(groups).toContainEqual({ chatId: groupId, title: 'Nhom Dev', type: 'supergroup' });
 
+    for (let i = 0; i < 105; i++) {
+      updates.push({
+        update_id: 3 + i,
+        message: {
+          message_id: 10 + i,
+          date: 1791000100 + i,
+          from: { id: 103, is_bot: false, username: 'chi' },
+          chat: { id: Number(groupId), title: 'Nhom Dev', type: 'supergroup' },
+          text: i === 104 ? 'Canh bao sprint moi' : `Chat ${i}`,
+        },
+      });
+    }
+
     const chatUpdates = await client.readUpdatesForChat(groupId, AbortSignal.timeout(5000));
     const texts = chatUpdates.map((u) => u.message?.text);
-    expect(seenOffsets).toEqual([undefined, 101, 108]);
+    expect(seenOffsets).toEqual([undefined, 3, 3, 103]);
     expect(texts).toContain('Canh bao sprint moi');
-    // Note: 106 ordinary messages matched (message_id 2 + 105 items = 106), trimmed to 100 newest so oldest 6 were evicted.
+    expect(texts).not.toContain('Release v3 da san sang');
     expect(chatUpdates.length).toBe(100);
   });
 });
