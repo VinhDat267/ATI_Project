@@ -535,7 +535,7 @@ export interface CalendarDigestDelivery {
   totalEvents: number;
   conflictCount: number;
   summaryIncluded: boolean;
-  sentAt: string;
+  sentAt: string | null;
   manualConfirmedAt?: string;
   manualResolution?: SheetsDigestManualResolution;
 }

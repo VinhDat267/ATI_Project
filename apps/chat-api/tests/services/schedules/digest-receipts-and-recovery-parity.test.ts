@@ -93,7 +93,7 @@ describe('PR3: Digest receipts, workspace-scoped Slack lookup, notion_digest err
       userId: owner.id,
     });
 
-    for (const badTs of [undefined, '', '   ', 'undefined', 'null']) {
+    for (const badTs of [undefined, '', '   ', 'undefined', 'null', 'abc']) {
       const convId = (
         await db.pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [owner.id])
       ).rows[0].id as string;
@@ -1038,6 +1038,8 @@ describe('PR3: Digest receipts, workspace-scoped Slack lookup, notion_digest err
       expect(markedRes.run.deliveryResolution).toBe('confirmed_sent');
       expect(markedRes.followUpRun).toBeNull();
       expect((markedRes.run.delivery as any)?.manualResolution?.status).toBe('confirmed_sent');
+      expect((markedRes.run.delivery as any)?.manualConfirmedAt).toBe(now.toISOString());
+      expect((markedRes.run.delivery as any)?.sentAt ?? null).toBeNull();
 
       // 5b. retry_new_run requires confirmDuplicateRisk: true
       const runToRetry = (

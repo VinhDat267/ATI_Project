@@ -2034,7 +2034,7 @@ export class ScheduleService {
               : {}),
             ...(prevDelivery.messageId !== undefined ? { messageId: prevDelivery.messageId } : {}),
             counts,
-            sentAt: typeof prevDelivery.sentAt === 'string' ? prevDelivery.sentAt : resolvedAtIso,
+            ...(typeof prevDelivery.sentAt === 'string' ? { sentAt: prevDelivery.sentAt } : {}),
             manualConfirmedAt: resolvedAtIso,
             manualResolution: {
               status: 'confirmed_sent',
@@ -2069,7 +2069,7 @@ export class ScheduleService {
             channelName: typeof prevDelivery.channelName === 'string' ? prevDelivery.channelName : (cfg?.channelName ?? ''),
             ts: typeof prevDelivery.ts === 'string' ? prevDelivery.ts : null,
             counts,
-            sentAt: typeof prevDelivery.sentAt === 'string' ? prevDelivery.sentAt : resolvedAtIso,
+            ...(typeof prevDelivery.sentAt === 'string' ? { sentAt: prevDelivery.sentAt } : {}),
             manualConfirmedAt: resolvedAtIso,
             manualResolution: {
               status: 'confirmed_sent',
@@ -2116,7 +2116,7 @@ export class ScheduleService {
             ...(prevDelivery.chatTitle ?? cfg?.chatTitle
               ? { chatTitle: prevDelivery.chatTitle ?? cfg?.chatTitle }
               : {}),
-            sentAt: typeof prevDelivery.sentAt === 'string' ? prevDelivery.sentAt : resolvedAtIso,
+            ...(typeof prevDelivery.sentAt === 'string' ? { sentAt: prevDelivery.sentAt } : {}),
             sources: Array.isArray(prevDelivery.sources) ? prevDelivery.sources : [],
             manualConfirmedAt: resolvedAtIso,
             manualResolution: {

@@ -1,3 +1,4 @@
+import { isSlackMessageTimestamp } from './slack-message-timestamp.js';
 import type pg from 'pg';
 import type { GithubDigestConfig, GithubDigestDelivery, ScheduleRecurrence } from '@wap/tool-schemas';
 import { isUuid } from '../../db/repositories/uuid.js';
@@ -577,10 +578,7 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
         { signal },
       );
       const validTs =
-        typeof sendRes?.ts === 'string' &&
-        sendRes.ts.trim().length > 0 &&
-        sendRes.ts.trim() !== 'undefined' &&
-        sendRes.ts.trim() !== 'null';
+        isSlackMessageTimestamp(sendRes?.ts);
       if (!validTs) {
         return {
           state: 'delivery_unknown',

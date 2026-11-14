@@ -1,3 +1,4 @@
+import { isSlackMessageTimestamp } from './slack-message-timestamp.js';
 import type pg from 'pg';
 import type { NotionDigestConfig, NotionDigestDelivery, ScheduleRecurrence } from '@wap/tool-schemas';
 import { approvedSlackNotionBinding, computeNotionDigestConfigHash } from './notion-digest-candidate.js';
@@ -356,10 +357,7 @@ export function createNotionDigestRunner(options: NotionDigestRunnerOptions): Ru
         deliveryStarted = true;
         const receipt = await slackAdapter.execute('slack.send_message', { channel: config.channelId, text }, { signal });
         if (
-          typeof receipt?.ts !== 'string' ||
-          !receipt.ts.trim() ||
-          receipt.ts.trim() === 'undefined' ||
-          receipt.ts.trim() === 'null'
+          !isSlackMessageTimestamp(receipt?.ts)
         ) {
           return { state: 'delivery_unknown', error: NOTION_DELIVERY_UNKNOWN };
         }

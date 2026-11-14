@@ -91,7 +91,7 @@ export function buildConfirmedCalendarDigestDelivery(input: {
       typeof prevDelivery.summaryIncluded === 'boolean'
         ? prevDelivery.summaryIncluded
         : Boolean(cfg?.includeSummary),
-    sentAt: typeof prevDelivery.sentAt === 'string' ? prevDelivery.sentAt : resolvedAtIso,
+    sentAt: typeof prevDelivery.sentAt === 'string' ? prevDelivery.sentAt : null,
     manualConfirmedAt: resolvedAtIso,
     manualResolution: {
       status: 'confirmed_sent',

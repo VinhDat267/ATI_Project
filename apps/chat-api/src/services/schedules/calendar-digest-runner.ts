@@ -1,3 +1,4 @@
+import { isSlackMessageTimestamp } from './slack-message-timestamp.js';
 import type pg from 'pg';
 import { decryptCredentials, detectCalendarConflicts, StepError, type CalendarEventWithConflict } from '@wap/tool-adapters';
 import type { CalendarDigestConfig, CalendarDigestDelivery } from '@wap/tool-schemas';
@@ -729,10 +730,7 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
           { signal },
         );
         const validTs =
-          typeof sendRes?.ts === 'string' &&
-          sendRes.ts.trim().length > 0 &&
-          sendRes.ts.trim() !== 'undefined' &&
-          sendRes.ts.trim() !== 'null';
+          isSlackMessageTimestamp(sendRes?.ts);
         if (!validTs) {
           return { state: 'delivery_unknown', error: CALENDAR_DELIVERY_UNKNOWN };
         }
