@@ -109,6 +109,7 @@ export interface EnvConfig {
   LLM_PROVIDER: 'gemini' | 'openai-compatible' | 'deepseek';
   /** 'llm': the model calls search tools itself; 'regex': registry gather rules resolve names first. */
   PLANNER_SEARCH_MODE: 'llm' | 'regex';
+  /** The PLANNER_READ_ANSWERS flag (default on unless off). */
   PLANNER_READ_ANSWERS: boolean;
   /** IANA zone the planner resolves relative dates such as "thứ 6" in. */
   APP_TIME_ZONE: string;
@@ -118,7 +119,7 @@ export interface EnvConfig {
   /** Google registration uses the raw account policy independently of SMTP availability. */
   GOOGLE_SIGNUP_ENABLED: boolean;
   GOOGLE_OAUTH?: GoogleOAuthConfig;
-  /** The GMAIL_ENABLED flag (default off). Gmail is usable only with GMAIL_OAUTH and PostgreSQL as well. */
+  /** Auto-enabled when GMAIL_OAUTH is complete unless GMAIL_ENABLED=off; explicit on requires every variable in live mode. */
   GMAIL_ENABLED: boolean;
   /** Complete only when the flag is on; sandbox also needs every fake endpoint. Missing in sandbox means 503. */
   GMAIL_OAUTH?: GmailOAuthConfig;
@@ -172,9 +173,8 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     throw new Error('LLM_PROVIDER must be gemini, openai-compatible, or deepseek');
   }
   const PLANNER_SEARCH_MODE = env.PLANNER_SEARCH_MODE || (isLive ? 'llm' : 'regex');
-  const readAnswers = env.PLANNER_READ_ANSWERS ?? 'off';
-  if (readAnswers !== 'on' && readAnswers !== 'off') throw new Error('PLANNER_READ_ANSWERS must be on or off');
-  const PLANNER_READ_ANSWERS = readAnswers === 'on';
+  if (env.PLANNER_READ_ANSWERS && !['on', 'off'].includes(env.PLANNER_READ_ANSWERS)) throw new Error('PLANNER_READ_ANSWERS must be on or off');
+  const PLANNER_READ_ANSWERS = env.PLANNER_READ_ANSWERS !== 'off';
   if (PLANNER_SEARCH_MODE !== 'llm' && PLANNER_SEARCH_MODE !== 'regex') {
     throw new Error('PLANNER_SEARCH_MODE must be llm or regex');
   }

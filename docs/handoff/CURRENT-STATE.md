@@ -1,6 +1,6 @@
 # Trạng thái hiện tại
 
-**Cập nhật:** 12/11/2026, `origin/main` `5eef6c39` (sau #318). Mỗi PR làm đổi trạng thái thì sửa đúng dòng của nó ở đây. Lịch sử đầy đủ trước ngày này nằm ở [`docs/archive/handoff-2026-11-12/CURRENT-STATE.md`](../archive/handoff-2026-11-12/CURRENT-STATE.md).
+**Cập nhật:** 14/11/2026, `origin/main` `7d41f0a2` (sau #327 và nghiệm thu `GMAIL-04`). Mỗi PR làm đổi trạng thái thì sửa đúng dòng của nó ở đây. Lịch sử đầy đủ trước ngày này nằm ở [`docs/archive/handoff-2026-11-12/CURRENT-STATE.md`](../archive/handoff-2026-11-12/CURRENT-STATE.md).
 
 ## Tổng quan
 
@@ -21,7 +21,7 @@
 | Notion | OAuth bền vững (#317) | **PR #319** (ràng buộc nguồn digest): CI đỏ ở `static-guard` | Khoảng 10 lỗi audit còn mở (độ phủ dữ liệu, bộ lọc ngày/trạng thái, biên nhận Slack, phân trang tìm database, Privacy); nghiệm thu thật |
 | Telegram | Bot cá nhân; chặn digest sai binding (#303) | #303 | Nghiệm thu thật |
 | Jira / MyJira | G2A read containment (#318) | #318 | Chỉ dùng trong "Không gian Chung" (site `ati-workflow-test`) |
-| Gmail | Gửi/nháp/đọc/nhãn qua OAuth cá nhân; ràng buộc nguồn Telegram digest + kiểm soát origin OAuth | #327 (G2 + đóng `GMAIL-AUDIT-08`..`12`) | Nghiệm thu thật với Google Cloud OAuth (`GMAIL-04`) |
+| Gmail | Gửi/nháp/đọc/nhãn qua OAuth cá nhân; ràng buộc nguồn Telegram digest + kiểm soát origin OAuth | #327 (G2 + đóng `GMAIL-AUDIT-08`..`12`) + `GMAIL-04` nghiệm thu Google Cloud OAuth thật & mặc định `PLANNER_READ_ANSWERS=on` (14/11/2026) | Kết nối lại OAuth trong vòng 7 ngày trước buổi bảo vệ (project Testing hết hạn refresh token sau 7 ngày) |
 
 ## Chạy và kiểm tra
 

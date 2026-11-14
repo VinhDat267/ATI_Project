@@ -513,7 +513,10 @@ switched to another model. [Report and provenance](../docs/ai-evidence/V3-GOLDEN
     second of the day is missed; the label's 00:00:00 next day covers it. The
     answer happens to be right on the current fixture. Proposed backlog item:
     full-day windows end at 00:00 the next day.
-- **Still open:** Google acceptance (parts 1–3) and the flag PR.
+- **Live acceptance and flag rollout (2026-11-14):** Google Cloud OAuth
+  acceptance (parts 1–3) passed in live mode; `GMAIL_ENABLED` auto-enables when
+  `GMAIL_OAUTH_*` are complete and `PLANNER_READ_ANSWERS` defaults to `on` (see
+  `GMAIL-04` below).
 
 ### W4-02: multi-turn conversations
 
@@ -869,6 +872,34 @@ links, emails and captures in that ignored directory, redact email/token
 from screenshots, and commit only aggregate results. SMTP accepting a send
 does not prove inbox receipt; record `PASS`, `FAIL`, `NOT_RUN` or `UNKNOWN`
 for each step without treating fixture browser tests as real-provider proof.
+
+### GMAIL-04: real Gmail personal OAuth setup and acceptance
+
+Live per-member Gmail OAuth uses a **dedicated Google Cloud project**
+(`GMAIL_OAUTH_PROJECT_ID`, separate from Google sign-in `GOOGLE_OAUTH_*`,
+`MYCALENDAR_OAUTH_*`, and `MYSHEETS_OAUTH_*`, so revoking Gmail access in
+Google Account never revokes another Google connection or sign-in). Enable the
+Gmail API, configure an external consent screen in `Testing` status with scope
+`https://www.googleapis.com/auth/gmail.modify` and test-user allowlist entries,
+create a **Web application** OAuth client with exact redirect URI
+`<APP_BASE_URL>/connections/gmail/callback`, and keep `GMAIL_OAUTH_*` only in
+the ignored `.env`.
+
+- **Flag behavior:** `GMAIL_ENABLED` unset auto-enables Gmail when
+  `GMAIL_OAUTH_*` are complete and leaves Gmail off without error when
+  unconfigured (an unconfigured live host starts normally). Setting
+  `GMAIL_ENABLED=on` in live mode fails startup if any `GMAIL_OAUTH_*`
+  variable is missing. `PLANNER_READ_ANSWERS` defaults to `on` unless
+  `PLANNER_READ_ANSWERS=off`.
+- **Evidence hygiene & 7-day Testing expiry:** Verify
+  `git check-ignore docs/ai-evidence/GMAIL-LIVE/2026-11-14-gmail-04-live-acceptance.md`
+  before storing local live acceptance artifacts; commit only redacted
+  summaries and SHA-256 checksums, keeping live writes self-addressed to the
+  team's test mailbox. Google Cloud `Testing` refresh tokens expire after
+  **7 days** (observed live on `gmail`, `mycalendar`, and `mysheets`; expired
+  credentials cleanly transition to `reconnect_required` with `0` plans or
+  steps), so reconnect personal Google OAuth within 7 days before the defense
+  demo.
 
 ## W4-00: manual Codex fallback through 9router
 
