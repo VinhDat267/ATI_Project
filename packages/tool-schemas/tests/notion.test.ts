@@ -19,7 +19,7 @@ it('publishes Notion database/page contracts with resource grounding and bounded
   expect(create(args)).toBe(true); expect(create({ ...args, databaseId: '../outside' })).toBe(false);
   expect(create({ ...args, title: 'x'.repeat(201) })).toBe(false); expect(create({ ...args, content: 'x'.repeat(4001) })).toBe(false);
   expect(create({ ...args, properties: { Score: 2 } })).toBe(false);
-  expect(ajv.compile(tools[1]!.inputSchema)({ databaseId: args.databaseId, status: 'In progress', limit: 20 })).toBe(true);
+  expect(ajv.compile(tools[1]!.inputSchema)({ databaseId: args.databaseId, status: 'In progress', dateOnOrAfter: '2026-10-01', dateOnOrBefore: '2026-10-31', limit: 20 })).toBe(true);
   expect(ajv.compile(tools[1]!.inputSchema)({ databaseId: args.databaseId, limit: 21 })).toBe(false);
   expect(ajv.compile(tools[3]!.inputSchema)({ pageId: args.databaseId, text: 'x'.repeat(2001) })).toBe(false);
   expect(tools[3]!.inputSchema.properties.pageId['x-resource']).toBe('page');

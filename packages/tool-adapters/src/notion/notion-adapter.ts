@@ -168,7 +168,36 @@ function validateAndConvertProperties(
   return properties;
 }
 
-function formatBlockMarkdown(type: string, textContent: string, checked?: boolean): string {
+function extractBlockText(type: string, data: any): string {
+  if (Array.isArray(data?.rich_text)) return plainRich(data.rich_text);
+  const caption = Array.isArray(data?.caption) ? plainRich(data.caption) : '';
+  switch (type) {
+    case 'child_page':
+    case 'child_database':
+      return String(data?.title || '');
+    case 'table_row':
+      return Array.isArray(data?.cells)
+        ? data.cells.map((cell: unknown) => (Array.isArray(cell) ? plainRich(cell) : '')).join(' | ')
+        : '';
+    case 'equation':
+      return String(data?.expression || '');
+    case 'bookmark':
+    case 'embed':
+    case 'link_preview':
+      return [caption, String(data?.url || '')].filter(Boolean).join(' - ');
+    case 'image':
+    case 'video':
+    case 'file':
+    case 'pdf':
+      return [caption, String(data?.external?.url || data?.file?.url || '')].filter(Boolean).join(' - ');
+    case 'divider':
+      return '---';
+    default:
+      return '';
+  }
+}
+
+function formatBlockMarkdown(type: string, textContent: string, checked?: boolean, data?: any): string {
   switch (type) {
     case 'heading_1': return `# ${textContent}`;
     case 'heading_2': return `## ${textContent}`;
@@ -176,9 +205,32 @@ function formatBlockMarkdown(type: string, textContent: string, checked?: boolea
     case 'bulleted_list_item': return `- ${textContent}`;
     case 'numbered_list_item': return `1. ${textContent}`;
     case 'to_do': return `- [${checked ? 'x' : ' '}] ${textContent}`;
-    case 'quote': case 'callout': return `> ${textContent}`;
+    case 'quote': return `> ${textContent}`;
+    case 'callout': return `> 💡 ${textContent}`;
+    case 'toggle': return `▸ ${textContent}`;
+    case 'code': return `\`\`\`${data?.language || ''}\n${textContent}\n\`\`\``;
+    case 'divider': return '---';
+    case 'table_row': return `| ${textContent} |`;
     default: return textContent;
   }
+}
+
+async function preWrite<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err: any) {
+    if (err && typeof err === 'object') {
+      err.details = { ...(err.details && typeof err.details === 'object' ? err.details : {}), requestSent: false };
+    }
+    throw err;
+  }
+}
+
+function parseDateBoundMs(value: string, upper: boolean): number {
+  if (value.length === 10) {
+    return Date.parse(value + (upper ? 'T23:59:59.999Z' : 'T00:00:00.000Z'));
+  }
+  return Date.parse(value);
 }
 function retryDelay(header: string | null): number {
   if (header == null) return 1000;
@@ -220,10 +272,10 @@ export class NotionAdapter extends BaseAdapter {
     if (typeof this.token !== 'string' || !this.token.trim()) denied();
     let networkRetries = 0; let serverRetries = 0; let rateRetries = 0;
     for (;;) {
-      if (signal?.aborted) throw new StepError({ message: 'Notion request cancelled before dispatch', category: 'NETWORK' });
+      if (signal?.aborted) throw new StepError({ message: 'Notion request cancelled before dispatch', category: 'NETWORK', details: { requestSent: false } });
       try { await this.waitForTransportSlot(this.rateLimiter ?? sharedLimiter, 'notion:' + this.token, signal); }
-      catch (error) { throw new StepError({ message: 'Notion request stopped before dispatch', category: error instanceof StepError ? error.category : 'NETWORK' }); }
-      if (signal?.aborted) throw new StepError({ message: 'Notion request cancelled before dispatch', category: 'NETWORK' });
+      catch (error) { throw new StepError({ message: 'Notion request stopped before dispatch', category: error instanceof StepError ? error.category : 'NETWORK', details: { requestSent: false } }); }
+      if (signal?.aborted) throw new StepError({ message: 'Notion request cancelled before dispatch', category: 'NETWORK', details: { requestSent: false } });
       let response: Response;
       try { response = await this.fetchFn(this.apiBaseUrl + '/' + path, { method, signal, redirect: 'error', headers: {
         Authorization: 'Bearer ' + this.token, 'Notion-Version': NOTION_VERSION, ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
@@ -259,7 +311,7 @@ export class NotionAdapter extends BaseAdapter {
   }
   private resource(value: any, object: string, id: string): void {
     if (value?.object !== object || uuid(value.id, true) !== id) badResponse();
-    if (value.in_trash === true) denied();
+    if (value.in_trash === true || value.archived === true) denied();
   }
   private async database(id: string, signal?: AbortSignal): Promise<any> {
     const value = await this.request('databases/' + id, signal); this.resource(value, 'database', id); return value;
@@ -297,31 +349,57 @@ export class NotionAdapter extends BaseAdapter {
       return result;
     }
     if (toolName === 'notion.query_database') {
-      only(args, ['databaseId', 'query', 'status', 'limit']); const id = this.checkedDatabase(args.databaseId); const maximum = limit(args.limit, 20);
+      only(args, ['databaseId', 'query', 'status', 'dateOnOrAfter', 'dateOnOrBefore', 'limit']);
+      const id = this.checkedDatabase(args.databaseId);
+      const maximum = limit(args.limit, 20);
       const query = args.query === undefined ? '' : text(args.query, 2000);
       const statusFilter = args.status === undefined ? '' : text(args.status, 200).trim();
+      const dateOnOrAfter = args.dateOnOrAfter === undefined ? '' : text(args.dateOnOrAfter, 64).trim();
+      const dateOnOrBefore = args.dateOnOrBefore === undefined ? '' : text(args.dateOnOrBefore, 64).trim();
+      if (dateOnOrAfter && !dateValue(dateOnOrAfter)) invalid('dateOnOrAfter requires a valid ISO date or timezone-qualified instant');
+      if (dateOnOrBefore && !dateValue(dateOnOrBefore)) invalid('dateOnOrBefore requires a valid ISO date or timezone-qualified instant');
+      const afterMs = dateOnOrAfter ? parseDateBoundMs(dateOnOrAfter, false) : undefined;
+      const beforeMs = dateOnOrBefore ? parseDateBoundMs(dateOnOrBefore, true) : undefined;
+      if (afterMs !== undefined && beforeMs !== undefined && afterMs > beforeMs) {
+        invalid('dateOnOrAfter must not be after dateOnOrBefore');
+      }
       const source = await this.schema(id, signal);
       const schema = extractSchema(source.properties);
+      const propEntries = Object.entries<any>(source.properties);
+      const selectEntries = propEntries.filter(
+        ([, def]) => def?.type === 'select' && Array.isArray(def?.select?.options),
+      );
       const statusEntry =
-        Object.entries<any>(source.properties).find(([, def]) => def?.type === 'status') ??
-        Object.entries<any>(source.properties).find(
-          ([, def]) => def?.type === 'select' && Array.isArray(def?.select?.options),
-        );
-      let filter: object | undefined;
-      if (query && statusFilter && statusEntry) {
-        const [colName, colDef] = statusEntry;
-        filter = {
-          and: [
-            { property: source.title, title: { contains: query } },
-            { property: colName, [colDef.type]: { equals: statusFilter } },
-          ],
-        };
-      } else if (statusFilter && statusEntry) {
-        const [colName, colDef] = statusEntry;
-        filter = { property: colName, [colDef.type]: { equals: statusFilter } };
-      } else if (query) {
-        filter = { property: source.title, title: { contains: query } };
+        propEntries.find(([, def]) => def?.type === 'status') ??
+        selectEntries.find(([name]) => /^(?:status|trạng\s*thái|state|stage|tình\s*trạng)$/i.test(name.trim())) ??
+        (selectEntries.length === 1 ? selectEntries[0] : undefined);
+      if (statusFilter && !statusEntry) {
+        throw new StepError({ message: 'Notion database has no status property to filter by', category: 'VALIDATION', retryable: false });
       }
+      const dateEntries = propEntries.filter(([, def]) => def?.type === 'date');
+      const dateEntry =
+        dateEntries.find(([name]) => /due|hạn|deadline/i.test(name.trim())) ??
+        dateEntries.find(([name]) => /date|ngày/i.test(name.trim())) ??
+        dateEntries[0];
+      if ((dateOnOrAfter || dateOnOrBefore) && !dateEntry) {
+        throw new StepError({ message: 'Notion database has no date property to filter by', category: 'VALIDATION', retryable: false });
+      }
+      const clauses: object[] = [];
+      if (query) {
+        clauses.push({ property: source.title, title: { contains: query } });
+      }
+      if (statusFilter && statusEntry) {
+        const [colName, colDef] = statusEntry;
+        clauses.push({ property: colName, [colDef.type]: { equals: statusFilter } });
+      }
+      if (dateOnOrAfter && dateEntry) {
+        clauses.push({ property: dateEntry[0], date: { on_or_after: dateOnOrAfter } });
+      }
+      if (dateOnOrBefore && dateEntry) {
+        clauses.push({ property: dateEntry[0], date: { on_or_before: dateOnOrBefore } });
+      }
+      const filter: object | undefined =
+        clauses.length === 1 ? clauses[0] : clauses.length > 1 ? { and: clauses } : undefined;
       const pages = []; const cursors = new Set<string>(); let cursor: string | undefined; let truncated = false;
       for (let index = 0; index < 20; index++) {
         const value = await this.request('data_sources/' + source.id + '/query', signal, 'POST', { page_size: maximum - pages.length,
@@ -329,8 +407,23 @@ export class NotionAdapter extends BaseAdapter {
         });
         if (value?.object !== 'list' || !Array.isArray(value.results) || typeof value.has_more !== 'boolean') badResponse();
         for (const item of value.results) {
-          if (item?.in_trash === true) continue;
+          if (item?.in_trash === true || item?.archived === true) continue;
           if (item?.object !== 'page' || item.parent?.type !== 'data_source_id' || uuid(item.parent.data_source_id, true) !== source.id || !item.properties || Array.isArray(item.properties)) badResponse();
+          if ((afterMs !== undefined || beforeMs !== undefined) && dateEntry) {
+            const rawDateProp = item.properties[dateEntry[0]];
+            const rawStart = typeof rawDateProp?.date?.start === 'string' ? rawDateProp.date.start.trim() : '';
+            if (!rawStart) continue;
+            const rawEnd = typeof rawDateProp?.date?.end === 'string' && rawDateProp.date.end.trim() ? rawDateProp.date.end.trim() : rawStart;
+            const itemStartMs = parseDateBoundMs(rawStart, false);
+            const itemEndMs = parseDateBoundMs(rawEnd, true);
+            if (!Number.isFinite(itemStartMs) || !Number.isFinite(itemEndMs)) continue;
+            if (afterMs !== undefined && itemEndMs < afterMs) continue;
+            if (beforeMs !== undefined && itemStartMs > beforeMs) continue;
+          }
+          if (pages.length >= maximum) {
+            truncated = true;
+            break;
+          }
           const properties = Object.fromEntries(Object.entries(item.properties).map(([key, prop]) => {
             const clipped = clipText(propertyText(prop), NOTION_MAX_PROPERTY_CHARS);
             if (clipped.clipped) truncated = true;
@@ -343,22 +436,28 @@ export class NotionAdapter extends BaseAdapter {
             properties,
             ...(typeof item.last_edited_time === 'string' ? { lastEditedTime: item.last_edited_time } : {}),
           });
-          if (pages.length >= maximum) break;
         }
-        if (pages.length >= maximum || !value.has_more) return { pages, schema, ...(truncated ? { truncated: true } : {}) };
+        if (pages.length >= maximum || !value.has_more) {
+          if (value.has_more) truncated = true;
+          return { pages, schema, ...(truncated ? { truncated: true } : {}) };
+        }
         if (typeof value.next_cursor !== 'string' || !value.next_cursor || cursors.has(value.next_cursor)) badResponse();
         const nextCursor: string = value.next_cursor; cursor = nextCursor; cursors.add(nextCursor);
       }
       throw new StepError({ message: 'Notion query pagination exceeded its read budget; narrow the query', category: 'SERVER_ERROR' });
     }
     if (toolName === 'notion.create_page') {
-      only(args, ['databaseId', 'title', 'content', 'properties']); const id = this.checkedDatabase(args.databaseId);
-      const title = text(args.title, 200, true); const content = args.content === undefined ? '' : text(args.content, 4000);
-      const values = args.properties === undefined ? {} : args.properties;
-      if (!values || typeof values !== 'object' || Array.isArray(values) || Object.keys(values).length > 100) invalid('properties must be a bounded string map');
-      for (const value of Object.values(values)) if (typeof value !== 'boolean') text(value, 2000);
-      const source = await this.schema(id, signal);
-      const properties = validateAndConvertProperties(source, values, title);
+      const { source, properties, content } = await preWrite(async () => {
+        only(args, ['databaseId', 'title', 'content', 'properties']);
+        const id = this.checkedDatabase(args.databaseId);
+        const title = text(args.title, 200, true);
+        const bodyContent = args.content === undefined ? '' : text(args.content, 4000);
+        const values = args.properties === undefined ? {} : args.properties;
+        if (!values || typeof values !== 'object' || Array.isArray(values) || Object.keys(values).length > 100) invalid('properties must be a bounded string map');
+        for (const value of Object.values(values)) if (typeof value !== 'boolean') text(value, 2000);
+        const src = await this.schema(id, signal);
+        return { source: src, properties: validateAndConvertProperties(src, values, title), content: bodyContent };
+      });
       const result = await this.request('pages', signal, 'POST', { parent: { type: 'data_source_id', data_source_id: source.id }, properties,
         ...(content ? { children: paragraphs(content) } : {}),
       }, true);
@@ -390,13 +489,13 @@ export class NotionAdapter extends BaseAdapter {
         if (!blk || blk.object !== 'block' || typeof blk.type !== 'string') continue;
         const blkId = uuid(blk.id, true);
         const data = blk[blk.type];
-        const rawText = Array.isArray(data?.rich_text) ? plainRich(data.rich_text) : '';
+        const rawText = extractBlockText(blk.type, data);
         const clippedBlk = clipText(rawText, NOTION_MAX_PROPERTY_CHARS);
         if (clippedBlk.clipped) truncated = true;
         const checked = blk.type === 'to_do' ? Boolean(data?.checked) : undefined;
         blocks.push({ id: blkId, type: blk.type, text: clippedBlk.text, ...(checked !== undefined ? { checked } : {}) });
-        if (clippedBlk.text || blk.type === 'to_do') {
-          lines.push(formatBlockMarkdown(blk.type, clippedBlk.text, checked));
+        if (clippedBlk.text || blk.type === 'to_do' || blk.type === 'divider') {
+          lines.push(formatBlockMarkdown(blk.type, clippedBlk.text, checked, data));
         }
         if (blk.has_children === true) {
           if (childFetchCount >= 5) {
@@ -409,7 +508,7 @@ export class NotionAdapter extends BaseAdapter {
                 if (!childBlk || childBlk.object !== 'block' || typeof childBlk.type !== 'string') continue;
                 const childId = uuid(childBlk.id, true);
                 const childData = childBlk[childBlk.type];
-                const childRawText = Array.isArray(childData?.rich_text) ? plainRich(childData.rich_text) : '';
+                const childRawText = extractBlockText(childBlk.type, childData);
                 const clippedChild = clipText(childRawText, NOTION_MAX_PROPERTY_CHARS);
                 if (clippedChild.clipped) truncated = true;
                 const childChecked = childBlk.type === 'to_do' ? Boolean(childData?.checked) : undefined;
@@ -419,8 +518,8 @@ export class NotionAdapter extends BaseAdapter {
                   text: clippedChild.text,
                   ...(childChecked !== undefined ? { checked: childChecked } : {}),
                 });
-                if (clippedChild.text || childBlk.type === 'to_do') {
-                  lines.push('  ' + formatBlockMarkdown(childBlk.type, clippedChild.text, childChecked));
+                if (clippedChild.text || childBlk.type === 'to_do' || childBlk.type === 'divider') {
+                  lines.push('  ' + formatBlockMarkdown(childBlk.type, clippedChild.text, childChecked, childData));
                 }
                 if (childBlk.has_children === true) truncated = true;
               }
@@ -443,28 +542,31 @@ export class NotionAdapter extends BaseAdapter {
       };
     }
     if (toolName === 'notion.update_page') {
-      only(args, ['pageId', 'title', 'properties', 'archived']);
-      const id = uuid(args.pageId);
-      const title = args.title === undefined ? undefined : text(args.title, 200, true);
-      const values = args.properties === undefined ? {} : args.properties;
-      if (!values || typeof values !== 'object' || Array.isArray(values) || Object.keys(values).length > 100) invalid('properties must be a bounded string map');
-      for (const value of Object.values(values)) if (typeof value !== 'boolean') text(value, 2000);
-      if (args.archived !== undefined && typeof args.archived !== 'boolean') invalid('archived must be a boolean');
-      if (title === undefined && Object.keys(values).length === 0 && args.archived === undefined) {
-        invalid('update_page requires at least one of title, properties, or archived');
-      }
-      this.databaseIds();
-      const page = await this.request('pages/' + id, signal); this.resource(page, 'page', id);
-      if (page.parent?.type !== 'data_source_id') denied();
-      const source = await this.dataSource(uuid(page.parent.data_source_id, true), signal);
-      if (!source.properties || typeof source.properties !== 'object' || Array.isArray(source.properties)) badResponse();
-      const titles = Object.entries<any>(source.properties).filter(([, value]) => value?.type === 'title');
-      if (titles.length !== 1) badResponse();
-      const titleKey = titles[0]![0];
-      const converted = validateAndConvertProperties({ properties: source.properties, title: titleKey }, values, title);
-      const body: Record<string, any> = {};
-      if (Object.keys(converted).length > 0) body.properties = converted;
-      if (typeof args.archived === 'boolean') body.archived = args.archived;
+      const { id, converted, body } = await preWrite(async () => {
+        only(args, ['pageId', 'title', 'properties', 'archived']);
+        const pageId = uuid(args.pageId);
+        const title = args.title === undefined ? undefined : text(args.title, 200, true);
+        const values = args.properties === undefined ? {} : args.properties;
+        if (!values || typeof values !== 'object' || Array.isArray(values) || Object.keys(values).length > 100) invalid('properties must be a bounded string map');
+        for (const value of Object.values(values)) if (typeof value !== 'boolean') text(value, 2000);
+        if (args.archived !== undefined && typeof args.archived !== 'boolean') invalid('archived must be a boolean');
+        if (title === undefined && Object.keys(values).length === 0 && args.archived === undefined) {
+          invalid('update_page requires at least one of title, properties, or archived');
+        }
+        this.databaseIds();
+        const page = await this.request('pages/' + pageId, signal); this.resource(page, 'page', pageId);
+        if (page.parent?.type !== 'data_source_id') denied();
+        const source = await this.dataSource(uuid(page.parent.data_source_id, true), signal);
+        if (!source.properties || typeof source.properties !== 'object' || Array.isArray(source.properties)) badResponse();
+        const titles = Object.entries<any>(source.properties).filter(([, value]) => value?.type === 'title');
+        if (titles.length !== 1) badResponse();
+        const titleKey = titles[0]![0];
+        const conv = validateAndConvertProperties({ properties: source.properties, title: titleKey }, values, title);
+        const reqBody: Record<string, any> = {};
+        if (Object.keys(conv).length > 0) reqBody.properties = conv;
+        if (typeof args.archived === 'boolean') reqBody.in_trash = args.archived;
+        return { id: pageId, converted: conv, body: reqBody };
+      });
       const result = await this.request('pages/' + id, signal, 'PATCH', body, true);
       if (result?.object !== 'page') badResponse(true);
       return {
@@ -475,10 +577,13 @@ export class NotionAdapter extends BaseAdapter {
       };
     }
     if (toolName === 'notion.append_text') {
-      only(args, ['pageId', 'text']); const id = uuid(args.pageId); const content = text(args.text, 2000, true); this.databaseIds();
-      const page = await this.request('pages/' + id, signal); this.resource(page, 'page', id);
-      if (page.parent?.type !== 'data_source_id') denied();
-      await this.dataSource(uuid(page.parent.data_source_id, true), signal); const url = link(page);
+      const { id, content, url } = await preWrite(async () => {
+        only(args, ['pageId', 'text']); const pageId = uuid(args.pageId); const bodyContent = text(args.text, 2000, true); this.databaseIds();
+        const page = await this.request('pages/' + pageId, signal); this.resource(page, 'page', pageId);
+        if (page.parent?.type !== 'data_source_id') denied();
+        await this.dataSource(uuid(page.parent.data_source_id, true), signal);
+        return { id: pageId, content: bodyContent, url: link(page) };
+      });
       const result = await this.request('blocks/' + id + '/children', signal, 'PATCH', { children: paragraphs(content) }, true);
       if (result?.object !== 'list' || !Array.isArray(result.results) || result.results.length !== 1 || result.results[0]?.object !== 'block') badResponse(true);
       return { pageId: id, blockIds: result.results.map((item: any) => uuid(item.id, true, true)), url };

@@ -8,6 +8,7 @@ import {
   analyzeNotionDigestPages,
   createNotionDigestRunner,
 } from '../../../src/services/schedules/notion-digest-runner.js';
+import { NotionDigestSourceAuthority } from '../../../src/services/notion/digest-source-authority.js';
 import { summarizeSourceItems } from '../../../src/services/schedules/telegram-digest-runner.js';
 import { ScheduleService } from '../../../src/services/schedules/schedule-service.js';
 import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
@@ -157,6 +158,219 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
         'p-done',
       ]);
       expect(analysis.sortedPages[1]?.isRecent24h).toBe(true);
+    });
+
+    it('uses the end date of multi-day date ranges (start → end) and computes midnight in the schedule timezone', () => {
+      // 2026-11-09T18:00:00.000Z is 2026-11-10 01:00:00 in Asia/Ho_Chi_Minh (already Nov 10 locally)
+      const nowMs = Date.parse('2026-11-09T18:00:00.000Z');
+      const analysis = analyzeNotionDigestPages(
+        [
+          {
+            databaseId: dbId1,
+            databaseTitle: 'Sprint',
+            id: 'p-multiday-active',
+            title: 'Multi-day task still active through Nov 12',
+            url: 'https://www.notion.so/p-multiday-active',
+            properties: { Status: 'Todo', Due: '2026-11-05 → 2026-11-12' },
+          },
+          {
+            databaseId: dbId1,
+            databaseTitle: 'Sprint',
+            id: 'p-yesterday-ict',
+            title: 'Task due Nov 9 (yesterday in ICT, but still Nov 9 in UTC)',
+            url: 'https://www.notion.so/p-yesterday-ict',
+            properties: { Status: 'Todo', Due: '2026-11-09' },
+          },
+          {
+            databaseId: dbId1,
+            databaseTitle: 'Sprint',
+            id: 'p-today-ict',
+            title: 'Task due Nov 10 (today in ICT)',
+            url: 'https://www.notion.so/p-today-ict',
+            properties: { Status: 'Todo', Due: '2026-11-10' },
+          },
+        ],
+        nowMs,
+        'Asia/Ho_Chi_Minh',
+      );
+
+      const byId = new Map(analysis.sortedPages.map((item) => [item.page.id, item.bucket]));
+      expect(byId.get('p-multiday-active')).toBe('todo');
+      expect(byId.get('p-yesterday-ict')).toBe('overdue_blocked');
+      expect(byId.get('p-today-ict')).toBe('todo');
+      expect(analysis.stats.overdueOrBlocked).toBe(1);
+    });
+
+    it('propagates truncated from NotionDigestSourceAuthority.read into the digest message and delivery', async () => {
+      const validUserId = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+      const notionBinding = bindingFor(validUserId);
+      const config = {
+        notionBinding,
+        credentialId,
+        workspaceId: 'ws-notion-1',
+        workspaceName: 'ATI Notion',
+        botId: 'bot-notion-1',
+        identityVersion: 1,
+        databases: [{ id: dbId1, title: 'Kế hoạch Sprint' }],
+        channelId: 'C_DEV',
+        channelName: 'dev',
+      };
+      const configHash = computeNotionDigestConfigHash({ config, recurrence, userId: validUserId });
+      const sentTexts: string[] = [];
+      const runner = createNotionDigestRunner({
+        pool: { query: vi.fn() } as any,
+        notionSources: {
+          read: async () => ({
+            pages: [{ id: 'p1', title: 'Trang 1', url: 'https://www.notion.so/p1' }],
+            pagesByDatabase: new Map([[dbId1, [{ id: 'p1', title: 'Trang 1', url: 'https://www.notion.so/p1' }]]]),
+            truncated: true,
+            truncatedByDatabase: new Map([[dbId1, true]]),
+            databases: [{ databaseId: dbId1, pages: [{ id: 'p1', title: 'Trang 1', url: 'https://www.notion.so/p1' }], truncated: true }],
+          }),
+          withSource: async (_ownerId, _binding, _signal, dispatch) => {
+            const fakeClient = {
+              query: vi.fn(async (sql: string) => {
+                if (sql.includes('SELECT conv_id FROM schedules')) return { rowCount: 1, rows: [{ conv_id: 'conv-1' }] };
+                if (sql.includes('FROM schedules s')) {
+                  return {
+                    rowCount: 1,
+                    rows: [{
+                      id: 'sched-1',
+                      user_id: validUserId,
+                      kind: 'notion_digest',
+                      version: 1,
+                      status: 'active',
+                      digest_config: config,
+                      digest_config_hash: configHash,
+                    }],
+                  };
+                }
+                if (sql.includes('FROM schedule_runs')) {
+                  return { rowCount: 1, rows: [{ status: 'planning', delivery_started_at: null }] };
+                }
+                if (sql.includes('UPDATE schedule_runs')) return { rowCount: 1, rows: [{ id: 'run-1' }] };
+                return { rowCount: 1, rows: [] };
+              }),
+            } as any;
+            return dispatch(fakeClient);
+          },
+        },
+        getAdapter: async () => ({
+          execute: async (tool: string, args: any) => {
+            if (tool === 'slack.search_channels') return [{ id: 'C_DEV', name: 'dev' }];
+            sentTexts.push(args.text);
+            return { ts: '1700000001.001' };
+          },
+        }),
+      });
+
+      const outcome = await runner(
+        {
+          runId: 'run-1',
+          scheduleId: 'sched-1',
+          scheduleVersion: 1,
+          userId: validUserId,
+          name: 'Báo cáo Notion',
+          request: 'Báo cáo Notion',
+          dueAt: new Date('2026-11-10T01:30:00.000Z'),
+          trigger: 'scheduled',
+          recurrence,
+          digestConfig: config,
+          digestConfigHash: configHash,
+        },
+        'conv-1',
+        AbortSignal.timeout(2000),
+      );
+
+      expect(outcome.state).toBe('digest_sent');
+      if (outcome.state === 'digest_sent') {
+        expect(outcome.text).toContain('rút gọn');
+        expect((outcome.delivery as any).truncated).toBe(true);
+      }
+      expect(sentTexts[0]).toContain('rút gọn');
+    });
+
+    it('NotionDigestSourceAuthority.read preserves truncated on returned database entries', async () => {
+      const validOwnerId = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+      const dsId = 'ffffffff-6666-4666-8666-ffffffffffff';
+      const pageId = '22222222-3333-4444-5555-666666666666';
+      const binding = bindingFor(validOwnerId);
+      const fakeFetch = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes(`/databases/${dbId1}`)) {
+          return new Response(
+            JSON.stringify({
+              object: 'database',
+              id: dbId1,
+              title: [{ plain_text: 'Kế hoạch Sprint' }],
+              url: 'https://www.notion.so/' + dbId1.replaceAll('-', ''),
+              data_sources: [{ id: dsId }],
+            }),
+          );
+        }
+        if (url.includes(`/data_sources/${dsId}/query`)) {
+          return new Response(
+            JSON.stringify({
+              object: 'list',
+              results: Array.from({ length: 20 }, (_, i) => ({
+                object: 'page',
+                id: `22222222-3333-4444-5555-${String(i + 1).padStart(12, '0')}`,
+                parent: { type: 'data_source_id', data_source_id: dsId },
+                url: 'https://www.notion.so/' + pageId.replaceAll('-', ''),
+                properties: { Name: { type: 'title', title: [{ plain_text: `Trang ${i + 1}` }] } },
+              })),
+              has_more: true,
+              next_cursor: 'cursor-next',
+            }),
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            object: 'data_source',
+            id: dsId,
+            parent: { type: 'database_id', database_id: dbId1 },
+            properties: { Name: { type: 'title' } },
+          }),
+        );
+      }) as unknown as typeof fetch;
+
+      vi.stubGlobal('fetch', fakeFetch);
+      try {
+        const authority = new NotionDigestSourceAuthority(
+          {
+            get: async () => ({
+              id: credentialId,
+              user_id: validOwnerId,
+              app_id: 'notion-app',
+              workspace_id: 'ws-notion-1',
+              workspace_name: 'ATI Notion',
+              actor_id: 'actor-notion-1',
+              bot_id: 'bot-notion-1',
+              identity_version: 1,
+              status: 'active',
+              config: 'cipher',
+              refresh_in_flight: false,
+              allowed_databases: [dbId1],
+            }),
+          } as any,
+          {
+            execute: async (_u: string, _c: string, _v: number, fn: any) => fn('tok-1', 'bot-notion-1', {}),
+          } as any,
+          { appId: 'notion-app', apiBaseUrl: 'https://api.notion.com/v1' } as any,
+          '0123456789abcdef0123456789abcdef',
+        );
+        const readResult = await authority.read(validOwnerId, binding, AbortSignal.timeout(2000));
+        expect(readResult.truncated).toBe(true);
+        expect(readResult.truncatedByDatabase?.get(dbId1)).toBe(true);
+        expect(readResult.databases).toEqual([
+          expect.objectContaining({
+            databaseId: dbId1,
+            truncated: true,
+          }),
+        ]);
+      } finally {
+        vi.unstubAllGlobals();
+      }
     });
   });
 

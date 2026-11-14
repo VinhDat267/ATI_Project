@@ -133,6 +133,60 @@ describe('NotionOAuthClient & extractNotionDatabaseId', () => {
     ).rejects.toBeInstanceOf(NotionOAuthError);
   });
 
+  it('paginates /search using next_cursor up to 5 pages so child pages do not hide databases or leave hasMore true when <= 10 databases exist', async () => {
+    const db1 = '44444444-5555-6666-7777-888888888888';
+    const db2 = '55555555-6666-7777-8888-999999999999';
+    const seenCursors: Array<string | undefined> = [];
+
+    const fetchFn = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}'));
+      seenCursors.push(body.start_cursor);
+      if (!body.start_cursor) {
+        return new Response(
+          JSON.stringify({
+            object: 'list',
+            results: [
+              // Child pages returned by /search on page 1
+              { object: 'page', id: '11111111-1111-4111-8111-111111111111' },
+              {
+                object: 'database',
+                id: db1,
+                title: [{ plain_text: 'Database 1' }],
+                url: 'https://www.notion.so/db-1',
+              },
+            ],
+            has_more: true,
+            next_cursor: 'cursor-page-2',
+          }),
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          object: 'list',
+          results: [
+            {
+              object: 'database',
+              id: db2,
+              title: [{ plain_text: 'Database 2' }],
+              url: 'https://www.notion.so/db-2',
+            },
+          ],
+          has_more: false,
+          next_cursor: null,
+        }),
+      );
+    }) as unknown as typeof fetch;
+
+    const client = new NotionOAuthClient(cfg, fetchFn);
+    const discovered = await client.databases('ntn_access_1', '', AbortSignal.timeout(5000));
+    expect(seenCursors).toEqual([undefined, 'cursor-page-2']);
+    expect(discovered.hasMore).toBe(false);
+    expect(discovered.databases).toEqual([
+      { id: db1, title: 'Database 1', url: 'https://www.notion.so/db-1' },
+      { id: db2, title: 'Database 2', url: 'https://www.notion.so/db-2' },
+    ]);
+  });
+
   it('allows null/missing refresh_token on initial exchange() while requiring refresh_token on refresh()', async () => {
     const wsId = '11111111-2222-3333-4444-555555555555';
     const botId = '22222222-3333-4444-5555-666666666666';

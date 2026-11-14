@@ -536,43 +536,57 @@ export class NotionOAuthClient {
     query: string,
     signal: AbortSignal,
   ): Promise<{ databases: NotionDatabaseItem[]; hasMore: boolean }> {
-    const body: Record<string, unknown> = { page_size: 20 };
-    if (query.trim()) body.query = query.trim();
-    const data = await this.request(
-      '/search',
-      {
-        method: 'POST',
-        signal,
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-          'Notion-Version': NOTION_API_VERSION,
-        },
-        body: JSON.stringify(body),
-      },
-      'resource',
-    );
     const seen = new Set<string>();
+    const seenCursors = new Set<string>();
     const databases: NotionDatabaseItem[] = [];
-    for (const source of Array.isArray(data?.results) ? data.results : []) {
-      if (source?.in_trash === true || source?.archived === true) continue;
-      let rawId: string | undefined;
-      if (source?.object === 'data_source' && source?.parent?.type === 'database_id') {
-        rawId = source.parent.database_id;
-      } else if (source?.object === 'database') {
-        rawId = source.id;
+    let cursor: string | undefined;
+    let hasMore = false;
+    for (let page = 0; page < 5; page++) {
+      const body: Record<string, unknown> = { page_size: 20 };
+      if (query.trim()) body.query = query.trim();
+      if (cursor) body.start_cursor = cursor;
+      const data = await this.request(
+        '/search',
+        {
+          method: 'POST',
+          signal,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+            'Notion-Version': NOTION_API_VERSION,
+          },
+          body: JSON.stringify(body),
+        },
+        'resource',
+      );
+      for (const source of Array.isArray(data?.results) ? data.results : []) {
+        if (source?.in_trash === true || source?.archived === true) continue;
+        let rawId: string | undefined;
+        if (source?.object === 'data_source' && source?.parent?.type === 'database_id') {
+          rawId = source.parent.database_id;
+        } else if (source?.object === 'database') {
+          rawId = source.id;
+        }
+        if (typeof rawId !== 'string' || !NOTION_ID_PATTERN.test(rawId.trim())) continue;
+        const id = normalizeNotionId(rawId);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        databases.push({
+          id,
+          title: plainTitle(source.title),
+          url: typeof source?.url === 'string' ? source.url : '',
+        });
+        if (databases.length >= 100) break;
       }
-      if (typeof rawId !== 'string' || !NOTION_ID_PATTERN.test(rawId.trim())) continue;
-      const id = normalizeNotionId(rawId);
-      if (seen.has(id)) continue;
-      seen.add(id);
-      databases.push({
-        id,
-        title: plainTitle(source.title),
-        url: typeof source?.url === 'string' ? source.url : '',
-      });
+      hasMore = Boolean(data?.has_more);
+      const nextCursor = typeof data?.next_cursor === 'string' ? data.next_cursor.trim() : '';
+      if (!hasMore || databases.length >= 100 || !nextCursor || seenCursors.has(nextCursor)) {
+        break;
+      }
+      seenCursors.add(nextCursor);
+      cursor = nextCursor;
     }
-    return { databases, hasMore: Boolean(data?.has_more) };
+    return { databases, hasMore };
   }
 
   async validateDatabases(
