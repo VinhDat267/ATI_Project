@@ -481,7 +481,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
             </section>}
           <section aria-label="Không gian Notion của bạn" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3 mt-4">
             <h3 className="font-semibold text-[#111827]">Không gian Notion bạn kết nối</h3>
-            <p>Khi kết nối Notion qua OAuth 2.0 1-Click, Planora chỉ đọc, truy vấn, tạo hoặc cập nhật trang trong đúng danh sách Database (tối đa 20 database) mà bạn đã cấp quyền trong Workspace đang kích hoạt.</p>
+            <p>Khi kết nối Notion qua OAuth 2.0 1-Click, Planora chỉ đọc, truy vấn, tạo hoặc cập nhật trang trong đúng danh sách Database (tối đa 10 database) mà bạn đã cấp quyền trong Workspace đang kích hoạt.</p>
             <p>Mọi thao tác tạo trang mới, cập nhật thuộc tính trang hoặc nối văn bản đều phải hiển thị bản xem trước và được bạn bấm phê duyệt trước khi thực thi. Bạn có thể đổi phạm vi database, chuyển đổi Workspace hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#notion" onClick={appLink(navigate, '/settings#notion')} className="text-[#FF5701] underline font-medium">Kết nối dịch vụ</a>.</p>
           </section>
           <section aria-label="Tài khoản Jira Cloud bạn kết nối" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3 mt-4">
