@@ -110,7 +110,17 @@ export class NotionDigestSourceAuthority {
     });
   }
 
-  async read(ownerId: string, binding: NotionDigestSourceBinding, signal: AbortSignal): Promise<{ pages: unknown[]; pagesByDatabase: Map<string, unknown[]> }> {
+  async read(
+    ownerId: string,
+    binding: NotionDigestSourceBinding,
+    signal: AbortSignal,
+  ): Promise<{
+    pages: unknown[];
+    pagesByDatabase: Map<string, unknown[]>;
+    truncated?: boolean;
+    truncatedByDatabase?: Map<string, boolean>;
+    databases?: Array<{ databaseId: string; pages: unknown[]; truncated: boolean }>;
+  }> {
     return this.tokens.execute(ownerId, binding.credentialId, binding.identityVersion, async (token, _botId, client) => {
       const row = await this.repo.get(client, ownerId, binding.credentialId);
       if (!matchesSource(row, ownerId, binding) || row.app_id !== this.oauth.appId) throw new NotionDigestSourceDenied();
@@ -121,10 +131,17 @@ export class NotionDigestSourceAuthority {
       });
       const pages: unknown[] = [];
       const pagesByDatabase = new Map<string, unknown[]>();
+      const truncatedByDatabase = new Map<string, boolean>();
+      const databases: Array<{ databaseId: string; pages: unknown[]; truncated: boolean }> = [];
+      let truncated = false;
       for (const { databaseId } of binding.databases) {
         try {
           const result = await adapter.execute('notion.query_database', { databaseId, limit: 20 }, { signal });
+          const dbTruncated = Boolean(result?.truncated);
+          if (dbTruncated) truncated = true;
           pagesByDatabase.set(databaseId, result.pages);
+          truncatedByDatabase.set(databaseId, dbTruncated);
+          databases.push({ databaseId, pages: result.pages, truncated: dbTruncated });
           pages.push(...result.pages);
         } catch (error) {
           if (error instanceof StepError && error.statusCode === 401) {
@@ -136,7 +153,7 @@ export class NotionDigestSourceAuthority {
           throw error;
         }
       }
-      return { pages, pagesByDatabase };
+      return { pages, pagesByDatabase, truncated, truncatedByDatabase, databases };
     });
   }
 

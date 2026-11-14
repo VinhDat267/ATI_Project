@@ -133,6 +133,97 @@ describe('NotionOAuthClient & extractNotionDatabaseId', () => {
     ).rejects.toBeInstanceOf(NotionOAuthError);
   });
 
+  it('paginates /search using next_cursor up to 5 pages so child pages do not hide databases or leave hasMore true when <= 10 databases exist', async () => {
+    const db1 = '44444444-5555-6666-7777-888888888888';
+    const db2 = '55555555-6666-7777-8888-999999999999';
+    const seenCursors: Array<string | undefined> = [];
+    const seenFilters: unknown[] = [];
+
+    const fetchFn = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}'));
+      seenCursors.push(body.start_cursor);
+      seenFilters.push(body.filter);
+      if (!body.start_cursor) {
+        return new Response(
+          JSON.stringify({
+            object: 'list',
+            results: [
+              // Child pages returned by /search on page 1
+              { object: 'page', id: '11111111-1111-4111-8111-111111111111' },
+              {
+                object: 'database',
+                id: db1,
+                title: [{ plain_text: 'Database 1' }],
+                url: 'https://www.notion.so/db-1',
+              },
+            ],
+            has_more: true,
+            next_cursor: 'cursor-page-2',
+          }),
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          object: 'list',
+          results: [
+            {
+              object: 'database',
+              id: db2,
+              title: [{ plain_text: 'Database 2' }],
+              url: 'https://www.notion.so/db-2',
+            },
+          ],
+          has_more: false,
+          next_cursor: null,
+        }),
+      );
+    }) as unknown as typeof fetch;
+
+    const client = new NotionOAuthClient(cfg, fetchFn);
+    const discovered = await client.databases('ntn_access_1', '', AbortSignal.timeout(5000));
+    expect(seenCursors).toEqual([undefined, 'cursor-page-2']);
+    expect(seenFilters).toEqual([
+      { property: 'object', value: 'data_source' },
+      { property: 'object', value: 'data_source' },
+    ]);
+    expect(discovered.hasMore).toBe(false);
+    expect(discovered.databases).toEqual([
+      { id: db1, title: 'Database 1', url: 'https://www.notion.so/db-1' },
+      { id: db2, title: 'Database 2', url: 'https://www.notion.so/db-2' },
+    ]);
+  });
+
+  it('sets hasMore accurately when 100 databases are exceeded mid-page or next_cursor is missing', async () => {
+    const mkUuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+    const overflowResults = Array.from({ length: 101 }, (_, i) => ({
+      object: 'data_source',
+      id: mkUuid(i + 1),
+      parent: { type: 'database_id', database_id: mkUuid(1000 + i) },
+      title: [{ plain_text: `DB ${i}` }],
+      url: `https://www.notion.so/db-${i}`,
+    }));
+    const fetchOverflow = vi.fn(async () =>
+      new Response(JSON.stringify({ object: 'list', results: overflowResults, has_more: false, next_cursor: null })),
+    ) as unknown as typeof fetch;
+    const overflowClient = new NotionOAuthClient(cfg, fetchOverflow);
+    const overflowRes = await overflowClient.databases('ntn_access_1', '', AbortSignal.timeout(5000));
+    expect(overflowRes.databases).toHaveLength(100);
+    expect(overflowRes.hasMore).toBe(true);
+
+    const fetchMissingCursor = vi.fn(async () =>
+      new Response(JSON.stringify({
+        object: 'list',
+        results: [{ object: 'data_source', id: mkUuid(1), parent: { type: 'database_id', database_id: mkUuid(2) }, title: [{ plain_text: 'Single DB' }], url: 'https://www.notion.so/db' }],
+        has_more: true,
+        next_cursor: null,
+      })),
+    ) as unknown as typeof fetch;
+    const missingCursorClient = new NotionOAuthClient(cfg, fetchMissingCursor);
+    const missingCursorRes = await missingCursorClient.databases('ntn_access_1', '', AbortSignal.timeout(5000));
+    expect(missingCursorRes.databases).toHaveLength(1);
+    expect(missingCursorRes.hasMore).toBe(false);
+  });
+
   it('allows null/missing refresh_token on initial exchange() while requiring refresh_token on refresh()', async () => {
     const wsId = '11111111-2222-3333-4444-555555555555';
     const botId = '22222222-3333-4444-5555-666666666666';

@@ -711,6 +711,10 @@ export class AIPlanner {
       if (signal?.aborted) throw signal.reason ?? new Error('Lookup was aborted');
       const sanitized = (sanitizeEntities(list) as unknown[]) ?? [];
       const result = sanitized.slice(0, MAX_RESULTS_PER_CALL);
+      const truncated = Boolean(
+        (!Array.isArray(raw) && raw && typeof raw === 'object' && (raw as Record<string, unknown>).truncated === true) ||
+        sanitized.length > MAX_RESULTS_PER_CALL,
+      );
       if (tool.discovers) {
         const enrichedStamp: Record<string, unknown> = { ...stamp };
         if (input.actor?.workspaceId && !enrichedStamp.workspaceId) {
@@ -747,7 +751,7 @@ export class AIPlanner {
         memory.setEntity('__observed', recordObserved(memory.getEntity('__observed'), 'recipient', workspaceRecipients, ['id', 'service']));
       }
       onGatherEvent?.({ tool: tool.name, status: 'completed', output: result });
-      return { tool: tool.name, args, result };
+      return { tool: tool.name, args, result, ...(truncated ? { truncated: true } : {}) };
     } catch (err: any) {
       onGatherEvent?.({ tool: tool.name, status: 'completed', output: [] });
       return { tool: tool.name, args, error: String(err?.message ?? err).slice(0, 300) };

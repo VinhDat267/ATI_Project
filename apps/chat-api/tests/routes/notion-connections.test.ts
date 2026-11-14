@@ -37,7 +37,7 @@ describe('Notion OAuth connection routes (/api/connections/notion & /api/connect
     apiBaseUrl: 'http://127.0.0.1:4100/v1',
   };
 
-  const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+  const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.endsWith('/oauth/token')) {
       return new Response(
@@ -56,6 +56,25 @@ describe('Notion OAuth connection routes (/api/connections/notion & /api/connect
       return new Response(JSON.stringify({ object: 'user', type: 'bot', id: botId }));
     }
     if (url.endsWith('/search')) {
+      const body = JSON.parse(String(init?.body ?? '{}'));
+      if (body?.filter?.property !== 'object' || body?.filter?.value !== 'data_source') {
+        return new Response(JSON.stringify({ object: 'error', message: 'missing data_source filter' }), { status: 400 });
+      }
+      if (!body.start_cursor) {
+        return new Response(
+          JSON.stringify({
+            object: 'list',
+            results: [
+              {
+                object: 'page',
+                id: 'cccccccc-dddd-eeee-ffff-000000000000',
+              },
+            ],
+            has_more: true,
+            next_cursor: 'search-page-2',
+          }),
+        );
+      }
       return new Response(
         JSON.stringify({
           object: 'list',
@@ -69,6 +88,7 @@ describe('Notion OAuth connection routes (/api/connections/notion & /api/connect
             },
           ],
           has_more: false,
+          next_cursor: null,
         }),
       );
     }

@@ -977,6 +977,7 @@ async function bootstrap() {
       pool,
       notionSources: notionDigestSources,
       getAdapter: (serviceName, context) => adapterFactory.getAdapterForService(serviceName, context),
+      timeZone: env.APP_TIME_ZONE,
     });
   }
 

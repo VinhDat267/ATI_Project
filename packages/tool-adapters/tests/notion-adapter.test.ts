@@ -417,6 +417,228 @@ it('updates page title, properties, and archived state via notion.update_page af
       Status: { status: { name: 'Done' } },
       Check: { checkbox: false },
     },
-    archived: false,
+    in_trash: false,
   });
+});
+
+it('sets truncated: true in query_database when has_more is true or results exceed limit, and omits truncated when complete', async () => {
+  const page2 = { ...page(), id: '77777777-8888-9999-aaaa-bbbbbbbbbbbb' };
+  const { adapter: hasMoreAdapter } = setup(call =>
+    ok(
+      call.url.endsWith('/query')
+        ? { object: 'list', results: [page()], has_more: true, next_cursor: 'cursor-more' }
+        : call.url.includes('/databases/')
+          ? database()
+          : source(),
+    ),
+  );
+  const resHasMore = await hasMoreAdapter.execute('notion.query_database', { databaseId: DB, limit: 1 });
+  expect(resHasMore.pages).toHaveLength(1);
+  expect(resHasMore.truncated).toBe(true);
+
+  const { adapter: overLimitAdapter } = setup(call =>
+    ok(
+      call.url.endsWith('/query')
+        ? { object: 'list', results: [page(), page2], has_more: false, next_cursor: null }
+        : call.url.includes('/databases/')
+          ? database()
+          : source(),
+    ),
+  );
+  const resOverLimit = await overLimitAdapter.execute('notion.query_database', { databaseId: DB, limit: 1 });
+  expect(resOverLimit.pages).toHaveLength(1);
+  expect(resOverLimit.truncated).toBe(true);
+
+  const { adapter: exactAdapter } = setup(call =>
+    ok(
+      call.url.endsWith('/query')
+        ? { object: 'list', results: [page()], has_more: false, next_cursor: null }
+        : call.url.includes('/databases/')
+          ? database()
+          : source(),
+    ),
+  );
+  const resExact = await exactAdapter.execute('notion.query_database', { databaseId: DB, limit: 1 });
+  expect(resExact.pages).toHaveLength(1);
+  expect(resExact.truncated).toBeUndefined();
+});
+
+it('validates status and date filters in query_database, enforces client-side date range, and rejects missing filter columns', async () => {
+  const noStatusOrDateSource = () => ({
+    object: 'data_source',
+    id: DS,
+    parent: { type: 'database_id', database_id: DB },
+    in_trash: false,
+    properties: {
+      Name: { type: 'title' },
+      Priority: { type: 'select', select: { options: [{ name: 'High' }] } },
+      Category: { type: 'select', select: { options: [{ name: 'Ops' }] } },
+    },
+  });
+  const { adapter: noColAdapter } = setup(call =>
+    ok(call.url.includes('/databases/') ? database() : noStatusOrDateSource()),
+  );
+  await expect(
+    noColAdapter.execute('notion.query_database', { databaseId: DB, status: 'Done' }),
+  ).rejects.toMatchObject({
+    category: 'VALIDATION',
+    retryable: false,
+    message: 'Notion database has no status property to filter by',
+  });
+  await expect(
+    noColAdapter.execute('notion.query_database', { databaseId: DB, dateOnOrAfter: '2026-10-01' }),
+  ).rejects.toMatchObject({
+    category: 'VALIDATION',
+    retryable: false,
+    message: 'Notion database has no date property to filter by',
+  });
+
+  // Prefers select named Trạng thái over unrelated select and filters by dateOnOrAfter / dateOnOrBefore
+  const pageInRange = {
+    ...page(),
+    id: '22222222-3333-4444-5555-666666666661',
+    properties: {
+      ...page().properties,
+      'Trạng thái': { type: 'select', select: { name: 'Đang làm' } },
+      Deadline: { type: 'date', date: { start: '2026-10-05', end: null } },
+    },
+  };
+  const pageOutOfRange = {
+    ...page(),
+    id: '22222222-3333-4444-5555-666666666662',
+    properties: {
+      ...page().properties,
+      'Trạng thái': { type: 'select', select: { name: 'Đang làm' } },
+      Deadline: { type: 'date', date: { start: '2026-09-20', end: null } },
+    },
+  };
+  const multiSelectSource = () => ({
+    ...source(),
+    properties: {
+      Name: { type: 'title' },
+      Priority: { type: 'select', select: { options: [{ name: 'High' }] } },
+      'Trạng thái': { type: 'select', select: { options: [{ name: 'Đang làm' }] } },
+      CreatedDate: { type: 'date' },
+      Deadline: { type: 'date' },
+    },
+  });
+  const { adapter: dateAdapter, calls } = setup(call => {
+    if (call.url.includes('/databases/')) return ok(database());
+    if (call.url.endsWith('/data_sources/' + DS)) return ok(multiSelectSource());
+    return ok({ object: 'list', results: [pageInRange, pageOutOfRange], has_more: false });
+  });
+  await expect(dateAdapter.execute('notion.query_database', {
+    databaseId: DB, dateOnOrAfter: '2026-10-01',
+  })).rejects.toThrow(/Specify dateProperty/);
+  const filtered = await dateAdapter.execute('notion.query_database', {
+    databaseId: DB,
+    status: 'Đang làm',
+    dateOnOrAfter: '2026-10-01',
+    dateOnOrBefore: '2026-10-10',
+    dateProperty: 'Deadline',
+  });
+  expect(filtered.pages.map((p: any) => p.id)).toEqual(['22222222-3333-4444-5555-666666666661']);
+  const queryCall = calls.find(c => c.url.endsWith('/query'))!;
+  expect(queryCall.body.filter).toEqual({
+    and: [
+      { property: 'Trạng thái', select: { equals: 'Đang làm' } },
+      { property: 'Deadline', date: { on_or_after: '2026-10-01' } },
+      { property: 'Deadline', date: { on_or_before: '2026-10-10' } },
+    ],
+  });
+});
+
+it('extracts non-rich_text blocks and formats code, callout, toggle, divider, and table_row in notion.get_page', async () => {
+  const { adapter } = setup(call => {
+    const pathname = new URL(call.url).pathname;
+    if (pathname === '/v1/pages/' + PAGE) return ok(page());
+    if (pathname === '/v1/data_sources/' + DS) return ok(source());
+    if (pathname === '/v1/blocks/' + PAGE + '/children') {
+      return ok({
+        object: 'list',
+        results: [
+          { object: 'block', id: '10000000-0000-0000-0000-000000000001', type: 'callout', callout: { rich_text: rich('Chú ý quan trọng') } },
+          { object: 'block', id: '10000000-0000-0000-0000-000000000002', type: 'toggle', toggle: { rich_text: rich('Mở rộng') } },
+          { object: 'block', id: '10000000-0000-0000-0000-000000000003', type: 'code', code: { language: 'ts', rich_text: rich('const x = 1;') } },
+          { object: 'block', id: '10000000-0000-0000-0000-000000000004', type: 'divider', divider: {} },
+          { object: 'block', id: '10000000-0000-0000-0000-000000000005', type: 'table_row', table_row: { cells: [rich('Cột A'), rich('Cột B')] } },
+          { object: 'block', id: '10000000-0000-0000-0000-000000000006', type: 'child_page', child_page: { title: 'Trang con' } },
+          { object: 'block', id: '10000000-0000-0000-0000-000000000007', type: 'equation', equation: { expression: 'E = mc^2' } },
+          { object: 'block', id: '10000000-0000-0000-0000-000000000008', type: 'bookmark', bookmark: { caption: rich('Tài liệu'), url: 'https://example.com/doc' } },
+          { object: 'block', id: '10000000-0000-0000-0000-000000000010', type: 'file', file: { caption: rich('Private PDF'), file: { url: 'https://files.example.test/private?signature=fixture' } } },
+          { object: 'block', id: '10000000-0000-0000-0000-000000000009', type: 'image', image: { caption: rich('Ảnh kiến trúc'), external: { url: 'https://example.com/arch.png' } } },
+        ],
+        has_more: false,
+      });
+    }
+    return ok(page());
+  });
+  const detail = await adapter.execute('notion.get_page', { pageId: PAGE });
+  expect(JSON.stringify(detail)).not.toContain('signature=fixture');
+  expect(detail.content).toBe(
+    [
+      '> 💡 Chú ý quan trọng',
+      '▸ Mở rộng',
+      '```ts\nconst x = 1;\n```',
+      '---',
+      '| Cột A | Cột B |',
+      'Trang con',
+      'E = mc^2',
+      'Tài liệu - https://example.com/doc',
+      'Private PDF',
+      'Ảnh kiến trúc - https://example.com/arch.png',
+    ].join('\n'),
+  );
+});
+
+it('treats archived: true like in_trash: true across query_database, get_page, update_page, and append_text', async () => {
+  const { adapter: queryArchived } = setup(call =>
+    ok(
+      call.url.endsWith('/query')
+        ? { object: 'list', results: [{ ...page(), archived: true }, page()], has_more: false }
+        : call.url.includes('/databases/')
+          ? database()
+          : source(),
+    ),
+  );
+  const res = await queryArchived.execute('notion.query_database', { databaseId: DB });
+  expect(res.pages).toHaveLength(1);
+
+  const { adapter: pageArchived } = setup(call =>
+    ok(call.url.includes('/pages/') ? { ...page(), archived: true } : source()),
+  );
+  await expect(pageArchived.execute('notion.get_page', { pageId: PAGE })).rejects.toMatchObject({ category: 'AUTH_ERROR' });
+  await expect(pageArchived.execute('notion.append_text', { pageId: PAGE, text: 'hi' })).rejects.toMatchObject({
+    category: 'AUTH_ERROR',
+    details: { requestSent: false },
+  });
+});
+
+it('marks pre-dispatch abort and pre-write GET failures with details.requestSent = false on write tools', async () => {
+  const preAborted = new AbortController();
+  preAborted.abort();
+  const { adapter: abortAdapter } = setup();
+  await expect(
+    abortAdapter.execute('notion.create_page', { databaseId: DB, title: 'T' }, { signal: preAborted.signal }),
+  ).rejects.toMatchObject({
+    category: 'NETWORK',
+    details: { requestSent: false },
+  });
+
+  // Pre-write GET failure on create_page, update_page, append_text sets details.requestSent = false
+  const { adapter: preWriteFailAdapter, calls } = setup(call => {
+    if (call.method === 'GET') return new Response('{}', { status: 503 });
+    return ok(page());
+  });
+  for (const [tool, args] of [
+    ['notion.create_page', { databaseId: DB, title: 'T' }],
+    ['notion.update_page', { pageId: PAGE, title: 'T' }],
+    ['notion.append_text', { pageId: PAGE, text: 'T' }],
+  ] as const) {
+    await expect(preWriteFailAdapter.execute(tool, args)).rejects.toMatchObject({
+      category: 'SERVER_ERROR',
+      details: { requestSent: false },
+    });
+  }
+  expect(calls.filter(c => c.method === 'POST' || c.method === 'PATCH')).toHaveLength(0);
 });

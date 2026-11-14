@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_TOOLS, NOTION_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
 import { AIPlanner, MockLLMProvider, WorkingMemory, buildSystemPrompt, formatSearchResults, validatePlan } from '../src/index.js';
 import * as validator from '../src/validator.js';
 
@@ -22,7 +22,7 @@ describe('ANS-01 read answers', () => {
     const offPrompt = buildSystemPrompt(ALL_TOOLS, date, { search: true, readAnswers: false } as any);
     expect(offPrompt).toBe(buildSystemPrompt(ALL_TOOLS, date, { search: true } as any));
     expect(hash(offPrompt))
-      .toBe('df2fb8753c9d83ae75c4065ae22ef4f684b137ddd58647f758a6c7c858d2ae92');
+      .toBe('6a47b8fcb55fad0b195247d57810f4db9e51b09d429f52e097f4f3ad3d890c89');
     expect(hash(formatSearchResults([{ tool: 'slack.search_channels', args: { query: 'frontend' }, result: [] }])))
       .toBe('1edfb5917d31a91aa046dca5ea220a6c131deed29412fa206df107eb32ef9850');
   });
@@ -180,5 +180,32 @@ describe('ANS-01 read answers', () => {
     expect(await setup([write], { requireGroundedResources: false }).run()).toEqual(write);
     const read = { ...write, steps: [{ ...write.steps[0], tool: 'slack.search_channels', args: { query: '' } }] };
     expect(await setup([read]).run()).toMatchObject({ kind: 'clarification', reason: 'read_only' });
+  });
+  it('preserves provider truncated flag from notion.query_database in search results prompt', async () => {
+    const dbId = '11111111-1111-4111-8111-111111111111';
+    const provider = new MockLLMProvider();
+    provider.setPlanResponses([
+      { kind: 'search', calls: [{ tool: 'notion.query_database', args: { databaseId: dbId, query: '' } }] },
+      answer('Danh sách đã bị rút gọn ở 1 trang.'),
+    ]);
+    const memory = new WorkingMemory();
+    memory.setEntity('database', [{ id: dbId, title: 'Sprint', url: 'https://www.notion.so/sprint' }]);
+    const planner = new AIPlanner({
+      provider,
+      toolCatalog: NOTION_TOOLS,
+      searchMode: 'llm',
+      readAnswers: true,
+      prefetchDirectory: false,
+      gatherSearch: async () => ({
+        pages: [{ id: '22222222-2222-4222-8222-222222222222', title: 'Task 1', url: 'https://www.notion.so/task-1', properties: { Status: 'Todo' } }],
+        schema: [{ name: 'Status', type: 'status', options: ['Todo', 'Done'] }],
+        truncated: true,
+      }),
+    });
+    const out = await planner.processMessage({ userMessage: 'Xem database Sprint', memory });
+    expect(out).toMatchObject({ kind: 'answer' });
+    const searchMsg = provider.getLastInput()?.conversationHistory.at(-1)?.content ?? '';
+    expect(searchMsg).toContain('"truncated"');
+    expect(searchMsg).toContain('provider limit or read cap');
   });
 });

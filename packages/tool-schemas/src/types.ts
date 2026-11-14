@@ -620,6 +620,7 @@ export interface TelegramDigestDelivery {
     service: string;
     label: string;
     status: 'ok' | 'partial_error' | 'empty';
+    truncated?: boolean;
     itemCount?: number;
     error?: string;
   }>;

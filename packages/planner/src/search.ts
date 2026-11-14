@@ -20,6 +20,7 @@ export interface SearchOutcome {
   args: Record<string, unknown>;
   result?: unknown;
   error?: string;
+  truncated?: boolean;
 }
 
 /** Normalize direct lists, singleton resources and one schema-declared resource collection. */
@@ -341,8 +342,11 @@ export function groundingMemory(
  * becomes in the prompt: whole leading array items that fit, otherwise a
  * marked text prefix. Results within budget are returned unchanged.
  */
-function boundedOutcome(tool: string, args: unknown, result: unknown, error?: string): Record<string, unknown> {
-  const plain = error ? { tool, args, error } : { tool, args, result };
+function boundedOutcome(tool: string, args: unknown, result: unknown, error?: string, sourceTruncated?: boolean): Record<string, unknown> {
+  const truncatedMeta = sourceTruncated
+    ? { note: 'Result was truncated at the provider limit or read cap; narrow filters if missing items are expected.' }
+    : undefined;
+  const plain = error ? { tool, args, error } : truncatedMeta ? { tool, args, result, truncated: truncatedMeta } : { tool, args, result };
   const cost = (outcome: Record<string, unknown>) => JSON.stringify([outcome], null, 2).length;
   if (cost(plain) <= MAX_SEARCH_RESULT_CHARS) return plain;
   // Even tool names, arguments and errors can exceed the budget. In that case
@@ -363,6 +367,7 @@ function boundedOutcome(tool: string, args: unknown, result: unknown, error?: st
   if (Array.isArray(result)) {
     const outcome = (kept: unknown[]) => ({ tool, args, result: kept, truncated: {
       omittedItems: result.length - kept.length,
+      ...(sourceTruncated ? { sourceTruncated: true } : {}),
       note: 'Result exceeded the search budget; ask the user to narrow the request if an omitted item is needed.',
     } });
     if (cost(outcome([])) > MAX_SEARCH_RESULT_CHARS) return envelopePreview();
@@ -386,9 +391,9 @@ function boundedOutcome(tool: string, args: unknown, result: unknown, error?: st
 }
 
 export function formatSearchResults(outcomes: SearchOutcome[], options: { readAnswers?: boolean } = {}): string {
-  const sanitizedOutcomes = outcomes.map(({ tool, args, result, error }) => {
+  const sanitizedOutcomes = outcomes.map(({ tool, args, result, error, truncated }) => {
     const cleanResult = result !== undefined ? sanitizeEntities(result) : undefined;
-    return boundedOutcome(tool, args, cleanResult, error);
+    return boundedOutcome(tool, args, cleanResult, error, truncated);
   });
   const body = JSON.stringify(sanitizedOutcomes, null, 2)
     .replace(/</g, '\\u003c')

@@ -202,8 +202,21 @@ export function summarizeSourceItems(
     }
   }
 
+  const rawObj = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : undefined;
+  const isTruncated = Boolean(
+    rawObj &&
+      (rawObj.truncated === true ||
+        (rawObj.truncatedByDatabase instanceof Map && [...rawObj.truncatedByDatabase.values()].some(Boolean)) ||
+        (Array.isArray(rawObj.databases) && rawObj.databases.some((d: any) => d?.truncated === true))),
+  );
+
   if (items.length === 0) {
-    return { count: 0, lines: ['  (Không có mục mới)'] };
+    return {
+      count: 0,
+      lines: isTruncated
+        ? ['  (Không có mục mới)', '  _(Lưu ý: Dữ liệu đã được rút gọn do vượt giới hạn đọc tối đa.)_']
+        : ['  (Không có mục mới)'],
+    };
   }
 
   const nowMs = now.getTime();
@@ -280,6 +293,9 @@ export function summarizeSourceItems(
 
   if (items.length > 5) {
     lines.push(`  ... và ${items.length - 5} mục khác`);
+  }
+  if (isTruncated) {
+    lines.push('  _(Lưu ý: Dữ liệu đã được rút gọn do vượt giới hạn đọc tối đa.)_');
   }
 
   return { count: items.length, lines };
@@ -1244,9 +1260,12 @@ export class TelegramDigestRunner {
         });
 
         let rawResult: unknown;
+        let truncated = false;
         if (source.service === 'notion') {
           if (!notionBinding || !this.options.notionSources) return notionBlocked();
-          rawResult = await this.options.notionSources.read(userId, notionBinding, signal);
+          const result = await this.options.notionSources.read(userId, notionBinding, signal);
+          truncated = result.truncated === true;
+          rawResult = result;
         } else if (source.service === 'gmail') {
           rawResult = await adapter.execute(
             'gmail.search_threads',
@@ -1371,6 +1390,7 @@ export class TelegramDigestRunner {
           label: source.label,
           status: count > 0 ? 'ok' : 'empty',
           itemCount: count,
+          ...(truncated ? { truncated } : {}),
         });
         sections.push(`• ${source.label} (${count}):\n${lines.join('\n')}`);
       } catch (err: any) {
