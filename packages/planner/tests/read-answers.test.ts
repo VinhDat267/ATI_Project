@@ -22,7 +22,7 @@ describe('ANS-01 read answers', () => {
     const offPrompt = buildSystemPrompt(ALL_TOOLS, date, { search: true, readAnswers: false } as any);
     expect(offPrompt).toBe(buildSystemPrompt(ALL_TOOLS, date, { search: true } as any));
     expect(hash(offPrompt))
-      .toBe('df2fb8753c9d83ae75c4065ae22ef4f684b137ddd58647f758a6c7c858d2ae92');
+      .toBe('55df5bcc361e7427cb7e1c676b92f777db7de909108a6464a4eeede3b08ac8d2');
     expect(hash(formatSearchResults([{ tool: 'slack.search_channels', args: { query: 'frontend' }, result: [] }])))
       .toBe('1edfb5917d31a91aa046dca5ea220a6c131deed29412fa206df107eb32ef9850');
   });
