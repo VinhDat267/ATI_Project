@@ -756,7 +756,7 @@ export class AdapterFactory {
             pollUpdates: async (chatId: string, signal?: AbortSignal) => {
               const effectiveSignal = signal ?? AbortSignal.timeout(10_000);
               try {
-                return await botClient.readUpdatesForChat!(chatId, effectiveSignal);
+                return await botClient.readUpdatesForChat!(chatId, effectiveSignal, allowedChats);
               } catch (err: any) {
                 const statusCode = typeof err?.status === 'number' ? err.status : undefined;
                 if (err?.kind === 'unauthorized') {

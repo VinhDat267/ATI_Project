@@ -45,7 +45,7 @@ export class TelegramUpdateRepo implements TelegramUpdateStore {
         }
       }
       const chatMessages = (batch as TelegramProjectedBatch)[TELEGRAM_CHAT_MESSAGES];
-      if (Array.isArray(chatMessages) && chatMessages.length > 0) {
+      if (this.encryptionKey && Array.isArray(chatMessages) && chatMessages.length > 0) {
         const deduped = new Map<string, TelegramCachedChatMessage>();
         const touchedChatIds = new Set<string>();
         for (const msg of chatMessages) {
@@ -54,9 +54,7 @@ export class TelegramUpdateRepo implements TelegramUpdateStore {
         }
         const expiresAt = new Date(now + TELEGRAM_CHAT_MESSAGE_RETENTION_MS);
         for (const msg of deduped.values()) {
-          const encoded = this.encryptionKey
-            ? encryptCredentials(msg, this.encryptionKey)
-            : JSON.stringify(msg);
+          const encoded = encryptCredentials(msg, this.encryptionKey);
           await client.query(
             `INSERT INTO telegram_chat_message_cache(bot_key, chat_id, message_id, message_date, payload, expires_at)
              VALUES($1, $2, $3, $4, $5, $6)
@@ -97,6 +95,10 @@ export class TelegramUpdateRepo implements TelegramUpdateStore {
     } finally { client.release(); }
   }
 
+  async purgeExpiredChatMessages(): Promise<void> {
+    await this.pool.query('DELETE FROM telegram_chat_message_cache WHERE expires_at <= now()');
+  }
+
   async readChatMessages(botKey: string, chatId: string): Promise<TelegramCachedChatMessage[]> {
     const res = await this.pool.query<{ payload: string }>(
       `SELECT payload
@@ -109,9 +111,8 @@ export class TelegramUpdateRepo implements TelegramUpdateStore {
     const messages: TelegramCachedChatMessage[] = [];
     for (const row of res.rows) {
       try {
-        const parsed = this.encryptionKey && row.payload.startsWith('v1:')
-          ? decryptCredentials<TelegramCachedChatMessage>(row.payload, this.encryptionKey)
-          : JSON.parse(row.payload);
+        if (!this.encryptionKey || !row.payload.startsWith('v1:')) continue;
+        const parsed = decryptCredentials<TelegramCachedChatMessage>(row.payload, this.encryptionKey);
         if (
           parsed &&
           typeof parsed.chatId === 'string' &&

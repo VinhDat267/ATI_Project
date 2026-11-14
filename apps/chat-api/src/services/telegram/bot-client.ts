@@ -197,11 +197,13 @@ export class TelegramBotClient {
     }
   }
 
-  async readUpdatesForChat(chatId: string, signal: AbortSignal): Promise<any[]> {
+  async readUpdatesForChat(chatId: string, signal: AbortSignal, allowedChats: readonly string[] = [chatId]): Promise<any[]> {
     const botKey = telegramStateHash(`${this.config.apiBaseUrl}:${this.config.botToken}`);
     const normalizedChatId = String(chatId ?? '').trim();
+    const cacheChatIds = new Set(allowedChats);
+    if (!cacheChatIds.has(normalizedChatId)) throw new TelegramBotError('rejected', 403);
     for (let page = 0; page < MAX_READ_POLL_PAGES; page += 1) {
-      const { rawCount } = await this.getUpdatesPage(signal);
+      const { rawCount } = await this.getUpdatesPage(signal, cacheChatIds);
       if (rawCount < 100) break;
     }
     if (!this.updates.readChatMessages) {
@@ -228,7 +230,7 @@ export class TelegramBotClient {
     return updates;
   }
 
-  private async getUpdatesPage(signal: AbortSignal): Promise<{ updates: any[]; rawCount: number }> {
+  private async getUpdatesPage(signal: AbortSignal, cacheChatIds?: ReadonlySet<string>): Promise<{ updates: any[]; rawCount: number }> {
     const botKey = telegramStateHash(`${this.config.apiBaseUrl}:${this.config.botToken}`);
     let rawCount = 0;
     try {
@@ -244,7 +246,7 @@ export class TelegramBotClient {
         const cachedMessages: TelegramCachedChatMessage[] = [];
         for (const update of result) {
           const msg = extractTelegramChatMessage(update, this.config.botToken);
-          if (msg) cachedMessages.push(msg);
+          if (msg && cacheChatIds?.has(msg.chatId)) cachedMessages.push(msg);
         }
         if (cachedMessages.length > 0) projected[TELEGRAM_CHAT_MESSAGES] = cachedMessages;
         return projected;

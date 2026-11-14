@@ -124,6 +124,7 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
     const encryptionKey = '0123456789abcdef0123456789abcdef';
     const state = 'z'.repeat(43);
     const groupId = '-100888777666';
+    const secondGroupId = '-100888777667';
     const telegramUpdates: any[] = [
       {
         update_id: 1,
@@ -172,7 +173,7 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
         return Response.json({ ok: true, result: { status: 'member' } });
       }
       if (method === 'getChat') {
-        return Response.json({ ok: true, result: { id: Number(groupId), title: 'San pham ATI', type: 'supergroup' } });
+        return Response.json({ ok: true, result: { id: Number(body.chat_id), title: 'San pham ATI', type: 'supergroup' } });
       }
       return Response.json({ ok: false, error_code: 404 }, { status: 404 });
     };
@@ -188,6 +189,10 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
     expect(paired).toMatchObject({ matched: true, telegramUserId: '777888' });
     expect(getUpdatesRequests[0]?.allowed_updates).toEqual(['message', 'edited_message', 'channel_post', 'my_chat_member']);
 
+    const groups = await botClient.discoverGroups(AbortSignal.timeout(5000));
+    expect(groups).toContainEqual({ chatId: groupId, title: 'San pham ATI', type: 'supergroup' });
+
+    expect((await db.pool.query('SELECT 1 FROM telegram_chat_message_cache')).rowCount).toBe(0);
     // Simulate >100 ordinary messages arriving later before read_messages runs.
     for (let i = 0; i < 110; i++) {
       telegramUpdates.push({
@@ -202,9 +207,6 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
       });
     }
 
-    const groups = await botClient.discoverGroups(AbortSignal.timeout(5000));
-    expect(groups).toContainEqual({ chatId: groupId, title: 'San pham ATI', type: 'supergroup' });
-
     const credRepo = new CredentialRepo(db.pool, encryptionKey);
     const user = await db.person('TelegramCoordinated');
     const savedCred = await credRepo.saveCredentials(
@@ -214,7 +216,10 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
           telegramUserId: '777888',
           username: 'minhle',
           displayName: 'Minh Le',
-          selectedChats: [{ chatId: groupId, title: 'San pham ATI', type: 'supergroup' }],
+          selectedChats: [
+            { chatId: groupId, title: 'San pham ATI', type: 'supergroup' },
+            { chatId: secondGroupId, title: 'Second group', type: 'supergroup' },
+          ],
         },
         encryptionKey,
       ),
@@ -236,11 +241,13 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
           credentialId: savedCred.id,
           telegramUserId: '777888',
           username: 'minhle',
-          chatIds: [groupId],
+          chatIds: [groupId, secondGroupId],
         },
       },
     });
 
+    telegramUpdates.push({ update_id: 114, message: { message_id: 900, date: 1791002000, chat: { id: 111222, type: 'private' }, text: 'OUT_OF_SCOPE' } });
+    telegramUpdates.push({ update_id: 115, message: { message_id: 901, date: 1791002000, chat: { id: Number(secondGroupId), type: 'supergroup' }, text: 'SECOND_ALLOWED_CHAT' } });
     // Query specifically for message 11? Since 110 newer messages arrived and cache cap is 100 per chat, verify newest messages AND cap of 100!
     const newest = await adapter.execute('telegram.read_messages', { chatId: groupId, query: 'MSG_109', limit: 5 });
     expect(newest.messages).toHaveLength(1);
@@ -254,6 +261,7 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
       )
     ).rows;
     expect(cacheRows).toHaveLength(100);
+    expect((await db.pool.query('SELECT 1 FROM telegram_chat_message_cache WHERE chat_id = $1', ['111222'])).rowCount).toBe(0);
     expect(cacheRows.every((r) => r.payload.startsWith('v1:'))).toBe(true);
     expect(JSON.stringify(cacheRows)).not.toContain('MSG_109');
 
@@ -265,11 +273,11 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
     expect(inboxRows).not.toContain(state);
 
     // Offsets progressed monotonically without clobbering across verifyPairing -> discoverGroups -> readUpdatesForChat.
-    expect(getUpdatesRequests.map((r) => r.offset)).toEqual([undefined, 4, 104]);
+    expect(getUpdatesRequests.map((r) => r.offset)).toEqual([undefined, 4, 4, 104]);
 
     // Edit earlier cached message (message_id 129) via edited_message in a subsequent update and verify overwrite + cursor 114.
     telegramUpdates.push({
-      update_id: 114,
+      update_id: 116,
       edited_message: {
         message_id: 129,
         date: 1791002000,
@@ -281,6 +289,12 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
     const edited = await adapter.execute('telegram.read_messages', { chatId: groupId, query: 'MSG_109_EDITED', limit: 5 });
     expect(edited.messages).toHaveLength(1);
     expect(edited.messages[0]).toMatchObject({ messageId: 129, text: 'MSG_109_EDITED' });
-    expect(getUpdatesRequests.map((r) => r.offset)).toEqual([undefined, 4, 104, 114]);
+    const second = await adapter.execute('telegram.read_messages', { chatId: secondGroupId, query: 'SECOND_ALLOWED_CHAT', limit: 5 });
+    expect(getUpdatesRequests.map((r) => r.offset)).toEqual([undefined, 4, 4, 104, 116, 117]);
+    expect(second.messages).toHaveLength(1);
+    expect(second.messages[0]).toMatchObject({ messageId: 901, text: 'SECOND_ALLOWED_CHAT' });
+    await db.pool.query('UPDATE telegram_chat_message_cache SET expires_at = now()');
+    await updateRepo.purgeExpiredChatMessages();
+    expect((await db.pool.query('SELECT 1 FROM telegram_chat_message_cache')).rowCount).toBe(0);
   });
 });
