@@ -203,11 +203,11 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                 <span className="font-semibold text-[#111827]">
                   Hành vi thực tế:
                 </span>
-                {" Chỉ khi bạn bấm nút cam "}
+                {" Với thao tác tương tác trong hội thoại, chỉ khi bạn bấm nút cam "}
                 <strong className="text-[#FF5701]">
                   “Duyệt kế hoạch ✓”
                 </strong>
-                , Planora mới bắt đầu tạo thẻ hay gửi tin. Nếu bạn huỷ bỏ hoặc đóng trang, không có bất kỳ ký tự nào bị ghi lên công cụ của bạn.
+                {" thì từng kế hoạch mới được thực thi; nếu bạn huỷ bỏ hoặc đóng trang, không có ký tự nào bị ghi lên công cụ của bạn. Riêng với lịch trình tổng hợp định kỳ (digest tự động), khi bạn chủ động chọn chế độ gửi tự động và xác nhận một lần cho phạm vi nguồn đọc cùng đích nhận đã ghim, các kỳ định kỳ tiếp theo sẽ tự động tổng hợp và gửi trong đúng phạm vi đã duyệt cho tới khi bạn tạm dừng, chỉnh sửa, xoá lịch trình hoặc ngắt kết nối nguồn."}
               </div>
             </article>
             {/* Cam kết 2: Khoá lưu trữ an toàn, không hiển thị lại */}
@@ -462,9 +462,9 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
           </div>
           {gmailEnabled && <section aria-label="Dữ liệu Gmail" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3">
               <h3 className="font-semibold text-[#111827]">Hộp thư Gmail bạn kết nối</h3>
-              <p>Nội dung và tiêu đề thư đi qua 9router tới tài khoản model bên thứ ba để lập kế hoạch hoặc trả lời.</p>
-              <p>Token được mã hoá trong cơ sở dữ liệu. Nội dung thư nằm trong kết quả tra cứu và trong lời gọi model; câu trả lời, hội thoại và kế hoạch có nội dung thư được giữ lại. Tham số và kết quả bước đã chạy giữ người nhận, tiêu đề và nội dung thư Planora gửi. Nội dung tệp đính kèm không gửi cho model. Bộ nhớ làm việc giữ ID và người tham gia; tiêu đề luồng còn ở nhãn tài nguyên, không gửi trong bộ nhớ cho model. Nhãn xem trước giữ tiêu đề luồng và nguồn người nhận.</p>
-              <p>Ngắt kết nối chỉ xoá token và thu hồi quyền Google; hội thoại, câu trả lời và kế hoạch cũ vẫn còn. Hiện chưa có chức năng xoá hội thoại. Planora không xoá vĩnh viễn thư.</p>
+              <p>Nội dung và tiêu đề thư cần xử lý được gửi tới nhà cung cấp mô hình AI bên thứ ba đã cấu hình để lập kế hoạch, tóm tắt hoặc trả lời (tối đa 10 luồng mỗi lần tìm kiếm; mỗi luồng đọc tối đa 5 thư gần nhất với giới hạn 4.000 ký tự mỗi thư và 12.000 ký tự cả luồng, kèm chỉ số totalMessages/omittedMessages khi luồng bị cắt bớt).</p>
+              <p>Token được mã hoá trong cơ sở dữ liệu. Thao tác ghi Gmail trong hội thoại luôn chờ bạn duyệt từng kế hoạch; riêng lịch trình tổng hợp định kỳ có nguồn Gmail chỉ tự động đọc và gửi tóm tắt sau khi bạn xác nhận một lần phạm vi nguồn cùng đích nhận đã ghim, và sẽ tự dừng nếu hộp thư đã ghim bị ngắt kết nối hoặc thay đổi. Nội dung thư nằm trong kết quả tra cứu và trong lời gọi model; câu trả lời, hội thoại và kế hoạch có nội dung thư được giữ lại. Tham số và kết quả bước đã chạy giữ người nhận, tiêu đề và nội dung thư Planora gửi. Nội dung tệp đính kèm không gửi cho model. Bộ nhớ làm việc giữ ID và người tham gia; tiêu đề luồng còn ở nhãn tài nguyên, không gửi trong bộ nhớ cho model. Nhãn xem trước giữ tiêu đề luồng và nguồn người nhận.</p>
+              <p>Khi ngắt kết nối Gmail, token mã hoá lưu cục bộ tại Planora bị xoá ngay; việc thu hồi quyền OAuth phía Google được thực hiện có điều kiện theo nỗ lực tốt nhất (ví dụ: không thu hồi chung nếu một kết nối Google cá nhân khác đang dùng chung grant hoặc khi kết nối mạng tới Google gặp lỗi — bạn luôn có thể thu hồi trực tiếp trong cài đặt Tài khoản Google). Dữ liệu phát sinh từ thư trong hội thoại, câu trả lời, kế hoạch, kết quả bước đã chạy và nhãn tài nguyên vẫn được giữ lại sau khi ngắt kết nối. Hiện chưa có chức năng xoá hội thoại. Planora không xoá vĩnh viễn thư.</p>
             </section>}
           {mycalendarEnabled && <section aria-label="Dữ liệu Google Calendar của bạn" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3">
               <h3 className="font-semibold text-[#111827]">Dữ liệu Google Calendar của bạn</h3>
@@ -743,7 +743,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
               <strong className="text-[#111827]">
                 Ngừng sử dụng dịch vụ:
               </strong>
-              {" Muốn ngừng dùng một dịch vụ, quản trị viên thu hồi khoá ngay trên trang của dịch vụ đó (Trello, Slack, GitHub…)."}
+              {" Muốn ngừng dùng một dịch vụ nhóm, quản trị viên thu hồi khoá ngay trên trang của dịch vụ đó (Trello, Slack, GitHub…). Với các kết nối OAuth cá nhân (như Gmail, Google Calendar, Google Sheets), ngắt kết nối trên Planora sẽ xoá ngay token đã lưu cục bộ và gửi yêu cầu thu hồi grant tới nhà cung cấp có điều kiện theo nỗ lực tốt nhất (bạn luôn có thể thu hồi trực tiếp trên trang cài đặt tài khoản Google); dữ liệu đã phát sinh từ thư, lịch hoặc bảng tính trong hội thoại, câu trả lời, kế hoạch và kết quả bước trước đó vẫn lưu lại trong cơ sở dữ liệu."}
             </p>
           </div>
           {/* Khối liên hệ báo cáo bảo mật */}

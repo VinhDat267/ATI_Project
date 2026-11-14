@@ -1,6 +1,7 @@
 import { decryptCredentials } from '@wap/tool-adapters';
 import type { PersonalSpreadsheetItem, PlanConnections } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
+import { hasGoogleCredentialOrigin } from './credential-origin.js';
 
 export type GmailConnectionReference = NonNullable<PlanConnections['gmail']>;
 export type MyCalendarConnectionReference = NonNullable<PlanConnections['mycalendar']>;
@@ -12,10 +13,17 @@ export type MySheetsConnectionLookupResult = MySheetsConnectionReference & {
 };
 
 /** The caller's active Gmail connection as a plan stores it, or null when none is usable. */
-export function createGmailConnectionLookup(credentials: Pick<CredentialRepo, 'getPersonalCredentials'>, encryptionKey: string) {
+export function createGmailConnectionLookup(
+  credentials: Pick<CredentialRepo, 'getPersonalCredentials'>,
+  encryptionKey: string,
+  oauthClientId?: string,
+) {
   return async (userId: string): Promise<GmailConnectionReference | null> => {
     const record = await credentials.getPersonalCredentials('gmail', userId);
     if (!record || record.status !== 'active') return null;
+    if (oauthClientId && !hasGoogleCredentialOrigin(record.config, encryptionKey, oauthClientId)) {
+      return null;
+    }
     try {
       const email = decryptCredentials(record.config, encryptionKey).email;
       return typeof email === 'string' && email ? { credentialId: record.id, email } : null;

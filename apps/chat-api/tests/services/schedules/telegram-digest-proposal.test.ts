@@ -7,6 +7,9 @@ import { ScheduleService } from '../../../src/services/schedules/schedule-servic
 import { ChatService } from '../../../src/services/chat-service.js';
 import { MessageRepo } from '../../../src/db/repositories/message-repo.js';
 import { ConversationRepo } from '../../../src/db/repositories/conversation-repo.js';
+import { CredentialRepo } from '../../../src/db/repositories/credential-repo.js';
+import { encryptCredentials } from '@wap/tool-adapters';
+import { GMAIL_MODIFY_SCOPE, type TelegramDigestConfig } from '@wap/tool-schemas';
 import {
   computeTelegramDigestConfigHash,
   evaluateTelegramDigestCandidate,
@@ -319,5 +322,583 @@ describe('Telegram auto_digest schedule proposal & confirmation on PostgreSQL (T
         now,
       }),
     ).rejects.toMatchObject({ code: 'AUTO_DIGEST_NOT_ALLOWED' });
+  });
+
+  describe('A01: Gmail source binding proposal & versioned hash contract', () => {
+    const ENC_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+    const GMAIL_CLIENT_ID = 'gmail-client-a1.apps.googleusercontent.com';
+    const USER_ID = '00000000-0000-4000-8000-000000000001';
+
+    it('A01-1: derives GmailDigestBinding and sourceBindingVersion=1 on the server at proposal time, includes binding in configHash, and never leaks tokens', async () => {
+      const credRepo = new CredentialRepo(pool, ENC_KEY);
+      const convRepo = new ConversationRepo(pool);
+      const msgRepo = new MessageRepo(pool);
+      const scheduleService = new ScheduleService({
+        pool,
+        timeZone: 'Asia/Ho_Chi_Minh',
+        encryptionKey: ENC_KEY,
+        gmailOAuthClientId: GMAIL_CLIENT_ID,
+      } as any);
+      const now = new Date('2026-11-02T00:00:00.000Z');
+
+      await pool.query("DELETE FROM service_credentials WHERE user_id = $1 AND service IN ('gmail', 'telegram')", [USER_ID]);
+      const tgCred = await credRepo.saveCredentials(
+        'telegram',
+        encryptCredentials(
+          {
+            telegramUserId: '777888999',
+            username: 'digestuser',
+            selectedChats: [{ chatId: '777888999', title: 'Telegram của tôi (Digest User)', type: 'private' }],
+          },
+          ENC_KEY,
+        ),
+        USER_ID,
+      );
+      const gmailCredA = await credRepo.saveCredentials(
+        'gmail',
+        encryptCredentials(
+          {
+            oauthClientId: GMAIL_CLIENT_ID,
+            refreshToken: '1//secret-refresh-token-account-a',
+            accessToken: 'ya29.secret-access-token-a',
+            email: '  Alice.Owner@Example.Test ',
+            scopes: [GMAIL_MODIFY_SCOPE],
+            connectedAt: '2026-11-01T00:00:00.000Z',
+          },
+          ENC_KEY,
+        ),
+        USER_ID,
+      );
+
+      // Model/client attempts to spoof binding in proposal payload; server must ignore it and derive from DB.
+      const tamperedProposal: any = {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Tóm tắt Gmail sáng',
+        request: 'Tóm tắt email chưa đọc trong hộp thư đến gửi vào Telegram của tôi',
+        recurrence: { type: 'daily', time: '08:00' },
+        summary: 'Mỗi sáng 8h tóm tắt Gmail gửi Telegram',
+        binding: {
+          kind: 'gmail',
+          credentialId: '00000000-0000-4000-8000-999999999999',
+          email: 'spoofed@attacker.test',
+          oauthClientId: 'spoofed-client.apps.googleusercontent.com',
+        },
+      };
+
+      const emitted: any[] = [];
+      const chatService = new ChatService({
+        msgRepo,
+        convRepo,
+        planner: {
+          processMessage: async () => structuredClone(tamperedProposal),
+          routeSchedule: async () => ({ services: ['gmail', 'telegram'], unavailable: [] }),
+        },
+        eventEmitter: { emit: (event, payload) => emitted.push({ event, payload }) },
+        telegramConnection: async () => ({
+          status: 'connected' as const,
+          selectedChats: [{ chatId: '777888999', title: 'Telegram của tôi (Digest User)', type: 'private' as const }],
+          connection: {
+            credentialId: tgCred.id,
+            telegramUserId: '777888999',
+            username: 'digestuser',
+            chatIds: ['777888999'],
+          },
+        }),
+        schedules: {
+          repo: scheduleService.repo,
+          pool,
+          encryptionKey: ENC_KEY,
+          gmailOAuthClientId: GMAIL_CLIENT_ID,
+          timeZone: 'Asia/Ho_Chi_Minh',
+          now: () => now,
+        } as any,
+      });
+
+      const waitForProposal = async () => {
+        for (let i = 0; i < 100 && !emitted.some((e) => e.event === 'schedule_proposal' || e.event === 'error'); i++) {
+          await new Promise((r) => setTimeout(r, 15));
+        }
+        return emitted.find((e) => e.event === 'schedule_proposal');
+      };
+
+      const convA = await convRepo.createConversation(USER_ID);
+      await chatService.handleUserMessage({
+        conversationId: convA.id,
+        userId: USER_ID,
+        content: 'Mỗi sáng 8h tóm tắt email chưa đọc gửi vào Telegram của tôi',
+      });
+
+      const eventA = await waitForProposal();
+      expect(eventA).toBeDefined();
+      const candidateA = eventA.payload.metadata.digestCandidate;
+      expect(candidateA?.canAutoDigest).toBe(true);
+      expect(candidateA?.config?.sourceBindingVersion).toBe(1);
+      const gmailSrcA = candidateA?.config?.sources?.find((s: any) => s.service === 'gmail');
+      expect(gmailSrcA).toEqual({
+        service: 'gmail',
+        tool: 'gmail.search_threads',
+        args: { query: 'in:inbox is:unread' },
+        label: 'Email chưa đọc (alice.owner@example.test)',
+        binding: {
+          kind: 'gmail',
+          credentialId: gmailCredA.id,
+          email: 'alice.owner@example.test',
+          oauthClientId: GMAIL_CLIENT_ID,
+        },
+      });
+      expect(gmailSrcA.label).not.toContain(gmailCredA.id);
+      const serializedA = JSON.stringify(eventA.payload);
+      expect(serializedA).not.toContain('1//secret-refresh-token-account-a');
+      expect(serializedA).not.toContain('ya29.secret-access-token-a');
+      expect(serializedA).not.toContain('spoofed@attacker.test');
+
+      // Replace personal Gmail with Account B and verify proposal hash changes deterministically
+      const gmailCredB = await credRepo.saveCredentials(
+        'gmail',
+        encryptCredentials(
+          {
+            oauthClientId: GMAIL_CLIENT_ID,
+            refreshToken: '1//secret-refresh-token-account-b',
+            email: 'bob.other@example.test',
+            scopes: [GMAIL_MODIFY_SCOPE],
+            connectedAt: '2026-11-01T01:00:00.000Z',
+          },
+          ENC_KEY,
+        ),
+        USER_ID,
+      );
+      emitted.length = 0;
+      const convB = await convRepo.createConversation(USER_ID);
+      await chatService.handleUserMessage({
+        conversationId: convB.id,
+        userId: USER_ID,
+        content: 'Mỗi sáng 8h tóm tắt email chưa đọc gửi vào Telegram của tôi',
+      });
+      const eventB = await waitForProposal();
+      const candidateB = eventB.payload.metadata.digestCandidate;
+      expect(candidateB?.canAutoDigest).toBe(true);
+      expect(candidateB?.config?.sources?.[0]?.label).toBe('Email chưa đọc (bob.other@example.test)');
+      expect(candidateB?.config?.sources?.[0]?.binding).toEqual({
+        kind: 'gmail',
+        credentialId: gmailCredB.id,
+        email: 'bob.other@example.test',
+        oauthClientId: GMAIL_CLIENT_ID,
+      });
+      expect(candidateB?.configHash).not.toBe(candidateA?.configHash);
+      expect(candidateA?.configHash).toBe(computeTelegramDigestConfigHash(candidateA.config));
+      expect(candidateB?.configHash).toBe(computeTelegramDigestConfigHash(candidateB.config));
+    });
+
+    it('A01-2: marks auto_digest ineligible when Gmail credential is absent, reconnect_required, wrong oauthClientId, or missing gmail.modify scope', async () => {
+      const credRepo = new CredentialRepo(pool, ENC_KEY);
+      const convRepo = new ConversationRepo(pool);
+      const msgRepo = new MessageRepo(pool);
+      const scheduleService = new ScheduleService({
+        pool,
+        timeZone: 'Asia/Ho_Chi_Minh',
+        encryptionKey: ENC_KEY,
+        gmailOAuthClientId: GMAIL_CLIENT_ID,
+      } as any);
+      const now = new Date('2026-11-02T00:00:00.000Z');
+
+      await pool.query("DELETE FROM service_credentials WHERE user_id = $1 AND service IN ('gmail', 'telegram')", [USER_ID]);
+      const tgCred = await credRepo.saveCredentials(
+        'telegram',
+        encryptCredentials(
+          {
+            telegramUserId: '777888999',
+            username: 'digestuser',
+            selectedChats: [{ chatId: '777888999', title: 'Telegram của tôi (Digest User)', type: 'private' }],
+          },
+          ENC_KEY,
+        ),
+        USER_ID,
+      );
+
+      const proposeOnce = async () => {
+        const emitted: any[] = [];
+        const chatService = new ChatService({
+          msgRepo,
+          convRepo,
+          planner: {
+            processMessage: async () => ({
+              kind: 'schedule',
+              action: 'create',
+              name: 'Tóm tắt Gmail sáng',
+              request: 'Tóm tắt email chưa đọc gửi vào Telegram của tôi',
+              recurrence: { type: 'daily', time: '08:00' },
+              summary: 'Mỗi sáng 8h tóm tắt Gmail gửi Telegram',
+            }),
+            routeSchedule: async () => ({ services: ['gmail', 'telegram'], unavailable: [] }),
+          },
+          eventEmitter: { emit: (event, payload) => emitted.push({ event, payload }) },
+          telegramConnection: async () => ({
+            status: 'connected' as const,
+            selectedChats: [{ chatId: '777888999', title: 'Telegram của tôi (Digest User)', type: 'private' as const }],
+            connection: {
+              credentialId: tgCred.id,
+              telegramUserId: '777888999',
+              username: 'digestuser',
+              chatIds: ['777888999'],
+            },
+          }),
+          schedules: {
+            repo: scheduleService.repo,
+            pool,
+            encryptionKey: ENC_KEY,
+            gmailOAuthClientId: GMAIL_CLIENT_ID,
+            timeZone: 'Asia/Ho_Chi_Minh',
+            now: () => now,
+          } as any,
+        });
+        const conv = await convRepo.createConversation(USER_ID);
+        await chatService.handleUserMessage({
+          conversationId: conv.id,
+          userId: USER_ID,
+          content: 'Mỗi sáng 8h tóm tắt email chưa đọc gửi vào Telegram của tôi',
+        });
+        for (let i = 0; i < 100 && !emitted.some((e) => e.event === 'schedule_proposal' || e.event === 'error'); i++) {
+          await new Promise((r) => setTimeout(r, 15));
+        }
+        return emitted.find((e) => e.event === 'schedule_proposal')?.payload?.metadata?.digestCandidate;
+      };
+
+      // 1. Absent Gmail credential -> ineligible
+      expect((await proposeOnce())?.canAutoDigest).toBe(false);
+
+      // 2. Wrong oauthClientId -> ineligible
+      await credRepo.saveCredentials(
+        'gmail',
+        encryptCredentials(
+          {
+            oauthClientId: 'other-project-client.apps.googleusercontent.com',
+            refreshToken: '1//rt',
+            email: 'alice@example.test',
+            scopes: [GMAIL_MODIFY_SCOPE],
+          },
+          ENC_KEY,
+        ),
+        USER_ID,
+      );
+      expect((await proposeOnce())?.canAutoDigest).toBe(false);
+
+      // 3. Missing gmail.modify scope -> ineligible
+      await credRepo.saveCredentials(
+        'gmail',
+        encryptCredentials(
+          {
+            oauthClientId: GMAIL_CLIENT_ID,
+            refreshToken: '1//rt',
+            email: 'alice@example.test',
+            scopes: ['openid', 'email'],
+          },
+          ENC_KEY,
+        ),
+        USER_ID,
+      );
+      expect((await proposeOnce())?.canAutoDigest).toBe(false);
+
+      // 4. Reconnect required -> ineligible
+      const activeCred = await credRepo.saveCredentials(
+        'gmail',
+        encryptCredentials(
+          {
+            oauthClientId: GMAIL_CLIENT_ID,
+            refreshToken: '1//rt',
+            email: 'alice@example.test',
+            scopes: [GMAIL_MODIFY_SCOPE],
+          },
+          ENC_KEY,
+        ),
+        USER_ID,
+      );
+      await credRepo.markReconnectRequired('gmail', USER_ID, activeCred.id);
+      expect((await proposeOnce())?.canAutoDigest).toBe(false);
+    });
+
+    it('A01-3: preserves exact legacy non-Gmail config hash bytes and rejects malformed, duplicate, non-Gmail-bound, or non-fixed-query Gmail configs', async () => {
+      const legacyNonGmail: TelegramDigestConfig = {
+        credentialId: '00000000-0000-4000-8000-000000000099',
+        telegramUserId: '777888999',
+        username: 'digestuser',
+        chatId: '777888999',
+        chatTitle: 'Telegram của tôi',
+        sources: [
+          { service: 'github', tool: 'github.search_issues', args: { repo: 'acme/ati', query: 'open' }, label: 'GitHub Issues' },
+          { service: 'calendar', tool: 'calendar.list_events', label: 'Lịch hôm nay' },
+        ],
+        recurrence: { type: 'daily', time: '08:00' },
+        timeZone: 'Asia/Ho_Chi_Minh',
+      };
+      // Precomputed canonical SHA-256 of baseline non-Gmail TelegramDigestConfig
+      expect(computeTelegramDigestConfigHash(legacyNonGmail)).toBe(
+        '3d42466d8ce4fe8fd249c83b55c3f9bfb0fd432cd825b8598bdeb110a521cccd',
+      );
+
+      const credRepo = new CredentialRepo(pool, ENC_KEY);
+      const convRepo = new ConversationRepo(pool);
+      const msgRepo = new MessageRepo(pool);
+      const scheduleService = new ScheduleService({
+        pool,
+        timeZone: 'Asia/Ho_Chi_Minh',
+        encryptionKey: ENC_KEY,
+        gmailOAuthClientId: GMAIL_CLIENT_ID,
+      } as any);
+      const now = new Date('2026-11-02T00:00:00.000Z');
+
+      await pool.query("DELETE FROM service_credentials WHERE user_id = $1 AND service IN ('gmail', 'telegram')", [USER_ID]);
+      const tgCred = await credRepo.saveCredentials(
+        'telegram',
+        encryptCredentials(
+          {
+            telegramUserId: '777888999',
+            username: 'digestuser',
+            selectedChats: [{ chatId: '777888999', title: 'Telegram của tôi', type: 'private' }],
+          },
+          ENC_KEY,
+        ),
+        USER_ID,
+      );
+      const gmailCred = await credRepo.saveCredentials(
+        'gmail',
+        encryptCredentials(
+          {
+            oauthClientId: GMAIL_CLIENT_ID,
+            refreshToken: '1//rt-valid',
+            email: 'alice@example.test',
+            scopes: [GMAIL_MODIFY_SCOPE],
+          },
+          ENC_KEY,
+        ),
+        USER_ID,
+      );
+      const validBinding = {
+        kind: 'gmail' as const,
+        credentialId: gmailCred.id,
+        email: 'alice@example.test',
+        oauthClientId: GMAIL_CLIENT_ID,
+      };
+
+      const badConfigs: Array<{ label: string; config: any }> = [
+        {
+          label: 'duplicate gmail sources',
+          config: {
+            ...legacyNonGmail,
+            credentialId: tgCred.id,
+            sourceBindingVersion: 1,
+            sources: [
+              { service: 'gmail', tool: 'gmail.search_threads', args: { query: 'in:inbox is:unread' }, label: 'Email 1', binding: validBinding },
+              { service: 'gmail', tool: 'gmail.search_threads', args: { query: 'in:inbox is:unread' }, label: 'Email 2', binding: validBinding },
+            ],
+          },
+        },
+        {
+          label: 'binding attached to non-gmail source',
+          config: {
+            ...legacyNonGmail,
+            credentialId: tgCred.id,
+            sourceBindingVersion: 1,
+            sources: [
+              { service: 'github', tool: 'github.search_issues', args: { repo: 'acme/ati', query: 'open' }, label: 'GH', binding: validBinding },
+            ],
+          },
+        },
+        {
+          label: 'non-fixed gmail query args',
+          config: {
+            ...legacyNonGmail,
+            credentialId: tgCred.id,
+            sourceBindingVersion: 1,
+            sources: [
+              { service: 'gmail', tool: 'gmail.search_threads', args: { query: 'from:ceo@acme.com' }, label: 'Email', binding: validBinding },
+            ],
+          },
+        },
+        {
+          label: 'unexpected gmail read tool',
+          config: {
+            ...legacyNonGmail,
+            credentialId: tgCred.id,
+            sourceBindingVersion: 1,
+            sources: [
+              { service: 'gmail', tool: 'gmail.read_thread', args: { query: 'in:inbox is:unread' }, label: 'Email', binding: validBinding },
+            ],
+          },
+        },
+        {
+          label: 'secret refreshToken smuggled inside binding',
+          config: {
+            ...legacyNonGmail,
+            credentialId: tgCred.id,
+            sourceBindingVersion: 1,
+            sources: [
+              {
+                service: 'gmail',
+                tool: 'gmail.search_threads',
+                args: { query: 'in:inbox is:unread' },
+                label: 'Email',
+                binding: { ...validBinding, refreshToken: '1//leaked' },
+              },
+            ],
+          },
+        },
+      ];
+
+      for (const bad of badConfigs) {
+        const conv = await convRepo.createConversation(USER_ID);
+        let configHash = 'invalid-hash';
+        try {
+          configHash = computeTelegramDigestConfigHash(bad.config);
+        } catch {
+          // Hash helper itself rejecting malformed config is also acceptable
+        }
+        const msg = await msgRepo.createMessage(conv.id, 'assistant', 'Bad proposal', {
+          type: 'schedule_proposal',
+          proposal: {
+            kind: 'schedule',
+            action: 'create',
+            name: `Bad ${bad.label}`,
+            request: 'Tóm tắt email chưa đọc gửi vào Telegram của tôi',
+            recurrence: { type: 'daily', time: '08:00' },
+            summary: 'Bad',
+          },
+          services: ['gmail', 'telegram'],
+          nextRuns: ['2026-11-03T01:00:00.000Z'],
+          digestCandidate: {
+            canAutoDigest: true,
+            config: bad.config,
+            configHash,
+          },
+        } as any);
+
+        await expect(
+          scheduleService.confirmProposal({
+            userId: USER_ID,
+            convId: conv.id,
+            messageId: msg.id,
+            approvalMode: 'auto_digest',
+            now,
+          }),
+          `Expected confirmProposal to reject: ${bad.label}`,
+        ).rejects.toThrow();
+      }
+    });
+
+    it('A01-4: derives Gmail human source label from trusted server binding (never model-supplied label/account), hides credentialId in UI label projection, and preserves fixed query/pin/hash & non-Gmail hash', () => {
+      const trustedCredId = '00000000-0000-4000-8000-000000000777';
+      const tgCredId = '00000000-0000-4000-8000-000000000888';
+
+      // Model/client supplies spoofed label, account, email, and sources on the ScheduleResponse object.
+      const modelSpoofedProposal: any = {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Bản tin sáng',
+        request: 'Tổng hợp issue GitHub đang mở và email chưa đọc gửi vào Telegram của tôi',
+        recurrence: { type: 'daily', time: '08:00' },
+        summary: 'Mỗi sáng 8h gửi bản tin',
+        label: 'Email chưa đọc (spoofed-model@attacker.test)',
+        account: 'spoofed-model@attacker.test',
+        email: 'spoofed-model@attacker.test',
+        sources: [
+          {
+            service: 'gmail',
+            tool: 'gmail.search_threads',
+            args: { query: 'from:secret@attacker.test' },
+            label: 'Email chưa đọc (spoofed-source@attacker.test)',
+            account: 'spoofed-source@attacker.test',
+          },
+        ],
+      };
+
+      const candidate = evaluateTelegramDigestCandidate({
+        proposal: modelSpoofedProposal,
+        services: ['github', 'gmail', 'telegram'],
+        timeZone: 'Asia/Ho_Chi_Minh',
+        telegramLookup: {
+          status: 'connected',
+          selectedChats: [
+            { chatId: '777888999', title: 'Telegram của tôi (Digest User)', type: 'private' },
+          ],
+          connection: {
+            credentialId: tgCredId,
+            telegramUserId: '777888999',
+            username: 'digestuser',
+            chatIds: ['777888999'],
+          },
+        },
+        githubLookup: {
+          status: 'connected',
+          connection: {
+            credentialId: '00000000-0000-4000-8000-000000000666',
+            githubUserId: '123',
+            login: 'tester',
+            repos: ['acme/ati'],
+          },
+        },
+        gmailBinding: {
+          kind: 'gmail',
+          credentialId: trustedCredId,
+          email: 'alice.trusted@example.test',
+          oauthClientId: GMAIL_CLIENT_ID,
+        },
+      });
+
+      expect(candidate.canAutoDigest).toBe(true);
+      expect(candidate.config).toBeDefined();
+      expect(candidate.config!.sourceBindingVersion).toBe(1);
+
+      const gmailSource = candidate.config!.sources.find((s) => s.service === 'gmail');
+      expect(gmailSource).toEqual({
+        service: 'gmail',
+        tool: 'gmail.search_threads',
+        args: { query: 'in:inbox is:unread' },
+        label: 'Email chưa đọc (alice.trusted@example.test)',
+        binding: {
+          kind: 'gmail',
+          credentialId: trustedCredId,
+          email: 'alice.trusted@example.test',
+          oauthClientId: GMAIL_CLIENT_ID,
+        },
+      });
+
+      // ScheduleMoment.tsx renders `config.sources.map((s) => s.label || s.service).join(', ')`
+      const renderedUiSources = candidate.config!.sources.map((s) => s.label || s.service).join(', ');
+      expect(renderedUiSources).toBe(
+        'GitHub Issues đang mở (acme/ati), Email chưa đọc (alice.trusted@example.test)',
+      );
+      expect(renderedUiSources).not.toContain(trustedCredId);
+      expect(renderedUiSources).not.toContain(tgCredId);
+      expect(renderedUiSources).not.toContain(GMAIL_CLIENT_ID);
+      expect(renderedUiSources).not.toContain('attacker.test');
+
+      // Label is covered by canonical config hash
+      expect(candidate.configHash).toBe(computeTelegramDigestConfigHash(candidate.config!));
+      const tamperedLabelConfig: TelegramDigestConfig = {
+        ...candidate.config!,
+        sources: candidate.config!.sources.map((s) =>
+          s.service === 'gmail' ? { ...s, label: 'Email chưa đọc (other@example.test)' } : s,
+        ),
+      };
+      expect(computeTelegramDigestConfigHash(tamperedLabelConfig)).not.toBe(candidate.configHash);
+
+      // Legacy non-Gmail config hash bytes remain unchanged
+      const nonGmailConfig: TelegramDigestConfig = {
+        credentialId: '00000000-0000-4000-8000-000000000099',
+        telegramUserId: '777888999',
+        username: 'digestuser',
+        chatId: '777888999',
+        chatTitle: 'Telegram của tôi',
+        sources: [
+          { service: 'github', tool: 'github.search_issues', args: { repo: 'acme/ati', query: 'open' }, label: 'GitHub Issues' },
+          { service: 'calendar', tool: 'calendar.list_events', label: 'Lịch hôm nay' },
+        ],
+        recurrence: { type: 'daily', time: '08:00' },
+        timeZone: 'Asia/Ho_Chi_Minh',
+      };
+      expect(computeTelegramDigestConfigHash(nonGmailConfig)).toBe(
+        '3d42466d8ce4fe8fd249c83b55c3f9bfb0fd432cd825b8598bdeb110a521cccd',
+      );
+    });
   });
 });

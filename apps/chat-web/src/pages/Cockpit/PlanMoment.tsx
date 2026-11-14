@@ -7,7 +7,25 @@ import { ServiceLogo } from '../../components/ServiceLogo';
 import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
 import { operation, planStepDataFlows, serviceId, servicePalette, serviceName } from './presentation';
 import { formatCalendarDateTime, formatRecurrenceLabel } from './PreviewContents';
+import { GmailPreview } from './GmailPreview';
 import { RequestEcho } from './RequestEcho';
+
+function sanitizePlanForTechPreview(plan: ActivePlan): Record<string, unknown> {
+  if (!plan.connections) return { ...plan };
+  const sanitizedConnections: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(plan.connections)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const copy = { ...(value as Record<string, unknown>) };
+      delete copy.credentialId;
+      delete copy.accessToken;
+      delete copy.refreshToken;
+      sanitizedConnections[key] = copy;
+    } else {
+      sanitizedConnections[key] = value;
+    }
+  }
+  return { ...plan, connections: sanitizedConnections };
+}
 
 function extractSuggestedFreeSlots(warning: string): string[] {
   const hintIndex = warning.indexOf('Gợi ý khung giờ trống');
@@ -31,8 +49,8 @@ function cleanPreviewValue(value: unknown): string | null {
 }
 
 function extractInlinePreviewRows(step: PlanStep): Array<{ label: string; value: string }> {
-  if (step.tool === 'myslack.chat_postMessage') return [];
   const service = serviceId(step.tool);
+  if (step.tool === 'myslack.chat_postMessage' || service === 'gmail') return [];
   const rows: Array<{ label: string; value: string }> = [];
 
   const recipient = cleanPreviewValue(step.args.to);
@@ -119,11 +137,20 @@ export function PlanMoment({
   const isPersonalWorkspace = (getActiveWorkspaceSummary()?.id || 'personal') === 'personal';
 
   const accountChips: Array<{ key: string; service: string; text: string }> = [];
-  if (plan.steps.some((step) => step.tool.startsWith('gmail.')) && plan.connections?.gmail) {
+  const gmailSteps = plan.steps.filter((step) => step.tool.startsWith('gmail.'));
+  if (gmailSteps.length > 0 && plan.connections?.gmail) {
+    const hasGmailSend = gmailSteps.some((step) =>
+      ['gmail.send_message', 'gmail.reply', 'gmail.forward'].includes(step.tool),
+    );
+    const hasGmailDraft = gmailSteps.some((step) => step.tool === 'gmail.create_draft');
     accountChips.push({
       key: 'gmail',
       service: 'gmail',
-      text: `Gửi từ: ${plan.connections.gmail.email}`,
+      text: hasGmailSend
+        ? `Gửi từ: ${plan.connections.gmail.email}`
+        : hasGmailDraft
+          ? `Tạo thư nháp tại: ${plan.connections.gmail.email}`
+          : `Tài khoản: ${plan.connections.gmail.email} (Gmail của bạn)`,
     });
   }
   for (const [svcKey, rawConn] of Object.entries(plan.connections ?? {})) {
@@ -376,7 +403,7 @@ export function PlanMoment({
                             ? `Đọc từ bảng tính của bạn: ${plan.resourceLabels?.[String(step.args.spreadsheetId)] ?? step.description}`
                             : step.description}
                         </h2>
-                        <p className="text-xs text-[#6B7280] mt-1 break-words">
+                        <p className="text-xs text-[#6B7280] mt-1 break-words [overflow-wrap:anywhere]">
                           Đích đến: {destination(step, plan.resourceLabels)}
                         </p>
                         {service === 'myjira' &&
@@ -820,6 +847,12 @@ export function PlanMoment({
                       <span>Xem trước</span>
                     </button>
                   </div>
+
+                  {service === 'gmail' && (
+                    <div className="mt-3 min-w-0">
+                      <GmailPreview step={step} labels={plan.resourceLabels} />
+                    </div>
+                  )}
                 </article>
               );
             })}
@@ -881,7 +914,7 @@ export function PlanMoment({
               className="p-4 rounded-xl bg-neutral-900 text-neutral-200 font-mono text-xs v3-space-y-3 border border-neutral-800"
             >
               <pre className="whitespace-pre-wrap break-all">
-                {JSON.stringify(slackRead ? { summary: plan.summary, steps: plan.steps } : plan, null, 2)}
+                {JSON.stringify(slackRead ? { summary: plan.summary, steps: plan.steps } : sanitizePlanForTechPreview(plan), null, 2)}
               </pre>
             </div>
           )}

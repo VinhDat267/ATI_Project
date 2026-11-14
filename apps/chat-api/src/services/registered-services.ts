@@ -1,4 +1,5 @@
 import { decryptCredentials } from '@wap/tool-adapters';
+import { hasGoogleCredentialOrigin } from './gmail/credential-origin.js';
 import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYJIRA_G2A_TOOLS, MYJIRA_TOOLS, MYSHEETS_TOOLS, NOTION_TOOLS, NOTION_OAUTH_TOOLS, TELEGRAM_TOOLS, TELEGRAM_OAUTH_TOOLS, TRELLO_TOOLS, TRELLO_OAUTH_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { ServiceTransport } from './transports/types.js';
@@ -139,6 +140,7 @@ export async function getToolCatalogFor(
     workspaceMode?: 'legacy' | 'personal' | 'organization';
     workspaceId?: string | null;
     gmailEnabled: boolean;
+    gmailOAuthClientId?: string;
     mycalendarEnabled?: boolean;
     mysheetsEnabled?: boolean;
     /** Server-owned kill-switch for the 4 MySheets Drive/Docs write tools (defaults to false). */
@@ -186,7 +188,17 @@ export async function getToolCatalogFor(
         if (typeof gmail.config === 'string' && encryptionKey) {
           decryptCredentials(gmail.config, encryptionKey);
         }
-        catalog = [...catalog, ...GMAIL_TOOLS];
+        if (
+          options.gmailOAuthClientId &&
+          (!encryptionKey ||
+            !hasGoogleCredentialOrigin(gmail.config, encryptionKey, options.gmailOAuthClientId))
+        ) {
+          console.warn(
+            "[registered-services] Gmail credential OAuth clientId mismatch; skipping service.",
+          );
+        } else {
+          catalog = [...catalog, ...GMAIL_TOOLS];
+        }
       } catch {
         // stale or unreadable connection does not add tools
         console.warn(

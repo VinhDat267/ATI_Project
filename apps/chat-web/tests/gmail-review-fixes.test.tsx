@@ -152,3 +152,265 @@ it('lists Gmail with the services on the landing page, outside the hidden demo s
   expect(card.closest('[data-od-id="integrations-section"]')).not.toBeNull();
   expect(card.closest('#stage-panel-2')).toBeNull();
 });
+
+it('D1-16: always renders exact attachment omission warning on gmail.forward preview without filenames, and never on non-forward tools', () => {
+  const forwardStep = step('gmail.forward', {
+    threadId: thread,
+    to: ['director@example.com'],
+    note: 'Nhờ anh xem giúp',
+  });
+  render(<PreviewContents step={forwardStep} destination="Họp nhóm ATI" labels={labels} />);
+  expect(
+    screen.getByText('Chỉ chuyển tiếp văn bản; tệp đính kèm gốc không được gửi.')
+  ).toBeInTheDocument();
+  cleanup();
+
+  for (const nonForwardTool of ['gmail.send_message', 'gmail.reply', 'gmail.create_draft'] as const) {
+    const otherStep = step(nonForwardTool, {
+      ...(nonForwardTool !== 'gmail.send_message' ? { threadId: thread } : {}),
+      to: ['director@example.com'],
+      subject: 'Re: Họp nhóm ATI',
+      body: 'Nội dung thư',
+    });
+    render(<PreviewContents step={otherStep} destination="Họp nhóm ATI" labels={labels} />);
+    expect(
+      screen.queryByText('Chỉ chuyển tiếp văn bản; tệp đính kèm gốc không được gửi.')
+    ).toBeNull();
+    cleanup();
+  }
+});
+
+it('D1-15: reuses GmailPreview inline on PlanMoment before approval with To/Cc/Bcc, provenance, warnings, note, full body, send-vs-draft, drift/subject guidance, and zero DOM credentials', () => {
+  const multilineBody = Array.from({ length: 8 }, (_, idx) => `Dòng nội dung số ${idx + 1}`).join('\n');
+  const forwardWithRecipients = step('gmail.forward', {
+    threadId: thread,
+    to: ['user@example.test'],
+    cc: ['thread@example.test'],
+    bcc: ['audit@example.test'],
+    note: 'Chuyển tiếp biên bản họp cho ban điều hành',
+    body: multilineBody,
+  });
+  const threadedDraft = step('gmail.create_draft', {
+    threadId: thread,
+    to: ['lan@example.com'],
+    body: 'Nháp trả lời chi tiết trước khi gửi',
+  });
+  const richLabels = {
+    ...labels,
+    'recipient:user@example.test': 'user',
+    'recipient:thread@example.test': 'thread:Họp nhóm ATI',
+  };
+  const onPreview = vi.fn();
+  const plan = {
+    id: 'plan-gmail-inline',
+    convId: 'conv-1',
+    summary: 'Chuyển tiếp và tạo nháp',
+    status: 'pending' as const,
+    resourceLabels: richLabels,
+    connections: { gmail: { credentialId: 'secret-cred-uuid-999', email: 'own@gmail.test' } },
+    steps: [forwardWithRecipients, threadedDraft],
+  };
+
+  render(
+    <PlanMoment
+      runtimeMode="live"
+      plan={plan}
+      services={[]}
+      destination={resourceDestination}
+      onPreview={onPreview}
+      onApprove={() => {}}
+      onCancel={() => {}}
+      onEdit={() => {}}
+      inlineComposer={null}
+    />
+  );
+
+  // Single consistent Gmail renderer: inline GmailPreview cards exist before clicking Xem trước; no duplicate truncated step-inline-payload
+  expect(screen.queryByTestId('step-inline-payload')).toBeNull();
+  const cards = [...document.querySelectorAll('#plan-cards-container article')] as HTMLElement[];
+  expect(cards).toHaveLength(2);
+
+  const [forwardCard, draftCard] = cards;
+  expect(within(forwardCard!).getByTestId('gmail-preview-card')).toBeInTheDocument();
+  expect(within(forwardCard!).getByText('user@example.test')).toBeInTheDocument();
+  expect(within(forwardCard!).getByText('thread@example.test')).toBeInTheDocument();
+  expect(within(forwardCard!).getByText('audit@example.test')).toBeInTheDocument();
+  expect(within(forwardCard!).getByText('bạn đã gõ')).toBeInTheDocument();
+  expect(within(forwardCard!).getByText("lấy từ luồng thư 'Họp nhóm ATI'")).toBeInTheDocument();
+  expect(within(forwardCard!).getByText('chưa có nhãn nguồn; hãy kiểm lại')).toBeInTheDocument();
+  expect(within(forwardCard!).getByRole('alert')).toHaveTextContent(/có thể bị giả mạo/);
+  expect(
+    within(forwardCard!).getByText('Chỉ chuyển tiếp văn bản; tệp đính kèm gốc không được gửi.')
+  ).toBeInTheDocument();
+  expect(
+    within(forwardCard!).getByText('Chuyển tiếp biên bản họp cho ban điều hành')
+  ).toBeInTheDocument();
+  const bodyNode = within(forwardCard!).getByText(/Dòng nội dung số 8/);
+  expect(bodyNode.className).not.toContain('line-clamp-2');
+  expect(within(forwardCard!).getByText(/tin nhắn đã gửi mới nhất/i)).toBeInTheDocument();
+  expect(within(forwardCard!).getByText(/Gửi thư thật tới người nhận/i)).toBeInTheDocument();
+
+  // Draft card distinguishes draft creation from immediate sending and discloses latest-delivered + custom-subject standalone draft guidance
+  expect(within(draftCard!).getByTestId('gmail-preview-card')).toBeInTheDocument();
+  expect(within(draftCard!).getByText(/Chỉ tạo thư nháp trong Gmail; chưa gửi/i)).toBeInTheDocument();
+  expect(within(draftCard!).getByText(/tin nhắn đã gửi mới nhất/i)).toBeInTheDocument();
+  expect(within(draftCard!).getByText(/thư nháp độc lập mới nếu muốn đổi tiêu đề/i)).toBeInTheDocument();
+
+  // Detailed modal preview trigger remains keyboard-focusable and operational before Duyệt kế hoạch
+  const previewButtons = screen.getAllByRole('button', { name: 'Xem trước' });
+  expect(previewButtons).toHaveLength(2);
+  previewButtons[0]!.focus();
+  expect(previewButtons[0]).toHaveFocus();
+  fireEvent.click(previewButtons[0]!);
+  expect(onPreview).toHaveBeenCalledWith(forwardWithRecipients);
+
+  // Zero credentials/tokens in DOM even when technical JSON panel is opened
+  fireEvent.click(screen.getByRole('button', { name: /Chi tiết kỹ thuật/i }));
+  expect(document.body.textContent).not.toContain('secret-cred-uuid-999');
+  expect(document.body.textContent).not.toContain('credentialId');
+
+  cleanup();
+
+  // Draft-only plan attribution chip does not mislabel draft creation as "Gửi từ:"
+  const draftOnlyPlan = { ...plan, steps: [threadedDraft] };
+  render(
+    <PlanMoment
+      runtimeMode="live"
+      plan={draftOnlyPlan}
+      services={[]}
+      destination={resourceDestination}
+      onPreview={() => {}}
+      onApprove={() => {}}
+      onCancel={() => {}}
+      onEdit={() => {}}
+      inlineComposer={null}
+    />
+  );
+  expect(screen.queryByText(/^Gửi từ:/)).toBeNull();
+  expect(screen.getByText(/Tạo thư nháp tại: own@gmail\.test/)).toBeInTheDocument();
+});
+
+it.each([false, true])(
+  'D1-13: reconciles PrivacyPage personal Calendar/Sheets opt-in, interactive vs recurring auto digest, configured AI provider, post-disconnect retention, and conditional revoke (flags=%s)',
+  async (flagsEnabled) => {
+    vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({
+      runtimeMode: 'live',
+      gmailEnabled: flagsEnabled,
+      mycalendarEnabled: flagsEnabled,
+      mysheetsEnabled: flagsEnabled,
+    });
+    render(<PrivacyPage navigate={() => {}} />);
+    await waitFor(() => expect(apiClient.getRuntime).toHaveBeenCalled());
+    await act(async () => {});
+
+    const main = screen.getByRole('main');
+    const text = main.textContent ?? '';
+    expect(text).toMatch(/Khi chưa kết nối dịch vụ cá nhân,\s*Planora không truy cập Drive hay lịch cá nhân/i);
+    expect(text).not.toMatch(/sẽ bị thu hồi hoàn toàn/i);
+    expect(text).toMatch(/Google Calendar|Google Sheets/);
+    expect(text).toMatch(/Duyệt kế hoạch/);
+    expect(text).toMatch(/định kỳ.*xác nhận một lần|xác nhận một lần.*định kỳ/i);
+    expect(text).toMatch(/xoá ngay token|bị xoá ngay/i);
+    expect(text).toMatch(/nỗ lực tốt nhất|có điều kiện/i);
+    expect(text).toMatch(/vẫn lưu lại|vẫn được giữ lại/i);
+
+    if (flagsEnabled) {
+      const gmailRegion = screen.getByRole('region', { name: 'Dữ liệu Gmail' });
+      expect(gmailRegion).not.toHaveTextContent(/9router/i);
+      expect(gmailRegion).toHaveTextContent(/nhà cung cấp mô hình AI bên thứ ba đã cấu hình/);
+      expect(gmailRegion).toHaveTextContent(/nỗ lực tốt nhất/);
+      expect(gmailRegion).toHaveTextContent(/vẫn được giữ lại sau khi ngắt kết nối/);
+    }
+  }
+);
+
+it('B2: displays confirmed completedThreadIds, failedThreadId, causeCategory, and non-rerun guidance on batch UNKNOWN without crashing on malformed error.details', () => {
+  const batchStep = step('gmail.batch_modify_threads', {
+    threadIds: ['gmail-thread-1', 'gmail-thread-2', 'gmail-thread-3'],
+    addLabelIds: ['Label_1'],
+  });
+  const basePlan = {
+    id: 'plan-batch',
+    convId: 'conv-batch',
+    summary: 'Gắn nhãn hàng loạt',
+    status: 'reconciliation_required' as const,
+    resourceLabels: { ...labels, 'gmail-thread-2': 'Báo cáo tuần' },
+    connections: { gmail: { credentialId: 'c1', email: 'own@gmail.test' } },
+    steps: [batchStep],
+  };
+  const validSnapshot: ExecutionSnapshot = {
+    plan: basePlan,
+    execution: { status: 'reconciliation_required', pausedStepId: batchStep.id },
+    recoveryActions: ['skip', 'stop'],
+    steps: [
+      {
+        stepId: batchStep.id,
+        tool: batchStep.tool,
+        status: 'unknown',
+        error: {
+          category: 'UNKNOWN',
+          message: 'Token expired mid-batch',
+          details: {
+            requestSent: true,
+            completedThreadIds: ['gmail-thread-1', 'gmail-thread-2'],
+            failedThreadId: 'gmail-thread-3',
+            causeCategory: 'AUTH_ERROR',
+          },
+        } as unknown as ExecutionSnapshot['steps'][number]['error'],
+      },
+    ],
+  };
+  const execSteps = [
+    { id: batchStep.id, tool: batchStep.tool, description: 'Đổi nhãn 3 luồng thư', status: 'unknown' as const },
+  ];
+
+  for (const moment of [8, 9] as const) {
+    render(<RecoveryMoment moment={moment} snapshot={validSnapshot} steps={execSteps} services={[]} controls={null} />);
+    expect(screen.queryByRole('button', { name: /Thử lại|Sửa rồi|Làm tiếp/ })).toBeNull();
+    const detailsBox = screen.getByTestId('batch-unknown-details');
+    expect(detailsBox).toHaveTextContent('Họp nhóm ATI (gmail-thread-1)');
+    expect(detailsBox).toHaveTextContent('Báo cáo tuần (gmail-thread-2)');
+    expect(detailsBox).toHaveTextContent('gmail-thread-3');
+    expect(detailsBox).toHaveTextContent('AUTH_ERROR');
+    expect(screen.getByText(/không chạy lại toàn bộ lô/i)).toBeInTheDocument();
+    expect(screen.queryByText(/dừng kế hoạch rồi gửi lại yêu cầu/i)).toBeNull();
+    cleanup();
+  }
+
+  // Malformed / absent error.details guard checks
+  const malformedCases: unknown[] = [
+    undefined,
+    null,
+    'corrupted-string',
+    { completedThreadIds: [], failedThreadId: '', causeCategory: 12345 },
+    { completedThreadIds: [null, 99, '  ', 'raw-thread-ok'], failedThreadId: { bad: true }, causeCategory: ['x'] },
+  ];
+  for (const rawDetails of malformedCases) {
+    const guardedSnapshot: ExecutionSnapshot = {
+      ...validSnapshot,
+      plan: { ...basePlan, resourceLabels: {} },
+      steps: [
+        {
+          stepId: batchStep.id,
+          tool: batchStep.tool,
+          status: 'unknown',
+          error: (rawDetails === undefined
+            ? 'Plain error string'
+            : { message: 'Interrupted', details: rawDetails }) as unknown as ExecutionSnapshot['steps'][number]['error'],
+        },
+      ],
+    };
+    render(<RecoveryMoment moment={8} snapshot={guardedSnapshot} steps={execSteps} services={[]} controls={null} />);
+    expect(screen.queryByRole('button', { name: /Thử lại|Sửa rồi|Làm tiếp/ })).toBeNull();
+    expect(document.body.textContent).not.toContain('[object Object]');
+    expect(document.body.textContent).not.toContain('undefined');
+    expect(screen.getByText(/không chạy lại toàn bộ lô/i)).toBeInTheDocument();
+    const detailsCard = screen.getByTestId('batch-unknown-details');
+    if (Array.isArray((rawDetails as { completedThreadIds?: unknown })?.completedThreadIds) && (rawDetails as { completedThreadIds: unknown[] }).completedThreadIds.includes('raw-thread-ok')) {
+      expect(detailsCard).toHaveTextContent('raw-thread-ok');
+    } else {
+      expect(detailsCard.textContent).not.toContain('gmail-thread-1');
+    }
+    cleanup();
+  }
+});

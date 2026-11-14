@@ -46,6 +46,8 @@ export interface ScheduleRunnerOptions {
   runJiraDigest?: (input: any, signal: AbortSignal) => Promise<any>;
   executeDigestRun?: ExecuteDigestRun;
   timeZone: string;
+  encryptionKey?: string;
+  gmailOAuthClientId?: string;
   /** Writes the state message of a schedule the runner paused or completed (ScheduleService.recordState). */
   recordState: (client: Queryable, row: ScheduleRow, now: Date) => Promise<ScheduleChange>;
   emit?: (convId: string, event: string, payload: unknown) => unknown;
@@ -73,16 +75,28 @@ const INTERRUPTED = 'Máy chủ khởi động lại khi đang lập kế hoạc
 
 async function inTransaction<T>(pool: pg.Pool, work: (client: pg.PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
+  let connectionErr: Error | undefined;
+  const onError = (err: unknown) => {
+    connectionErr = err instanceof Error ? err : new Error(String(err));
+  };
+  (client as any).on?.('error', onError);
   try {
     await client.query('BEGIN');
     const result = await work(client);
     await client.query('COMMIT');
     return result;
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
+    try {
+      await client.query('ROLLBACK');
+    } catch (rbErr) {
+      if (!connectionErr) {
+        connectionErr = rbErr instanceof Error ? rbErr : new Error(String(rbErr));
+      }
+    }
     throw error;
   } finally {
-    client.release();
+    (client as any).removeListener?.('error', onError);
+    client.release(connectionErr);
   }
 }
 
@@ -448,6 +462,8 @@ export class ScheduleRunner {
         pool,
         scheduleId: started.toPlan.scheduleId,
         claimedWorkspaceId: started.toPlan.workspaceId,
+        encryptionKey: this.options.encryptionKey,
+        gmailOAuthClientId: this.options.gmailOAuthClientId,
       });
       started.toPlan.workspaceId = liveGuard.trustedWorkspaceId;
       started.toPlan.workspaceMode = liveGuard.trustedWorkspaceMode as RunToPlan['workspaceMode'];

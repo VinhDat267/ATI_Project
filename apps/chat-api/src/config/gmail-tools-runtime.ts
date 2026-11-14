@@ -51,6 +51,7 @@ export async function runtimeToolCatalog(
     workspaceMode?: 'legacy' | 'personal' | 'organization';
     workspaceId?: string | null;
     gmailEnabled: boolean;
+    gmailOAuthClientId?: string;
     mycalendarEnabled?: boolean;
     mysheetsEnabled?: boolean;
     trelloEnabled?: boolean;

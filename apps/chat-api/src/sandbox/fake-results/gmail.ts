@@ -13,10 +13,10 @@ export const GMAIL_THREADS = [
 ].map(([subject = '', body = ''], index) => ({
   id: `gmail-thread-${index + 1}`, subject, from: 'Lan <lan@example.com>', to: ['gmail-owner@example.test'], cc: ['minh@example.com'],
   snippet: body, date: '2026-10-14T09:00:00+07:00', labels: ['INBOX', 'UNREAD'], messageCount: 1, unread: true,
-  hasAttachment: index === 1, attachmentNames: index === 1 ? ['báo cáo.pdf'] : [],
+  hasAttachment: index === 1, attachmentNames: index === 1 ? ['báo cáo.pdf'] : [], hasDraft: false,
   participants: ['lan@example.com', 'gmail-owner@example.test', 'minh@example.com'],
   messages: [{ messageId: `gmail-message-${index + 1}`, from: 'lan@example.com', to: ['gmail-owner@example.test'], cc: ['minh@example.com'],
-    subject, date: '2026-10-14T09:00:00+07:00', body, attachments: index === 1 ? [{ filename: 'báo cáo.pdf', size: 1200 }] : [] }],
+    subject, date: '2026-10-14T09:00:00+07:00', body, attachments: index === 1 ? [{ filename: 'báo cáo.pdf', size: 1200 }] : [], isDraft: false }],
 }));
 const thread = (id: string) => {
   const found = GMAIL_THREADS.find(t => t.id === id);
@@ -28,7 +28,7 @@ export const GMAIL_FAKE: { id: string; tools: Record<string, (args: Record<strin
   id: 'gmail', tools: {
     'gmail.search_threads': (args: Record<string, any>) => GMAIL_THREADS.filter(t => !args.query || t.subject.toLowerCase().includes(args.query.toLowerCase()) || t.snippet.toLowerCase().includes(args.query.toLowerCase()))
       .slice(0, Math.min(args.limit ?? 10, 10)).map(({ messages: _messages, ...summary }) => structuredClone(summary)),
-    'gmail.get_thread': (args: Record<string, any>) => { const t = thread(args.threadId); return structuredClone({ id: t.id, subject: t.subject, participants: t.participants, messages: t.messages }); },
+    'gmail.get_thread': (args: Record<string, any>) => { const t = thread(args.threadId); return structuredClone({ id: t.id, subject: t.subject, participants: t.participants, totalMessages: t.messages.length, omittedMessages: 0, messages: t.messages }); },
     'gmail.list_labels': (args: Record<string, any>) => ['INBOX', 'UNREAD', 'STARRED'].filter(id => !args.query || id.toLowerCase().includes(args.query.toLowerCase())).slice(0, Math.min(args.limit ?? 10, 10)).map(id => ({ id, name: id, type: 'system' })),
     'gmail.send_message': (args: Record<string, any>) => sent('send', args),
     'gmail.reply': (args: Record<string, any>) => sent('reply', args),

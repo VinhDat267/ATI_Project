@@ -46,6 +46,47 @@ export function recoveryDestination(step?:PlanStep):string|undefined {
   if(target && typeof step.args[target.argument]==='string' && safe(target.url)) {const url=new URL(target.url);url.searchParams.set(target.query,step.args[target.argument] as string);return url.href;}
   return;
 }
+
+const CAUSE_LABELS: Record<string, string> = {
+  AUTH_ERROR: 'Lỗi xác thực (AUTH_ERROR)',
+  RATE_LIMIT: 'Giới hạn tần suất (RATE_LIMIT)',
+  NOT_FOUND: 'Không tìm thấy luồng thư (NOT_FOUND)',
+  VALIDATION: 'Dữ liệu không hợp lệ (VALIDATION)',
+  SERVER_ERROR: 'Lỗi máy chủ (SERVER_ERROR)',
+  NETWORK: 'Gián đoạn kết nối (NETWORK)',
+  UNKNOWN: 'Chưa rõ trạng thái (UNKNOWN)',
+};
+
+function extractBatchUnknownDetails(snapshot: ExecutionSnapshot | null, pausedStepId?: string, pausedTool?: string) {
+  const savedStep = pausedStepId ? snapshot?.steps.find(step => step.stepId === pausedStepId) : undefined;
+  const rawError = (savedStep as { error?: unknown } | undefined)?.error;
+  const rawDetails = rawError && typeof rawError === 'object' && !Array.isArray(rawError)
+    ? (rawError as Record<string, unknown>).details
+    : undefined;
+  const detailsObj = rawDetails && typeof rawDetails === 'object' && !Array.isArray(rawDetails)
+    ? (rawDetails as Record<string, unknown>)
+    : null;
+  const hasCompletedList = Array.isArray(detailsObj?.completedThreadIds);
+  const completedThreadIds = hasCompletedList
+    ? Array.from(new Set(
+        (detailsObj!.completedThreadIds as unknown[])
+          .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+          .map(item => item.trim())
+      ))
+    : [];
+  const failedThreadId = typeof detailsObj?.failedThreadId === 'string' && detailsObj.failedThreadId.trim().length > 0
+    ? detailsObj.failedThreadId.trim()
+    : null;
+  const rawCause = typeof detailsObj?.causeCategory === 'string' ? detailsObj.causeCategory.trim() : '';
+  const causeCategory = /^[A-Z0-9_:-]{1,64}$/i.test(rawCause) ? rawCause : null;
+  const isBatchUnknown = pausedTool === 'gmail.batch_modify_threads' || hasCompletedList || failedThreadId !== null;
+  return { isBatchUnknown, hasCompletedList, completedThreadIds, failedThreadId, causeCategory };
+}
+
+function formatThreadIdWithLabel(id: string, labels?: Record<string, string>): string {
+  const title = typeof labels?.[id] === 'string' ? labels[id]!.trim() : '';
+  return title && title !== id ? `${title} (${id})` : id;
+}
 function SavedWork({steps}:{steps:ExecutionStepInfo[]}) { return <div className="v3-space-y-2 pt-2">{steps.map((step,index)=>
   <div key={step.id} className={step.status==='succeeded' ? 'p-3 rounded-xl bg-white border border-[#E5E5E0] flex items-center justify-between text-xs sm:text-sm gap-3' : 'p-3 rounded-xl bg-white/80 border border-dashed border-[#D6D6D0] flex items-center justify-between text-xs sm:text-sm text-[#6B7280] gap-3'}>
     <div className="flex items-center gap-2.5 min-w-0"><span className={`w-5 h-5 rounded-full ${step.status==='succeeded'?'bg-emerald-100 text-emerald-800':'bg-neutral-200 text-[#4B5563]'} flex items-center justify-center font-bold text-xs flex-shrink-0`}>{step.status==='succeeded'?<svg aria-hidden="true" className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>:index+1}</span><span className={step.status==='succeeded'?'font-medium text-[#111827] break-words min-w-0':'break-words min-w-0'}>Việc {index+1}: {step.description}</span></div>
@@ -82,11 +123,51 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
   const canRetry=moment===7 && !hasUnknown && paused?.status==='failed' && actions.includes('retry');
   const canContinue=moment===9 && !hasUnknown && !steps.some(step=>['failed','running'].includes(step.status)) && actions.includes('continue');
   const error=paused?.error ?? 'Dịch vụ không thể hoàn thành việc này.';
+  const batchUnknown = paused?.status === 'unknown'
+    ? extractBatchUnknownDetails(snapshot, paused.id, paused.tool)
+    : { isBatchUnknown: false, hasCompletedList: false, completedThreadIds: [] as string[], failedThreadId: null as string | null, causeCategory: null as string | null };
+  const resourceLabels = snapshot?.plan.resourceLabels;
+  const hasPriorSucceededSteps = steps.some(step => step.status === 'succeeded');
   const unknownInstructions=<>
     <p className="text-base text-brand-text leading-relaxed">Tôi không chắc lệnh đã tới {service || 'dịch vụ'} hay chưa. Hãy kiểm tra trên {service || 'dịch vụ'} trước khi quyết định.</p>
+    {batchUnknown.isBatchUnknown && (
+      <div data-testid="batch-unknown-details" className="v3-space-y-2.5 p-4 rounded-xl bg-amber-50/70 border border-amber-200 text-xs sm:text-sm text-[#111827]">
+        <div className="font-semibold text-amber-900">Trạng thái xử lý từng phần của lô luồng thư:</div>
+        <div className="v3-space-y-1">
+          <div className="font-medium text-[#374151]">Luồng thư đã xác nhận cập nhật:</div>
+          {batchUnknown.completedThreadIds.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {batchUnknown.completedThreadIds.map(id => (
+                <span key={id} className="px-2.5 py-1 rounded-lg bg-white border border-amber-200 text-[#111827] font-medium max-w-full break-words [overflow-wrap:anywhere]">
+                  {formatThreadIdWithLabel(id, resourceLabels)}
+                </span>
+              ))}
+            </div>
+          ) : batchUnknown.hasCompletedList ? (
+            <p className="text-[#4B5563]">Chưa có luồng thư nào được xác nhận hoàn tất trước khi gián đoạn.</p>
+          ) : (
+            <p className="text-[#4B5563]">Chưa nhận được danh sách mã luồng thư đã xác nhận từ máy chủ; hãy đối chiếu trực tiếp trên Gmail.</p>
+          )}
+        </div>
+        <div className="v3-space-y-1">
+          <div className="font-medium text-[#374151]">Luồng thư gián đoạn / chưa rõ kết quả:</div>
+          <p className="text-[#111827] break-words [overflow-wrap:anywhere]">
+            {batchUnknown.failedThreadId
+              ? `${formatThreadIdWithLabel(batchUnknown.failedThreadId, resourceLabels)} (các luồng thư tiếp theo trong lô chưa được xử lý tiếp)`
+              : 'Chưa xác định được luồng thư dừng cụ thể; một phần lô có thể đã được cập nhật.'}
+          </p>
+        </div>
+        {batchUnknown.causeCategory && (
+          <div className="text-xs text-amber-900">
+            <span className="font-semibold">Nguyên nhân ghi nhận:</span>{' '}
+            <span>{CAUSE_LABELS[batchUnknown.causeCategory] ?? batchUnknown.causeCategory}</span>
+          </div>
+        )}
+      </div>
+    )}
     <div className="v3-space-y-2 p-4 rounded-xl bg-neutral-50 border border-neutral-200 text-xs sm:text-sm"><div className="font-semibold text-neutral-800">Hướng dẫn xử lý:</div><ul className="v3-space-y-1.5 text-neutral-700">
-      <li className="flex items-start gap-2"><span className="text-emerald-600 font-bold">•</span><span>Nếu đã thấy kết quả → bỏ qua bước này và làm tiếp.</span></li>
-      <li className="flex items-start gap-2"><span className="text-red-600 font-bold">•</span><span>Nếu chưa có: dừng kế hoạch rồi gửi lại yêu cầu.</span></li>
+      <li className="flex items-start gap-2"><span className="text-emerald-600 font-bold">•</span><span>{batchUnknown.isBatchUnknown ? 'Nếu đã kiểm tra trên Gmail và thấy toàn bộ lô đã cập nhật đúng → bỏ qua bước này và làm tiếp.' : 'Nếu đã thấy kết quả → bỏ qua bước này và làm tiếp.'}</span></li>
+      <li className="flex items-start gap-2"><span className="text-red-600 font-bold">•</span><span>{batchUnknown.isBatchUnknown ? 'Nếu chưa có đủ trên Gmail: dừng kế hoạch, kiểm tra nhãn trực tiếp trên Gmail và chỉ tạo yêu cầu mới cho các luồng thư chưa được cập nhật — không chạy lại toàn bộ lô và không lặp lại các bước hay luồng thư đã hoàn tất.' : hasPriorSucceededSteps ? 'Nếu chưa có: dừng kế hoạch và chỉ tạo yêu cầu mới cho phần việc chưa thực hiện (không chạy lại các bước đã hoàn tất).' : 'Nếu chưa có: dừng kế hoạch rồi tạo yêu cầu mới cho bước chưa thực hiện.'}</span></li>
     </ul></div><div className="text-xs text-neutral-500 italic">* Lưu ý an toàn: Để tránh ghi lặp, hệ thống không thử lại ở bước chưa rõ kết quả.</div>
   </>;
   return <section id={`moment-${moment}`} className="stage-section is-active w-full max-w-3xl mx-auto" aria-label="Cockpit" data-moment={moment} aria-labelledby={`heading-moment-${moment}`} aria-busy={busy}>

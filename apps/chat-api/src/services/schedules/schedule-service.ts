@@ -49,6 +49,14 @@ import {
   computeTrelloDigestConfigHash,
   getTrelloDigestPinnedCredentialIds,
 } from './trello-digest-candidate.js';
+import {
+  loadGmailDigestBinding,
+  validateTelegramDigestGmailConfig,
+} from './gmail-digest-binding.js';
+import {
+  assertDigestScheduleLiveScopeAndAuth,
+  buildPinnedTelegramAdapterContext,
+} from './digest-scope-guard.js';
 import { approvedSlackNotionBinding, canonicalizeNotionDigestConfig, computeNotionDigestConfigHash } from './notion-digest-candidate.js';
 import { canonicalizeJiraDigestConfig, computeJiraDigestConfigHash, type JiraDigestCandidate, type JiraDigestConfig } from './jira-digest-candidate.js';
 
@@ -143,6 +151,7 @@ export interface ScheduleServiceOptions {
   verifyNotionSource?: Pick<NotionDigestSourceAuthority, 'withSource'>['withSource'];
   credentialRepo?: CredentialRepo;
   encryptionKey?: string;
+  gmailOAuthClientId?: string;
   mysheetsEnabled?: boolean;
   emitV2?: boolean;
   fetchOrgSheetsMetadata?: FetchOrgSheetsMetadataFn;
@@ -576,7 +585,13 @@ export class ScheduleService {
           if (!candidate || candidate.canAutoDigest !== true || !candidate.config || !candidate.configHash) {
             throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
           }
-          const computedHash = computeTelegramDigestConfigHash(candidate.config);
+          await this.verifyTelegramDigestGmailConfigInTx(client, userId, candidate.config, metadata.services);
+          let computedHash: string;
+          try {
+            computedHash = computeTelegramDigestConfigHash(candidate.config);
+          } catch {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+          }
           if (computedHash !== candidate.configHash) {
             throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
           }
@@ -655,6 +670,7 @@ export class ScheduleService {
             expectedHash: effectiveExpectedHash,
             trustedScope,
             encryptionKey: this.options.encryptionKey,
+            gmailOAuthClientId: this.options.gmailOAuthClientId,
             mysheetsEnabled: this.options.mysheetsEnabled,
           });
           if (!verified.ok) {
@@ -869,6 +885,12 @@ export class ScheduleService {
         }
         await this.assertSheetsDigestCanResumeInTx(client, existing);
       }
+      if (proposal.action === 'resume' && existing.kind === 'telegram_digest') {
+        if (existing.status === 'cancelled' || existing.status === 'completed') {
+          throw new ScheduleConflict('SCHEDULE_CLOSED');
+        }
+        await this.assertTelegramDigestCanResumeInTx(client, existing);
+      }
       const fields = this.transition(existing, proposal.action, proposal, persistedServices, now);
       if (!fields) {
         await client.query('UPDATE schedules SET last_proposal_id=$2 WHERE id=$1', [existing.id, messageId]);
@@ -894,7 +916,10 @@ export class ScheduleService {
           fields.digest_approved_at = null;
         } else if (existing.kind === 'telegram_digest' && existing.digest_config) {
           const tgCandidate = metadata.digestCandidate as TelegramDigestCandidate | undefined;
-          if (tgCandidate?.canAutoDigest === false) {
+          const existingGmailValidation = validateTelegramDigestGmailConfig(existing.digest_config);
+          const involvesGmail =
+            fields.services.includes('gmail') || existingGmailValidation.kind !== 'non_gmail';
+          if (tgCandidate?.canAutoDigest === false || (involvesGmail && (!tgCandidate?.canAutoDigest || !tgCandidate.config))) {
             fields.kind = 'plan';
             fields.digest_config = null;
             fields.digest_config_hash = null;
@@ -915,6 +940,9 @@ export class ScheduleService {
               if (!binding || wsMode === 'organization' || !(await lockApprovedNotionSource(client, userId, binding))) {
                 throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', NOTION_DIGEST_REAPPROVAL);
               }
+            }
+            if (involvesGmail) {
+              await this.verifyTelegramDigestGmailConfigInTx(client, userId, updatedConfig, fields.services);
             }
             fields.kind = 'telegram_digest';
             fields.digest_config = updatedConfig;
@@ -1137,6 +1165,7 @@ export class ScheduleService {
       expectedHash: row.digest_config_hash,
       trustedScope,
       encryptionKey: this.options.encryptionKey,
+      gmailOAuthClientId: this.options.gmailOAuthClientId,
       mysheetsEnabled: this.options.mysheetsEnabled,
     });
     if (!verified.ok) {
@@ -1295,6 +1324,7 @@ export class ScheduleService {
       services: effectiveServices,
       credentialRepo: this.options.credentialRepo,
       encryptionKey: this.options.encryptionKey,
+      gmailOAuthClientId: this.options.gmailOAuthClientId,
       mysheetsEnabled: this.options.mysheetsEnabled,
       fetchOrgSheetsMetadata: this.options.fetchOrgSheetsMetadata,
       emitV2: true,
@@ -1452,6 +1482,7 @@ export class ScheduleService {
         expectedHash: candidate.configHash,
         trustedScope: txTrustedScope,
         encryptionKey: this.options.encryptionKey,
+        gmailOAuthClientId: this.options.gmailOAuthClientId,
         mysheetsEnabled: this.options.mysheetsEnabled,
       });
       if (!verified.ok) {
@@ -1560,6 +1591,89 @@ export class ScheduleService {
     }
   }
 
+  private async verifyTelegramDigestGmailConfigInTx(
+    client: pg.PoolClient,
+    userId: string,
+    config: TelegramDigestConfig,
+    services: string[],
+  ): Promise<void> {
+    const gmailCheck = validateTelegramDigestGmailConfig(config);
+    if (
+      gmailCheck.kind === 'invalid' ||
+      gmailCheck.kind === 'gmail_legacy' ||
+      (services.includes('gmail') && gmailCheck.kind !== 'gmail_bound')
+    ) {
+      throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+    }
+    if (gmailCheck.kind === 'gmail_bound') {
+      const liveBinding = await loadGmailDigestBinding(
+        client,
+        userId,
+        this.options.gmailOAuthClientId,
+        this.options.encryptionKey,
+      );
+      if (
+        !liveBinding ||
+        liveBinding.credentialId !== gmailCheck.binding.credentialId ||
+        liveBinding.email !== gmailCheck.binding.email ||
+        liveBinding.oauthClientId !== gmailCheck.binding.oauthClientId
+      ) {
+        throw new ScheduleConflict(
+          'DIGEST_PREVIEW_CHANGED',
+          'Kết nối Gmail nguồn đã thay đổi kể từ bản xem trước. Vui lòng tạo đề xuất mới và xác nhận lại.',
+        );
+      }
+    }
+  }
+
+  private async assertTelegramDigestCanResumeInTx(
+    client: pg.PoolClient,
+    row: ScheduleRow,
+  ): Promise<void> {
+    const gmailCheck = validateTelegramDigestGmailConfig(row.digest_config);
+    if (
+      gmailCheck.kind === 'invalid' ||
+      gmailCheck.kind === 'gmail_legacy' ||
+      (Array.isArray(row.services) && row.services.includes('gmail') && gmailCheck.kind !== 'gmail_bound')
+    ) {
+      throw new ScheduleConflict(
+        'REAUTHORIZATION_REQUIRED',
+        gmailCheck.kind === 'non_gmail' ? undefined : gmailCheck.reason,
+      );
+    }
+    if (gmailCheck.kind === 'gmail_bound') {
+      let expectedHash: string | null = null;
+      try {
+        expectedHash = computeTelegramDigestConfigHash(row.digest_config as TelegramDigestConfig);
+      } catch {
+        expectedHash = null;
+      }
+      if (!row.digest_config_hash || !expectedHash || expectedHash !== row.digest_config_hash) {
+        throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+      }
+      const guard = await assertDigestScheduleLiveScopeAndAuth({
+        pool: client,
+        scheduleId: row.id,
+        encryptionKey: this.options.encryptionKey,
+        gmailOAuthClientId: this.options.gmailOAuthClientId,
+      });
+      if (!guard.allowed) {
+        throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', guard.pauseReason);
+      }
+      if (this.options.encryptionKey) {
+        const tgCtx = await buildPinnedTelegramAdapterContext({
+          pool: client,
+          scheduleId: row.id,
+          encryptionKey: this.options.encryptionKey,
+          gmailOAuthClientId: this.options.gmailOAuthClientId,
+        });
+        if (!tgCtx.allowed) {
+          throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+        }
+      }
+    }
+  }
+
   async setStatus(input: { userId: string; scheduleId: string; action: 'pause' | 'resume' | 'cancel'; version: number; now: Date; scope?: ScheduleScope }): Promise<ScheduleChange> {
     return this.transaction(async (client) => {
       const row = await this.lockSchedule(client, input.scheduleId, input.userId, input.scope);
@@ -1571,6 +1685,12 @@ export class ScheduleService {
           throw new ScheduleConflict('SCHEDULE_CLOSED');
         }
         await this.assertSheetsDigestCanResumeInTx(client, row);
+      }
+      if (input.action === 'resume' && row.kind === 'telegram_digest') {
+        if (row.status === 'cancelled' || row.status === 'completed') {
+          throw new ScheduleConflict('SCHEDULE_CLOSED');
+        }
+        await this.assertTelegramDigestCanResumeInTx(client, row);
       }
       const fields = this.transition(row, input.action, null, null, input.now);
       if (!fields) return this.unchanged(client, row, input.now);
@@ -2008,6 +2128,7 @@ export class ScheduleService {
               throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
             }
           }
+          await this.assertTelegramDigestCanResumeInTx(client, schedule);
         }
       }
       const busy = await client.query(

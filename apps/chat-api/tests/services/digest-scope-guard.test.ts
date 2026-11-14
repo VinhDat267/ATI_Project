@@ -2,11 +2,12 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomUUID, createHash } from 'node:crypto';
 import type pg from 'pg';
 import { encryptCredentials } from '@wap/tool-adapters';
+import { GMAIL_MODIFY_SCOPE } from '@wap/tool-schemas';
+import { computeTelegramDigestConfigHash } from '../../src/services/schedules/telegram-digest-candidate.js';
 import {
-  createIsolatedTestSchema,
   createSyntheticUser,
-  type IsolatedTestContext,
 } from '../helpers/jira-test-db.js';
+import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { WorkspaceRepo } from '../../src/db/repositories/workspace-repo.js';
 import {
@@ -19,15 +20,14 @@ const TEAM_CHAT = '-1001234567890';
 const TG_USER = '99001';
 
 describe('PR-R1-C1: Digest Runner Live Scope, Membership & Telegram Binding Guard', () => {
-  let ctx: IsolatedTestContext;
+  let db: Awaited<ReturnType<typeof createMigratedSchema>>;
   let pool: pg.Pool;
   let credentialRepo: CredentialRepo;
   let workspaceRepo: WorkspaceRepo;
 
   beforeAll(async () => {
-    ctx = await createIsolatedTestSchema();
-    await ctx.runAllMigrations();
-    pool = ctx.pool;
+    db = await createMigratedSchema('digest_scope_guard');
+    pool = db.pool;
     credentialRepo = new CredentialRepo(pool, ENCRYPTION_KEY);
     workspaceRepo = new WorkspaceRepo(pool);
     // Test-only, isolated schema: emulate the post-0034 (PR-R1-A1) shape in which github scope rows are
@@ -37,7 +37,7 @@ describe('PR-R1-C1: Digest Runner Live Scope, Membership & Telegram Binding Guar
   });
 
   afterAll(async () => {
-    await ctx.cleanup();
+    await db?.close();
   });
 
   async function githubCredential(userId: string): Promise<string> {
@@ -412,6 +412,255 @@ describe('PR-R1-C1: Digest Runner Live Scope, Membership & Telegram Binding Guar
       });
       await pool.query(`UPDATE service_credentials SET config = 'not-ciphertext' WHERE id = $1`, [credentialId]);
       expect(await tgContext(tg)).toMatchObject({ allowed: false, code: 'DIGEST_TELEGRAM_CONTEXT_INVALID' });
+    });
+  });
+
+  describe('A02: Gmail source binding guard in assertDigestScheduleLiveScopeAndAuth', () => {
+    const GMAIL_CLIENT_ID = 'gmail-guard-client.apps.googleusercontent.com';
+
+    async function saveGmailCred(
+      userId: string,
+      opts: {
+        email?: string;
+        oauthClientId?: string;
+        scopes?: string[];
+        refreshToken?: string;
+        workspaceId?: string | null;
+      } = {},
+    ): Promise<string> {
+      const enc = encryptCredentials(
+        {
+          oauthClientId: opts.oauthClientId ?? GMAIL_CLIENT_ID,
+          refreshToken: opts.refreshToken ?? `1//rt-${randomUUID()}`,
+          email: opts.email ?? 'alice@example.test',
+          scopes: opts.scopes ?? [GMAIL_MODIFY_SCOPE],
+          connectedAt: new Date().toISOString(),
+        },
+        ENCRYPTION_KEY,
+      );
+      if (opts.workspaceId) {
+        const res = await pool.query(
+          `INSERT INTO service_credentials (service, user_id, workspace_id, config, status)
+           VALUES ('gmail', $1, $2, $3, 'active') RETURNING id`,
+          [userId, opts.workspaceId, enc],
+        );
+        return res.rows[0].id;
+      }
+      return (await credentialRepo.saveCredentials('gmail', enc, userId)).id;
+    }
+
+    async function seedGmailTelegramSchedule(options: {
+      userId: string;
+      workspaceId?: string | null;
+      workspaceMode?: 'personal' | 'organization';
+      digestConfig: Record<string, unknown>;
+      hashOverride?: string;
+    }): Promise<string> {
+      const convId = randomUUID();
+      const wsId = options.workspaceId ?? null;
+      const wsMode = options.workspaceMode ?? 'personal';
+      await pool.query(
+        `INSERT INTO conversations (id, user_id, status, workspace_id, workspace_mode) VALUES ($1, $2, 'chatting', $3, $4)`,
+        [convId, options.userId, wsId, wsMode],
+      );
+      const scheduleId = randomUUID();
+      const cfgJson = JSON.stringify(options.digestConfig);
+      let configHash = options.hashOverride;
+      if (!configHash) {
+        try {
+          configHash = computeTelegramDigestConfigHash(options.digestConfig as any);
+        } catch {
+          configHash = createHash('sha256').update(cfgJson).digest('hex');
+        }
+      }
+      await pool.query(
+        `INSERT INTO schedules (
+           id, conv_id, user_id, workspace_id, workspace_mode,
+           name, request, services, recurrence, status, next_run_at,
+           kind, digest_config, digest_config_hash, digest_approved_at
+         ) VALUES ($1, $2, $3, $4, $5, 'Gmail Digest', 'Tóm tắt email chưa đọc gửi Telegram', ARRAY['gmail','telegram'], $6::jsonb, 'active',
+                   now() + interval '1 day', 'telegram_digest', $7::jsonb, $8, now())`,
+        [
+          scheduleId,
+          convId,
+          options.userId,
+          wsId,
+          wsMode,
+          JSON.stringify({ type: 'daily', time: '08:00' }),
+          cfgJson,
+          configHash,
+        ],
+      );
+      return scheduleId;
+    }
+
+    const gmailGuard = (scheduleId: string, clientOverride?: pg.Pool | pg.PoolClient, clientIdOverride = GMAIL_CLIENT_ID) =>
+      assertDigestScheduleLiveScopeAndAuth({
+        pool: (clientOverride ?? pool) as any,
+        scheduleId,
+        encryptionKey: ENCRYPTION_KEY,
+        gmailOAuthClientId: clientIdOverride,
+      } as any);
+
+    it('A02-G1: allows active owner personal Gmail binding with exact credentialId, email, oauthClientId and gmail.modify scope, and denies A->B replacement or same-email new credentialId', async () => {
+      const ownerId = await createSyntheticUser(pool, 'Gmail Guard Owner', 'gm-guard-own');
+      const tgCredId = await telegramCredential(ownerId);
+      const gmailCredA = await saveGmailCred(ownerId, { email: 'alice@example.test' });
+
+      const validConfig = {
+        credentialId: tgCredId,
+        telegramUserId: TG_USER,
+        username: 'tgowner',
+        chatId: TEAM_CHAT,
+        chatTitle: 'Team',
+        sourceBindingVersion: 1,
+        sources: [
+          {
+            service: 'gmail',
+            tool: 'gmail.search_threads',
+            args: { query: 'in:inbox is:unread' },
+            label: 'Email chưa đọc',
+            binding: {
+              kind: 'gmail',
+              credentialId: gmailCredA,
+              email: 'alice@example.test',
+              oauthClientId: GMAIL_CLIENT_ID,
+            },
+          },
+        ],
+        recurrence: { type: 'daily', time: '08:00' },
+        timeZone: 'Asia/Ho_Chi_Minh',
+      };
+      const scheduleId = await seedGmailTelegramSchedule({ userId: ownerId, digestConfig: validConfig });
+      expect(await gmailGuard(scheduleId)).toMatchObject({ allowed: true });
+
+      // Same email reconnected -> new credentialId -> denied until reconfirmed
+      const gmailCredSameEmailNewId = await saveGmailCred(ownerId, { email: 'alice@example.test' });
+      expect(gmailCredSameEmailNewId).not.toBe(gmailCredA);
+      expect((await gmailGuard(scheduleId)).allowed).toBe(false);
+
+      // Replaced with Account B -> denied
+      await saveGmailCred(ownerId, { email: 'bob@example.test' });
+      expect((await gmailGuard(scheduleId)).allowed).toBe(false);
+    });
+
+    it('A02-G2: denies legacy unbound Gmail config, revoked gmail.modify scope, wrong oauthClientId, workspace-owned Gmail row, and uncommitted in-transaction disconnect via caller client', async () => {
+      const ownerId = await createSyntheticUser(pool, 'Gmail Guard Edge', 'gm-guard-edge');
+      const tgCredId = await telegramCredential(ownerId);
+      const gmailCred = await saveGmailCred(ownerId, { email: 'edge@example.test' });
+
+      // 1. Legacy unbound Gmail config (no sourceBindingVersion / no binding) -> fail closed
+      const legacySched = await seedGmailTelegramSchedule({
+        userId: ownerId,
+        digestConfig: {
+          credentialId: tgCredId,
+          telegramUserId: TG_USER,
+          username: 'tgowner',
+          chatId: TEAM_CHAT,
+          chatTitle: 'Team',
+          sources: [
+            { service: 'gmail', tool: 'gmail.search_threads', args: { query: 'in:inbox is:unread' }, label: 'Email chưa đọc' },
+          ],
+          recurrence: { type: 'daily', time: '08:00' },
+          timeZone: 'Asia/Ho_Chi_Minh',
+        },
+      });
+      expect((await gmailGuard(legacySched)).allowed).toBe(false);
+
+      // 2. Valid v1 schedule sees uncommitted DELETE on caller transaction client (proving transaction client usage, not separate pool)
+      const v1Sched = await seedGmailTelegramSchedule({
+        userId: ownerId,
+        digestConfig: {
+          credentialId: tgCredId,
+          telegramUserId: TG_USER,
+          username: 'tgowner',
+          chatId: TEAM_CHAT,
+          chatTitle: 'Team',
+          sourceBindingVersion: 1,
+          sources: [
+            {
+              service: 'gmail',
+              tool: 'gmail.search_threads',
+              args: { query: 'in:inbox is:unread' },
+              label: 'Email chưa đọc',
+              binding: {
+                kind: 'gmail',
+                credentialId: gmailCred,
+                email: 'edge@example.test',
+                oauthClientId: GMAIL_CLIENT_ID,
+              },
+            },
+          ],
+          recurrence: { type: 'daily', time: '08:00' },
+          timeZone: 'Asia/Ho_Chi_Minh',
+        },
+      });
+      expect((await gmailGuard(v1Sched)).allowed).toBe(true);
+
+      const txClient = await pool.connect();
+      try {
+        await txClient.query('BEGIN');
+        await txClient.query('DELETE FROM service_credentials WHERE id = $1', [gmailCred]);
+        // Pool outside tx still sees row, whereas txClient sees uncommitted delete!
+        expect((await gmailGuard(v1Sched, txClient)).allowed).toBe(false);
+        await txClient.query('ROLLBACK');
+      } finally {
+        txClient.release();
+      }
+      expect((await gmailGuard(v1Sched)).allowed).toBe(true);
+
+      // 3. Wrong expected oauthClientId on server -> denied
+      expect((await gmailGuard(v1Sched, undefined, 'different-server-client.apps.googleusercontent.com')).allowed).toBe(false);
+
+      // 4. Stored credential loses gmail.modify scope -> denied
+      await pool.query(
+        `UPDATE service_credentials SET config = $2 WHERE id = $1`,
+        [
+          gmailCred,
+          encryptCredentials(
+            {
+              oauthClientId: GMAIL_CLIENT_ID,
+              refreshToken: '1//rt-no-modify',
+              email: 'edge@example.test',
+              scopes: ['openid', 'email'],
+            },
+            ENCRYPTION_KEY,
+          ),
+        ],
+      );
+      expect((await gmailGuard(v1Sched)).allowed).toBe(false);
+
+      // 5. Workspace-owned Gmail row pinned as personal source -> denied
+      const ws = await workspaceRepo.create(ownerId, 'Gmail Guard WS');
+      const wsGmailId = await saveGmailCred(ownerId, { email: 'ws@example.test', workspaceId: ws.id });
+      const wsPinnedSched = await seedGmailTelegramSchedule({
+        userId: ownerId,
+        digestConfig: {
+          credentialId: tgCredId,
+          telegramUserId: TG_USER,
+          username: 'tgowner',
+          chatId: TEAM_CHAT,
+          chatTitle: 'Team',
+          sourceBindingVersion: 1,
+          sources: [
+            {
+              service: 'gmail',
+              tool: 'gmail.search_threads',
+              args: { query: 'in:inbox is:unread' },
+              label: 'Email chưa đọc',
+              binding: {
+                kind: 'gmail',
+                credentialId: wsGmailId,
+                email: 'ws@example.test',
+                oauthClientId: GMAIL_CLIENT_ID,
+              },
+            },
+          ],
+          recurrence: { type: 'daily', time: '08:00' },
+          timeZone: 'Asia/Ho_Chi_Minh',
+        },
+      });
+      expect((await gmailGuard(wsPinnedSched)).allowed).toBe(false);
     });
   });
 });

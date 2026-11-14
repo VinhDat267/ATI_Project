@@ -568,6 +568,13 @@ export interface ScheduleDigestCandidate {
   configHash?: string;
 }
 
+export interface GmailDigestBinding {
+  kind: 'gmail';
+  credentialId: string;
+  email: string;
+  oauthClientId: string;
+}
+
 export interface NotionDigestSourceBinding {
   version: 1;
   ownerId: string;
@@ -586,6 +593,7 @@ export interface TelegramDigestSource {
   tool: string;
   args?: Record<string, any>;
   label: string;
+  binding?: GmailDigestBinding;
   notionBinding?: NotionDigestSourceBinding;
 }
 
@@ -595,6 +603,7 @@ export interface TelegramDigestConfig {
   username: string;
   chatId: string;
   chatTitle: string;
+  sourceBindingVersion?: 1;
   sources: TelegramDigestSource[];
   recurrence: ScheduleRecurrence;
   timeZone: string;

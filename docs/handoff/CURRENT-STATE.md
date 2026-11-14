@@ -21,7 +21,7 @@
 | Notion | OAuth bền vững (#317) | **PR #319** (ràng buộc nguồn digest): CI đỏ ở `static-guard` | Khoảng 10 lỗi audit còn mở (độ phủ dữ liệu, bộ lọc ngày/trạng thái, biên nhận Slack, phân trang tìm database, Privacy); nghiệm thu thật |
 | Telegram | Bot cá nhân; chặn digest sai binding (#303) | #303 | Nghiệm thu thật |
 | Jira / MyJira | G2A read containment (#318) | #318 | Chỉ dùng trong "Không gian Chung" (site `ati-workflow-test`) |
-| Gmail | Gửi/nháp qua OAuth cá nhân | G2 đang làm ở worktree `gmail-g2-main315-integration`, **chưa commit, chưa PR** | Hoàn tất G2, nghiệm thu thật |
+| Gmail | Gửi/nháp/đọc/nhãn qua OAuth cá nhân; ràng buộc nguồn Telegram digest + kiểm soát origin OAuth | #327 (G2 + đóng `GMAIL-AUDIT-08`..`12`) | Nghiệm thu thật với Google Cloud OAuth (`GMAIL-04`) |
 
 ## Chạy và kiểm tra
 
