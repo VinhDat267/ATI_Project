@@ -74,15 +74,15 @@ export interface ServicesRoutesOptions {
     get: (scopeId?: string) => Promise<{ repos?: Array<{ repoId: string; fullName: string }> } | null>;
   };
   githubOAuthClient?: {
-    repos?: (accessToken: string) => Promise<Array<any>>;
-    repositories?: (accessToken: string) => Promise<Array<any>>;
+    repos?: (accessToken: string, signal?: AbortSignal) => Promise<Array<any>>;
+    repositories?: (accessToken: string, signal?: AbortSignal) => Promise<Array<any>>;
   };
   githubTokens?: {
     forConnection: (
       userId: string,
       credentialId: string,
       stored: { accessToken: string; refreshToken?: string }
-    ) => { getAccessToken: () => Promise<string> };
+    ) => { getAccessToken: (options?: { signal?: AbortSignal; forceRefresh?: boolean }) => Promise<string> };
   };
   notionConnectionRepo?: Pick<NotionConnectionRepo, 'getActive'>;
   notionConnection?: (userId: string) => Promise<any>;
@@ -500,7 +500,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
                             if (!raw) return null;
                             return {
                               ...raw,
-                              config: raw.config ?? raw.encryptedToken ?? (raw.status === 'active' ? '{}' : ''),
+                              config: raw.config ?? raw.encryptedToken ?? '',
                               allowed_databases:
                                 raw.allowed_databases ??
                                 raw.allowedDatabases ??
@@ -629,8 +629,14 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
                           accessToken: dec.accessToken,
                           refreshToken: dec.refreshToken,
                         });
-                        const accessToken = await tokenProvider.getAccessToken();
-                        const callerRepos = await fetchRepos.call(options.githubOAuthClient, accessToken);
+                        const accessToken = await tokenProvider.getAccessToken({
+                          signal: AbortSignal.timeout(10_000),
+                        });
+                        const callerRepos = await fetchRepos.call(
+                          options.githubOAuthClient,
+                          accessToken,
+                          AbortSignal.timeout(10_000),
+                        );
                         if (Array.isArray(callerRepos)) {
                           const accessibleRepos = teamScope.repos.filter((tr) =>
                             callerRepos.some(
@@ -652,7 +658,12 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
                           }
                         }
                       } catch (err: any) {
-                        if (err?.kind === 'invalid_grant' || err?.status === 401 || err?.statusCode === 401) {
+                        if (
+                          err?.category === 'AUTH_ERROR' ||
+                          err?.kind === 'invalid_grant' ||
+                          err?.status === 401 ||
+                          err?.statusCode === 401
+                        ) {
                           personalStatus = 'reconnect_required';
                           personalAllowedScope = [];
                         }

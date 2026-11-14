@@ -3,7 +3,7 @@ import request from 'supertest';
 import { createApp } from '../../src/app.js';
 import { generateAccessToken, generateTokens } from '../../src/auth/jwt.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
-import { decryptCredentials, encryptCredentials } from '@wap/tool-adapters';
+import { decryptCredentials, encryptCredentials, StepError } from '@wap/tool-adapters';
 import { getConfiguredToolCatalog, getToolCatalogFor } from '../../src/services/registered-services.js';
 
 const secret = 'service-route-secret-at-least-32-chars';
@@ -351,6 +351,17 @@ describe('service credential and health boundary', () => {
       personalStatus: 'reconnect_required',
       allowedScope: [],
     });
+
+    // Active row with missing encrypted secret must also fail closed to reconnect_required (never synthesize '{}')
+    const { encryptedToken: _omitted, ...rowWithoutSecret } = activeRow;
+    activeRow = { ...rowWithoutSecret, status: 'active' };
+    const resMissingSecret = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
+    const notionMissingSecret = resMissingSecret.body.services.find((s: any) => s.id === 'notion');
+    expect(notionMissingSecret).toMatchObject({
+      connected: false,
+      personalStatus: 'reconnect_required',
+      allowedScope: [],
+    });
   });
 
   it('AUD-W2-04: does not report myjira as connected/healthy or leak raw cloudIds in Personal Mode', async () => {
@@ -418,6 +429,9 @@ describe('service credential and health boundary', () => {
   it('verifies live GitHub repo membership when githubOAuthClient and githubTokens are provided (2e)', async () => {
     const githubConfig = encryptCredentials({ accessToken: 'gho-live', login: 'octocat' }, key);
     let callerRepos: Array<{ fullName: string; member?: boolean }> = [];
+    let tokenError: Error | null = null;
+    const seenTokenSignals: Array<AbortSignal | undefined> = [];
+    const seenRepoSignals: Array<AbortSignal | undefined> = [];
 
     const app = createApp({
       jwtSecret: secret,
@@ -432,11 +446,20 @@ describe('service credential and health boundary', () => {
         get: async () => ({ repos: [{ repoId: 'r-1', fullName: 'org/private-repo' }] }),
       } as any,
       githubTokens: {
-        forConnection: () => ({ getAccessToken: async () => 'gho-live' }),
+        forConnection: () => ({
+          getAccessToken: async (opts?: { signal?: AbortSignal }) => {
+            seenTokenSignals.push(opts?.signal);
+            if (tokenError) throw tokenError;
+            return 'gho-live';
+          },
+        }),
       } as any,
       githubOAuthClient: {
-        repos: async () => callerRepos,
-      },
+        repos: async (_accessToken: string, signal?: AbortSignal) => {
+          seenRepoSignals.push(signal);
+          return callerRepos;
+        },
+      } as any,
     });
 
     // 0 accessible repos -> needs_membership, connected: false, connectionStatus: 'needs_scope'
@@ -461,6 +484,20 @@ describe('service credential and health boundary', () => {
       connectionStatus: 'healthy',
       personalStatus: 'connected',
       allowedScope: ['org/private-repo'],
+    });
+    expect(seenTokenSignals.every((s) => s instanceof AbortSignal)).toBe(true);
+    expect(seenRepoSignals.every((s) => s instanceof AbortSignal)).toBe(true);
+
+    // AUTH_ERROR StepError(400) from GitHubTokenManager -> reconnect_required (never stay connected)
+    tokenError = new StepError({ category: 'AUTH_ERROR', statusCode: 400, message: 'GitHub cần được kết nối lại.' });
+    const resAuthError = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
+    const ghAuthError = resAuthError.body.services.find((s: any) => s.id === 'github');
+    expect(ghAuthError).toMatchObject({
+      connected: false,
+      configured: false,
+      connectionStatus: 'unconfigured',
+      personalStatus: 'reconnect_required',
+      allowedScope: [],
     });
   });
 

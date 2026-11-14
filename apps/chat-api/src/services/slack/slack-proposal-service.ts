@@ -223,13 +223,19 @@ export class SlackProposalService {
       const isDirectReply =
         rawTargetService === SLACK_PROPOSAL_WORKFLOW_TOOLS.replyService ||
         (!override.service && (!primaryIntent || primaryIntent.action === 'question'));
+      // Match planSlackProposalWorkflow branch order: explicit calendar/github/gmail target services
+      // take precedence over fallback action ('issue' -> bugService, 'progress' -> progressService).
       const effectiveTargetService = isDirectReply
         ? SLACK_PROPOSAL_WORKFLOW_TOOLS.replyService
-        : !override.service && primaryIntent?.action === 'issue'
-          ? SLACK_PROPOSAL_WORKFLOW_TOOLS.bugService
-          : !override.service && primaryIntent?.action === 'progress'
-            ? SLACK_PROPOSAL_WORKFLOW_TOOLS.progressService
-            : rawTargetService ?? SLACK_PROPOSAL_WORKFLOW_TOOLS.taskService;
+        : rawTargetService === SLACK_PROPOSAL_WORKFLOW_TOOLS.calendarService ||
+            rawTargetService === SLACK_PROPOSAL_WORKFLOW_TOOLS.githubService ||
+            rawTargetService === SLACK_PROPOSAL_WORKFLOW_TOOLS.gmailService
+          ? rawTargetService
+          : !override.service && primaryIntent?.action === 'issue'
+            ? SLACK_PROPOSAL_WORKFLOW_TOOLS.bugService
+            : !override.service && primaryIntent?.action === 'progress'
+              ? SLACK_PROPOSAL_WORKFLOW_TOOLS.progressService
+              : rawTargetService ?? SLACK_PROPOSAL_WORKFLOW_TOOLS.taskService;
       const requiredCredByService: Record<
         string,
         { id: string; status: string; config: Record<string, any> } | undefined

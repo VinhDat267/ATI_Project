@@ -592,6 +592,22 @@ describe('SLACK-06A protected inbox, refine/prepare/reject CAS, and cross-servic
   expect(unconnectedErr?.category).toBe('AUTH_ERROR');
   expect(unconnectedErr?.message).toBe('SERVICE_NOT_CONNECTED');
 
+  // Same fail-closed check when action='issue' or 'progress' pairs with explicit service='github'|'gmail'|'mycalendar' without targetOverride.service
+  const unconnectedIssueGithub = await f.seedProposal({
+    intents: [{ action: 'issue', service: 'github', summary: 'Create GitHub bug issue' }],
+  });
+  let issueGhErr: any = null;
+  try {
+    await f.proposalService.prepare(f.owner.person.id, unconnectedIssueGithub.id, {
+      expectedRevision: 1,
+      replyInThread: false,
+    });
+  } catch (e) {
+    issueGhErr = e;
+  }
+  expect(issueGhErr?.category).toBe('AUTH_ERROR');
+  expect(issueGhErr?.message).toBe('SERVICE_NOT_CONNECTED');
+
   await creds.saveCredentials('trello',encryptCredentials({refreshToken:'synthetic-refresh',accessToken:'synthetic-access',memberId:'M_1',username:'alice_trello'},TEST_KEY),f.owner.person.id);
   await creds.saveCredentials('github',encryptCredentials({refreshToken:'synthetic-refresh',accessToken:'synthetic-access',githubUserId:'G_1',login:'octo_alice'},TEST_KEY),f.owner.person.id);
   await creds.saveCredentials('gmail',encryptCredentials({refreshToken:'later-account-refresh',email:'sender@example.test'},TEST_KEY),f.owner.person.id);
