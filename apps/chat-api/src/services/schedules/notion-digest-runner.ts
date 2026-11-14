@@ -412,10 +412,16 @@ export function createNotionDigestRunner(options: NotionDigestRunnerOptions): Ru
       }));
       lines.push(...formatNotionDatabaseSection(db.title, pages, run.dueAt.getTime(), timeZone));
     }
-    if (anyTruncated) {
-      lines.push('_(Lưu ý: Dữ liệu Notion đã được rút gọn do vượt giới hạn đọc tối đa mỗi database.)_');
-    }
-    const text = lines.join('\n').slice(0, 3500);
+    const truncationNote = anyTruncated
+      ? '\n_(Lưu ý: Dữ liệu Notion đã được rút gọn do vượt giới hạn đọc tối đa mỗi database.)_'
+      : '';
+    const bodyLimit = 3500 - truncationNote.length;
+    const rawBody = lines.join('\n');
+    const boundedBody =
+      rawBody.length > bodyLimit
+        ? `${rawBody.slice(0, Math.max(0, bodyLimit - 3))}...`
+        : rawBody;
+    const text = `${boundedBody}${truncationNote}`;
 
     let deliveryStarted = false;
     try {

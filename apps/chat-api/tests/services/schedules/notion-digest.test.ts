@@ -503,6 +503,7 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       await runner.tick();
 
       expect(runNotionDigest).toHaveBeenCalledTimes(1);
+      expect(runNotionDigest.mock.calls[0]?.[0]?.timeZone).toBe('Asia/Ho_Chi_Minh');
       expect(sendSlack).toHaveBeenCalledTimes(1);
       const runs = await service.listRuns(
         user.id,
@@ -642,6 +643,82 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
           lockedRun.release();
         }
       }
+    });
+
+    it('preserves truncation warning in long Slack Notion digests and Telegram summarizeSourceItems', async () => {
+      const validUserId = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
+      const longTitle = 'Việc rất dài '.repeat(30);
+      const manyPages = Array.from({ length: 20 }, (_, i) => ({
+        id: `p-${i}`,
+        title: `${longTitle} #${i}`,
+        url: `https://www.notion.so/p-${i}`,
+        properties: { Status: 'In Progress' },
+      }));
+      const config = {
+        notionBinding: bindingFor(validUserId),
+        credentialId, workspaceId: 'ws-notion-1', workspaceName: 'ATI Notion',
+        botId: 'bot-notion-1', identityVersion: 1,
+        databases: [{ id: dbId1, title: 'Kế hoạch Sprint' }], channelId: 'C_DEV', channelName: 'dev',
+      };
+      const configHash = computeNotionDigestConfigHash({ config, recurrence, userId: validUserId });
+      let postedText = '';
+      const runner = createNotionDigestRunner({
+        pool: { query: vi.fn() } as any,
+        timeZone: 'America/New_York',
+        notionSources: {
+          read: async () => ({
+            pages: manyPages,
+            pagesByDatabase: new Map([[dbId1, manyPages]]),
+            truncated: true,
+            truncatedByDatabase: new Map([[dbId1, true]]),
+            databases: [{ databaseId: dbId1, pages: manyPages, truncated: true }],
+          }),
+          withSource: async (_ownerId, _binding, _signal, action) => action({
+            query: async (sql: string) => {
+              if (sql.includes('SELECT conv_id FROM schedules')) return { rowCount: 1, rows: [{ conv_id: 'conv-trunc-1' }] };
+              if (sql.includes('FROM schedules s')) {
+                return {
+                  rowCount: 1,
+                  rows: [{ id: 'sched-trunc-1', user_id: validUserId, kind: 'notion_digest', version: 1, digest_config: config, digest_config_hash: configHash, status: 'active' }],
+                };
+              }
+              if (sql.includes('FROM schedule_runs')) return { rowCount: 1, rows: [{ status: 'planning', delivery_started_at: null }] };
+              return { rowCount: 1, rows: [{ id: 'run-trunc-1' }] };
+            },
+          } as any),
+        },
+        getAdapter: async (serviceName) => {
+          if (serviceName === 'slack') {
+            return {
+              execute: vi.fn().mockImplementation(async (tool: string, args: any) => {
+                if (tool === 'slack.search_channels') return [{ id: 'C_DEV', name: 'dev' }];
+                if (tool === 'slack.send_message') {
+                  postedText = args.text;
+                  return { ts: '1700000123.001' };
+                }
+              }),
+            };
+          }
+          return null;
+        },
+      });
+      const outcome = await runner({
+        runId: 'run-trunc-1', scheduleId: 'sched-trunc-1', scheduleVersion: 1, userId: validUserId,
+        name: 'Notion Digest', request: 'Tóm tắt Notion',
+        dueAt: new Date('2026-11-03T12:00:00.000Z'), trigger: 'scheduled',
+        recurrence, digestConfig: config,
+        digestConfigHash: configHash,
+      }, 'conv-trunc-1', AbortSignal.timeout(2000));
+      expect(outcome.state).toBe('digest_sent');
+      expect(postedText.length).toBeLessThanOrEqual(3500);
+      expect(postedText).toContain('Dữ liệu Notion đã được rút gọn');
+
+      const tgSummary = summarizeSourceItems(
+        'notion',
+        { pages: manyPages.slice(0, 3), truncated: true },
+        new Date('2026-11-03T12:00:00.000Z'),
+      );
+      expect(tgSummary.lines.join('\n')).toContain('Dữ liệu đã được rút gọn');
     });
   });
 });

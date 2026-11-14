@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_TOOLS, NOTION_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
 import { AIPlanner, MockLLMProvider, WorkingMemory, buildSystemPrompt, formatSearchResults, validatePlan } from '../src/index.js';
 import * as validator from '../src/validator.js';
 
@@ -180,5 +180,32 @@ describe('ANS-01 read answers', () => {
     expect(await setup([write], { requireGroundedResources: false }).run()).toEqual(write);
     const read = { ...write, steps: [{ ...write.steps[0], tool: 'slack.search_channels', args: { query: '' } }] };
     expect(await setup([read]).run()).toMatchObject({ kind: 'clarification', reason: 'read_only' });
+  });
+  it('preserves provider truncated flag from notion.query_database in search results prompt', async () => {
+    const dbId = '11111111-1111-4111-8111-111111111111';
+    const provider = new MockLLMProvider();
+    provider.setPlanResponses([
+      { kind: 'search', calls: [{ tool: 'notion.query_database', args: { databaseId: dbId, query: '' } }] },
+      answer('Danh sách đã bị rút gọn ở 1 trang.'),
+    ]);
+    const memory = new WorkingMemory();
+    memory.setEntity('database', [{ id: dbId, title: 'Sprint', url: 'https://www.notion.so/sprint' }]);
+    const planner = new AIPlanner({
+      provider,
+      toolCatalog: NOTION_TOOLS,
+      searchMode: 'llm',
+      readAnswers: true,
+      prefetchDirectory: false,
+      gatherSearch: async () => ({
+        pages: [{ id: '22222222-2222-4222-8222-222222222222', title: 'Task 1', url: 'https://www.notion.so/task-1', properties: { Status: 'Todo' } }],
+        schema: [{ name: 'Status', type: 'status', options: ['Todo', 'Done'] }],
+        truncated: true,
+      }),
+    });
+    const out = await planner.processMessage({ userMessage: 'Xem database Sprint', memory });
+    expect(out).toMatchObject({ kind: 'answer' });
+    const searchMsg = provider.getLastInput()?.conversationHistory.at(-1)?.content ?? '';
+    expect(searchMsg).toContain('"truncated"');
+    expect(searchMsg).toContain('provider limit or read cap');
   });
 });

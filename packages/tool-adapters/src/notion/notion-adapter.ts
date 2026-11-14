@@ -437,14 +437,14 @@ export class NotionAdapter extends BaseAdapter {
             ...(typeof item.last_edited_time === 'string' ? { lastEditedTime: item.last_edited_time } : {}),
           });
         }
-        if (pages.length >= maximum || !value.has_more) {
+        if (pages.length >= maximum || !value.has_more || index === 19) {
           if (value.has_more) truncated = true;
           return { pages, schema, ...(truncated ? { truncated: true } : {}) };
         }
         if (typeof value.next_cursor !== 'string' || !value.next_cursor || cursors.has(value.next_cursor)) badResponse();
         const nextCursor: string = value.next_cursor; cursor = nextCursor; cursors.add(nextCursor);
       }
-      throw new StepError({ message: 'Notion query pagination exceeded its read budget; narrow the query', category: 'SERVER_ERROR' });
+      return { pages, schema, truncated: true };
     }
     if (toolName === 'notion.create_page') {
       const { source, properties, content } = await preWrite(async () => {

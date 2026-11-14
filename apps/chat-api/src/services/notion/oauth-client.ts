@@ -542,7 +542,10 @@ export class NotionOAuthClient {
     let cursor: string | undefined;
     let hasMore = false;
     for (let page = 0; page < 5; page++) {
-      const body: Record<string, unknown> = { page_size: 20 };
+      const body: Record<string, unknown> = {
+        page_size: 20,
+        filter: { property: 'object', value: 'data_source' },
+      };
       if (query.trim()) body.query = query.trim();
       if (cursor) body.start_cursor = cursor;
       const data = await this.request(
@@ -559,6 +562,7 @@ export class NotionOAuthClient {
         },
         'resource',
       );
+      let pageTruncated = false;
       for (const source of Array.isArray(data?.results) ? data.results : []) {
         if (source?.in_trash === true || source?.archived === true) continue;
         let rawId: string | undefined;
@@ -570,17 +574,21 @@ export class NotionOAuthClient {
         if (typeof rawId !== 'string' || !NOTION_ID_PATTERN.test(rawId.trim())) continue;
         const id = normalizeNotionId(rawId);
         if (seen.has(id)) continue;
+        if (databases.length >= 100) {
+          pageTruncated = true;
+          break;
+        }
         seen.add(id);
         databases.push({
           id,
           title: plainTitle(source.title),
           url: typeof source?.url === 'string' ? source.url : '',
         });
-        if (databases.length >= 100) break;
       }
-      hasMore = Boolean(data?.has_more);
       const nextCursor = typeof data?.next_cursor === 'string' ? data.next_cursor.trim() : '';
-      if (!hasMore || databases.length >= 100 || !nextCursor || seenCursors.has(nextCursor)) {
+      const canAdvance = Boolean(data?.has_more && nextCursor && !seenCursors.has(nextCursor));
+      hasMore = pageTruncated || canAdvance || (databases.length >= 100 && Boolean(data?.has_more));
+      if (!canAdvance || databases.length >= 100 || pageTruncated) {
         break;
       }
       seenCursors.add(nextCursor);

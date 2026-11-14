@@ -57,6 +57,9 @@ describe('Notion OAuth connection routes (/api/connections/notion & /api/connect
     }
     if (url.endsWith('/search')) {
       const body = JSON.parse(String(init?.body ?? '{}'));
+      if (body?.filter?.property !== 'object' || body?.filter?.value !== 'data_source') {
+        return new Response(JSON.stringify({ object: 'error', message: 'missing data_source filter' }), { status: 400 });
+      }
       if (!body.start_cursor) {
         return new Response(
           JSON.stringify({

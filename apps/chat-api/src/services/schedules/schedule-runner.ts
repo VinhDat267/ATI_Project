@@ -12,7 +12,7 @@ import { SHEETS_DELIVERY_UNKNOWN, type SheetsDigestRunner } from './sheets-diges
 import type { DigestRunOutcome as GithubDigestRunOutcome, RunGithubDigest } from './github-digest-runner.js';
 import { GITHUB_DELIVERY_UNKNOWN } from './github-digest-runner.js';
 import { TRELLO_DELIVERY_UNKNOWN, type TrelloDigestRunOutcome, type RunTrelloDigest } from './trello-digest-runner.js';
-import type { NotionDigestRunOutcome, RunNotionDigest } from './notion-digest-runner.js';
+import { NOTION_DELIVERY_UNKNOWN, type NotionDigestRunOutcome, type RunNotionDigest } from './notion-digest-runner.js';
 import { TELEGRAM_DELIVERY_UNKNOWN, type DigestRunInput, type DigestRunOutcome } from './telegram-digest-runner.js';
 import { assertDigestScheduleLiveScopeAndAuth } from './digest-scope-guard.js';
 
@@ -21,6 +21,7 @@ export interface RunToPlan {
   name: string; request: string; dueAt: Date; trigger: 'scheduled' | 'manual' | 'replan';
   workspaceId?: string | null;
   workspaceMode?: 'legacy' | 'personal' | 'organization';
+  timeZone?: string;
 }
 export interface PreparedRun {
   /** Writes the result with the client of the transaction that holds the schedule row. */
@@ -113,6 +114,7 @@ export async function reconcileScheduleRuns(pool: pg.Pool): Promise<void> {
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'trello_digest' THEN $4
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'telegram_digest' THEN $5
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'github_digest' THEN $6
+           WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'notion_digest' THEN $7
            WHEN r.delivery_started_at IS NOT NULL THEN $2
            ELSE $1
          END,
@@ -127,6 +129,7 @@ export async function reconcileScheduleRuns(pool: pg.Pool): Promise<void> {
         TRELLO_DELIVERY_UNKNOWN,
         TELEGRAM_DELIVERY_UNKNOWN,
         GITHUB_DELIVERY_UNKNOWN,
+        NOTION_DELIVERY_UNKNOWN,
       ],
     );
     for (const row of res.rows) {
@@ -412,6 +415,7 @@ export class ScheduleRunner {
         trigger: run.trigger,
         workspaceId: run.workspace_id ?? null,
         workspaceMode: run.workspace_mode ?? 'legacy',
+        timeZone,
       };
       const scheduleRow: ScheduleRow = {
         id: run.schedule_id,
@@ -966,6 +970,7 @@ export class ScheduleRunner {
         githubRunner(
           {
             ...started.toPlan,
+            timeZone: started.toPlan.timeZone ?? this.options.timeZone,
             recurrence: started.recurrence,
             digestConfig: started.digestConfig,
             digestConfigHash: started.digestConfigHash,
@@ -1009,7 +1014,12 @@ export class ScheduleRunner {
       }
 
       if (outcome?.state === 'delivery_unknown' || (run.delivery_started_at && outcome?.state !== 'digest_sent')) {
-        const defaultUnknownErr = schedule.kind === 'trello_digest' ? TRELLO_DELIVERY_UNKNOWN : GITHUB_DELIVERY_UNKNOWN;
+        const defaultUnknownErr =
+          schedule.kind === 'trello_digest'
+            ? TRELLO_DELIVERY_UNKNOWN
+            : schedule.kind === 'notion_digest'
+              ? NOTION_DELIVERY_UNKNOWN
+              : GITHUB_DELIVERY_UNKNOWN;
         const unknownErr = outcome?.state === 'delivery_unknown' ? outcome.error : defaultUnknownErr;
         await this.messages.createMessage(started.convId, 'system', `Lỗi: ${unknownErr}`, { type: 'planning_error', ...replyTo }, client);
         await client.query("UPDATE schedule_runs SET status='needs_attention', error=$2, updated_at=now() WHERE id=$1", [runId, unknownErr]);
