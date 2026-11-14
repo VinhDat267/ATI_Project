@@ -5,7 +5,8 @@ import { computeCalendarDigestHash } from './calendar-digest-candidate.js';
 import { localLabel } from './next-occurrence.js';
 import type { RunToPlan } from './schedule-runner.js';
 
-export const CALENDAR_DELIVERY_UNKNOWN = 'Chưa xác định bản tin lịch đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
+export const CALENDAR_DELIVERY_UNKNOWN =
+  'CALENDAR_DELIVERY_UNKNOWN: Chưa xác định bản tin lịch đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
 export const MAX_DIGEST_DISPLAY_EVENTS = 20;
 export const MAX_DIGEST_MESSAGE_CHARS = 3900;
 
@@ -492,12 +493,22 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
 
     // Verify destination service (slack or telegram)
     const destService = config.destination.service;
+    const isOrgSlack =
+      destService === 'slack' &&
+      run.workspaceMode === 'organization' &&
+      Boolean(run.workspaceId);
     const destRow = (
       await options.pool.query(
         destService === 'telegram'
           ? 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND (user_id = $2 OR user_id IS NULL) ORDER BY user_id IS NULL ASC LIMIT 1'
-          : 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL LIMIT 1',
-        destService === 'telegram' ? [destService, run.userId] : [destService],
+          : isOrgSlack
+            ? 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id = $2 LIMIT 1'
+            : 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id IS NULL LIMIT 1',
+        destService === 'telegram'
+          ? [destService, run.userId]
+          : isOrgSlack
+            ? [destService, run.workspaceId]
+            : [destService],
       )
     ).rows[0];
 
@@ -677,9 +688,13 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
 
     // 6. Send to locked Slack channel or Telegram chat
     let deliveryStarted = false;
+    let slackReceiptTs: string | undefined;
+    let telegramReceiptMessageId: number | undefined;
     try {
       const destAdapter = await options.getAdapter(destService, {
         userId: run.userId,
+        ...(run.workspaceId !== undefined ? { workspaceId: run.workspaceId } : {}),
+        ...(run.workspaceMode !== undefined ? { workspaceMode: run.workspaceMode } : {}),
         phase: 'execution',
         actor: { userId: run.userId },
         ...(telegramDestBinding ? { connections: { telegram: telegramDestBinding } } : {}),
@@ -692,27 +707,46 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
       }
       signal.throwIfAborted();
       const marked = await options.pool.query(
-        `UPDATE schedule_runs r SET delivery_started_at=now(), updated_at=now()
-         FROM schedules s WHERE r.id=$1 AND r.schedule_id=s.id AND s.id=$2
-           AND r.status='planning' AND r.delivery_started_at IS NULL
-           AND s.version=$3 AND s.status IN ('active', 'completed') RETURNING r.id`,
+        `UPDATE schedule_runs r
+            SET delivery_started_at=now(), updated_at=now(),
+                dispatched_config=s.digest_config, dispatched_config_hash=s.digest_config_hash
+          FROM schedules s WHERE r.id=$1 AND r.schedule_id=s.id AND s.id=$2
+            AND r.status='planning' AND r.delivery_started_at IS NULL
+            AND s.version=$3 AND s.status IN ('active', 'completed') RETURNING r.id`,
         [run.runId, run.scheduleId, run.scheduleVersion],
       );
       if (!marked.rowCount) return { state: 'discarded' };
       deliveryStarted = true;
       signal.throwIfAborted();
       if (config.destination.service === 'slack') {
-        await destAdapter.execute(
+        const sendRes = await destAdapter.execute(
           'slack.send_message',
           { channel: config.destination.channelId, text: formatted.text },
           { signal },
         );
+        const validTs =
+          typeof sendRes?.ts === 'string' &&
+          sendRes.ts.trim().length > 0 &&
+          sendRes.ts.trim() !== 'undefined' &&
+          sendRes.ts.trim() !== 'null';
+        if (!validTs) {
+          return { state: 'delivery_unknown', error: CALENDAR_DELIVERY_UNKNOWN };
+        }
+        slackReceiptTs = sendRes.ts.trim();
       } else {
-        await destAdapter.execute(
+        const sendRes = await destAdapter.execute(
           'telegram.send_message',
           { chatId: config.destination.chatId, text: formatted.text },
           { signal },
         );
+        const validMessageId =
+          typeof sendRes?.messageId === 'number' &&
+          Number.isInteger(sendRes.messageId) &&
+          sendRes.messageId > 0;
+        if (!validMessageId) {
+          return { state: 'delivery_unknown', error: CALENDAR_DELIVERY_UNKNOWN };
+        }
+        telegramReceiptMessageId = sendRes.messageId;
       }
     } catch (error) {
       const definitelyRejected = error instanceof StepError &&
@@ -739,6 +773,8 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
       ...(config.destination.service === 'telegram' && config.destination.chatTitle
         ? { channelName: config.destination.chatTitle }
         : {}),
+      ...(slackReceiptTs !== undefined ? { ts: slackReceiptTs } : {}),
+      ...(telegramReceiptMessageId !== undefined ? { messageId: telegramReceiptMessageId } : {}),
       calendarsChecked: config.calendars.length,
       totalEvents: enrichedEvents.length,
       conflictCount: formatted.conflictCount,

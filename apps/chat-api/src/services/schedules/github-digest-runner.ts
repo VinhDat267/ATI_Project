@@ -5,7 +5,7 @@ import { computeDigestConfigHash } from './github-digest-candidate.js';
 import type { RunToPlan } from './schedule-runner.js';
 
 export const GITHUB_DELIVERY_UNKNOWN =
-  'Chưa xác định bản tin GitHub đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
+  'GITHUB_DELIVERY_UNKNOWN: Chưa xác định bản tin GitHub đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
 
 export function escapeSlackMrkdwn(text: string): string {
   return String(text ?? '')
@@ -24,7 +24,7 @@ export interface DigestRunInput extends RunToPlan {
 export type DigestRunOutcome =
   | { state: 'digest_sent'; delivery: GithubDigestDelivery; text: string }
   | { state: 'digest_failed'; error: string }
-  | { state: 'delivery_unknown'; error: string }
+  | { state: 'delivery_unknown'; error: string; text?: string }
   | { state: 'blocked'; error: string; pauseReason: string }
   | { state: 'discarded' };
 
@@ -89,7 +89,8 @@ async function claimGithubDigestDelivery(
   if (typeof pool.connect !== 'function') {
     const marked = await pool.query(
       `UPDATE schedule_runs r
-          SET delivery_started_at = now(), updated_at = now()
+          SET delivery_started_at = now(), updated_at = now(),
+              dispatched_config = s.digest_config, dispatched_config_hash = s.digest_config_hash
          FROM schedules s
         WHERE r.id = $1
           AND r.schedule_id = s.id
@@ -172,13 +173,16 @@ async function claimGithubDigestDelivery(
       }
 
       const marked = await client.query(
-        `UPDATE schedule_runs
-            SET delivery_started_at = now(), updated_at = now()
-          WHERE id = $1
-            AND schedule_id = $2
-            AND status = 'planning'
-            AND delivery_started_at IS NULL
-        RETURNING id`,
+        `UPDATE schedule_runs r
+            SET delivery_started_at = now(), updated_at = now(),
+                dispatched_config = s.digest_config, dispatched_config_hash = s.digest_config_hash
+           FROM schedules s
+          WHERE r.id = $1
+            AND r.schedule_id = s.id
+            AND s.id = $2
+            AND r.status = 'planning'
+            AND r.delivery_started_at IS NULL
+        RETURNING r.id`,
         [run.runId, run.scheduleId],
       );
       await client.query('COMMIT');
@@ -520,13 +524,24 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
           { chatId: config.telegramChatId, text: messageText },
           { signal, chatId: config.telegramChatId },
         );
+        const validMessageId =
+          typeof sendRes?.messageId === 'number' &&
+          Number.isInteger(sendRes.messageId) &&
+          sendRes.messageId > 0;
+        if (!validMessageId) {
+          return {
+            state: 'delivery_unknown',
+            error: GITHUB_DELIVERY_UNKNOWN,
+            text: messageText,
+          };
+        }
         const delivery: GithubDigestDelivery = {
           channelId: '',
           channelName: '',
           ts: null,
           telegramChatId: config.telegramChatId,
           telegramChatTitle: config.telegramChatTitle ?? '',
-          messageId: typeof sendRes?.messageId === 'number' ? sendRes.messageId : null,
+          messageId: sendRes.messageId,
           counts: {
             newIssues: newIssues.length,
             stalePrs: stalePrs.length,
@@ -539,6 +554,7 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
           return {
             state: 'delivery_unknown',
             error: GITHUB_DELIVERY_UNKNOWN,
+            text: messageText,
           };
         }
         if (deliveryStarted) {
@@ -560,10 +576,22 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
         { channel: config.channelId, text: messageText },
         { signal },
       );
+      const validTs =
+        typeof sendRes?.ts === 'string' &&
+        sendRes.ts.trim().length > 0 &&
+        sendRes.ts.trim() !== 'undefined' &&
+        sendRes.ts.trim() !== 'null';
+      if (!validTs) {
+        return {
+          state: 'delivery_unknown',
+          error: GITHUB_DELIVERY_UNKNOWN,
+          text: messageText,
+        };
+      }
       const delivery: GithubDigestDelivery = {
         channelId: config.channelId,
         channelName: config.channelName,
-        ts: typeof sendRes?.ts === 'string' ? sendRes.ts : null,
+        ts: sendRes.ts.trim(),
         counts: {
           newIssues: newIssues.length,
           stalePrs: stalePrs.length,
@@ -576,6 +604,7 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
         return {
           state: 'delivery_unknown',
           error: GITHUB_DELIVERY_UNKNOWN,
+          text: messageText,
         };
       }
       if (deliveryStarted) {

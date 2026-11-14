@@ -812,6 +812,8 @@ async function bootstrap() {
                     userId: input.userId,
                     request: input.request,
                     services: input.services,
+                    workspaceMode: input.workspaceMode,
+                    workspaceId: input.workspaceId,
                   })
                 ).candidate
             : undefined,

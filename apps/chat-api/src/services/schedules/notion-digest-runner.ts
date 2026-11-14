@@ -6,7 +6,7 @@ import { NOTION_DIGEST_REAPPROVAL, isNotionSourceDenied, type NotionDigestSource
 import type { RunToPlan } from './schedule-runner.js';
 
 export const NOTION_DELIVERY_UNKNOWN =
-  'Chưa xác định bản tin Notion đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
+  'NOTION_DELIVERY_UNKNOWN: Chưa xác định bản tin Notion đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
 
 export interface NotionDigestRunInput extends RunToPlan {
   recurrence: ScheduleRecurrence;
@@ -355,11 +355,16 @@ export function createNotionDigestRunner(options: NotionDigestRunnerOptions): Ru
         if (claim === 'discarded') return { state: 'discarded' };
         deliveryStarted = true;
         const receipt = await slackAdapter.execute('slack.send_message', { channel: config.channelId, text }, { signal });
-        if (typeof receipt?.ts !== 'string' || !receipt.ts.trim()) {
+        if (
+          typeof receipt?.ts !== 'string' ||
+          !receipt.ts.trim() ||
+          receipt.ts.trim() === 'undefined' ||
+          receipt.ts.trim() === 'null'
+        ) {
           return { state: 'delivery_unknown', error: NOTION_DELIVERY_UNKNOWN };
         }
         const delivery: NotionDigestDelivery = {
-          channelId: config.channelId, channelName: config.channelName, ts: receipt.ts,
+          channelId: config.channelId, channelName: config.channelName, ts: receipt.ts.trim(),
           counts: { databasesChecked: config.databases.length, totalPages: sourceData.pages.length },
         };
         return { state: 'digest_sent', delivery, text };

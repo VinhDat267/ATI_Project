@@ -529,11 +529,15 @@ export interface CalendarDigestDelivery {
   destinationService?: 'slack' | 'telegram';
   channelId: string;
   channelName?: string;
+  ts?: string | null;
+  messageId?: number | null;
   calendarsChecked: number;
   totalEvents: number;
   conflictCount: number;
   summaryIncluded: boolean;
   sentAt: string;
+  manualConfirmedAt?: string;
+  manualResolution?: SheetsDigestManualResolution;
 }
 
 export interface GithubDigestConfig {
@@ -559,6 +563,9 @@ export interface GithubDigestDelivery {
   telegramChatId?: string;
   telegramChatTitle?: string;
   messageId?: number | null;
+  sentAt?: string;
+  manualConfirmedAt?: string;
+  manualResolution?: SheetsDigestManualResolution;
 }
 
 export interface ScheduleDigestCandidate {
@@ -714,6 +721,9 @@ export interface NotionDigestDelivery {
   telegramChatId?: string;
   telegramChatTitle?: string;
   messageId?: number | null;
+  sentAt?: string;
+  manualConfirmedAt?: string;
+  manualResolution?: SheetsDigestManualResolution;
 }
 
 export interface NotionDigestCandidate {

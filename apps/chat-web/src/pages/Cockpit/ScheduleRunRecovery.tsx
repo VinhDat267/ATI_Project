@@ -27,6 +27,23 @@ export function getEffectiveDeliveryResolution(
   return null;
 }
 
+const UNCERTAIN_DELIVERY_ERROR_MARKERS = [
+  'SHEETS_DELIVERY_UNKNOWN',
+  'TRELLO_DELIVERY_UNKNOWN',
+  'GITHUB_DELIVERY_UNKNOWN',
+  'NOTION_DELIVERY_UNKNOWN',
+  'CALENDAR_DELIVERY_UNKNOWN',
+  'TELEGRAM_DELIVERY_UNKNOWN',
+  'Chưa xác định bản tin GitHub đã gửi hay chưa',
+  'Chưa xác định bản tin Notion đã gửi hay chưa',
+  'Chưa xác định bản tin lịch đã gửi hay chưa',
+] as const;
+
+function hasUncertainDeliveryError(error: string | null | undefined): boolean {
+  if (typeof error !== 'string') return false;
+  return UNCERTAIN_DELIVERY_ERROR_MARKERS.some(marker => error.includes(marker));
+}
+
 export function isUncertainSheetsDeliveryRun(
   run: ScheduleRunView | null | undefined
 ): boolean {
@@ -35,9 +52,7 @@ export function isUncertainSheetsDeliveryRun(
     run.state === 'needs_attention' &&
     getEffectiveDeliveryResolution(run) == null &&
     Boolean(run.deliveryStartedAt) &&
-    typeof run.error === 'string' &&
-    (run.error.includes('SHEETS_DELIVERY_UNKNOWN') ||
-      run.error.includes('TRELLO_DELIVERY_UNKNOWN'))
+    hasUncertainDeliveryError(run.error)
   );
 }
 
@@ -258,8 +273,7 @@ export function ScheduleRunRecovery({ message, navigate }: { message: ChatMessag
       !getEffectiveDeliveryResolution(run) &&
       !(
         typeof run.error === 'string' &&
-        (run.error.includes('SHEETS_DELIVERY_UNKNOWN') ||
-          run.error.includes('TRELLO_DELIVERY_UNKNOWN') ||
+        (hasUncertainDeliveryError(run.error) ||
           run.error.includes('SHEETS_APPEND_UNKNOWN_OUTCOME'))
       )
   );

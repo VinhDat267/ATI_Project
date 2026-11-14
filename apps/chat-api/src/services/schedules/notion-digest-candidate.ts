@@ -96,7 +96,12 @@ export async function evaluateNotionDigestCandidate(
 
   let matchedChannel: { id: string; name: string } | null = null;
   try {
-    const slackAdapter = await input.getAdapter?.('slack', { userId, phase: 'planning' });
+    const slackAdapter = await input.getAdapter?.('slack', {
+      userId,
+      workspaceMode: 'personal',
+      workspaceId: null,
+      phase: 'planning',
+    });
     if (slackAdapter && typeof slackAdapter.execute === 'function') {
       const channels = await slackAdapter.execute('slack.search_channels', { query: channelQuery });
       if (Array.isArray(channels) && channels.length > 0) {
