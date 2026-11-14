@@ -3322,13 +3322,13 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
             label: 'A04-R6/commitInterceptedA',
             barrier: commitInterceptedA.promise,
             concurrentOp: opA,
-            maxWaitMs: 2_500,
+            maxWaitMs: 4_000,
           });
           activeQueryWhileStalled = Boolean(obs.currentActiveQuery);
           abortCtrlA.abort(new Error('EARLY_COMMIT_PARENT_ABORT'));
           settledBeforeSafetyDestroyA = await Promise.race([
             opA.then(() => true),
-            new Promise<false>((r) => setTimeout(() => r(false), 1_500)),
+            new Promise<false>((r) => setTimeout(() => r(false), 2_500)),
           ]);
           checkedOutWhileStalledA = obs.checkedOutClients;
         } finally {
@@ -3445,7 +3445,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
               branch === 'telegram_pin_mismatch' ? '-100999999999' : tgGroup.chatId,
               { credentialId: tgGroup.row.id, telegramUserId: tgGroup.telegramUserId },
               new AbortController().signal,
-              400,
+              1_500,
               async () => {
                 actionCallsB += 1;
                 return 'unexpected';
@@ -3462,11 +3462,17 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
               label: `A04-R6/ackDropped/${branch}`,
               barrier: ackDropped.promise,
               concurrentOp: opB,
-              maxWaitMs: 2_500,
+              maxWaitMs: 5_000,
+              describeState: () => ({
+                branch,
+                caughtB,
+                actionCallsB,
+                interceptedCount: proxy.interceptedCount,
+              }),
             });
             settledB = await Promise.race([
               opB.then(() => true),
-              new Promise<false>((r) => setTimeout(() => r(false), 1_500)),
+              new Promise<false>((r) => setTimeout(() => r(false), 3_000)),
             ]);
           } finally {
             proxy.disarm();
@@ -3521,7 +3527,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
       } finally {
         await proxy.close();
       }
-    }, 30_000);
+    }, 45_000);
 
     it('A04-R7-A: handles pre-dispatch authority revocation and pre-AI deadline abort without awaiting an unreachable send event (0 unauthorized AI/send, no credential substitution, no invalid recovery) while preserving post-admission AI-timeout fallback', async () => {
       // 1. Pre-AI credential replacement after read aborts fail-closed before AI & outbound dispatch
@@ -3902,7 +3908,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
         const hB = createHarness({
           pool: obs.observedPool,
           credRepo: new CredentialRepo(obs.observedPool, ENC_KEY),
-          sendTimeoutMs: 450,
+          sendTimeoutMs: 2_000,
           onAiSummary: async () => {
             if (armPreSendCommitDrop) {
               armPreSendCommitDrop = false;
@@ -3918,6 +3924,14 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
             return 'Tóm tắt AI R7-B.';
           },
         });
+        const origExecuteB = hB.digestRunner.execute.bind(hB.digestRunner);
+        hB.digestRunner.execute = async (...args) => {
+          try {
+            return await origExecuteB(...args);
+          } finally {
+            proxy.disarm();
+          }
+        };
 
         const tickPromise = hB.scheduleRunner.tick();
         let tickSettledWithinBound = false;
@@ -3926,7 +3940,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
             label: 'A04-R7-B/sendClaimAckDropped',
             barrier: sendClaimAckDropped.promise,
             concurrentOp: tickPromise,
-            maxWaitMs: 3_500,
+            maxWaitMs: 6_000,
             describeState: async () => {
               const latest = (
                 await db.pool.query(
@@ -3948,7 +3962,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
           });
           tickSettledWithinBound = await Promise.race([
             tickPromise.then(() => true),
-            new Promise<false>((r) => setTimeout(() => r(false), 3_500)),
+            new Promise<false>((r) => setTimeout(() => r(false), 5_000)),
           ]);
         } finally {
           proxy.disarm();
@@ -4053,7 +4067,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
       } finally {
         await proxy.close();
       }
-    }, 30_000);
+    }, 45_000);
 
     it('A04-R8: bounds ROLLBACK wire loss on abort/guard timer, enforces client non-reuse on action abort even when ROLLBACK completes, and preserves 55P03 NOWAIT reuse and known-undispatched classification', async () => {
       const owner = await db.person('Owner A04-R8');

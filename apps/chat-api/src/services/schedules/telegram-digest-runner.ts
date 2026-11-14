@@ -297,7 +297,16 @@ export class TelegramDigestRunner {
     | { allowed: true; claimedInDb: boolean }
     | { allowed: false; outcome: DigestRunOutcome }
   > {
-    if (!this.options.pool) return { allowed: true, claimedInDb: false };
+    if (!this.options.pool) {
+      return {
+        allowed: false,
+        outcome: {
+          status: 'digest_failed',
+          error: 'Lịch tự gửi cần kết nối PostgreSQL.',
+          pauseSchedule: true,
+        },
+      };
+    }
     if (typeof (this.options.pool as any).connect !== 'function') {
       const preSendCheck = await this.options.pool.query(
         'SELECT version, status FROM schedules WHERE id = $1',
@@ -1071,6 +1080,9 @@ export class TelegramDigestRunner {
     }
 
     const gmailBinding = gmailValidation.kind === 'gmail_bound' ? gmailValidation.binding : null;
+    if (telegramNotionSource(digestConfig) && (gmailBinding || digestConfig.sources.some((s) => s?.service === 'gmail'))) {
+      return notionBlocked();
+    }
     if (gmailBinding && !this.options.pool) {
       return {
         status: 'blocked',
