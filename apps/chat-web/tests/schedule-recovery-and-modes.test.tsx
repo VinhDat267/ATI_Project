@@ -3,7 +3,11 @@ import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import { ScheduleSection } from '../src/pages/History/ScheduleSection';
-import { ScheduleRunRecovery } from '../src/pages/Cockpit/ScheduleRunRecovery';
+import {
+  ScheduleRunRecovery,
+  SheetsDeliveryRecoveryControl,
+  isUncertainSheetsDeliveryRun,
+} from '../src/pages/Cockpit/ScheduleRunRecovery';
 import { apiClient } from '../src/services/api-client';
 import * as useSchedulesHook from '../src/hooks/use-schedules';
 import type { ChatMessage, User } from '../src/types';
@@ -189,5 +193,43 @@ describe('FLOW-06 Web: Schedule approval modes, timezone, next run, and recovery
     expect(await screen.findByText('Báo cáo Sprint Jira')).toBeInTheDocument();
     expect(screen.getByText('Lượt chạy chờ duyệt:')).toBeInTheDocument();
     expect(screen.getByText(/Kế hoạch đã sẵn sàng, cần bạn xem và xác nhận trước khi gửi/)).toBeInTheDocument();
+  });
+
+  it('recognizes GITHUB_DELIVERY_UNKNOWN, NOTION_DELIVERY_UNKNOWN, and CALENDAR_DELIVERY_UNKNOWN in isUncertainSheetsDeliveryRun and renders operator recovery controls', async () => {
+    const unknownCodes = [
+      'GITHUB_DELIVERY_UNKNOWN: Chưa xác định bản tin GitHub đã gửi hay chưa.',
+      'NOTION_DELIVERY_UNKNOWN: Chưa xác định bản tin Notion đã gửi hay chưa.',
+      'CALENDAR_DELIVERY_UNKNOWN: Chưa xác định bản tin lịch đã gửi hay chưa.',
+    ];
+
+    for (const [idx, errorText] of unknownCodes.entries()) {
+      const run = {
+        id: `run-unknown-${idx}`,
+        scheduleId: `sched-unknown-${idx}`,
+        dueAt: '2026-11-04T02:00:00.000Z',
+        createdAt: '2026-11-04T02:00:05.000Z',
+        trigger: 'scheduled' as const,
+        state: 'needs_attention' as const,
+        convId: `conv-unknown-${idx}`,
+        planId: null,
+        planStatus: null,
+        missedCount: 0,
+        deliveryStartedAt: '2026-11-04T02:00:10.000Z',
+        error: errorText,
+      };
+      expect(isUncertainSheetsDeliveryRun(run)).toBe(true);
+
+      const { unmount } = render(
+        <SheetsDeliveryRecoveryControl
+          run={run}
+          scheduleStatus="active"
+          onResolved={vi.fn()}
+        />
+      );
+      expect(screen.getByTestId('sheets-delivery-recovery-panel')).toBeInTheDocument();
+      expect(screen.getByTestId('btn-resolve-mark-sent')).toBeInTheDocument();
+      expect(screen.getByTestId('btn-resolve-retry-new-run')).toBeDisabled();
+      unmount();
+    }
   });
 });

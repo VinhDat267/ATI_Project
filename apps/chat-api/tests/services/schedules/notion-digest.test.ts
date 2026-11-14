@@ -263,7 +263,7 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       });
 
       const pages = [{ id: 'page1', title: 'Trang Sprint', url: 'https://www.notion.so/page1' }];
-      const sendSlack = vi.fn(async () => ({ ts: '1700000000.009' }));
+      const sendSlack = vi.fn(async () => ({ ts: '1700000000.009000' }));
       const runNotionDigest = vi.fn(createNotionDigestRunner({
         pool: db.pool,
         notionSources: {
@@ -301,7 +301,7 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       expect(runs[0]!.delivery).toEqual({
         channelId: 'C_DEV',
         channelName: 'dev',
-        ts: '1700000000.009',
+        ts: '1700000000.009000',
         counts: { databasesChecked: 1, totalPages: 1 },
       });
     });
@@ -406,7 +406,7 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
                   if (tool === 'slack.search_channels') return [{ id: 'C_DEV', name: 'dev' }];
                   if (tool === 'slack.send_message') {
                     slackSendCallsAfterCancel++;
-                    return { ts: '1700000099.009' };
+                    return { ts: '1700000099.009000' };
                   }
                 }),
               };

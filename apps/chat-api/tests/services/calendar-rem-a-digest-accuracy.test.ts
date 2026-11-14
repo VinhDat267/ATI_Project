@@ -185,7 +185,7 @@ describe('CALENDAR-REM-A: Calendar Digest Accuracy (CALENDAR-AUDIT-01) & Window 
       for await (const chunk of req) body += chunk;
       slackPosts.push(JSON.parse(body));
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ ok: true, ts: '1700000001.0001', channel: 'C0123456789' }));
+      res.end(JSON.stringify({ ok: true, ts: '1700000001.000100', channel: 'C0123456789' }));
     });
     servers.push(slackServer);
     slackServer.listen(0, '127.0.0.1');
@@ -267,7 +267,7 @@ describe('CALENDAR-REM-A: Calendar Digest Accuracy (CALENDAR-AUDIT-01) & Window 
                   coverage: { complete: true, returned: 4, totalAvailable: 4 },
                 }),
               }
-            : { execute: async () => ({ ts: '1.1', channel: 'C0123456789' }) },
+            : { execute: async () => ({ ts: '1.100000', channel: 'C0123456789' }) },
         summarizeDigest: async () => {
           summaryCalls++;
           return '4 cuộc họp ngắn buổi sáng, lịch trình thông suốt.';
@@ -301,7 +301,7 @@ describe('CALENDAR-REM-A: Calendar Digest Accuracy (CALENDAR-AUDIT-01) & Window 
                   coverage: { complete: true, returned: 20, totalAvailable: 20 },
                 }),
               }
-            : { execute: async () => ({ ts: '1.2', channel: 'C0123456789' }) },
+            : { execute: async () => ({ ts: '1.200000', channel: 'C0123456789' }) },
         summarizeDigest: async () => {
           summaryCalls++;
           return 'Đủ 20 sự kiện trong ngày, không trùng giờ.';
@@ -335,7 +335,7 @@ describe('CALENDAR-REM-A: Calendar Digest Accuracy (CALENDAR-AUDIT-01) & Window 
                   coverage: { complete: false, returned: 20, totalAvailable: null, reason: 'next_page_token' },
                 }),
               }
-            : { execute: async () => ({ ts: '1.3', channel: 'C0123456789' }) },
+            : { execute: async () => ({ ts: '1.300000', channel: 'C0123456789' }) },
         summarizeDigest: async () => {
           summaryCalls++;
           return 'Should be suppressed';
@@ -371,7 +371,7 @@ describe('CALENDAR-REM-A: Calendar Digest Accuracy (CALENDAR-AUDIT-01) & Window 
                   coverage: { complete: true, returned: 20, totalAvailable: 34, reason: 'limit_20' },
                 }),
               }
-            : { execute: async () => ({ ts: '1.3b', channel: 'C0123456789' }) },
+            : { execute: async () => ({ ts: '1.300000', channel: 'C0123456789' }) },
         summarizeDigest: async () => {
           summaryCalls++;
           return 'Should be suppressed';
@@ -411,7 +411,7 @@ describe('CALENDAR-REM-A: Calendar Digest Accuracy (CALENDAR-AUDIT-01) & Window 
                 // coverage intentionally omitted
               }),
             }
-          : { execute: async () => ({ ts: '1.4', channel: 'C0123456789' }) },
+          : { execute: async () => ({ ts: '1.400000', channel: 'C0123456789' }) },
       summarizeDigest: async () => {
         summaryCalls++;
         return 'Should not run on unknown coverage';
@@ -519,7 +519,7 @@ describe('CALENDAR-REM-A: Calendar Digest Accuracy (CALENDAR-AUDIT-01) & Window 
             },
           };
         }
-        return { execute: async () => ({ ts: '1.5', channel: 'C0123456789' }) };
+        return { execute: async () => ({ ts: '1.500000', channel: 'C0123456789' }) };
       },
       summarizeDigest: async () => {
         summaryCalls++;
@@ -585,7 +585,7 @@ describe('CALENDAR-REM-A: Calendar Digest Accuracy (CALENDAR-AUDIT-01) & Window 
             },
           };
         }
-        return { execute: async () => ({ ts: '1.5b', channel: 'C0123456789' }) };
+        return { execute: async () => ({ ts: '1.500000', channel: 'C0123456789' }) };
       },
       summarizeDigest: async () => {
         summaryCalls++;
@@ -667,7 +667,7 @@ describe('CALENDAR-REM-A: Calendar Digest Accuracy (CALENDAR-AUDIT-01) & Window 
         return {
           execute: async () => {
             slackCalls++;
-            return { ts: '1.6', channel: 'C0123456789' };
+            return { ts: '1.600000', channel: 'C0123456789' };
           },
         };
       },
@@ -693,7 +693,7 @@ describe('CALENDAR-REM-A: Calendar Digest Accuracy (CALENDAR-AUDIT-01) & Window 
         return {
           execute: async () => {
             slackCalls++;
-            return { ts: '1.7', channel: 'C0123456789' };
+            return { ts: '1.700000', channel: 'C0123456789' };
           },
         };
       },
@@ -769,7 +769,7 @@ describe('CALENDAR-REM-A: Calendar Digest Accuracy (CALENDAR-AUDIT-01) & Window 
       encryptionKey: KEY,
       timeZone: VN,
       getAdapter: async (name) =>
-        name === 'mycalendar' ? mycalAdapter : { execute: async () => ({ ts: '1.8', channel: 'C0123456789' }) },
+        name === 'mycalendar' ? mycalAdapter : { execute: async () => ({ ts: '1.800000', channel: 'C0123456789' }) },
     });
 
     const outcome = await execute(runInput, new AbortController().signal);
@@ -867,7 +867,7 @@ describe('CALENDAR-REM-A: Calendar Digest Accuracy (CALENDAR-AUDIT-01) & Window 
                   return { events: [], coverage: { complete: true, returned: 0, totalAvailable: 0 } };
                 },
               }
-            : { execute: async () => ({ ts: '1.9', channel: 'C0123456789' }) },
+            : { execute: async () => ({ ts: '1.900000', channel: 'C0123456789' }) },
       });
 
       const outcome = await execute(runInput, new AbortController().signal);
@@ -938,7 +938,7 @@ describe('CALENDAR-REM-A: Calendar Digest Accuracy (CALENDAR-AUDIT-01) & Window 
                   return { events: [], coverage: { complete: true, returned: 0, totalAvailable: 0 } };
                 },
               }
-            : { execute: async () => ({ ts: '1.10', channel: 'C0123456789' }) },
+            : { execute: async () => ({ ts: '1.100000', channel: 'C0123456789' }) },
       });
 
       const outcome = await execute(runInput, new AbortController().signal);

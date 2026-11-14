@@ -42,6 +42,66 @@ export function computeCalendarDigestHash(config: CalendarDigestConfig): string 
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
 }
 
+export function buildConfirmedCalendarDigestDelivery(input: {
+  config: CalendarDigestConfig | null;
+  previousDelivery: Record<string, unknown>;
+  resolvedAtIso: string;
+  resolvedBy: string;
+}): Record<string, unknown> {
+  const { config: cfg, previousDelivery: prevDelivery, resolvedAtIso, resolvedBy } = input;
+  const destService =
+    prevDelivery.destinationService === 'slack' || prevDelivery.destinationService === 'telegram'
+      ? prevDelivery.destinationService
+      : cfg?.destination?.service ?? 'slack';
+  const fallbackChannelId =
+    cfg?.destination?.service === 'telegram'
+      ? cfg.destination.chatId
+      : cfg?.destination?.service === 'slack'
+        ? cfg.destination.channelId
+        : 'unknown';
+  const fallbackChannelName =
+    cfg?.destination?.service === 'telegram'
+      ? cfg.destination.chatTitle
+      : cfg?.destination?.service === 'slack'
+        ? cfg.destination.channelName
+        : undefined;
+  return {
+    ...prevDelivery,
+    destinationService: destService,
+    channelId:
+      typeof prevDelivery.channelId === 'string' && prevDelivery.channelId
+        ? prevDelivery.channelId
+        : fallbackChannelId,
+    ...(typeof prevDelivery.channelName === 'string' && prevDelivery.channelName
+      ? { channelName: prevDelivery.channelName }
+      : fallbackChannelName
+        ? { channelName: fallbackChannelName }
+        : {}),
+    ...(prevDelivery.ts !== undefined ? { ts: prevDelivery.ts } : {}),
+    ...(prevDelivery.messageId !== undefined ? { messageId: prevDelivery.messageId } : {}),
+    calendarsChecked:
+      typeof prevDelivery.calendarsChecked === 'number'
+        ? prevDelivery.calendarsChecked
+        : Array.isArray(cfg?.calendars)
+          ? cfg.calendars.length
+          : 0,
+    totalEvents: typeof prevDelivery.totalEvents === 'number' ? prevDelivery.totalEvents : 0,
+    conflictCount: typeof prevDelivery.conflictCount === 'number' ? prevDelivery.conflictCount : 0,
+    summaryIncluded:
+      typeof prevDelivery.summaryIncluded === 'boolean'
+        ? prevDelivery.summaryIncluded
+        : Boolean(cfg?.includeSummary),
+    sentAt: typeof prevDelivery.sentAt === 'string' ? prevDelivery.sentAt : null,
+    manualConfirmedAt: resolvedAtIso,
+    manualResolution: {
+      status: 'confirmed_sent',
+      resolvedAt: resolvedAtIso,
+      manualConfirmedAt: resolvedAtIso,
+      resolvedBy,
+    },
+  };
+}
+
 export interface EvaluateCalendarDigestInput {
   pool: Queryable;
   encryptionKey?: string;
@@ -50,6 +110,8 @@ export interface EvaluateCalendarDigestInput {
   request: string;
   windowHours?: number;
   includeSummary?: boolean;
+  workspaceMode?: 'legacy' | 'personal' | 'organization';
+  workspaceId?: string | null;
 }
 
 export interface CalendarDigestEvaluation {
@@ -169,12 +231,29 @@ export async function evaluateCalendarDigestCandidate(
   }
 
   // 2. Check destination service (slack or telegram)
+  if (destService === 'slack' && input.workspaceMode === 'organization' && !input.workspaceId) {
+    return {
+      candidate: {
+        canAutoDigest: false,
+        defaultMode: 'manual',
+        disabledReason: 'Dịch vụ Slack chưa được kích hoạt.',
+      },
+    };
+  }
+  const slackScope =
+    destService !== 'slack'
+      ? null
+      : input.workspaceMode === 'organization'
+        ? { sql: 'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id = $2 LIMIT 1', params: [destService, input.workspaceId] }
+        : input.workspaceMode === 'personal'
+          ? { sql: 'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id = $2 AND workspace_id IS NULL LIMIT 1', params: [destService, userId] }
+          : { sql: 'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id IS NULL LIMIT 1', params: [destService] };
   const destRow = (
     await pool.query(
       destService === 'telegram'
         ? 'SELECT config, status FROM service_credentials WHERE service = $1 AND (user_id = $2 OR user_id IS NULL) ORDER BY user_id IS NULL ASC LIMIT 1'
-        : 'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL LIMIT 1',
-      destService === 'telegram' ? [destService, userId] : [destService],
+        : slackScope!.sql,
+      destService === 'telegram' ? [destService, userId] : slackScope!.params,
     )
   ).rows[0];
 

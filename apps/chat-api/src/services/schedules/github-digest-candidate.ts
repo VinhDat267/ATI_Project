@@ -52,6 +52,8 @@ const WRITE_INTENT_REGEX =
 export interface EvaluateGithubDigestInput {
   userId: string;
   scopeId?: string;
+  workspaceMode?: 'legacy' | 'personal' | 'organization';
+  workspaceId?: string | null;
   request?: string;
   proposal?: { request: string; recurrence: ScheduleRecurrence; [key: string]: any };
   services: string[];
@@ -225,7 +227,26 @@ export async function evaluateGithubDigestCandidate(
 
   let matchedChannel: { id: string; name: string } | null = null;
   try {
-    const slackAdapter = await input.getAdapter?.('slack', { userId, phase: 'planning' });
+    const isOrgScope =
+      input.workspaceMode === 'organization' ||
+      (input.workspaceMode === undefined &&
+        Boolean(input.scopeId) &&
+        !input.scopeId!.startsWith('personal:') &&
+        input.scopeId !== 'default');
+    const workspaceId = isOrgScope ? (input.workspaceId ?? input.scopeId ?? null) : null;
+    if (isOrgScope && !workspaceId) {
+      return {
+        canAutoDigest: false,
+        disabledReason: 'Không tìm thấy kênh Slack nhận báo cáo tự động hợp lệ cho workspace hiện tại.',
+      };
+    }
+    const workspaceMode = isOrgScope ? ('organization' as const) : (input.workspaceMode ?? ('personal' as const));
+    const slackAdapter = await input.getAdapter?.('slack', {
+      userId,
+      workspaceMode,
+      workspaceId,
+      phase: 'planning',
+    });
     if (slackAdapter && typeof slackAdapter.execute === 'function') {
       const channels = await slackAdapter.execute('slack.search_channels', { query: channelQuery });
       if (Array.isArray(channels) && channels.length > 0) {

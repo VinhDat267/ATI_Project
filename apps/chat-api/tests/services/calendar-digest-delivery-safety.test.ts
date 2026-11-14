@@ -50,7 +50,7 @@ describe('Calendar delivery recovery with real HTTP and PostgreSQL', () => {
       else if (response === 'reject') { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: false, error: 'invalid_auth' })); }
       else if (response === 'server_error') { res.writeHead(500); res.end('upstream unavailable'); }
       else if (response === 'malformed') { res.writeHead(200); res.end('{'); }
-      else if (response === 'success') { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ok: true, ts: '1.0001', channel: 'C0123456789' })); }
+      else if (response === 'success') { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify({ ok: true, ts: '1.000100', channel: 'C0123456789' })); }
     });
     servers.push(server); server.listen(0, '127.0.0.1'); await once(server, 'listening');
     const baseUrl = `http://127.0.0.1:${(server.address() as { port: number }).port}`;

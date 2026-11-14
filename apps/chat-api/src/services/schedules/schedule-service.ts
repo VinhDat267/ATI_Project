@@ -2,6 +2,7 @@ import type pg from 'pg';
 import {
   isSheetsDigestConfigV2,
   type CalendarDigestCandidate,
+  type CalendarDigestConfig,
   type GithubDigestConfig,
   type ScheduleApprovalMode,
   type ScheduleDigestCandidate,
@@ -26,7 +27,12 @@ import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import { MessageRepo } from '../../db/repositories/message-repo.js';
 import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
-import { calendarDigestCandidateMatches, computeCalendarDigestHash, evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js';
+import {
+  buildConfirmedCalendarDigestDelivery,
+  calendarDigestCandidateMatches,
+  computeCalendarDigestHash,
+  evaluateCalendarDigestCandidate,
+} from './calendar-digest-candidate.js';
 import { runState, runView } from './run-state.js';
 import { nextOccurrence, nextRuns } from './next-occurrence.js';
 import { captureScheduleArtifact, guardScheduleArtifact, prelockScheduleArtifacts, registerScheduleFields, scheduleRegistry, scheduleSourceContext, tagScheduleContext } from '../slack/slack-schedule-lineage.js';
@@ -618,6 +624,8 @@ export class ScheduleService {
             userId,
             services: metadata.services,
             request: proposal.request!,
+            workspaceMode: wsMode,
+            workspaceId: wsId,
           });
           if (!evaluated.candidate.canAutoDigest || !evaluated.config || !evaluated.configHash) {
             throw new ScheduleConflict('AUTO_DIGEST_NOT_ELIGIBLE');
@@ -959,6 +967,8 @@ export class ScheduleService {
           userId,
           services: fields.services,
           request: fields.request,
+          workspaceMode: wsMode,
+          workspaceId: wsId,
         });
         if (!evaluated.candidate.canAutoDigest || !evaluated.config || !evaluated.configHash) {
           if ((metadata.digestCandidate as CalendarDigestCandidate | undefined)?.canAutoDigest) {
@@ -1725,7 +1735,7 @@ export class ScheduleService {
           previous.status === 'needs_attention' ||
           previous.delivery_resolution != null ||
           (previous.delivery_started_at != null && previous.status !== 'digest_failed') ||
-          (typeof previous.error === 'string' && previous.error.includes('SHEETS_DELIVERY_UNKNOWN')) ||
+          (typeof previous.error === 'string' && /(?:SHEETS|GITHUB|CALENDAR|NOTION|TRELLO|TELEGRAM)_DELIVERY_UNKNOWN/.test(previous.error)) ||
           !REPLANNABLE.has(prevState)
         ) {
           throw new ScheduleConflict('RUN_NOT_REPLANNABLE');
@@ -1816,7 +1826,10 @@ export class ScheduleService {
       if (
         schedule.kind !== 'sheets_digest' &&
         schedule.kind !== 'trello_digest' &&
-        schedule.kind !== 'telegram_digest'
+        schedule.kind !== 'telegram_digest' &&
+        schedule.kind !== 'github_digest' &&
+        schedule.kind !== 'notion_digest' &&
+        schedule.kind !== 'calendar_digest'
       ) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
@@ -1863,13 +1876,17 @@ export class ScheduleService {
         run.delivery_started_at != null &&
         typeof run.error === 'string' &&
         run.error.includes('SHEETS_DELIVERY_UNKNOWN');
-      const isTrelloOrTelegramUnknown =
-        (schedule.kind === 'trello_digest' || schedule.kind === 'telegram_digest') &&
+      const isOtherDigestUnknown =
+        (schedule.kind === 'trello_digest' ||
+          schedule.kind === 'telegram_digest' ||
+          schedule.kind === 'github_digest' ||
+          schedule.kind === 'notion_digest' ||
+          schedule.kind === 'calendar_digest') &&
         run.status === 'needs_attention' &&
         run.delivery_started_at != null &&
         typeof run.error === 'string' &&
         run.error.trim().length > 0;
-      if (!isSheetsUnknown && !isTrelloOrTelegramUnknown) {
+      if (!isSheetsUnknown && !isOtherDigestUnknown) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
           'Lượt chạy này không ở trạng thái chờ xác nhận kết quả gửi.',
@@ -1987,6 +2004,99 @@ export class ScheduleService {
             resolvedAtIso,
             resolvedBy: userId,
           });
+        } else if (schedule.kind === 'github_digest') {
+          const cfg =
+            run.dispatched_config && typeof run.dispatched_config === 'object'
+              ? (run.dispatched_config as unknown as GithubDigestConfig)
+              : schedule.version === run.schedule_version &&
+                  schedule.digest_config &&
+                  typeof schedule.digest_config === 'object'
+                ? (schedule.digest_config as GithubDigestConfig)
+                : null;
+          const prevDelivery =
+            run.delivery && typeof run.delivery === 'object'
+              ? (run.delivery as unknown as Record<string, unknown>)
+              : {};
+          const counts =
+            prevDelivery.counts && typeof prevDelivery.counts === 'object'
+              ? prevDelivery.counts
+              : { newIssues: 0, stalePrs: 0, unassignedIssues: 0 };
+          deliveryPayload = {
+            ...prevDelivery,
+            channelId: typeof prevDelivery.channelId === 'string' ? prevDelivery.channelId : (cfg?.channelId ?? ''),
+            channelName: typeof prevDelivery.channelName === 'string' ? prevDelivery.channelName : (cfg?.channelName ?? ''),
+            ts: typeof prevDelivery.ts === 'string' ? prevDelivery.ts : null,
+            ...(prevDelivery.telegramChatId ?? cfg?.telegramChatId
+              ? {
+                  telegramChatId: prevDelivery.telegramChatId ?? cfg?.telegramChatId,
+                  telegramChatTitle: prevDelivery.telegramChatTitle ?? cfg?.telegramChatTitle ?? '',
+                }
+              : {}),
+            ...(prevDelivery.messageId !== undefined ? { messageId: prevDelivery.messageId } : {}),
+            counts,
+            ...(typeof prevDelivery.sentAt === 'string' ? { sentAt: prevDelivery.sentAt } : {}),
+            manualConfirmedAt: resolvedAtIso,
+            manualResolution: {
+              status: 'confirmed_sent',
+              resolvedAt: resolvedAtIso,
+              manualConfirmedAt: resolvedAtIso,
+              resolvedBy: userId,
+            },
+          };
+        } else if (schedule.kind === 'notion_digest') {
+          const cfg =
+            run.dispatched_config && typeof run.dispatched_config === 'object'
+              ? (run.dispatched_config as unknown as NotionDigestConfig)
+              : schedule.version === run.schedule_version &&
+                  schedule.digest_config &&
+                  typeof schedule.digest_config === 'object'
+                ? (schedule.digest_config as NotionDigestConfig)
+                : null;
+          const prevDelivery =
+            run.delivery && typeof run.delivery === 'object'
+              ? (run.delivery as unknown as Record<string, unknown>)
+              : {};
+          const counts =
+            prevDelivery.counts && typeof prevDelivery.counts === 'object'
+              ? prevDelivery.counts
+              : {
+                  databasesChecked: Array.isArray(cfg?.databases) ? cfg.databases.length : 0,
+                  totalPages: 0,
+                };
+          deliveryPayload = {
+            ...prevDelivery,
+            channelId: typeof prevDelivery.channelId === 'string' ? prevDelivery.channelId : (cfg?.channelId ?? ''),
+            channelName: typeof prevDelivery.channelName === 'string' ? prevDelivery.channelName : (cfg?.channelName ?? ''),
+            ts: typeof prevDelivery.ts === 'string' ? prevDelivery.ts : null,
+            counts,
+            ...(typeof prevDelivery.sentAt === 'string' ? { sentAt: prevDelivery.sentAt } : {}),
+            manualConfirmedAt: resolvedAtIso,
+            manualResolution: {
+              status: 'confirmed_sent',
+              resolvedAt: resolvedAtIso,
+              manualConfirmedAt: resolvedAtIso,
+              resolvedBy: userId,
+            },
+          };
+        } else if (schedule.kind === 'calendar_digest') {
+          const cfg =
+            run.dispatched_config && typeof run.dispatched_config === 'object'
+              ? (run.dispatched_config as unknown as CalendarDigestConfig)
+              : schedule.version === run.schedule_version &&
+                  schedule.digest_config &&
+                  typeof schedule.digest_config === 'object'
+                ? (schedule.digest_config as CalendarDigestConfig)
+                : null;
+          const prevDelivery =
+            run.delivery && typeof run.delivery === 'object'
+              ? (run.delivery as unknown as Record<string, unknown>)
+              : {};
+          deliveryPayload = buildConfirmedCalendarDigestDelivery({
+            config: cfg,
+            previousDelivery: prevDelivery,
+            resolvedAtIso,
+            resolvedBy: userId,
+          });
         } else {
           const cfg =
             run.dispatched_config && typeof run.dispatched_config === 'object'
@@ -2006,7 +2116,7 @@ export class ScheduleService {
             ...(prevDelivery.chatTitle ?? cfg?.chatTitle
               ? { chatTitle: prevDelivery.chatTitle ?? cfg?.chatTitle }
               : {}),
-            sentAt: typeof prevDelivery.sentAt === 'string' ? prevDelivery.sentAt : resolvedAtIso,
+            ...(typeof prevDelivery.sentAt === 'string' ? { sentAt: prevDelivery.sentAt } : {}),
             sources: Array.isArray(prevDelivery.sources) ? prevDelivery.sources : [],
             manualConfirmedAt: resolvedAtIso,
             manualResolution: {
@@ -2087,7 +2197,8 @@ export class ScheduleService {
           run.schedule_version !== schedule.version ||
           !schedule.digest_config ||
           typeof schedule.digest_config !== 'object' ||
-          !schedule.digest_config_hash
+          !schedule.digest_config_hash ||
+          (run.dispatched_config_hash != null && run.dispatched_config_hash !== schedule.digest_config_hash)
         ) {
           throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
         }
@@ -2129,6 +2240,53 @@ export class ScheduleService {
             }
           }
           await this.assertTelegramDigestCanResumeInTx(client, schedule);
+        } else if (schedule.kind === 'github_digest') {
+          const cfg = canonicalizeDigestConfig(schedule.digest_config as GithubDigestConfig);
+          const expectedHash = computeDigestConfigHash({
+            config: cfg,
+            recurrence: schedule.recurrence,
+            userId: schedule.user_id,
+          });
+          if (expectedHash !== schedule.digest_config_hash) {
+            throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
+          }
+          for (const credId of [cfg.credentialId, cfg.telegramCredentialId]) {
+            if (credId && isUuid(credId)) {
+              const credRes = await client.query<{ status: string }>(
+                'SELECT status FROM service_credentials WHERE id = $1 AND user_id = $2',
+                [credId, schedule.user_id],
+              );
+              if (credRes.rows[0]?.status !== 'active') {
+                throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+              }
+            }
+          }
+        } else if (schedule.kind === 'notion_digest') {
+          await this.assertNotionSourceInTx(client, schedule);
+          const cfg = canonicalizeNotionDigestConfig(schedule.digest_config as NotionDigestConfig);
+          const expectedHash = computeNotionDigestConfigHash({
+            config: cfg,
+            recurrence: schedule.recurrence,
+            userId: schedule.user_id,
+          });
+          if (expectedHash !== schedule.digest_config_hash) {
+            throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
+          }
+        } else if (schedule.kind === 'calendar_digest') {
+          const cfg = schedule.digest_config as CalendarDigestConfig;
+          const expectedHash = computeCalendarDigestHash(cfg);
+          if (expectedHash !== schedule.digest_config_hash) {
+            throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
+          }
+          if (cfg.credentialId && isUuid(cfg.credentialId)) {
+            const credRes = await client.query<{ status: string }>(
+              'SELECT status FROM service_credentials WHERE id = $1 AND user_id = $2',
+              [cfg.credentialId, schedule.user_id],
+            );
+            if (credRes.rows[0]?.status !== 'active') {
+              throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+            }
+          }
         }
       }
       const busy = await client.query(

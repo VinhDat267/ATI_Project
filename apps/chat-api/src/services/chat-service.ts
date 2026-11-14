@@ -216,7 +216,13 @@ export interface ChatServiceOptions {
     mysheetsEnabled?: boolean;
     emitV2?: boolean;
     fetchOrgSheetsMetadata?: FetchOrgSheetsMetadataFn;
-    evaluateDigestCandidate?: (input: { userId: string; services: string[]; request: string }) => Promise<CalendarDigestCandidate | undefined>;
+    evaluateDigestCandidate?: (input: {
+      userId: string;
+      services: string[];
+      request: string;
+      workspaceMode?: 'legacy' | 'personal' | 'organization';
+      workspaceId?: string | null;
+    }) => Promise<CalendarDigestCandidate | undefined>;
   };
   /** Optional adapter retriever or tool executor for live resource validation in planning. */
   getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
@@ -1670,6 +1676,8 @@ export class ChatService {
         userId: actor.userId,
         services,
         request: proposal.request,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
       });
     } else if ((proposal.action === 'create' || proposal.action === 'update') && isGithubThreeSectionOverTelegram) {
       const githubScopeId =
@@ -1679,6 +1687,8 @@ export class ChatService {
       digestCandidate = await evaluateGithubDigestCandidate({
         userId: actor.userId,
         scopeId: githubScopeId,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
         request: proposal.request,
         services,
         recurrence,
@@ -1758,6 +1768,8 @@ export class ChatService {
       digestCandidate = await evaluateGithubDigestCandidate({
         userId: actor.userId,
         scopeId: githubScopeId,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
         request: proposal.request,
         services,
         recurrence,
@@ -1808,6 +1820,8 @@ export class ChatService {
         userId: actor.userId,
         services,
         request: proposal.request,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
       });
     } else if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram')) {
       digestCandidate = evaluateTelegramDigestCandidate({
