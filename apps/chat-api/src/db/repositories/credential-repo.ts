@@ -2,6 +2,7 @@ import type pg from 'pg';
 import { decryptCredentials, encryptCredentials } from '@wap/tool-adapters';
 
 export type CredentialStatus = 'active' | 'reconnect_required';
+export type CredentialRefreshState = 'idle' | 'refreshing' | 'failed';
 
 export interface ServiceCredentialRow {
   id: string;
@@ -13,7 +14,34 @@ export interface ServiceCredentialRow {
   created_at: Date;
   status: CredentialStatus;
   status_changed_at: Date | null;
+  refresh_state?: CredentialRefreshState;
+  refresh_attempt_id?: string | null;
+  refresh_started_at?: Date | null;
+  token_version?: number;
+  status_reason?: string | null;
+  access_expires_at?: Date | null;
 }
+
+export type PersonalRefreshPollResult =
+  | { kind: 'missing' }
+  | { kind: 'reconnect_required'; statusReason: string | null }
+  | {
+      kind: 'active';
+      refreshState: CredentialRefreshState;
+      tokenVersion: number;
+      refreshElapsedMs: number | null;
+      accessToken?: string;
+      expiresAtMs?: number;
+      statusReason: string | null;
+    };
+
+export type PersonalRefreshClaimResult =
+  | { kind: 'missing' }
+  | { kind: 'reconnect_required'; statusReason: string | null }
+  | { kind: 'failed_closed'; statusReason: string }
+  | { kind: 'already_refreshed'; accessToken: string; expiresAtMs: number; tokenVersion: number }
+  | { kind: 'busy'; tokenVersion: number; refreshElapsedMs: number }
+  | { kind: 'claimed'; attemptId: string; refreshToken: string; tokenVersion: number };
 
 export type CredentialRecord = ServiceCredentialRow;
 
@@ -219,7 +247,16 @@ export class CredentialRepo {
       `INSERT INTO service_credentials (service, user_id, workspace_id, config, status, created_at)
        VALUES ($1, $2, NULL, $3, $4, now())
        ON CONFLICT (service, user_id, workspace_id) DO UPDATE
-       SET id = gen_random_uuid(), config = EXCLUDED.config, status = EXCLUDED.status
+       SET id = gen_random_uuid(),
+           config = EXCLUDED.config,
+           status = EXCLUDED.status,
+           status_changed_at = NULL,
+           refresh_state = 'idle',
+           refresh_attempt_id = NULL,
+           refresh_started_at = NULL,
+           token_version = 1,
+           status_reason = NULL,
+           access_expires_at = NULL
        RETURNING *`,
       [input.service, requireUser(input.userId), input.config, input.status ?? 'active']
     );
@@ -246,13 +283,317 @@ export class CredentialRepo {
   }
 
   /** The grant is gone: keep the row for the UI. A newer connection (another id) is never touched. */
-  async markReconnectRequired(service: string, userId: string, credentialId: string): Promise<boolean> {
+  async markReconnectRequired(
+    service: string,
+    userId: string,
+    credentialId: string,
+    statusReason?: string
+  ): Promise<boolean> {
     const res = await this.pool.query(
-      `UPDATE service_credentials SET status = 'reconnect_required', status_changed_at = now()
+      `UPDATE service_credentials
+       SET status = 'reconnect_required',
+           status_changed_at = clock_timestamp(),
+           refresh_state = 'idle',
+           refresh_attempt_id = NULL,
+           status_reason = COALESCE($4, status_reason)
        WHERE id = $3 AND service = $1 AND user_id = $2 AND workspace_id IS NULL AND status = 'active'`,
-      [service, requireUser(userId), credentialId]
+      [service, requireUser(userId), credentialId, statusReason ?? null]
     );
     return (res.rowCount ?? 0) > 0;
+  }
+
+  private scrubSecretConfig(rawConfig: string): string {
+    try {
+      const data = decryptCredentials<Record<string, any>>(rawConfig, this.encryptionKey);
+      const { refreshToken: _rt, accessToken: _at, expiresAt: _exp, ...metadata } = data;
+      return encryptCredentials(metadata, this.encryptionKey);
+    } catch {
+      return encryptCredentials({}, this.encryptionKey);
+    }
+  }
+
+  private parseAccessSnapshot(row: ServiceCredentialRow): { accessToken?: string; expiresAtMs?: number; refreshToken?: string } {
+    try {
+      const data = decryptCredentials<Record<string, any>>(row.config, this.encryptionKey);
+      const accessToken = typeof data.accessToken === 'string' && data.accessToken ? data.accessToken : undefined;
+      const refreshToken = typeof data.refreshToken === 'string' && data.refreshToken.trim() ? data.refreshToken : undefined;
+      const expiresAtMs = row.access_expires_at
+        ? new Date(row.access_expires_at).getTime()
+        : typeof data.expiresAt === 'number' && Number.isFinite(data.expiresAt)
+          ? data.expiresAt
+          : undefined;
+      return { accessToken, expiresAtMs, refreshToken };
+    } catch {
+      return {};
+    }
+  }
+
+  /** Reads current personal credential refresh state without holding any DB lock. */
+  async pollPersonalRefresh(input: {
+    service: 'trello' | 'github';
+    userId: string;
+    credentialId: string;
+  }): Promise<PersonalRefreshPollResult> {
+    const res = await this.pool.query<ServiceCredentialRow & { refresh_elapsed_ms: string | number | null }>(
+      `SELECT *,
+              CASE
+                WHEN refresh_started_at IS NULL THEN NULL
+                ELSE GREATEST(0, EXTRACT(EPOCH FROM (clock_timestamp() - refresh_started_at)) * 1000)
+              END AS refresh_elapsed_ms
+       FROM service_credentials
+       WHERE id = $1 AND service = $2 AND user_id = $3 AND workspace_id IS NULL`,
+      [input.credentialId, input.service, requireUser(input.userId)]
+    );
+    const row = res.rows[0];
+    if (!row) return { kind: 'missing' };
+    if (row.status !== 'active') {
+      return { kind: 'reconnect_required', statusReason: row.status_reason ?? null };
+    }
+    const { accessToken, expiresAtMs } = this.parseAccessSnapshot(row);
+    const elapsed = row.refresh_elapsed_ms === null || row.refresh_elapsed_ms === undefined
+      ? null
+      : Number(row.refresh_elapsed_ms);
+    return {
+      kind: 'active',
+      refreshState: (row.refresh_state ?? 'idle') as CredentialRefreshState,
+      tokenVersion: Number(row.token_version ?? 1),
+      refreshElapsedMs: elapsed !== null && Number.isFinite(elapsed) ? elapsed : null,
+      accessToken,
+      expiresAtMs,
+      statusReason: row.status_reason ?? null,
+    };
+  }
+
+  /**
+   * Acquires or observes the multi-process refresh lease in a short transaction and releases
+   * the PG connection before any outbound provider HTTP request begins.
+   */
+  async claimPersonalRefresh(input: {
+    service: 'trello' | 'github';
+    userId: string;
+    credentialId: string;
+    minTokenVersion?: number;
+    forceRefresh?: boolean;
+    refreshTimeoutMs: number;
+    attemptId: string;
+    nowMs?: number;
+  }): Promise<PersonalRefreshClaimResult> {
+    const userId = requireUser(input.userId);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const res = await client.query<ServiceCredentialRow & { refresh_elapsed_ms: string | number | null }>(
+        `SELECT *,
+                CASE
+                  WHEN refresh_started_at IS NULL THEN NULL
+                  ELSE GREATEST(0, EXTRACT(EPOCH FROM (clock_timestamp() - refresh_started_at)) * 1000)
+                END AS refresh_elapsed_ms
+         FROM service_credentials
+         WHERE id = $1 AND service = $2 AND user_id = $3 AND workspace_id IS NULL
+         FOR UPDATE`,
+        [input.credentialId, input.service, userId]
+      );
+      const row = res.rows[0];
+      if (!row) {
+        await client.query('COMMIT');
+        return { kind: 'missing' };
+      }
+      if (row.status !== 'active') {
+        await client.query('COMMIT');
+        return { kind: 'reconnect_required', statusReason: row.status_reason ?? null };
+      }
+
+      const tokenVersion = Number(row.token_version ?? 1);
+      const refreshState = (row.refresh_state ?? 'idle') as CredentialRefreshState;
+      const { accessToken, expiresAtMs, refreshToken } = this.parseAccessSnapshot(row);
+
+      if (
+        refreshState === 'idle' &&
+        accessToken &&
+        ((typeof input.minTokenVersion === 'number' && tokenVersion > input.minTokenVersion) ||
+          (!input.forceRefresh && typeof input.nowMs === 'number' && typeof expiresAtMs === 'number' && expiresAtMs - input.nowMs > 60_000))
+      ) {
+        await client.query('COMMIT');
+        return {
+          kind: 'already_refreshed',
+          accessToken,
+          expiresAtMs: expiresAtMs ?? ((input.nowMs ?? Date.now()) + 3600_000),
+          tokenVersion,
+        };
+      }
+
+      if (refreshState === 'refreshing') {
+        const elapsed =
+          row.refresh_started_at && row.refresh_elapsed_ms !== null && row.refresh_elapsed_ms !== undefined
+            ? Number(row.refresh_elapsed_ms)
+            : Number.POSITIVE_INFINITY;
+        if (elapsed >= input.refreshTimeoutMs) {
+          const scrubbedConfig = this.scrubSecretConfig(row.config);
+          await client.query(
+            `UPDATE service_credentials
+             SET config = $1,
+                 status = 'reconnect_required',
+                 status_reason = 'CRASH_UNKNOWN_ROTATION',
+                 refresh_state = 'idle',
+                 refresh_attempt_id = NULL,
+                 access_expires_at = NULL,
+                 status_changed_at = clock_timestamp()
+             WHERE id = $2 AND status = 'active'`,
+            [scrubbedConfig, row.id]
+          );
+          await client.query('COMMIT');
+          return { kind: 'failed_closed', statusReason: 'CRASH_UNKNOWN_ROTATION' };
+        }
+        await client.query('COMMIT');
+        return { kind: 'busy', tokenVersion, refreshElapsedMs: Number.isFinite(elapsed) ? elapsed : 0 };
+      }
+
+      if (refreshState === 'failed' || !refreshToken) {
+        const reason = refreshState === 'failed' ? row.status_reason ?? 'REFRESH_FAILED' : 'NO_REFRESH_TOKEN';
+        const scrubbedConfig = this.scrubSecretConfig(row.config);
+        await client.query(
+          `UPDATE service_credentials
+           SET config = $1,
+               status = 'reconnect_required',
+               status_reason = $2,
+               refresh_state = 'idle',
+               refresh_attempt_id = NULL,
+               access_expires_at = NULL,
+               status_changed_at = clock_timestamp()
+           WHERE id = $3 AND status = 'active'`,
+          [scrubbedConfig, reason, row.id]
+        );
+        await client.query('COMMIT');
+        return { kind: 'failed_closed', statusReason: reason };
+      }
+
+      await client.query(
+        `UPDATE service_credentials
+         SET refresh_state = 'refreshing',
+             refresh_attempt_id = $1,
+             refresh_started_at = clock_timestamp()
+         WHERE id = $2 AND status = 'active'`,
+        [input.attemptId, row.id]
+      );
+      await client.query('COMMIT');
+      return { kind: 'claimed', attemptId: input.attemptId, refreshToken, tokenVersion };
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /** Fenced compare-and-swap commit after upstream rotation; honors Disconnect-Wins. */
+  async commitPersonalRefresh(input: {
+    service: 'trello' | 'github';
+    userId: string;
+    credentialId: string;
+    attemptId: string;
+    nextRefreshToken: string;
+    nextAccessToken: string;
+    accessExpiresAt: Date;
+  }): Promise<'committed' | 'disconnected'> {
+    const userId = requireUser(input.userId);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const res = await client.query<ServiceCredentialRow>(
+        `SELECT * FROM service_credentials
+         WHERE id = $1 AND service = $2 AND user_id = $3 AND workspace_id IS NULL
+         FOR UPDATE`,
+        [input.credentialId, input.service, userId]
+      );
+      const row = res.rows[0];
+      if (!row || row.status !== 'active' || row.refresh_attempt_id !== input.attemptId) {
+        await client.query('COMMIT');
+        return 'disconnected';
+      }
+
+      let data: Record<string, any>;
+      try {
+        data = decryptCredentials(row.config, this.encryptionKey);
+      } catch {
+        data = {};
+      }
+      const updatedConfig = encryptCredentials(
+        {
+          ...data,
+          refreshToken: input.nextRefreshToken,
+          accessToken: input.nextAccessToken,
+          expiresAt: input.accessExpiresAt.getTime(),
+        },
+        this.encryptionKey
+      );
+
+      const updateRes = await client.query(
+        `UPDATE service_credentials
+         SET config = $1,
+             token_version = token_version + 1,
+             refresh_state = 'idle',
+             refresh_attempt_id = NULL,
+             status_reason = NULL,
+             access_expires_at = $2,
+             status = 'active'
+         WHERE id = $3 AND refresh_attempt_id = $4 AND status = 'active'`,
+        [updatedConfig, input.accessExpiresAt, row.id, input.attemptId]
+      );
+      await client.query('COMMIT');
+      return (updateRes.rowCount ?? 0) > 0 ? 'committed' : 'disconnected';
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  /** Fails closed and scrubs tokens on post-dispatch error while preserving Disconnect-Wins. */
+  async failPersonalRefresh(input: {
+    service: 'trello' | 'github';
+    userId: string;
+    credentialId: string;
+    attemptId: string;
+    statusReason: string;
+  }): Promise<'fenced' | 'disconnected'> {
+    const userId = requireUser(input.userId);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const res = await client.query<ServiceCredentialRow>(
+        `SELECT * FROM service_credentials
+         WHERE id = $1 AND service = $2 AND user_id = $3 AND workspace_id IS NULL
+         FOR UPDATE`,
+        [input.credentialId, input.service, userId]
+      );
+      const row = res.rows[0];
+      if (!row || row.status !== 'active' || row.refresh_attempt_id !== input.attemptId) {
+        await client.query('COMMIT');
+        return 'disconnected';
+      }
+
+      const scrubbedConfig = this.scrubSecretConfig(row.config);
+      const updateRes = await client.query(
+        `UPDATE service_credentials
+         SET config = $1,
+             status = 'reconnect_required',
+             status_reason = $2,
+             refresh_state = 'idle',
+             refresh_attempt_id = NULL,
+             access_expires_at = NULL,
+             status_changed_at = clock_timestamp()
+         WHERE id = $3 AND refresh_attempt_id = $4 AND status = 'active'`,
+        [scrubbedConfig, input.statusReason, row.id, input.attemptId]
+      );
+      await client.query('COMMIT');
+      return (updateRes.rowCount ?? 0) > 0 ? 'fenced' : 'disconnected';
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   /** Rotates a personal single-use refresh token inside a transaction with plaintext comparison. */

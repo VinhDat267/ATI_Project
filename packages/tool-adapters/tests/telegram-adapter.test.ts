@@ -387,3 +387,42 @@ it('rejects out-of-scope chatId or invalid arguments on telegram.read_messages b
   expect(fetchFn).not.toHaveBeenCalled();
 });
 
+it('uses coordinated pollUpdates hook when provided instead of calling HTTP getUpdates directly', async () => {
+  const fetchFn = vi.fn(async (url: string) => {
+    if (url.endsWith('/getChat')) {
+      return ok({ id: -1001234567890, title: 'ATI Team', type: 'supergroup' });
+    }
+    throw new Error(`Unexpected direct HTTP call to ${url}`);
+  });
+  const pollUpdates = vi.fn(async () => [
+    {
+      update_id: 0,
+      message: {
+        message_id: 88,
+        date: 1791000800,
+        chat: { id: -1001234567890 },
+        from: { first_name: 'Linh' },
+        text: 'Tin nhan qua bo dem phoi hop',
+      },
+    },
+  ]);
+
+  const a = make(fetchFn, { pollUpdates });
+
+  const res = await a.execute('telegram.read_messages', { chatId: id });
+  expect(pollUpdates).toHaveBeenCalledTimes(1);
+  expect(fetchFn).toHaveBeenCalledTimes(1);
+  expect(res).toEqual({
+    messages: [
+      {
+        id: '88',
+        messageId: 88,
+        chatId: id,
+        senderName: 'Linh',
+        text: 'Tin nhan qua bo dem phoi hop',
+        date: 1791000800,
+      },
+    ],
+  });
+});
+

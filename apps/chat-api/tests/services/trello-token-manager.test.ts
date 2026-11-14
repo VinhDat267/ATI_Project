@@ -1,6 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { encryptCredentials, StepError } from '@wap/tool-adapters';
+import { decryptCredentials, encryptCredentials, StepError } from '@wap/tool-adapters';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { TrelloTokenManager } from '../../src/services/trello/token-manager.js';
 import { TrelloOAuthClient, TrelloOAuthError } from '../../src/services/trello/oauth-client.js';
@@ -399,6 +400,236 @@ describe('TrelloTokenManager', () => {
         // Credential in DB is still active, not reconnect_required
         const credStatus = await credentials.getPersonalConnectionStatus('trello', user.id);
         expect(credStatus?.status).toBe('active');
+      } finally {
+        await new Promise((resolve) => server.close(resolve));
+      }
+    });
+
+    it('coordinates concurrent multi-instance refresh, reuses cached accessToken, rotates refreshToken on expiry, and enforces Disconnect-Wins and fail-closed fences', async () => {
+      let currentNow = 1_700_000_000_000;
+      const clock = () => currentNow;
+      let serverBehavior: 'normal' | 'http500' | 'hang' | 'disconnect_midflight' = 'normal';
+      let onHeldRequestReached: (() => void) | null = null;
+      let releaseHeldRequest: (() => void) | null = null;
+      const seenRefreshTokens: string[] = [];
+      let stepCounter = 0;
+
+      const server = createServer(async (req, res) => {
+        if (req.method === 'POST' && req.url === '/oauth/token') {
+          let bodyStr = '';
+          req.on('data', (chunk) => {
+            bodyStr += chunk;
+          });
+          req.on('end', async () => {
+            stepCounter++;
+            const body = JSON.parse(bodyStr);
+            seenRefreshTokens.push(body.refresh_token);
+
+            if (serverBehavior === 'http500') {
+              res.writeHead(500, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: 'internal_error' }));
+              return;
+            }
+            if (serverBehavior === 'hang') {
+              // Hold longer than refreshTimeoutMs until aborted.
+              await new Promise<void>((resolve) => {
+                const timer = setTimeout(resolve, 2000);
+                req.on('close', () => {
+                  clearTimeout(timer);
+                  resolve();
+                });
+              });
+              return;
+            }
+            if (serverBehavior === 'disconnect_midflight') {
+              onHeldRequestReached?.();
+              await new Promise<void>((resolve) => {
+                releaseHeldRequest = resolve;
+              });
+            }
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(
+              JSON.stringify({
+                access_token: `access-step-${stepCounter}`,
+                refresh_token: `rotated-rt-${stepCounter}`,
+                expires_in: 3600,
+                token_type: 'Bearer',
+              })
+            );
+          });
+        } else {
+          res.writeHead(404);
+          res.end();
+        }
+      });
+
+      await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+      const port = (server.address() as any).port;
+      const oauthClient = new TrelloOAuthClient({
+        clientId: 'cid',
+        clientSecret: 'csec',
+        redirectUri: 'http://127.0.0.1/callback',
+        authorizationUrl: 'http://127.0.0.1/auth',
+        tokenUrl: `http://127.0.0.1:${port}/oauth/token`,
+        apiBaseUrl: 'http://127.0.0.1/api',
+      });
+
+      try {
+        // 1. Two separate TrelloTokenManager instances race concurrently -> single HTTP refresh, both get access-step-1.
+        const credentialsA = new CredentialRepo(db.pool, encryptionKey);
+        const credentialsB = new CredentialRepo(db.pool, encryptionKey);
+        const user1 = await db.person('MultiProcRace');
+        const initialRt = 'rt-initial-0';
+        const row1 = await credentialsA.saveCredentials(
+          'trello',
+          encryptCredentials({ refreshToken: initialRt, username: 'multi_race' }, encryptionKey),
+          user1.id
+        );
+
+        const mgrA = new TrelloTokenManager({ client: oauthClient, credentials: credentialsA, clock, refreshTimeoutMs: 2000 });
+        const mgrB = new TrelloTokenManager({ client: oauthClient, credentials: credentialsB, clock, refreshTimeoutMs: 2000 });
+
+        const [tokA, tokB] = await Promise.all([
+          mgrA.forConnection(user1.id, row1.id, initialRt).getAccessToken(),
+          mgrB.forConnection(user1.id, row1.id, initialRt).getAccessToken(),
+        ]);
+        expect(tokA).toBe('access-step-1');
+        expect(tokB).toBe('access-step-1');
+        expect(seenRefreshTokens).toEqual([initialRt]);
+
+        const afterFirst = await credentialsA.getPersonalConnectionStatus('trello', user1.id);
+        expect(afterFirst?.token_version).toBe(2);
+        expect(afterFirst?.refresh_state).toBe('idle');
+
+        // 2. Third fresh instance reads unexpired persisted accessToken from PostgreSQL with ZERO HTTP calls.
+        const credentialsC = new CredentialRepo(db.pool, encryptionKey);
+        const mgrC = new TrelloTokenManager({ client: oauthClient, credentials: credentialsC, clock, refreshTimeoutMs: 2000 });
+        const tokC = await mgrC.forConnection(user1.id, row1.id, initialRt).getAccessToken();
+        expect(tokC).toBe('access-step-1');
+        expect(seenRefreshTokens).toEqual([initialRt]);
+
+        // 3. Advance clock past 3600s expiry -> post-expiry refresh uses DB-rotated refresh token, even if stale initialRt was passed.
+        currentNow += 3600_000;
+        const tok2 = await mgrC.forConnection(user1.id, row1.id, initialRt).getAccessToken();
+        expect(tok2).toBe('access-step-2');
+        expect(seenRefreshTokens).toEqual([initialRt, 'rotated-rt-1']);
+        const afterSecond = await credentialsC.getPersonalConnectionStatus('trello', user1.id);
+        expect(afterSecond?.token_version).toBe(3);
+
+        // 4. Orphaned 'refreshing' lease past refreshTimeoutMs -> fail closed (CRASH_UNKNOWN_ROTATION), scrub tokens, 0 HTTP calls.
+        const user2 = await db.person('OrphanedLease');
+        const row2 = await credentialsA.saveCredentials(
+          'trello',
+          encryptCredentials({ refreshToken: 'rt-crashed', username: 'crashed_user' }, encryptionKey),
+          user2.id
+        );
+        await db.pool.query(
+          `UPDATE service_credentials
+           SET refresh_state = 'refreshing',
+               refresh_attempt_id = $2,
+               refresh_started_at = clock_timestamp() - interval '20 seconds'
+           WHERE id = $1`,
+          [row2.id, randomUUID()]
+        );
+        const orphanReconnects: string[] = [];
+        const mgrOrphan = new TrelloTokenManager({
+          client: oauthClient,
+          credentials: credentialsA,
+          clock,
+          refreshTimeoutMs: 2000,
+          onReconnectRequired: (uid) => orphanReconnects.push(uid),
+        });
+        const httpCountBeforeOrphan = seenRefreshTokens.length;
+        await expect(mgrOrphan.forConnection(user2.id, row2.id, 'rt-crashed').getAccessToken()).rejects.toMatchObject({
+          category: 'AUTH_ERROR',
+        });
+        expect(seenRefreshTokens.length).toBe(httpCountBeforeOrphan);
+        expect(orphanReconnects).toEqual([user2.id]);
+        const orphanRow = await credentialsA.getPersonalConnectionStatus('trello', user2.id);
+        expect(orphanRow?.status).toBe('reconnect_required');
+        expect(orphanRow?.status_reason).toBe('CRASH_UNKNOWN_ROTATION');
+        expect(orphanRow?.refresh_state).toBe('idle');
+        expect(orphanRow?.refresh_attempt_id).toBeNull();
+        expect(decryptCredentials<Record<string, any>>(orphanRow!.config, encryptionKey).refreshToken).toBeUndefined();
+
+        // 5. Disconnect-Wins while HTTP refresh is in-flight -> old caller gets AUTH_ERROR, refreshed token discarded, onReconnectRequired NOT fired.
+        const user3 = await db.person('DisconnectWins');
+        const row3 = await credentialsA.saveCredentials(
+          'trello',
+          encryptCredentials({ refreshToken: 'rt-dw', username: 'dw_user' }, encryptionKey),
+          user3.id
+        );
+        const dwReconnects: string[] = [];
+        const mgrDw = new TrelloTokenManager({
+          client: oauthClient,
+          credentials: credentialsA,
+          clock,
+          refreshTimeoutMs: 2000,
+          onReconnectRequired: (uid) => dwReconnects.push(uid),
+        });
+        serverBehavior = 'disconnect_midflight';
+        const heldReached = new Promise<void>((resolve) => {
+          onHeldRequestReached = resolve;
+        });
+        const dwPromise = mgrDw.forConnection(user3.id, row3.id, 'rt-dw').getAccessToken();
+        await heldReached;
+        await credentialsA.deletePersonalCredentials('trello', user3.id);
+        releaseHeldRequest!();
+        await expect(dwPromise).rejects.toMatchObject({ category: 'AUTH_ERROR' });
+        expect(dwReconnects).toEqual([]);
+        expect(await credentialsA.getPersonalConnectionStatus('trello', user3.id)).toBeNull();
+
+        // 6a. Post-dispatch HTTP 500 -> fails closed with CRASH_UNKNOWN_ROTATION and never gets stuck 'refreshing'.
+        serverBehavior = 'http500';
+        const user4 = await db.person('PostDispatch500');
+        const row4 = await credentialsA.saveCredentials(
+          'trello',
+          encryptCredentials({ refreshToken: 'rt-500', username: 'u500' }, encryptionKey),
+          user4.id
+        );
+        const reconnect500: string[] = [];
+        const mgr500 = new TrelloTokenManager({
+          client: oauthClient,
+          credentials: credentialsA,
+          clock,
+          refreshTimeoutMs: 500,
+          onReconnectRequired: (uid) => reconnect500.push(uid),
+        });
+        await expect(mgr500.forConnection(user4.id, row4.id, 'rt-500').getAccessToken()).rejects.toMatchObject({
+          category: 'AUTH_ERROR',
+        });
+        expect(reconnect500).toEqual([user4.id]);
+        const row4After = await credentialsA.getPersonalConnectionStatus('trello', user4.id);
+        expect(row4After?.status).toBe('reconnect_required');
+        expect(row4After?.status_reason).toBe('CRASH_UNKNOWN_ROTATION');
+        expect(row4After?.refresh_state).toBe('idle');
+
+        // 6b. Real AbortSignal timeout -> fails closed with REFRESH_TIMEOUT, never replays consumed token.
+        serverBehavior = 'hang';
+        const user5 = await db.person('PostDispatchTimeout');
+        const row5 = await credentialsA.saveCredentials(
+          'trello',
+          encryptCredentials({ refreshToken: 'rt-timeout', username: 'utimeout' }, encryptionKey),
+          user5.id
+        );
+        const reconnectTimeout: string[] = [];
+        const mgrTimeout = new TrelloTokenManager({
+          client: oauthClient,
+          credentials: credentialsA,
+          clock,
+          refreshTimeoutMs: 120,
+          onReconnectRequired: (uid) => reconnectTimeout.push(uid),
+        });
+        await expect(mgrTimeout.forConnection(user5.id, row5.id, 'rt-timeout').getAccessToken()).rejects.toMatchObject({
+          category: 'AUTH_ERROR',
+        });
+        expect(reconnectTimeout).toEqual([user5.id]);
+        const row5After = await credentialsA.getPersonalConnectionStatus('trello', user5.id);
+        expect(row5After?.status).toBe('reconnect_required');
+        expect(row5After?.status_reason).toBe('REFRESH_TIMEOUT');
+        expect(row5After?.refresh_state).toBe('idle');
+        expect(decryptCredentials<Record<string, any>>(row5After!.config, encryptionKey).refreshToken).toBeUndefined();
       } finally {
         await new Promise((resolve) => server.close(resolve));
       }

@@ -86,7 +86,7 @@ export interface AdapterFactoryOptions {
     botUsername: string;
     apiBaseUrl?: string;
   };
-  telegramBotClient?: Pick<TelegramBotClient, 'getChatMember'>;
+  telegramBotClient?: Pick<TelegramBotClient, 'getChatMember'> & Partial<Pick<TelegramBotClient, 'readUpdatesForChat'>>;
   createTelegramAdapter?: (input: {
     userId: string;
     telegramUserId: string;
@@ -743,6 +743,7 @@ export class AdapterFactory {
       throw telegramError('VALIDATION', 'Telegram chưa sẵn sàng trên máy chủ này.');
     }
 
+    const botClient = this.options.telegramBotClient;
     return new TelegramAdapter({
       credentials: { botToken: this.options.telegramBot.botToken },
       baseUrl: this.options.telegramBot.apiBaseUrl,
@@ -750,6 +751,27 @@ export class AdapterFactory {
       allowedScope: { chats: allowedChats },
       knownChats: selectedChats,
       fetchFn: this.options.serviceFetchFn,
+      ...(botClient?.readUpdatesForChat
+        ? {
+            pollUpdates: async (chatId: string, signal?: AbortSignal) => {
+              const effectiveSignal = signal ?? AbortSignal.timeout(10_000);
+              try {
+                return await botClient.readUpdatesForChat!(chatId, effectiveSignal);
+              } catch (err: any) {
+                const statusCode = typeof err?.status === 'number' ? err.status : undefined;
+                if (err?.kind === 'unauthorized') {
+                  throw new StepError({ category: 'AUTH_ERROR', statusCode: statusCode ?? 401, retryable: false, message: 'Telegram request failed: AUTH_ERROR' });
+                }
+                if (err?.kind === 'rejected') {
+                  const category = statusCode === 429 ? 'RATE_LIMIT' : statusCode === 404 ? 'NOT_FOUND' : 'VALIDATION';
+                  throw new StepError({ category, statusCode, retryable: false, message: `Telegram request failed: ${category}` });
+                }
+                const category = err?.kind === 'network' || effectiveSignal.aborted ? 'NETWORK' : 'SERVER_ERROR';
+                throw new StepError({ category, statusCode, retryable: false, message: `Telegram request failed: ${category}` });
+              }
+            },
+          }
+        : {}),
     });
   }
 

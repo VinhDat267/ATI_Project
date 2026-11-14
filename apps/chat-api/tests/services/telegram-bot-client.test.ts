@@ -231,4 +231,66 @@ describe('TelegramBotClient', () => {
     await expect(clientAbort.verifyPairing('d'.repeat(43), aborted.signal)).rejects.toMatchObject({ kind: 'network' });
     expect(neverFetch).not.toHaveBeenCalled();
   });
+
+  it('preserves ordinary chat messages across verifyPairing, discoverGroups, and multi-page readUpdatesForChat', async () => {
+    const state = 'p'.repeat(43);
+    const groupId = '-100555444333';
+    const updates: any[] = [
+      {
+        update_id: 1,
+        message: {
+          message_id: 1,
+          date: 1791000010,
+          from: { id: 101, is_bot: false, first_name: 'An' },
+          chat: { id: Number(groupId), title: 'Nhom Dev', type: 'supergroup' },
+          text: `/start ati_${state}`,
+        },
+      },
+      {
+        update_id: 2,
+        edited_message: {
+          message_id: 2,
+          date: 1791000020,
+          from: { id: 102, is_bot: false, first_name: 'Binh' },
+          chat: { id: Number(groupId), title: 'Nhom Dev', type: 'supergroup' },
+          text: 'Release v3 da san sang',
+        },
+      },
+    ];
+    for (let i = 0; i < 105; i++) {
+      updates.push({
+        update_id: 3 + i,
+        message: {
+          message_id: 10 + i,
+          date: 1791000100 + i,
+          from: { id: 103, is_bot: false, username: 'chi' },
+          chat: { id: Number(groupId), title: 'Nhom Dev', type: 'supergroup' },
+          text: i === 104 ? 'Canh bao sprint moi' : `Chat ${i}`,
+        },
+      });
+    }
+
+    const seenOffsets: Array<number | undefined> = [];
+    const client = new TelegramBotClient(config, async (_url, init) => {
+      const body = JSON.parse(String(init?.body ?? '{}'));
+      seenOffsets.push(body.offset);
+      const slice = updates
+        .filter((u) => body.offset === undefined || u.update_id >= body.offset)
+        .slice(0, body.limit ?? 100);
+      return Response.json({ ok: true, result: slice });
+    });
+
+    const paired = await client.verifyPairing(state, AbortSignal.timeout(5000));
+    expect(paired).toMatchObject({ matched: true, telegramUserId: '101' });
+
+    const groups = await client.discoverGroups(AbortSignal.timeout(5000));
+    expect(groups).toContainEqual({ chatId: groupId, title: 'Nhom Dev', type: 'supergroup' });
+
+    const chatUpdates = await client.readUpdatesForChat(groupId, AbortSignal.timeout(5000));
+    const texts = chatUpdates.map((u) => u.message?.text);
+    expect(seenOffsets).toEqual([undefined, 101, 108]);
+    expect(texts).toContain('Canh bao sprint moi');
+    // Note: 106 ordinary messages matched (message_id 2 + 105 items = 106), trimmed to 100 newest so oldest 6 were evicted.
+    expect(chatUpdates.length).toBe(100);
+  });
 });

@@ -14,6 +14,7 @@ export interface TelegramAdapterConfig extends BaseAdapterConfig {
   telegramUserId?: string;
   knownChats?: TelegramKnownChat[];
   fetchFn?: typeof fetch;
+  pollUpdates?: (chatId: string, signal?: AbortSignal) => Promise<unknown[]>;
   chatRateLimiter?: GlobalRateLimiter;
   groupRateLimiter?: GlobalRateLimiter;
 }
@@ -63,6 +64,7 @@ export class TelegramAdapter extends BaseAdapter {
   private readonly telegramUserId?: string;
   private readonly knownChatMap: Map<string, TelegramKnownChat>;
   private readonly fetchFn: typeof fetch;
+  private readonly pollUpdates?: (chatId: string, signal?: AbortSignal) => Promise<unknown[]>;
   private readonly chatRate: GlobalRateLimiter;
   private readonly groupRate: GlobalRateLimiter;
 
@@ -80,6 +82,7 @@ export class TelegramAdapter extends BaseAdapter {
         }),
     );
     this.fetchFn = config.fetchFn ?? fetch;
+    this.pollUpdates = config.pollUpdates;
     this.rateLimiter = config.rateLimiter ?? requestLimiter;
     this.chatRate = config.chatRateLimiter ?? chatLimiter;
     this.groupRate = config.groupRateLimiter ?? groupLimiter;
@@ -126,12 +129,25 @@ export class TelegramAdapter extends BaseAdapter {
       }
       const rawChat = await this.request('getChat', { chat_id: id }, false, signal);
       this.chat(rawChat, id);
-      const updatesRaw = await this.request(
-        'getUpdates',
-        { limit: 100, timeout: 0, allowed_updates: ['message', 'edited_message', 'channel_post'] },
-        false,
-        signal,
-      );
+      let updatesRaw: unknown;
+      if (this.pollUpdates) {
+        if (signal?.aborted) throw fail('NETWORK', undefined, { requestSent: false });
+        await this.slot(this.rateLimiter!, this.token, signal);
+        if (signal?.aborted) throw fail('NETWORK', undefined, { requestSent: false });
+        try {
+          updatesRaw = await this.pollUpdates(id, signal);
+        } catch (err) {
+          if (err instanceof StepError) throw err;
+          throw fail(signal?.aborted ? 'NETWORK' : 'SERVER_ERROR');
+        }
+      } else {
+        updatesRaw = await this.request(
+          'getUpdates',
+          { limit: 100, timeout: 0, allowed_updates: ['message', 'edited_message', 'channel_post', 'my_chat_member'] },
+          false,
+          signal,
+        );
+      }
       const updates = Array.isArray(updatesRaw) ? updatesRaw : [];
       const byId = new Map<number, { id: string; messageId: number; chatId: string; senderName: string; text: string; date: number }>();
 

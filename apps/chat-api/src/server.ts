@@ -526,7 +526,7 @@ async function bootstrap() {
 
   const telegramAvailable = Boolean(env.TELEGRAM_BOT && pool);
   const telegramBotClient = telegramAvailable && pool
-    ? new TelegramBotClient(env.TELEGRAM_BOT!, fetch, new TelegramUpdateRepo(pool))
+    ? new TelegramBotClient(env.TELEGRAM_BOT!, fetch, new TelegramUpdateRepo(pool, env.ENCRYPTION_KEY))
     : undefined;
   const telegramTeamRepo = pool ? new TelegramTeamRepo(pool) : undefined;
   const telegramLookup = telegramAvailable && telegramBotClient
