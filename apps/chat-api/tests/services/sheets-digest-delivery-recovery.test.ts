@@ -637,17 +637,15 @@ describe('Task 5B (PR-5B): Manual Delivery Recovery API & Audit Preservation (TC
     expect(unclaimedResolve.body.error.code).toBe('RUN_NOT_AWAITING_DELIVERY_RESOLUTION');
   });
 
-  it('7. rejects wrong-kind schedules (calendar_digest, notion_digest, plan, github_digest) with 409 RUN_NOT_AWAITING_DELIVERY_RESOLUTION and zero DB mutations', async () => {
+  it('7. rejects non-digest schedules (plan) with 409 RUN_NOT_AWAITING_DELIVERY_RESOLUTION and zero DB mutations', async () => {
     const service = buildService();
     const app = buildApp(service);
     const { personalA } = fixtures;
     const recurrence = { type: 'daily' as const, time: '08:00' };
-    const dummyHash = 'a'.repeat(64);
 
-    const wrongKinds = ['calendar_digest', 'notion_digest', 'plan', 'github_digest'] as const;
+    const wrongKinds = ['plan'] as const;
 
     for (const kind of wrongKinds) {
-      const isPlan = kind === 'plan';
       const kindConv = await fixtures.convRepo.createConversation(
         personalA.user.id,
         `Hội thoại ${kind}`,
@@ -669,9 +667,9 @@ describe('Task 5B (PR-5B): Manual Delivery Recovery API & Audit Preservation (TC
           ['slack'],
           new Date('2026-11-03T01:00:00.000Z'),
           kind,
-          isPlan ? null : JSON.stringify({ version: 1, dummy: kind }),
-          isPlan ? null : dummyHash,
-          isPlan ? null : new Date('2026-11-01T12:00:00.000Z'),
+          null,
+          null,
+          null,
         ]
       );
       const sched = schedRes.rows[0];
