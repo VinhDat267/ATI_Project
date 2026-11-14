@@ -1,6 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { encryptCredentials } from '@wap/tool-adapters';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
+import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { TelegramUpdateRepo } from '../../src/db/repositories/telegram-update-repo.js';
+import { AdapterFactory } from '../../src/services/adapter-factory.js';
 import { TelegramBotClient } from '../../src/services/telegram/bot-client.js';
 
 const config = {
@@ -115,5 +118,183 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
     await db.pool.query('INSERT INTO telegram_update_cursors(bot_key,next_update_id,updated_at) VALUES($1,201,$2)', ['empty-poll-bot', lastUpdate]);
     await new TelegramUpdateRepo(db.pool).poll('empty-poll-bot', AbortSignal.timeout(2000), async () => []);
     expect((await db.pool.query("SELECT updated_at FROM telegram_update_cursors WHERE bot_key='empty-poll-bot'")).rows[0].updated_at.getTime()).toBe(lastUpdate.getTime());
+  });
+
+  it('shares cursor cleanly between verifyPairing, discoverGroups, and AdapterFactory read_messages with encrypted 100-message cache', async () => {
+    const encryptionKey = '0123456789abcdef0123456789abcdef';
+    const state = 'z'.repeat(43);
+    const groupId = '-100888777666';
+    const secondGroupId = '-100888777667';
+    const telegramUpdates: any[] = [
+      {
+        update_id: 1,
+        message: {
+          message_id: 10,
+          date: 1791000100,
+          from: { id: 777888, is_bot: false, first_name: 'Minh' },
+          chat: { id: 777888, type: 'private' },
+          text: `/start ati_${state}`,
+        },
+      },
+      {
+        update_id: 2,
+        message: {
+          message_id: 11,
+          date: 1791000200,
+          from: { id: 777888, is_bot: false, first_name: 'Minh', last_name: 'Le' },
+          chat: { id: Number(groupId), title: 'San pham ATI', type: 'supergroup' },
+          text: 'ORDINARY_GROUP_MESSAGE_BEFORE_PAIRING',
+        },
+      },
+      {
+        update_id: 3,
+        edited_message: {
+          message_id: 11,
+          date: 1791000250,
+          from: { id: 777888, is_bot: false, first_name: 'Minh', last_name: 'Le' },
+          chat: { id: Number(groupId), title: 'San pham ATI', type: 'supergroup' },
+          text: 'EDITED_GROUP_MESSAGE_BEFORE_PAIRING',
+        },
+      },
+    ];
+
+    const getUpdatesRequests: Array<{ offset?: number; allowed_updates?: string[] }> = [];
+    const fetchFn: typeof fetch = async (url, init) => {
+      const method = String(url).split('/').at(-1);
+      const body = JSON.parse(String(init?.body ?? '{}'));
+      if (method === 'getUpdates') {
+        getUpdatesRequests.push({ offset: body.offset, allowed_updates: body.allowed_updates });
+        const batch = telegramUpdates
+          .filter((u) => body.offset === undefined || u.update_id >= body.offset)
+          .slice(0, body.limit ?? 100);
+        return Response.json({ ok: true, result: batch });
+      }
+      if (method === 'getChatMember') {
+        return Response.json({ ok: true, result: { status: 'member' } });
+      }
+      if (method === 'getChat') {
+        return Response.json({ ok: true, result: { id: Number(body.chat_id), title: 'San pham ATI', type: 'supergroup' } });
+      }
+      return Response.json({ ok: false, error_code: 404 }, { status: 404 });
+    };
+
+    const isolatedConfig = {
+      ...config,
+      apiBaseUrl: 'http://127.0.0.1:45999',
+    };
+    const updateRepo = new TelegramUpdateRepo(db.pool, encryptionKey);
+    const botClient = new TelegramBotClient(isolatedConfig, fetchFn, updateRepo);
+
+    const paired = await botClient.verifyPairing(state, AbortSignal.timeout(5000));
+    expect(paired).toMatchObject({ matched: true, telegramUserId: '777888' });
+    expect(getUpdatesRequests[0]?.allowed_updates).toEqual(['message', 'edited_message', 'channel_post', 'my_chat_member']);
+
+    const groups = await botClient.discoverGroups(AbortSignal.timeout(5000));
+    expect(groups).toContainEqual({ chatId: groupId, title: 'San pham ATI', type: 'supergroup' });
+
+    expect((await db.pool.query('SELECT 1 FROM telegram_chat_message_cache')).rowCount).toBe(0);
+    // Simulate >100 ordinary messages arriving later before read_messages runs.
+    for (let i = 0; i < 110; i++) {
+      telegramUpdates.push({
+        update_id: 4 + i,
+        message: {
+          message_id: 20 + i,
+          date: 1791001000 + i,
+          from: { id: 999, is_bot: false, username: 'qa_bot_tester' },
+          chat: { id: Number(groupId), title: 'San pham ATI', type: 'supergroup' },
+          text: `MSG_${String(i).padStart(3, '0')}`,
+        },
+      });
+    }
+
+    const credRepo = new CredentialRepo(db.pool, encryptionKey);
+    const user = await db.person('TelegramCoordinated');
+    const savedCred = await credRepo.saveCredentials(
+      'telegram',
+      encryptCredentials(
+        {
+          telegramUserId: '777888',
+          username: 'minhle',
+          displayName: 'Minh Le',
+          selectedChats: [
+            { chatId: groupId, title: 'San pham ATI', type: 'supergroup' },
+            { chatId: secondGroupId, title: 'Second group', type: 'supergroup' },
+          ],
+        },
+        encryptionKey,
+      ),
+      user.id,
+    );
+
+    const factory = new AdapterFactory({
+      credentialRepo: credRepo,
+      encryptionKey,
+      telegramBot: isolatedConfig,
+      telegramBotClient: botClient,
+      serviceFetchFn: fetchFn,
+    });
+    const adapter = await factory.getAdapterForService('telegram', {
+      userId: user.id,
+      phase: 'execution',
+      connections: {
+        telegram: {
+          credentialId: savedCred.id,
+          telegramUserId: '777888',
+          username: 'minhle',
+          chatIds: [groupId, secondGroupId],
+        },
+      },
+    });
+
+    telegramUpdates.push({ update_id: 114, message: { message_id: 900, date: 1791002000, chat: { id: 111222, type: 'private' }, text: 'OUT_OF_SCOPE' } });
+    telegramUpdates.push({ update_id: 115, message: { message_id: 901, date: 1791002000, chat: { id: Number(secondGroupId), type: 'supergroup' }, text: 'SECOND_ALLOWED_CHAT' } });
+    // Query specifically for message 11? Since 110 newer messages arrived and cache cap is 100 per chat, verify newest messages AND cap of 100!
+    const newest = await adapter.execute('telegram.read_messages', { chatId: groupId, query: 'MSG_109', limit: 5 });
+    expect(newest.messages).toHaveLength(1);
+    expect(newest.messages[0]).toMatchObject({ messageId: 129, text: 'MSG_109' });
+
+    // Verify telegram_chat_message_cache holds encrypted payloads ('v1:...') and is bounded at 100 rows per chat.
+    const cacheRows = (
+      await db.pool.query<{ payload: string }>(
+        'SELECT payload FROM telegram_chat_message_cache WHERE chat_id = $1',
+        [groupId],
+      )
+    ).rows;
+    expect(cacheRows).toHaveLength(100);
+    expect((await db.pool.query('SELECT 1 FROM telegram_chat_message_cache WHERE chat_id = $1', ['111222'])).rowCount).toBe(0);
+    expect(cacheRows.every((r) => r.payload.startsWith('v1:'))).toBe(true);
+    expect(JSON.stringify(cacheRows)).not.toContain('MSG_109');
+
+    // Verify telegram_update_inbox NEVER persists ordinary message text or raw pairing state.
+    const inboxRows = JSON.stringify((await db.pool.query('SELECT payload FROM telegram_update_inbox')).rows);
+    expect(inboxRows).not.toContain('ORDINARY_GROUP_MESSAGE_BEFORE_PAIRING');
+    expect(inboxRows).not.toContain('EDITED_GROUP_MESSAGE_BEFORE_PAIRING');
+    expect(inboxRows).not.toContain('MSG_109');
+    expect(inboxRows).not.toContain(state);
+
+    // Offsets progressed monotonically without clobbering across verifyPairing -> discoverGroups -> readUpdatesForChat.
+    expect(getUpdatesRequests.map((r) => r.offset)).toEqual([undefined, 4, 4, 104]);
+
+    // Edit earlier cached message (message_id 129) via edited_message in a subsequent update and verify overwrite + cursor 114.
+    telegramUpdates.push({
+      update_id: 116,
+      edited_message: {
+        message_id: 129,
+        date: 1791002000,
+        from: { id: 999, is_bot: false, username: 'qa_bot_tester' },
+        chat: { id: Number(groupId), title: 'San pham ATI', type: 'supergroup' },
+        text: 'MSG_109_EDITED',
+      },
+    });
+    const edited = await adapter.execute('telegram.read_messages', { chatId: groupId, query: 'MSG_109_EDITED', limit: 5 });
+    expect(edited.messages).toHaveLength(1);
+    expect(edited.messages[0]).toMatchObject({ messageId: 129, text: 'MSG_109_EDITED' });
+    const second = await adapter.execute('telegram.read_messages', { chatId: secondGroupId, query: 'SECOND_ALLOWED_CHAT', limit: 5 });
+    expect(getUpdatesRequests.map((r) => r.offset)).toEqual([undefined, 4, 4, 104, 116, 117]);
+    expect(second.messages).toHaveLength(1);
+    expect(second.messages[0]).toMatchObject({ messageId: 901, text: 'SECOND_ALLOWED_CHAT' });
+    await db.pool.query('UPDATE telegram_chat_message_cache SET expires_at = now()');
+    await updateRepo.purgeExpiredChatMessages();
+    expect((await db.pool.query('SELECT 1 FROM telegram_chat_message_cache')).rowCount).toBe(0);
   });
 });

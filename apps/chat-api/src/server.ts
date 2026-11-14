@@ -525,8 +525,9 @@ async function bootstrap() {
   const githubConnection = githubLookup ?? sandboxGitHubConnection;
 
   const telegramAvailable = Boolean(env.TELEGRAM_BOT && pool);
+  const telegramUpdates = pool ? new TelegramUpdateRepo(pool, env.ENCRYPTION_KEY) : undefined;
   const telegramBotClient = telegramAvailable && pool
-    ? new TelegramBotClient(env.TELEGRAM_BOT!, fetch, new TelegramUpdateRepo(pool))
+    ? new TelegramBotClient(env.TELEGRAM_BOT!, fetch, telegramUpdates!)
     : undefined;
   const telegramTeamRepo = pool ? new TelegramTeamRepo(pool) : undefined;
   const telegramLookup = telegramAvailable && telegramBotClient
@@ -1183,6 +1184,12 @@ async function bootstrap() {
       }, 6 * 60 * 60 * 1000)
     : undefined;
   slackReceiptCleanupTimer?.unref?.();
+  const purgeTelegramCache = () => {
+    void telegramUpdates?.purgeExpiredChatMessages().catch(() => console.warn('[chat-api] Telegram cache cleanup failed'));
+  };
+  purgeTelegramCache();
+  const telegramCacheCleanupTimer = telegramUpdates ? setInterval(purgeTelegramCache, 60_000) : undefined;
+  telegramCacheCleanupTimer?.unref?.();
 
   const host = env.RUNTIME_MODE === 'sandbox' ? '127.0.0.1' : '0.0.0.0';
   app.listen(port, host, () => {
@@ -1198,6 +1205,7 @@ async function bootstrap() {
   const shutdown = async () => {
     schedules?.runner.stop();
     if (slackReceiptCleanupTimer) clearInterval(slackReceiptCleanupTimer);
+    if (telegramCacheCleanupTimer) clearInterval(telegramCacheCleanupTimer);
     await Promise.all([slackInvalidationRunner?.stop(), slackLifecycleRuntime?.stop(), slackFanoutRuntime?.stop(),slackAssistant?.runner?.stop()]);
     process.exit(0);
   };

@@ -1,6 +1,18 @@
 import type { TelegramBotConfig } from '../../config/env.js';
 import type { TelegramChatType, TelegramTeamChatItem } from '../../db/repositories/telegram-team-repo.js';
-import { MemoryTelegramUpdateStore, projectTelegramUpdate, telegramStateHash, type TelegramUpdateStore } from './update-inbox.js';
+import {
+  extractTelegramChatMessage,
+  MemoryTelegramUpdateStore,
+  projectTelegramUpdate,
+  TELEGRAM_CHAT_MESSAGES,
+  telegramStateHash,
+  type TelegramCachedChatMessage,
+  type TelegramProjectedBatch,
+  type TelegramUpdateStore,
+} from './update-inbox.js';
+
+const COORDINATED_ALLOWED_UPDATES = ['message', 'edited_message', 'channel_post', 'my_chat_member'];
+const MAX_READ_POLL_PAGES = 10;
 
 export class TelegramBotError extends Error {
   constructor(
@@ -72,7 +84,7 @@ export class TelegramBotClient {
     const groupMap = new Map<string, TelegramTeamChatItem>();
 
     for (const u of updates) {
-      const chat = u?.message?.chat ?? u?.my_chat_member?.chat ?? u?.channel_post?.chat;
+      const chat = u?.message?.chat ?? u?.edited_message?.chat ?? u?.my_chat_member?.chat ?? u?.channel_post?.chat;
       if (chat && (chat.type === 'group' || chat.type === 'supergroup' || chat.type === 'channel')) {
         const chatId = String(chat.id ?? '').trim();
         const title = String(chat.title ?? chat.username ?? chatId).trim();
@@ -127,7 +139,7 @@ export class TelegramBotClient {
     const updates = await this.getUpdates(signal);
     const groupMap = new Map<string, TelegramTeamChatItem>();
     for (const u of updates) {
-      const chat = u?.message?.chat ?? u?.my_chat_member?.chat ?? u?.channel_post?.chat;
+      const chat = u?.message?.chat ?? u?.edited_message?.chat ?? u?.my_chat_member?.chat ?? u?.channel_post?.chat;
       if (chat && (chat.type === 'group' || chat.type === 'supergroup' || chat.type === 'channel')) {
         const chatId = String(chat.id ?? '').trim();
         const title = String(chat.title ?? chat.username ?? chatId).trim();
@@ -185,18 +197,61 @@ export class TelegramBotClient {
     }
   }
 
-  private async getUpdates(signal: AbortSignal): Promise<any[]> {
+  async readUpdatesForChat(chatId: string, signal: AbortSignal, allowedChats: readonly string[] = [chatId]): Promise<any[]> {
     const botKey = telegramStateHash(`${this.config.apiBaseUrl}:${this.config.botToken}`);
+    const normalizedChatId = String(chatId ?? '').trim();
+    const cacheChatIds = new Set(allowedChats);
+    if (!cacheChatIds.has(normalizedChatId)) throw new TelegramBotError('rejected', 403);
+    for (let page = 0; page < MAX_READ_POLL_PAGES; page += 1) {
+      const { rawCount } = await this.getUpdatesPage(signal, cacheChatIds);
+      if (rawCount < 100) break;
+    }
+    if (!this.updates.readChatMessages) {
+      return [];
+    }
+    const cached = await this.updates.readChatMessages(botKey, normalizedChatId);
+    return cached.map((msg) => {
+      const numericChatId = Number(msg.chatId);
+      return {
+        update_id: 0,
+        message: {
+          message_id: msg.messageId,
+          date: msg.date,
+          text: msg.text,
+          chat: { id: Number.isSafeInteger(numericChatId) ? numericChatId : msg.chatId },
+          ...(msg.from ? { from: msg.from } : {}),
+        },
+      };
+    });
+  }
+
+  private async getUpdates(signal: AbortSignal): Promise<any[]> {
+    const { updates } = await this.getUpdatesPage(signal);
+    return updates;
+  }
+
+  private async getUpdatesPage(signal: AbortSignal, cacheChatIds?: ReadonlySet<string>): Promise<{ updates: any[]; rawCount: number }> {
+    const botKey = telegramStateHash(`${this.config.apiBaseUrl}:${this.config.botToken}`);
+    let rawCount = 0;
     try {
-      return await this.updates.poll(botKey, signal, async (offset) => {
+      const updates = await this.updates.poll(botKey, signal, async (offset) => {
         const result = await this.callMethod(
           'getUpdates',
-          { limit: 100, timeout: 0, allowed_updates: ['message', 'my_chat_member', 'channel_post'], ...(offset !== undefined ? { offset } : {}) },
+          { limit: 100, timeout: 0, allowed_updates: COORDINATED_ALLOWED_UPDATES, ...(offset !== undefined ? { offset } : {}) },
           signal,
         );
         if (!Array.isArray(result)) throw new TelegramBotError('server');
-        return result.map(projectTelegramUpdate);
+        rawCount = result.length;
+        const projected: TelegramProjectedBatch = result.map(projectTelegramUpdate);
+        const cachedMessages: TelegramCachedChatMessage[] = [];
+        for (const update of result) {
+          const msg = extractTelegramChatMessage(update, this.config.botToken);
+          if (msg && cacheChatIds?.has(msg.chatId)) cachedMessages.push(msg);
+        }
+        if (cachedMessages.length > 0) projected[TELEGRAM_CHAT_MESSAGES] = cachedMessages;
+        return projected;
       });
+      return { updates, rawCount };
     } catch (error) {
       if (error instanceof TelegramBotError) throw error;
       throw new TelegramBotError(signal.aborted ? 'network' : 'server');
