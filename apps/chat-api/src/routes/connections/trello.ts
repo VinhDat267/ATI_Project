@@ -243,13 +243,9 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
       }
 
       const now = clock();
-      const rawExpiresIn = Number(tokens.expiresInSeconds ?? (tokens as any).expiresIn ?? 3600);
-      const expiresInSeconds = Number.isFinite(rawExpiresIn) && rawExpiresIn >= 0 ? rawExpiresIn : 3600;
       const config = encryptCredentials(
         {
           refreshToken: tokens.refreshToken,
-          accessToken: tokens.accessToken,
-          expiresAt: now + expiresInSeconds * 1000,
           username: member.username,
           memberId: member.id,
           connectedAt: new Date(now).toISOString(),
