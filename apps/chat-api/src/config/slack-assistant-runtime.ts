@@ -30,7 +30,7 @@ export function createPersonalSlackAssistantRuntime(input:Options){
  const sandboxReady=env.LLM_PROVIDER==='openai-compatible'&&literalLoopback(env.LLM_BASE_URL)&&literalLoopback(input.oauth?.apiBaseUrl);
  const available=env.MYSLACK_ENABLED==='on'&&env.MYSLACK_AUTOMATION_ENABLED==='on'&&!!input.oauth&&!!input.encryptionKey&&!!identity.accountIdentifier&&!!identity.model&&(input.live||sandboxReady);
  const repo=new SlackAssistantRepo(input.pool,policy,{appId:input.oauth?.appId??env.MYSLACK_APP_ID??'disabled',automationEnabled:available,timezone:env.APP_TIME_ZONE},artifacts);
- const proposals=new SlackProposalService({pool:input.pool,repo,artifacts,plans:new PlanRepo(input.pool,lineage),messages:new MessageRepo(input.pool,lineage),policy,invalidation});
+ const proposals=new SlackProposalService({pool:input.pool,repo,artifacts,plans:new PlanRepo(input.pool,lineage),messages:new MessageRepo(input.pool,lineage),policy,invalidation,encryptionKey:input.encryptionKey});
  const digests=new SlackDigestService({pool:input.pool,repo,artifacts,policy});
  const directoryReady=env.MYSLACK_ENABLED==='on'&&!!input.oauth&&!!input.encryptionKey&&!!identity.accountIdentifier&&!!identity.model;
  const connections=directoryReady?new SlackConnectionRepo(input.pool,invalidation):undefined;

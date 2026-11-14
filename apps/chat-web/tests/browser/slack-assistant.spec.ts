@@ -1,11 +1,12 @@
 import {test,expect} from '@playwright/test';
 import pg from 'pg';
-import {createHash} from 'node:crypto';
+import {createHash, randomUUID} from 'node:crypto';
 import {SlackConsentRepo} from '../../../chat-api/src/db/repositories/slack-consent-repo.js';
 import {SlackPolicyService} from '../../../chat-api/src/services/slack/policy-service.js';
 import {SlackAssistantRepo} from '../../../chat-api/src/db/repositories/slack-assistant-repo.js';
 import {SlackAssistantArtifactRepo} from '../../../chat-api/src/db/repositories/slack-assistant-artifact-repo.js';
 import {resolveRuntimeProviderIdentity} from '../../../chat-api/src/config/slack-policy-runtime.js';
+import {encryptCredentials} from '../../../../packages/tool-adapters/src/crypto.js';
 import {validateSlackPolicyReference} from '@wap/tool-schemas';
 
 for(const width of [375,1440])for(const theme of ['light','dark']){
@@ -185,6 +186,29 @@ test('SLACK-M4: multi-service targets, URL thread parser, directory picker and P
   } finally {
    client.release();
   }
+  const encryptionKey = process.env.ENCRYPTION_KEY || '01234567890123456789012345678901';
+  const encryptedGithubCred = encryptCredentials(
+   { refreshToken: 'synthetic-refresh', accessToken: 'synthetic-access', githubUserId: 'G_FIXTURE', login: 'fixture_octo' },
+   encryptionKey,
+  );
+  const scopeId = `personal:${connRow.user_id}`;
+  await pool.query("DELETE FROM service_credentials WHERE service = 'github' AND user_id = $1 AND workspace_id IS NULL", [connRow.user_id]);
+  await pool.query(
+   "INSERT INTO service_credentials(id, service, user_id, workspace_id, config, status) VALUES($1, 'github', $2, NULL, $3, 'active')",
+   [randomUUID(), connRow.user_id, encryptedGithubCred],
+  );
+  await pool.query('DELETE FROM github_team_repos WHERE scope_id = $1', [scopeId]);
+  await pool.query(
+   `INSERT INTO github_team_scope(id, chosen_by, updated_at) VALUES($1, $2, now())
+    ON CONFLICT (id) DO UPDATE SET chosen_by = EXCLUDED.chosen_by, updated_at = now()`,
+   [scopeId, connRow.user_id],
+  );
+  await pool.query(
+   `INSERT INTO github_team_repos(scope_id, repo_id, full_name, name, position)
+    VALUES ($1, 'R_PLATFORM', 'acme/platform', 'platform', 1),
+           ($1, 'R_PAYMENT', 'acme/payment-service', 'payment-service', 2)`,
+   [scopeId],
+  );
  } finally {
   await pool.end();
  }
