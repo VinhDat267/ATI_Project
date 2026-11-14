@@ -43,8 +43,12 @@ interface ScopedSite {
 
 const sharedLimiter = new GlobalRateLimiter({ maxRequests: 5, windowMs: 1000 });
 
-const fail = (category: Parameters<typeof createJiraStepError>[0], statusCode?: number, customMessage?: string) =>
-  createJiraStepError(category, statusCode, customMessage);
+const fail = (
+  category: Parameters<typeof createJiraStepError>[0],
+  statusCode?: number,
+  customMessage?: string,
+  details?: Record<string, unknown>
+) => createJiraStepError(category, statusCode, customMessage, false, details);
 
 const record = (v: unknown): v is Record<string, any> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -344,19 +348,19 @@ export class PersonalJiraAdapter extends BaseAdapter {
         value.startAt !== start ||
         value.issueTypes.length > 50
       ) {
-        throw fail('SERVER_ERROR');
+        throw fail('SERVER_ERROR', undefined, undefined, { requestSent: false });
       }
       for (const type of value.issueTypes) {
         if (!record(type) || !identifier(type.id) || !text(type.name, 1, 255) || typeof type.subtask !== 'boolean') {
-          throw fail('SERVER_ERROR');
+          throw fail('SERVER_ERROR', undefined, undefined, { requestSent: false });
         }
         types.push({ id: type.id, name: type.name, subtask: type.subtask });
       }
       start += value.issueTypes.length;
       if (start >= value.total) return types;
-      if (!value.issueTypes.length) throw fail('SERVER_ERROR');
+      if (!value.issueTypes.length) throw fail('SERVER_ERROR', undefined, undefined, { requestSent: false });
     }
-    throw fail('VALIDATION');
+    throw fail('VALIDATION', undefined, undefined, { requestSent: false });
   }
 
   async checkConnection(signal?: AbortSignal): Promise<boolean> {
@@ -393,6 +397,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
           statusCode: 403,
           retryable: false,
           message: `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Tool '${tool}' is disabled in Jira G2A read-only mode`,
+          details: { requestSent: false },
         });
       }
     }
@@ -696,12 +701,26 @@ export class PersonalJiraAdapter extends BaseAdapter {
       );
 
       if (!record(issue) || !record(issue.fields?.project) || typeof issue.fields.project.key !== 'string') {
-        throw fail('SERVER_ERROR');
+        throw fail('SERVER_ERROR', undefined, undefined, { requestSent: false });
       }
 
       const currentProjectKey = issue.fields.project.key;
       this.resolveProject(site, currentProjectKey);
-      const idn = this.identity(issue, site, currentProjectKey);
+      let idn: { id: string; key: string; url: string };
+      try {
+        idn = this.identity(issue, site, currentProjectKey);
+      } catch (err) {
+        if (err instanceof StepError) {
+          throw new StepError({
+            category: err.category,
+            statusCode: err.statusCode,
+            retryable: err.retryable,
+            message: err.message,
+            details: { ...(err.details ?? {}), requestSent: false },
+          });
+        }
+        throw err;
+      }
 
       const value = await this.transport.request(site.cloudId, '/issue/' + idn.key + '/comment', true, {
         ...callOpts,

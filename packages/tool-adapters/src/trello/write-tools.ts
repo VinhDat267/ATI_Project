@@ -2,6 +2,24 @@ import { TrelloReadTools } from './read-tools.js';
 import { StepError } from '../base-adapter.js';
 
 export class TrelloWriteTools extends TrelloReadTools {
+  private async preWriteRequest<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    try {
+      return await this.request<T>(endpoint, options);
+    } catch (err: any) {
+      if (err instanceof StepError) {
+        throw new StepError({
+          message: err.message,
+          category: err.category,
+          statusCode: err.statusCode,
+          retryable: err.retryable,
+          cause: err.cause ?? err,
+          details: { ...(err.details ?? {}), requestSent: false },
+        });
+      }
+      throw err;
+    }
+  }
+
   /**
    * Create a new card on a list.
    */
@@ -34,11 +52,11 @@ export class TrelloWriteTools extends TrelloReadTools {
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const listInfo = await this.request<any>(`/lists/${safeListId}`, { signal: options?.signal });
+    const listInfo = await this.preWriteRequest<any>(`/lists/${safeListId}`, { signal: options?.signal });
     this.assertParentBoard(listInfo, options?.boardId);
 
     if (Array.isArray(args.idMembers) && args.idMembers.length > 0) {
-      const boardMembers = await this.request<any[]>(`/boards/${listInfo.idBoard}/members`, {
+      const boardMembers = await this.preWriteRequest<any[]>(`/boards/${listInfo.idBoard}/members`, {
         signal: options?.signal,
       });
       const allowedMemberIds = new Set(
@@ -115,10 +133,10 @@ export class TrelloWriteTools extends TrelloReadTools {
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.request<any>(`/cards/${safeCardId}`, { signal: options?.signal });
+    const cardInfo = await this.preWriteRequest<any>(`/cards/${safeCardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
     if (args.idList) {
-      const listInfo = await this.request<any>(`/lists/${args.idList}`, { signal: options?.signal });
+      const listInfo = await this.preWriteRequest<any>(`/lists/${args.idList}`, { signal: options?.signal });
       this.assertParentBoard(listInfo, options?.boardId);
     }
 
@@ -160,10 +178,10 @@ export class TrelloWriteTools extends TrelloReadTools {
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.request<any>(`/cards/${safeCardId}`, { signal: options?.signal });
+    const cardInfo = await this.preWriteRequest<any>(`/cards/${safeCardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
 
-    const boardMembers = await this.request<any[]>(`/boards/${cardInfo.idBoard}/members`, { signal: options?.signal });
+    const boardMembers = await this.preWriteRequest<any[]>(`/boards/${cardInfo.idBoard}/members`, { signal: options?.signal });
     const isBoardMember = Array.isArray(boardMembers) && boardMembers.some((m) => m.id === safeMemberId);
     if (!isBoardMember) {
       throw new StepError({
@@ -308,7 +326,7 @@ export class TrelloWriteTools extends TrelloReadTools {
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.request<any>(`/cards/${safeCardId}`, { signal: options?.signal });
+    const cardInfo = await this.preWriteRequest<any>(`/cards/${safeCardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
 
     const res = await this.request<any>(`/cards/${safeCardId}/actions/comments`, {
@@ -386,7 +404,7 @@ export class TrelloWriteTools extends TrelloReadTools {
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.request<any>(`/cards/${safeCardId}`, { signal: options?.signal });
+    const cardInfo = await this.preWriteRequest<any>(`/cards/${safeCardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
 
     const deleteEndpoint = `/cards/${encodeURIComponent(safeCardId)}/idMembers/${encodeURIComponent(safeMemberId)}`;
@@ -445,10 +463,10 @@ export class TrelloWriteTools extends TrelloReadTools {
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.request<any>(`/cards/${safeCardId}`, { signal: options?.signal });
+    const cardInfo = await this.preWriteRequest<any>(`/cards/${safeCardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
 
-    const checklists = await this.request<any[]>(`/cards/${safeCardId}/checklists`, { signal: options?.signal });
+    const checklists = await this.preWriteRequest<any[]>(`/cards/${safeCardId}/checklists`, { signal: options?.signal });
     const needle = (args.itemName || '').trim().toLowerCase();
     const allItems: Array<{ id: string; name: string; state: string }> = [];
     if (Array.isArray(checklists)) {
@@ -476,6 +494,7 @@ export class TrelloWriteTools extends TrelloReadTools {
           category: 'NOT_FOUND',
           statusCode: 404,
           retryable: false,
+          details: { requestSent: false },
         });
       }
       if (needle) {
@@ -492,6 +511,7 @@ export class TrelloWriteTools extends TrelloReadTools {
             category: 'VALIDATION',
             statusCode: 400,
             retryable: false,
+            details: { requestSent: false },
           });
         }
       }
@@ -504,6 +524,7 @@ export class TrelloWriteTools extends TrelloReadTools {
           category: 'VALIDATION',
           statusCode: 400,
           retryable: false,
+          details: { requestSent: false },
         });
       }
       if (exactMatches.length === 1) {
@@ -519,6 +540,7 @@ export class TrelloWriteTools extends TrelloReadTools {
             category: 'NOT_FOUND',
             statusCode: 404,
             retryable: false,
+            details: { requestSent: false },
           });
         }
         if (partialMatches.length > 1) {
@@ -527,6 +549,7 @@ export class TrelloWriteTools extends TrelloReadTools {
             category: 'VALIDATION',
             statusCode: 400,
             retryable: false,
+            details: { requestSent: false },
           });
         }
         targetCheckItemId = partialMatches[0]!.id;
@@ -565,7 +588,7 @@ export class TrelloWriteTools extends TrelloReadTools {
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.request<any>(`/cards/${safeCardId}`, { signal: options?.signal });
+    const cardInfo = await this.preWriteRequest<any>(`/cards/${safeCardId}`, { signal: options?.signal });
     this.assertParentBoard(cardInfo, options?.boardId);
 
     const res = await this.request<any>(`/cards/${safeCardId}`, {

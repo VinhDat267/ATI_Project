@@ -76,6 +76,42 @@ export class SheetsAdapter extends BaseAdapter {
     this.assertAllowedScope('spreadsheets', value);
     return value;
   }
+  private withPreWriteFlag(err: unknown): never {
+    if (err instanceof StepError) {
+      throw new StepError({
+        message: err.message,
+        category: err.category,
+        statusCode: err.statusCode,
+        retryable: err.retryable,
+        details: { ...(err.details ?? {}), requestSent: false },
+      });
+    }
+    throw new StepError({
+      message: 'Sheets request stopped before dispatch',
+      category: 'NETWORK',
+      details: { requestSent: false },
+    });
+  }
+
+  private withPartialWriteFlag(err: unknown): never {
+    if (err instanceof StepError) {
+      const { requestSent: _ignored, ...rest } = (err.details ?? {}) as Record<string, unknown>;
+      throw new StepError({
+        message: err.message,
+        category: 'UNKNOWN',
+        statusCode: err.statusCode,
+        retryable: false,
+        details: { ...rest, partialWrite: true, requestSent: true },
+      });
+    }
+    throw new StepError({
+      message: 'Sheets write outcome is unknown after partial mutation',
+      category: 'UNKNOWN',
+      retryable: false,
+      details: { partialWrite: true, requestSent: true },
+    });
+  }
+
   private async request(
     path: string,
     signal?: AbortSignal,
@@ -92,7 +128,7 @@ export class SheetsAdapter extends BaseAdapter {
       try { await this.waitForTransportSlot(this.rateLimiter ?? sharedLimiter, 'sheets:' + this.account, signal); }
       catch (error) {
         // The limiter message carries its key (the service-account email); keep only the category.
-        if (error instanceof StepError) throw new StepError({ message: 'Sheets request stopped before dispatch', category: error.category, statusCode: error.statusCode, retryable: error.retryable });
+        if (error instanceof StepError) throw new StepError({ message: 'Sheets request stopped before dispatch', category: error.category, statusCode: error.statusCode, retryable: error.retryable, ...(error.details ? { details: error.details } : {}) });
         throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
       }
       if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
@@ -230,6 +266,9 @@ export class SheetsAdapter extends BaseAdapter {
       });
     }
     if (toolName === 'sheets.append_rows') {
+      let writeDispatched = false;
+      let batchMutationCommitted = false;
+      try {
       const id = this.checkedId(args.spreadsheetId);
       const sheet = titleText(args.sheet);
       const needsHeaderLookup = args.records !== undefined || args.keyColumn !== undefined;
@@ -238,7 +277,7 @@ export class SheetsAdapter extends BaseAdapter {
         ? { enabled: true, keyColumns: null, onDuplicate: 'skip' as const }
         : resolveDeduplicationPolicy(rawRows, args);
       const tabs = await this.tabs(id, signal);
-      if (!tabs.some(tab => tab.title === sheet)) throw new StepError({ message: 'Sheets tab not found in the allowed spreadsheet', category: 'NOT_FOUND', statusCode: 404 });
+      if (!tabs.some(tab => tab.title === sheet)) throw new StepError({ message: 'Sheets tab not found in the allowed spreadsheet', category: 'NOT_FOUND', statusCode: 404, details: { requestSent: false } });
       const quotedSheet = /\s|'/.test(sheet) ? "'" + sheet.replaceAll("'", "''") + "'" : sheet;
       const range = "'" + sheet.replaceAll("'", "''") + "'!A1";
       const readRange = `${quotedSheet}!A1:Z500`;
@@ -258,8 +297,6 @@ export class SheetsAdapter extends BaseAdapter {
           })
         : null;
 
-      let writeDispatched = false;
-      let batchMutationCommitted = false;
       let activeDispatchMeta: SheetsAppendDispatchMetadata | undefined;
 
       try {
@@ -389,154 +426,222 @@ export class SheetsAdapter extends BaseAdapter {
       } finally {
         await lease?.release();
       }
+      } catch (err) {
+        if (batchMutationCommitted) {
+          this.withPartialWriteFlag(err);
+        }
+        if (!writeDispatched) {
+          this.withPreWriteFlag(err);
+        }
+        throw err;
+      }
     }
     if (toolName === 'sheets.update_rows') {
-      const id = this.checkedId(args.spreadsheetId);
-      const sheet = titleText(args.sheet);
-      const tabs = await this.tabs(id, signal);
-      if (!tabs.some((tab) => tab.title === sheet)) {
-        throw new StepError({
-          message: 'Sheets tab not found in the allowed spreadsheet',
-          category: 'NOT_FOUND',
-          statusCode: 404,
-        });
-      }
-      const quotedSheet = /\s|'/.test(sheet) ? "'" + sheet.replaceAll("'", "''") + "'" : sheet;
-      const readRange = `${quotedSheet}!A1:Z500`;
-      const existingData = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
-      const existingRows = Array.isArray(existingData?.values) ? existingData.values : [];
-      const { batchData, updatedRowsCount, unmatchedKeys } = buildPartialCellUpdates(
-        quotedSheet,
-        existingRows,
-        args.updates
-      );
-      let lastUpdatedRange = `${quotedSheet}!A1`;
-      if (batchData.length > 0) {
-        const batchRes = await this.request(id + '/values:batchUpdate', signal, {
-          valueInputOption: 'USER_ENTERED',
-          data: batchData,
-        });
-        const respRange = batchRes?.responses?.[batchRes.responses.length - 1]?.updatedRange;
-        if (typeof respRange === 'string') {
-          lastUpdatedRange = respRange;
-        } else {
-          lastUpdatedRange = batchData[batchData.length - 1]!.range;
+      let writeDispatched = false;
+      try {
+        const id = this.checkedId(args.spreadsheetId);
+        const sheet = titleText(args.sheet);
+        const tabs = await this.tabs(id, signal);
+        if (!tabs.some((tab) => tab.title === sheet)) {
+          throw new StepError({
+            message: 'Sheets tab not found in the allowed spreadsheet',
+            category: 'NOT_FOUND',
+            statusCode: 404,
+            details: { requestSent: false },
+          });
         }
-      }
-      return {
-        spreadsheetId: id,
-        updatedRange: lastUpdatedRange,
-        updatedRows: updatedRowsCount,
-        updatedCells: batchData.length,
-        ...(unmatchedKeys.length > 0 ? { unmatchedKeys } : {}),
-        url: this.url(id),
-      };
-    }
-    if (toolName === 'sheets.delete_rows') {
-      const id = this.checkedId(args.spreadsheetId);
-      const sheet = titleText(args.sheet);
-      if (args.rowNumbers !== undefined) {
-        buildDeleteRowRequests(0, [], args);
-      }
-      const tabs = await this.tabs(id, signal);
-      const matchedTab = tabs.find((tab) => tab.title === sheet);
-      if (!matchedTab) {
-        throw new StepError({
-          message: 'Sheets tab not found in the allowed spreadsheet',
-          category: 'NOT_FOUND',
-          statusCode: 404,
-        });
-      }
-      let existingRows: unknown[][] = [];
-      if (typeof args.matchColumn === 'string' && args.matchColumn.trim().length > 0) {
         const quotedSheet = /\s|'/.test(sheet) ? "'" + sheet.replaceAll("'", "''") + "'" : sheet;
         const readRange = `${quotedSheet}!A1:Z500`;
         const existingData = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
-        existingRows = Array.isArray(existingData?.values) ? existingData.values : [];
+        const existingRows = Array.isArray(existingData?.values) ? existingData.values : [];
+        const { batchData, updatedRowsCount, unmatchedKeys } = buildPartialCellUpdates(
+          quotedSheet,
+          existingRows,
+          args.updates
+        );
+        let lastUpdatedRange = `${quotedSheet}!A1`;
+        if (batchData.length > 0) {
+          const batchRes = await this.request(
+            id + '/values:batchUpdate',
+            signal,
+            {
+              valueInputOption: 'USER_ENTERED',
+              data: batchData,
+            },
+            (dispatched) => {
+              writeDispatched = dispatched;
+            }
+          );
+          const respRange = batchRes?.responses?.[batchRes.responses.length - 1]?.updatedRange;
+          if (typeof respRange === 'string') {
+            lastUpdatedRange = respRange;
+          } else {
+            lastUpdatedRange = batchData[batchData.length - 1]!.range;
+          }
+        }
+        return {
+          spreadsheetId: id,
+          updatedRange: lastUpdatedRange,
+          updatedRows: updatedRowsCount,
+          updatedCells: batchData.length,
+          ...(unmatchedKeys.length > 0 ? { unmatchedKeys } : {}),
+          url: this.url(id),
+        };
+      } catch (err) {
+        if (!writeDispatched) {
+          this.withPreWriteFlag(err);
+        }
+        throw err;
       }
-      const { deletedRowNumbers, requests } = buildDeleteRowRequests(
-        matchedTab.id,
-        existingRows,
-        args
-      );
-      if (requests.length > 0) {
-        await this.request(id + ':batchUpdate', signal, { requests });
+    }
+    if (toolName === 'sheets.delete_rows') {
+      let writeDispatched = false;
+      try {
+        const id = this.checkedId(args.spreadsheetId);
+        const sheet = titleText(args.sheet);
+        if (args.rowNumbers !== undefined) {
+          buildDeleteRowRequests(0, [], args);
+        }
+        const tabs = await this.tabs(id, signal);
+        const matchedTab = tabs.find((tab) => tab.title === sheet);
+        if (!matchedTab) {
+          throw new StepError({
+            message: 'Sheets tab not found in the allowed spreadsheet',
+            category: 'NOT_FOUND',
+            statusCode: 404,
+            details: { requestSent: false },
+          });
+        }
+        let existingRows: unknown[][] = [];
+        if (typeof args.matchColumn === 'string' && args.matchColumn.trim().length > 0) {
+          const quotedSheet = /\s|'/.test(sheet) ? "'" + sheet.replaceAll("'", "''") + "'" : sheet;
+          const readRange = `${quotedSheet}!A1:Z500`;
+          const existingData = await this.request(id + '/values/' + encodeURIComponent(readRange), signal);
+          existingRows = Array.isArray(existingData?.values) ? existingData.values : [];
+        }
+        const { deletedRowNumbers, requests } = buildDeleteRowRequests(
+          matchedTab.id,
+          existingRows,
+          args
+        );
+        if (requests.length > 0) {
+          await this.request(
+            id + ':batchUpdate',
+            signal,
+            { requests },
+            (dispatched) => {
+              writeDispatched = dispatched;
+            }
+          );
+        }
+        return {
+          spreadsheetId: id,
+          sheet,
+          deletedRows: deletedRowNumbers.length,
+          deletedRowNumbers,
+          url: this.url(id),
+        };
+      } catch (err) {
+        if (!writeDispatched) {
+          this.withPreWriteFlag(err);
+        }
+        throw err;
       }
-      return {
-        spreadsheetId: id,
-        sheet,
-        deletedRows: deletedRowNumbers.length,
-        deletedRowNumbers,
-        url: this.url(id),
-      };
     }
     if (toolName === 'sheets.create_sheet') {
-      const id = this.checkedId(args.spreadsheetId);
-      const title = titleText(args.title);
-      let rawHeaders: string[] | undefined;
-      if (args.headers !== undefined) {
-        if (
-          !Array.isArray(args.headers) ||
-          args.headers.length < 1 ||
-          args.headers.length > 20 ||
-          args.headers.some((h: unknown) => typeof h !== 'string' || !h.trim() || h.length > 200)
-        ) {
-          invalid('headers must be an array of 1..20 non-empty strings');
+      let writeDispatched = false;
+      let sheetCreated = false;
+      try {
+        const id = this.checkedId(args.spreadsheetId);
+        const title = titleText(args.title);
+        let rawHeaders: string[] | undefined;
+        if (args.headers !== undefined) {
+          if (
+            !Array.isArray(args.headers) ||
+            args.headers.length < 1 ||
+            args.headers.length > 20 ||
+            args.headers.some((h: unknown) => typeof h !== 'string' || !h.trim() || h.length > 200)
+          ) {
+            invalid('headers must be an array of 1..20 non-empty strings');
+          }
+          rawHeaders = args.headers as string[];
         }
-        rawHeaders = args.headers as string[];
-      }
-      const existingTabs = await this.tabs(id, signal);
-      const existing = existingTabs.find((t) => t.title.toLowerCase() === title.toLowerCase());
-      let sheetId: number;
-      let actualTitle: string;
-      if (existing) {
-        sheetId = existing.id;
-        actualTitle = existing.title;
-      } else {
-        const createRes = await this.request(id + ':batchUpdate', signal, {
-          requests: [{ addSheet: { properties: { title } } }],
-        });
-        const props = createRes?.replies?.[0]?.addSheet?.properties;
-        sheetId = Number.isSafeInteger(props?.sheetId) ? props.sheetId : 0;
-        actualTitle = typeof props?.title === 'string' ? props.title : title;
-      }
-      let existingHeaders = existing?.headers && existing.headers.length > 0 ? existing.headers : undefined;
-      if (existing && !existingHeaders) {
-        const quotedExisting = /\s|'/.test(actualTitle) ? "'" + actualTitle.replaceAll("'", "''") + "'" : actualTitle;
-        const row1Data = await this.request(
-          id + '/values/' + encodeURIComponent(`${quotedExisting}!A1:Z1`),
-          signal,
-        );
-        const row1 = Array.isArray(row1Data?.values?.[0]) ? row1Data.values[0] : [];
-        const extracted = row1
-          .slice(0, SHEETS_MAX_COLUMNS)
-          .map((cell: unknown) => clipText(cell == null ? '' : String(cell).trim(), SHEETS_MAX_CELL_CHARS).text)
-          .filter((cell: string) => cell.length > 0);
-        if (extracted.length > 0) {
-          existingHeaders = extracted;
-        }
-      }
-      if (rawHeaders && (!existingHeaders || existingHeaders.length === 0)) {
-        const quotedTitle = /\s|'/.test(actualTitle) ? "'" + actualTitle.replaceAll("'", "''") + "'" : actualTitle;
-        await this.request(id + '/values:batchUpdate', signal, {
-          valueInputOption: 'USER_ENTERED',
-          data: [
+        const existingTabs = await this.tabs(id, signal);
+        const existing = existingTabs.find((t) => t.title.toLowerCase() === title.toLowerCase());
+        let sheetId: number;
+        let actualTitle: string;
+        if (existing) {
+          sheetId = existing.id;
+          actualTitle = existing.title;
+        } else {
+          const createRes = await this.request(
+            id + ':batchUpdate',
+            signal,
             {
-              range: `${quotedTitle}!A1`,
-              majorDimension: 'ROWS',
-              values: safeRows([rawHeaders]),
+              requests: [{ addSheet: { properties: { title } } }],
             },
-          ],
-        });
+            (dispatched) => {
+              writeDispatched = dispatched;
+            }
+          );
+          sheetCreated = true;
+          const props = createRes?.replies?.[0]?.addSheet?.properties;
+          sheetId = Number.isSafeInteger(props?.sheetId) ? props.sheetId : 0;
+          actualTitle = typeof props?.title === 'string' ? props.title : title;
+        }
+        let existingHeaders = existing?.headers && existing.headers.length > 0 ? existing.headers : undefined;
+        if (existing && !existingHeaders) {
+          const quotedExisting = /\s|'/.test(actualTitle) ? "'" + actualTitle.replaceAll("'", "''") + "'" : actualTitle;
+          const row1Data = await this.request(
+            id + '/values/' + encodeURIComponent(`${quotedExisting}!A1:Z1`),
+            signal,
+          );
+          const row1 = Array.isArray(row1Data?.values?.[0]) ? row1Data.values[0] : [];
+          const extracted = row1
+            .slice(0, SHEETS_MAX_COLUMNS)
+            .map((cell: unknown) => clipText(cell == null ? '' : String(cell).trim(), SHEETS_MAX_CELL_CHARS).text)
+            .filter((cell: string) => cell.length > 0);
+          if (extracted.length > 0) {
+            existingHeaders = extracted;
+          }
+        }
+        if (rawHeaders && (!existingHeaders || existingHeaders.length === 0)) {
+          const quotedTitle = /\s|'/.test(actualTitle) ? "'" + actualTitle.replaceAll("'", "''") + "'" : actualTitle;
+          await this.request(
+            id + '/values:batchUpdate',
+            signal,
+            {
+              valueInputOption: 'USER_ENTERED',
+              data: [
+                {
+                  range: `${quotedTitle}!A1`,
+                  majorDimension: 'ROWS',
+                  values: safeRows([rawHeaders]),
+                },
+              ],
+            },
+            (dispatched) => {
+              if (dispatched) writeDispatched = true;
+            }
+          );
+        }
+        const finalHeaders = existingHeaders && existingHeaders.length > 0 ? existingHeaders : rawHeaders;
+        return {
+          id: sheetId,
+          title: actualTitle,
+          spreadsheetId: id,
+          ...(finalHeaders && finalHeaders.length > 0 ? { headers: finalHeaders } : {}),
+          url: this.url(id),
+        };
+      } catch (err) {
+        if (sheetCreated) {
+          this.withPartialWriteFlag(err);
+        }
+        if (!writeDispatched) {
+          this.withPreWriteFlag(err);
+        }
+        throw err;
       }
-      const finalHeaders = existingHeaders && existingHeaders.length > 0 ? existingHeaders : rawHeaders;
-      return {
-        id: sheetId,
-        title: actualTitle,
-        spreadsheetId: id,
-        ...(finalHeaders && finalHeaders.length > 0 ? { headers: finalHeaders } : {}),
-        url: this.url(id),
-      };
     }
     return invalid('tool is unsupported');
   }

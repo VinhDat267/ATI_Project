@@ -23,9 +23,10 @@ const requestLimiter = new GlobalRateLimiter({ maxRequests: 30, windowMs: 1000 }
 const chatLimiter = new GlobalRateLimiter({ maxRequests: 1, windowMs: 1000 });
 const groupLimiter = new GlobalRateLimiter({ maxRequests: 1, windowMs: 3000 });
 const chatTypes = new Set(['private', 'group', 'supergroup', 'channel']);
-const fail = (category: ErrorCategory, statusCode?: number) => new StepError({
+const fail = (category: ErrorCategory, statusCode?: number, details?: Record<string, unknown>) => new StepError({
   category, statusCode, retryable: false,
   message: category === 'UNKNOWN' ? 'Telegram write outcome is unknown; verify before sending again.' : 'Telegram request failed: ' + category,
+  ...(details ? { details } : {}),
 });
 const record = (value: unknown): value is Record<string, any> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const integer = (value: unknown, minimum = 0): value is number => Number.isSafeInteger(value) && Number(value) >= minimum;
@@ -183,16 +184,30 @@ export class TelegramAdapter extends BaseAdapter {
     if (toolName === 'telegram.send_message') {
       if (typeof args.chatId !== 'string' || !TELEGRAM_CHAT_ID_PATTERN.test(args.chatId) ||
           typeof args.text !== 'string' || Array.from(args.text).length < 1 || Array.from(args.text).length > 4096 ||
-          Object.keys(args).some(key => !['chatId', 'text'].includes(key))) throw fail('VALIDATION');
+          Object.keys(args).some(key => !['chatId', 'text'].includes(key))) throw fail('VALIDATION', undefined, { requestSent: false });
       const id = normalizeTelegramChatId(args.chatId);
-      if (!this.scope().includes(id)) throw fail('AUTH_ERROR', 403);
+      if (!this.scope().includes(id)) throw fail('AUTH_ERROR', 403, { requestSent: false });
       if (context?.chatId !== undefined) {
         if (typeof context.chatId !== 'string' || !TELEGRAM_CHAT_ID_PATTERN.test(context.chatId.trim()) || normalizeTelegramChatId(context.chatId) !== id) {
-          throw fail('AUTH_ERROR', 403);
+          throw fail('AUTH_ERROR', 403, { requestSent: false });
         }
       }
       // A fresh read establishes chat identity and group type before any write.
-      const chat = this.chat(await this.request('getChat', { chat_id: id }, false, signal), id);
+      let chat: { id: string; title: string; type: string };
+      try {
+        chat = this.chat(await this.request('getChat', { chat_id: id }, false, signal), id);
+      } catch (err) {
+        if (err instanceof StepError) {
+          throw new StepError({
+            category: err.category,
+            statusCode: err.statusCode,
+            retryable: err.retryable,
+            message: err.message,
+            details: { ...(err.details ?? {}), requestSent: false },
+          });
+        }
+        throw fail('NETWORK', undefined, { requestSent: false });
+      }
       const limiter = chat.type === 'group' || chat.type === 'supergroup' ? this.groupRate : this.chatRate;
       const result = await this.request('sendMessage', {
         chat_id: id, text: args.text, link_preview_options: { is_disabled: true }, allow_paid_broadcast: false,
@@ -249,9 +264,9 @@ export class TelegramAdapter extends BaseAdapter {
 
   private async slot(limiter: GlobalRateLimiter, key: string, signal?: AbortSignal) {
     try {
-      if (!await limiter.waitForSlot(key, 30_000, 50, signal)) throw fail('RATE_LIMIT', 429);
+      if (!await limiter.waitForSlot(key, 30_000, 50, signal)) throw fail('RATE_LIMIT', 429, { requestSent: false });
     } catch {
-      throw signal?.aborted ? fail('NETWORK') : fail('RATE_LIMIT', 429);
+      throw signal?.aborted ? fail('NETWORK', undefined, { requestSent: false }) : fail('RATE_LIMIT', 429, { requestSent: false });
     }
   }
 
@@ -268,15 +283,15 @@ export class TelegramAdapter extends BaseAdapter {
 
   private async request(method: 'getMe' | 'getChat' | 'getUpdates' | 'sendMessage', body: object, write: boolean, signal?: AbortSignal,
     pacing?: { limiter: GlobalRateLimiter; key: string }): Promise<any> {
-    if (typeof this.token !== 'string' || !/^\d{1,20}:[A-Za-z0-9_-]{10,200}$/.test(this.token)) throw fail('AUTH_ERROR', 401);
+    if (typeof this.token !== 'string' || !/^\d{1,20}:[A-Za-z0-9_-]{10,200}$/.test(this.token)) throw fail('AUTH_ERROR', 401, { requestSent: false });
     let networkRetries = 0; let serverRetries = 0; let rateRetries = 0;
     for (;;) {
-      if (signal?.aborted) throw fail('NETWORK');
+      if (signal?.aborted) throw fail('NETWORK', undefined, { requestSent: false });
       await this.slot(this.rateLimiter!, this.token, signal);
       // Last reservation before dispatch: transport contention cannot collapse
       // the per-chat send interval. A provider retry takes a fresh message slot.
       if (pacing) await this.slot(pacing.limiter, pacing.key, signal);
-      if (signal?.aborted) throw fail('NETWORK');
+      if (signal?.aborted) throw fail('NETWORK', undefined, { requestSent: false });
       let response: Response;
       try {
         response = await this.fetchFn(this.baseUrl + '/bot' + this.token + '/' + method, {
@@ -298,8 +313,8 @@ export class TelegramAdapter extends BaseAdapter {
         : record(envelope) && envelope.ok === false && integer(envelope.error_code, 400) ? envelope.error_code : undefined;
       if (code === 429) {
         const delay = this.retryDelay(envelope, response.headers?.get('Retry-After') ?? null);
-        if (rateRetries++ >= 1 || delay === null || delay > 30_000) throw fail('RATE_LIMIT', 429);
-        try { await waitWithSignal(delay, signal); } catch { throw fail('NETWORK'); }
+        if (rateRetries++ >= 1 || delay === null || delay > 30_000) throw fail('RATE_LIMIT', 429, write ? { requestSent: false } : undefined);
+        try { await waitWithSignal(delay, signal); } catch { throw fail('NETWORK', undefined, write ? { requestSent: false } : undefined); }
         continue;
       }
       if (code !== undefined) {
@@ -308,7 +323,7 @@ export class TelegramAdapter extends BaseAdapter {
           if (!signal?.aborted && serverRetries++ < 1) continue;
           throw fail('SERVER_ERROR', code);
         }
-        throw fail(code === 401 || code === 403 ? 'AUTH_ERROR' : code === 404 ? 'NOT_FOUND' : 'VALIDATION', code);
+        throw fail(code === 401 || code === 403 ? 'AUTH_ERROR' : code === 404 ? 'NOT_FOUND' : 'VALIDATION', code, write ? { requestSent: false } : undefined);
       }
       if (response.status < 200 || response.status >= 300 || !record(envelope) || envelope.ok !== true || !('result' in envelope)) {
         throw fail(write ? 'UNKNOWN' : 'SERVER_ERROR');

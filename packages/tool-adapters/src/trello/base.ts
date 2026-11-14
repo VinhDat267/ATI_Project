@@ -145,6 +145,7 @@ export class TrelloBaseAdapter extends BaseAdapter {
         category: 'NETWORK',
         retryable: true,
         cause: options.signal.reason,
+        details: { requestSent: false },
       });
     }
 
@@ -154,7 +155,30 @@ export class TrelloBaseAdapter extends BaseAdapter {
 
     let res: Response;
     for (let attempt = 0; ; attempt++) {
-      await this.waitForTransportSlot(this.rateLimiter ?? sharedTrelloLimiter, this.service, options.signal ?? undefined);
+      try {
+        await this.waitForTransportSlot(this.rateLimiter ?? sharedTrelloLimiter, this.service, options.signal ?? undefined);
+      } catch (err: any) {
+        if (attempt === 0) {
+          throw new StepError({
+            message: err instanceof StepError ? err.message : 'Trello network request aborted',
+            category: options.signal?.aborted ? 'NETWORK' : err instanceof StepError ? err.category : 'RATE_LIMIT',
+            statusCode: err instanceof StepError ? err.statusCode : undefined,
+            retryable: err instanceof StepError ? err.retryable : true,
+            cause: err,
+            details: { ...(err?.details ?? {}), requestSent: false },
+          });
+        }
+        throw err;
+      }
+      if (options.signal?.aborted) {
+        throw new StepError({
+          message: 'Trello network request aborted',
+          category: 'NETWORK',
+          retryable: true,
+          cause: options.signal.reason,
+          ...(attempt === 0 ? { details: { requestSent: false } } : {}),
+        });
+      }
       try {
         res = await this.fetchFn(url.toString(), { ...options, headers });
       } catch (err: any) {

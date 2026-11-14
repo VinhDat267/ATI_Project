@@ -10,6 +10,7 @@ if (!connectionString) throw new Error('DATABASE_URL is required for v3 migratio
 const pool = new pg.Pool({ connectionString });
 const client = await pool.connect();
 try {
+  await client.query('SELECT pg_advisory_lock($1)', [20260929]);
   await client.query('BEGIN');
   await client.query('SELECT pg_advisory_xact_lock($1)', [20260929]);
   const files = (await readdir(directory)).filter((name) => /^\d{4}_.*\.sql$/.test(name)).sort();
@@ -19,9 +20,10 @@ try {
   await client.query('COMMIT');
   for (const file of files) process.stdout.write(`Applied ${file}\n`);
 } catch (error) {
-  await client.query('ROLLBACK');
+  await client.query('ROLLBACK').catch(() => {});
   throw error;
 } finally {
+  await client.query('SELECT pg_advisory_unlock($1)', [20260929]).catch(() => {});
   client.release();
   await pool.end();
 }
