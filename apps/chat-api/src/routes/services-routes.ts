@@ -14,6 +14,7 @@ import {
   MYJIRA_TOOLS,
   MYSHEETS_SERVICE,
   MYSHEETS_TOOLS,
+  NOTION_OAUTH_TOOLS,
   type PersonalCalendarItem,
   type PersonalSpreadsheetItem,
 } from '@wap/tool-schemas';
@@ -26,6 +27,8 @@ import {
   normalizeAllowedScope,
 } from '../services/registered-services.js';
 import { isAdmin } from '../auth/jwt.js';
+import type { NotionConnectionRepo } from '../db/repositories/notion-connection-repo.js';
+import { createNotionConnectionLookup } from '../services/notion/connection-reference.js';
 
 export interface ServicesRoutesOptions {
   slackOAuthAvailable?: boolean;
@@ -70,6 +73,19 @@ export interface ServicesRoutesOptions {
   githubTeamRepo?: {
     get: (scopeId?: string) => Promise<{ repos?: Array<{ repoId: string; fullName: string }> } | null>;
   };
+  githubOAuthClient?: {
+    repos?: (accessToken: string, signal?: AbortSignal) => Promise<Array<any>>;
+    repositories?: (accessToken: string, signal?: AbortSignal) => Promise<Array<any>>;
+  };
+  githubTokens?: {
+    forConnection: (
+      userId: string,
+      credentialId: string,
+      stored: { accessToken: string; refreshToken?: string }
+    ) => { getAccessToken: (options?: { signal?: AbortSignal; forceRefresh?: boolean }) => Promise<string> };
+  };
+  notionConnectionRepo?: Pick<NotionConnectionRepo, 'getActive'>;
+  notionConnection?: (userId: string) => Promise<any>;
 }
 
 const PERSONAL_ONLY = 'Gmail do mỗi người tự kết nối ở mục "Của riêng bạn"; không có khoá chung để quản trị viên cấu hình.';
@@ -455,14 +471,82 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           const savedCheck = checks.get(checkKey(id, mode, workspaceId, userId));
           const check =
             savedCheck?.credentialVersion === (record ? versionOf(record.config) : null) ? savedCheck : undefined;
+          const isPersonalNotionOAuth =
+            id === 'notion' && !configured && Boolean(options.notionConnectionRepo || options.notionConnection);
+          const effectiveIsPersonalOAuth = isPersonalOAuth || isPersonalNotionOAuth;
 
-          let personalStatus: 'connected' | 'scope_required' | 'needs_scope' | 'reconnect_required' | 'not_connected' | undefined =
-            isPersonalOAuth ? 'not_connected' : undefined;
+          let personalStatus:
+            | 'connected'
+            | 'scope_required'
+            | 'needs_scope'
+            | 'reconnect_required'
+            | 'not_connected'
+            | 'needs_membership'
+            | undefined = effectiveIsPersonalOAuth ? 'not_connected' : undefined;
           let personalAllowedScope: string[] | undefined;
           let username: string | undefined;
           let connectedAt: string | undefined;
 
-          if (isPersonalOAuth && credentialRepo && typeof credentialRepo.getPersonalConnectionStatus === 'function') {
+          if (isPersonalNotionOAuth) {
+            if (userId) {
+              try {
+                const lookup =
+                  options.notionConnection ??
+                  (options.notionConnectionRepo
+                    ? createNotionConnectionLookup({
+                        repo: {
+                          getActive: async (uid: string) => {
+                            const raw: any = await options.notionConnectionRepo!.getActive(uid);
+                            if (!raw) return null;
+                            return {
+                              ...raw,
+                              config: raw.config ?? raw.encryptedToken ?? '',
+                              allowed_databases:
+                                raw.allowed_databases ??
+                                raw.allowedDatabases ??
+                                (Array.isArray(raw.selectedDatabases)
+                                  ? raw.selectedDatabases.map((d: any) => (typeof d === 'string' ? d : d?.id)).filter(Boolean)
+                                  : []),
+                              selected_databases: raw.selected_databases ?? raw.selectedDatabases ?? [],
+                              workspace_name: raw.workspace_name ?? raw.workspaceName,
+                              workspace_id: raw.workspace_id ?? raw.workspaceId,
+                              bot_id: raw.bot_id ?? raw.botId,
+                            };
+                          },
+                        },
+                      })
+                    : undefined);
+                const notionState = lookup ? await lookup(userId) : null;
+                if (notionState?.status === 'connected') {
+                  personalStatus = 'connected';
+                  const dbIds =
+                    notionState.connection?.databaseIds ??
+                    notionState.databaseIds ??
+                    notionState.allowedScope ??
+                    [];
+                  personalAllowedScope = Array.isArray(dbIds) ? dbIds.map(String) : [];
+                  if (typeof (notionState.connection?.workspaceName ?? notionState.workspaceName) === 'string') {
+                    username = notionState.connection?.workspaceName ?? notionState.workspaceName;
+                  }
+                } else if (notionState?.status === 'needs_scope' || notionState?.status === 'scope_required') {
+                  personalStatus = 'scope_required';
+                  personalAllowedScope = [];
+                  if (typeof (notionState.connection?.workspaceName ?? notionState.workspaceName) === 'string') {
+                    username = notionState.connection?.workspaceName ?? notionState.workspaceName;
+                  }
+                } else if (notionState?.status === 'reconnect_required') {
+                  personalStatus = 'reconnect_required';
+                  personalAllowedScope = [];
+                } else {
+                  personalStatus = 'not_connected';
+                  personalAllowedScope = [];
+                }
+              } catch {
+                personalStatus = 'not_connected';
+                personalAllowedScope = [];
+              }
+            }
+          } else if (isPersonalOAuth && credentialRepo && typeof credentialRepo.getPersonalConnectionStatus === 'function') {
             let personalRecord: any = null;
             if (userId) {
               try {
@@ -531,6 +615,60 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
                     personalStatus = 'scope_required';
                   } else {
                     personalAllowedScope = teamScope.repos.map((r) => r.fullName);
+                    const fetchRepos = options.githubOAuthClient?.repos ?? options.githubOAuthClient?.repositories;
+                    if (
+                      options.githubOAuthClient &&
+                      options.githubTokens &&
+                      typeof fetchRepos === 'function' &&
+                      userId &&
+                      personalRecord &&
+                      dec?.accessToken
+                    ) {
+                      try {
+                        const tokenProvider = options.githubTokens.forConnection(userId, personalRecord.id, {
+                          accessToken: dec.accessToken,
+                          refreshToken: dec.refreshToken,
+                        });
+                        const accessToken = await tokenProvider.getAccessToken({
+                          signal: AbortSignal.timeout(10_000),
+                        });
+                        const callerRepos = await fetchRepos.call(
+                          options.githubOAuthClient,
+                          accessToken,
+                          AbortSignal.timeout(10_000),
+                        );
+                        if (Array.isArray(callerRepos)) {
+                          const accessibleRepos = teamScope.repos.filter((tr) =>
+                            callerRepos.some(
+                              (cr: any) =>
+                                cr.member !== false &&
+                                ((typeof cr.fullName === 'string' &&
+                                  cr.fullName.toLowerCase() === tr.fullName.toLowerCase()) ||
+                                  (typeof cr.full_name === 'string' &&
+                                    cr.full_name.toLowerCase() === tr.fullName.toLowerCase()) ||
+                                  (cr.id !== undefined && String(cr.id) === String(tr.repoId)) ||
+                                  (cr.repoId !== undefined && String(cr.repoId) === String(tr.repoId))),
+                            ),
+                          );
+                          if (accessibleRepos.length === 0) {
+                            personalStatus = 'needs_membership';
+                            personalAllowedScope = [];
+                          } else {
+                            personalAllowedScope = accessibleRepos.map((r) => r.fullName);
+                          }
+                        }
+                      } catch (err: any) {
+                        if (
+                          err?.category === 'AUTH_ERROR' ||
+                          err?.kind === 'invalid_grant' ||
+                          err?.status === 401 ||
+                          err?.statusCode === 401
+                        ) {
+                          personalStatus = 'reconnect_required';
+                          personalAllowedScope = [];
+                        }
+                      }
+                    }
                   }
                 } else if (id === 'telegram' && dec) {
                   const hasSelectedChats = Array.isArray(dec.selectedChats);
@@ -552,18 +690,23 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
             }
           }
 
-          const personalConnected = isPersonalOAuth && personalStatus === 'connected';
-          const effectiveConfigured = isPersonalOAuth ? personalConnected : configured;
-          const effectiveConnected = isPersonalOAuth
+          const personalConnected = effectiveIsPersonalOAuth && personalStatus === 'connected';
+          const effectiveConfigured = effectiveIsPersonalOAuth ? personalConnected : configured;
+          const effectiveConnected = effectiveIsPersonalOAuth
             ? personalConnected
             : configured && check?.connectionStatus === 'healthy';
-          const effectiveConnectionStatus = isPersonalOAuth
+          const effectiveConnectionStatus = effectiveIsPersonalOAuth
             ? personalConnected
               ? 'healthy'
-              : 'unconfigured'
+              : personalStatus === 'needs_membership'
+                ? 'needs_scope'
+                : 'unconfigured'
             : configured
               ? check?.connectionStatus ?? 'unchecked'
               : 'unconfigured';
+          const serviceTools = isPersonalNotionOAuth
+            ? [...ALL_TOOLS.filter((tool) => tool.service === 'notion'), ...NOTION_OAUTH_TOOLS].map((tool) => tool.name)
+            : ALL_TOOLS.filter((tool) => tool.service === id).map((tool) => tool.name);
 
           return {
             id,
@@ -573,14 +716,14 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
             scopeKey,
             scopeLabel,
             credentialFields,
-            connection: isPersonalOAuth ? ('personal' as const) : (definition.connection ?? 'shared'),
-            tools: ALL_TOOLS.filter((tool) => tool.service === id).map((tool) => tool.name),
+            connection: effectiveIsPersonalOAuth ? ('personal' as const) : (definition.connection ?? 'shared'),
+            tools: serviceTools,
             configured: effectiveConfigured,
             connected: effectiveConnected,
             connectionStatus: effectiveConnectionStatus,
             lastCheckedAt: check?.lastCheckedAt ?? null,
             allowedScope: personalAllowedScope ?? (Array.isArray(entries) ? entries : []),
-            ...(isPersonalOAuth && personalStatus
+            ...(effectiveIsPersonalOAuth && personalStatus
               ? { personalStatus, ...(username ? { username } : {}), ...(connectedAt ? { connectedAt } : {}) }
               : {}),
           };
@@ -598,28 +741,64 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       }
       if (options.myjiraAvailable && userId) {
         const { id, name, description, scopes, scopeKey, scopeLabel, credentialFields } = MYJIRA_SERVICE;
-        let personalStatus: 'connected' | 'scope_required' | 'reconnect_required' | 'not_connected' = 'not_connected';
+        const isOrgMode = mode === 'organization' && Boolean(workspaceId);
+        let personalStatus: 'connected' | 'scope_required' | 'reconnect_required' | 'not_connected' | undefined =
+          isOrgMode ? 'not_connected' : undefined;
         let allowedScope: string[] = [];
+        let connectionStatus: 'healthy' | 'needs_scope' | 'unconfigured' = 'unconfigured';
         try {
           if (options.jiraOAuthRepo?.getConnectionStatus) {
             const statusRes = await options.jiraOAuthRepo.getConnectionStatus(userId);
-            if (statusRes.connectionState === 'reconnect_required') {
+            if (!isOrgMode) {
+              allowedScope = [];
+              if (statusRes.connectionState === 'reconnect_required') {
+                personalStatus = 'reconnect_required';
+                connectionStatus = 'unconfigured';
+              } else {
+                const isIdentityConnected = Boolean(
+                  statusRes.connected ||
+                    statusRes.connectionState === 'connected' ||
+                    statusRes.connectionState === 'identity_connected' ||
+                    statusRes.connectionState === 'scope_required',
+                );
+                connectionStatus = isIdentityConnected ? 'needs_scope' : 'unconfigured';
+                personalStatus = isIdentityConnected ? 'scope_required' : undefined;
+              }
+            } else if (statusRes.connectionState === 'reconnect_required') {
               personalStatus = 'reconnect_required';
-            } else if (statusRes.connectionState === 'identity_connected' || statusRes.connectionState === 'scope_required') {
+            } else if (
+              statusRes.connectionState === 'identity_connected' ||
+              statusRes.connectionState === 'scope_required'
+            ) {
               personalStatus = 'scope_required';
+              connectionStatus = 'needs_scope';
             } else if (statusRes.connectionState === 'connected') {
               if (workspaceId && options.jiraWorkspaceRepo) {
                 const caps = await options.jiraWorkspaceRepo.getCapabilities(workspaceId, userId);
                 allowedScope = (caps?.sites ?? []).map((s) => s.siteId);
                 personalStatus = allowedScope.length > 0 ? 'connected' : 'scope_required';
+                connectionStatus = allowedScope.length > 0 ? 'healthy' : 'needs_scope';
               } else {
-                allowedScope = (statusRes.sites ?? []).map((s) => s.cloudId);
-                personalStatus = allowedScope.length > 0 ? 'connected' : 'scope_required';
+                allowedScope = [];
+                personalStatus = 'scope_required';
+                connectionStatus = 'needs_scope';
               }
             }
           } else if (options.jiraOAuthRepo?.getIdentityConnection) {
             const identity = await options.jiraOAuthRepo.getIdentityConnection(userId);
-            if (identity) {
+            if (!isOrgMode) {
+              allowedScope = [];
+              if (identity?.status === 'reconnect_required') {
+                personalStatus = 'reconnect_required';
+                connectionStatus = 'unconfigured';
+              } else if (identity?.status === 'active') {
+                personalStatus = 'scope_required';
+                connectionStatus = 'needs_scope';
+              } else {
+                personalStatus = undefined;
+                connectionStatus = 'unconfigured';
+              }
+            } else if (identity) {
               if (identity.status === 'reconnect_required') {
                 personalStatus = 'reconnect_required';
               } else if (identity.status === 'active') {
@@ -627,16 +806,23 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
                   const caps = await options.jiraWorkspaceRepo.getCapabilities(workspaceId, userId);
                   allowedScope = (caps?.sites ?? []).map((s) => s.siteId);
                   personalStatus = allowedScope.length > 0 ? 'connected' : 'scope_required';
+                  connectionStatus = allowedScope.length > 0 ? 'healthy' : 'needs_scope';
                 } else {
-                  personalStatus = 'connected';
+                  allowedScope = [];
+                  personalStatus = 'scope_required';
+                  connectionStatus = 'needs_scope';
                 }
               }
             }
           }
         } catch {
-          personalStatus = 'not_connected';
+          personalStatus = isOrgMode ? 'not_connected' : undefined;
+          connectionStatus = 'unconfigured';
         }
-        const connected = personalStatus === 'connected';
+        const connected = isOrgMode && personalStatus === 'connected';
+        if (connected) {
+          connectionStatus = 'healthy';
+        }
         services.push({
           id,
           name,
@@ -649,10 +835,10 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           tools: MYJIRA_G2A_TOOLS.map((tool) => tool.name),
           configured: connected,
           connected,
-          connectionStatus: connected ? 'healthy' : 'unconfigured',
+          connectionStatus,
           lastCheckedAt: null,
           allowedScope,
-          personalStatus,
+          ...(personalStatus ? { personalStatus } : {}),
         });
       }
 

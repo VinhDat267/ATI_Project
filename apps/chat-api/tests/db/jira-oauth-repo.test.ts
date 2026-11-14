@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { randomUUID } from 'node:crypto';
 import { JiraOAuthRepo } from '../../src/db/repositories/jira-oauth-repo.js';
 import WorkspaceRepo, { type NativeAdminVerifier } from '../../src/db/repositories/workspace/index.js';
 import {
@@ -6,6 +7,7 @@ import {
   createSyntheticUser,
   type IsolatedTestContext,
 } from '../helpers/jira-test-db.js';
+import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 import { decryptCredentials } from '@wap/tool-adapters';
 
 describe('JiraOAuthRepo (Real PostgreSQL Isolation & Jira03 Semantics)', () => {
@@ -880,5 +882,113 @@ describe('JiraOAuthRepo (Real PostgreSQL Isolation & Jira03 Semantics)', () => {
         code: 'GRANT_NOT_FOUND',
       });
     });
+  });
+});
+
+describe('AUD-W2-06: syncSites lease revocation', () => {
+  const encryptionKey = '01234567890123456789012345678901';
+
+  it('AUD-W2-06: syncSites revokes active leases for deselected sites and bumps identity_version when sites are removed', async () => {
+    const env = await createMigratedSchema('jira_sync_leases');
+    try {
+      const localRepo = new JiraOAuthRepo(env.pool, encryptionKey);
+      const person = await env.person('Lease Sync User');
+      const userId = person.id;
+
+      await localRepo.saveIdentityGrant(userId, {
+        atlassianAccountId: 'atl-lease-sync',
+        accessToken: 'acc-ls-1',
+        expiresInSeconds: 3600,
+        scopes: ['read:me', 'offline_access'],
+      });
+      const grantRes = await localRepo.saveSitesGrant(userId, {
+        atlassianAccountId: 'atl-lease-sync',
+        accessToken: 'acc-ls-2',
+        expiresInSeconds: 3600,
+        scopes: ['read:me', 'read:jira-work', 'offline_access'],
+        sites: [
+          {
+            id: 'cloud-keep',
+            name: 'Keep Site',
+            url: 'https://keep.atlassian.net',
+            scopes: ['read:jira-work'],
+          },
+          {
+            id: 'cloud-remove',
+            name: 'Remove Site',
+            url: 'https://remove.atlassian.net',
+            scopes: ['read:jira-work'],
+          },
+        ],
+      });
+
+      const wsId = randomUUID();
+      await env.pool.query(
+        `INSERT INTO workspaces (id, name, invite_code, require_approval, created_by)
+         VALUES ($1, 'Lease WS', $2, true, $3)`,
+        [wsId, `INV-${wsId.slice(0, 8)}`, userId]
+      );
+      await env.pool.query(
+        `INSERT INTO ati_workspaces (id, slug, status, version, created_by)
+         VALUES ($1, $2, 'active', 1, $3)`,
+        [wsId, `ws-lease-${wsId.slice(0, 8)}`, userId]
+      );
+
+      const accBefore = (
+        await env.pool.query<{ id: string; identity_version: string }>(
+          `SELECT id, identity_version FROM jira_accounts WHERE id = $1`,
+          [grantRes.accountId]
+        )
+      ).rows[0]!;
+
+      // Insert active leases for both cloud-keep and cloud-remove
+      const leaseKeepId = randomUUID();
+      const leaseRemoveId = randomUUID();
+      for (const [leaseId, cloudId] of [
+        [leaseKeepId, 'cloud-keep'],
+        [leaseRemoveId, 'cloud-remove'],
+      ] as const) {
+        await env.pool.query(
+          `INSERT INTO jira_authorization_leases (
+             lease_id, workspace_id, cloud_id, ati_user_id, jira_account_id, atlassian_account_id, grant_id,
+             membership_version, identity_version, workspace_version, site_policy_version,
+             project_id, project_policy_version, ttl_ms, expires_at, status
+           )
+           VALUES ($1, $2, $3, $4, $5, 'atl-lease-sync', $6, 1, $7, 1, 1, NULL, NULL, 30000, clock_timestamp() + interval '30 seconds', 'active')`,
+          [leaseId, wsId, cloudId, userId, grantRes.accountId, grantRes.grantId, accBefore.identity_version]
+        );
+      }
+
+      // Deselect cloud-remove via syncSites
+      const remaining = await localRepo.syncSites(userId, [
+        {
+          id: 'cloud-keep',
+          name: 'Keep Site',
+          url: 'https://keep.atlassian.net',
+          scopes: ['read:jira-work'],
+        },
+      ]);
+      expect(remaining).toBe(1);
+
+      const leasesAfter = await env.pool.query<{ lease_id: string; cloud_id: string; status: string; released_at: Date | null }>(
+        `SELECT lease_id, cloud_id, status, released_at FROM jira_authorization_leases WHERE lease_id IN ($1, $2)`,
+        [leaseKeepId, leaseRemoveId]
+      );
+      const keepLease = leasesAfter.rows.find((r) => r.lease_id === leaseKeepId)!;
+      const removeLease = leasesAfter.rows.find((r) => r.lease_id === leaseRemoveId)!;
+      expect(keepLease.status).toBe('active');
+      expect(removeLease.status).toBe('revoked');
+      expect(removeLease.released_at).not.toBeNull();
+
+      const accAfter = (
+        await env.pool.query<{ identity_version: string }>(
+          `SELECT identity_version FROM jira_accounts WHERE id = $1`,
+          [grantRes.accountId]
+        )
+      ).rows[0]!;
+      expect(BigInt(accAfter.identity_version)).toBe(BigInt(accBefore.identity_version) + 1n);
+    } finally {
+      await env.close();
+    }
   });
 });

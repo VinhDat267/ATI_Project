@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, resolve } from 'node:path';
@@ -65,6 +65,9 @@ const { OpenAICompatibleProvider } = await import(
 );
 const { validateSlackPolicyReference } = await import(
   pathToFileURL(resolve(defaultRootDir, 'packages/tool-schemas/src/index.ts')).href
+);
+const { encryptCredentials } = await import(
+  pathToFileURL(resolve(defaultRootDir, 'packages/tool-adapters/src/crypto.ts')).href
 );
 
 export { slackPersonalRelevance, evaluateSlackRules };
@@ -683,6 +686,7 @@ export async function runSlackTriageBenchmark(options = {}) {
     },
   };
 
+  const evalEncryptionKey = randomBytes(16).toString('hex');
   const proposalPool = {
     connect: async () => ({
       query: async (sql, params = []) => {
@@ -703,11 +707,11 @@ export async function runSlackTriageBenchmark(options = {}) {
         if (sql.includes('FROM service_credentials')) {
           return {
             rows: [
-              { id: 'c1111111-1111-4111-8111-111111111111', service: 'trello', config: JSON.stringify({ memberId: 'M_EVAL', username: 'eval_trello' }) },
-              { id: 'c2222222-2222-4222-8222-222222222222', service: 'github', config: JSON.stringify({ githubUserId: 'GH_EVAL', login: 'eval_gh' }) },
-              { id: 'c3333333-3333-4333-8333-333333333333', service: 'gmail', config: JSON.stringify({ email: 'eval-sender@example.test' }) },
-              { id: 'c4444444-4444-4444-8444-444444444444', service: 'mycalendar', config: JSON.stringify({ email: 'eval-cal@example.test', allowedScope: { calendars: ['primary'] } }) },
-              { id: 'c5555555-5555-4555-8555-555555555555', service: 'mysheets', config: JSON.stringify({ email: 'eval-sheets@example.test', allowedScope: { spreadsheets: ['sheet-eval-1'] } }) },
+              { id: 'c1111111-1111-4111-8111-111111111111', service: 'trello', status: 'active', config: encryptCredentials({ memberId: 'M_EVAL', username: 'eval_trello' }, evalEncryptionKey) },
+              { id: 'c2222222-2222-4222-8222-222222222222', service: 'github', status: 'active', config: encryptCredentials({ githubUserId: 'GH_EVAL', login: 'eval_gh' }, evalEncryptionKey) },
+              { id: 'c3333333-3333-4333-8333-333333333333', service: 'gmail', status: 'active', config: encryptCredentials({ email: 'eval-sender@example.test' }, evalEncryptionKey) },
+              { id: 'c4444444-4444-4444-8444-444444444444', service: 'mycalendar', status: 'active', config: encryptCredentials({ email: 'eval-cal@example.test', allowedScope: { calendars: ['primary'] } }, evalEncryptionKey) },
+              { id: 'c5555555-5555-4555-8555-555555555555', service: 'mysheets', status: 'active', config: encryptCredentials({ email: 'eval-sheets@example.test', allowedScope: { spreadsheets: ['sheet-eval-1'] } }, evalEncryptionKey) },
             ],
           };
         }
@@ -737,6 +741,7 @@ export async function runSlackTriageBenchmark(options = {}) {
     },
     messages: {},
     policy: policyService,
+    encryptionKey: evalEncryptionKey,
   });
 
   const worker = new SlackTriageWorker({

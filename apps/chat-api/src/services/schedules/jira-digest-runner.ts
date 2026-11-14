@@ -152,21 +152,24 @@ export async function runJiraDigest(
   for (const proj of digestConfig.projects) {
     const rawIssues = await jiraAdapter.execute(
       'myjira.search_issues',
-      { siteId: proj.siteId, projectKey: proj.projectKey, maxResults: 20 },
+      { siteId: proj.siteId, projectKey: proj.projectKey, limit: 20 },
       { signal },
     );
-    const issues: JiraDigestIssueItem[] = Array.isArray(rawIssues)
-      ? rawIssues.map((it: any) => ({
-          key: String(it.key || ''),
-          summary: String(it.summary || ''),
-          status: String(it.status || 'Unknown'),
-          ...(it.priority ? { priority: String(it.priority) } : {}),
-          ...(it.assignee ? { assignee: String(it.assignee) } : {}),
-          ...(it.issueType ? { issueType: String(it.issueType) } : {}),
-          ...(it.dueDate ? { dueDate: String(it.dueDate) } : {}),
-          url: String(it.url || ''),
-        }))
-      : [];
+    const issueList = Array.isArray(rawIssues)
+      ? rawIssues
+      : Array.isArray((rawIssues as any)?.issues)
+        ? (rawIssues as any).issues
+        : [];
+    const issues: JiraDigestIssueItem[] = issueList.map((it: any) => ({
+      key: String(it.key || ''),
+      summary: String(it.title ?? it.summary ?? ''),
+      status: String(it.status || 'Unknown'),
+      ...(it.priority ? { priority: String(it.priority) } : {}),
+      ...(it.assignee ? { assignee: String(it.assignee) } : {}),
+      ...(it.issueType ? { issueType: String(it.issueType) } : {}),
+      ...(it.dueDate ? { dueDate: String(it.dueDate) } : {}),
+      url: String(it.url || ''),
+    }));
     sections.push({
       projectKey: proj.projectKey,
       ...(proj.projectName ? { projectName: proj.projectName } : {}),

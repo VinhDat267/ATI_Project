@@ -2,6 +2,8 @@ import { decryptCredentials } from '@wap/tool-adapters';
 import { hasGoogleCredentialOrigin } from './gmail/credential-origin.js';
 import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYJIRA_G2A_TOOLS, MYJIRA_TOOLS, MYSHEETS_TOOLS, NOTION_TOOLS, NOTION_OAUTH_TOOLS, TELEGRAM_TOOLS, TELEGRAM_OAUTH_TOOLS, TRELLO_TOOLS, TRELLO_OAUTH_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
+import type { NotionConnectionRepo } from '../db/repositories/notion-connection-repo.js';
+import { createNotionConnectionLookup } from './notion/connection-reference.js';
 import type { ServiceTransport } from './transports/types.js';
 import { TRELLO_TRANSPORT } from './transports/trello.js';
 import { SLACK_TRANSPORT } from './transports/slack.js';
@@ -158,6 +160,7 @@ export async function getToolCatalogFor(
     telegramEnabled?: boolean;
     telegramConnection?: (userId: string) => Promise<any>;
     notionEnabled?: boolean;
+    notionConnectionRepo?: Pick<NotionConnectionRepo, 'getActive'>;
     notionConnection?: (userId: string) => Promise<any>;
     myjiraEnabled?: boolean;
     jiraWorkspaceRepo?: {
@@ -394,9 +397,14 @@ export async function getToolCatalogFor(
       }
     }
   }
-  if (options.notionConnection) {
+  const notionLookup =
+    options.notionConnection ??
+    (options.notionConnectionRepo
+      ? createNotionConnectionLookup({ repo: options.notionConnectionRepo })
+      : undefined);
+  if (notionLookup) {
     try {
-      const notion = await options.notionConnection(options.userId);
+      const notion = await notionLookup(options.userId);
       if (notion?.status === 'connected' && notion.connection?.databaseIds?.length > 0) {
         catalog = [...catalog.filter((t) => t.service !== 'notion'), ...NOTION_TOOLS, ...NOTION_OAUTH_TOOLS];
       }

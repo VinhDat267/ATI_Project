@@ -132,12 +132,63 @@ describe('Jira Read-Only Standup Digest (Phase 3)', () => {
     }
     expect(jiraExecute).toHaveBeenCalledWith(
       'myjira.search_issues',
-      { siteId: 'site-1', projectKey: 'ATI', maxResults: 20 },
+      { siteId: 'site-1', projectKey: 'ATI', limit: 20 },
       { signal: undefined },
     );
     expect(slackExecute).toHaveBeenCalledWith(
       'slack.send_message',
       expect.objectContaining({ channel: 'C12345' }),
+      { signal: undefined },
+    );
+  });
+
+  it('AUD-W2-01: supports { issues: [...] } response shape and title field from myjira.search_issues', async () => {
+    const config: JiraDigestConfig = {
+      workspaceId: 'ws-1',
+      grantId: 'grant-1',
+      atlassianAccountId: 'acc-1',
+      projects: [{ siteId: 'site-1', siteName: 'Acme Jira', projectKey: 'ATI', projectName: 'ATI Platform' }],
+      channelId: 'C12345',
+      channelName: 'standup',
+    };
+    const configHash = computeJiraDigestConfigHash({
+      config,
+      recurrence,
+      userId: 'user-1',
+    });
+
+    const jiraExecute = vi.fn(async () => ({
+      issues: [
+        {
+          key: 'ATI-99',
+          title: 'Schema-compliant issue title',
+          status: 'In Progress',
+          priority: 'High',
+          url: 'https://acme.atlassian.net/browse/ATI-99',
+        },
+      ],
+    }));
+    const slackExecute = vi.fn(async () => ({ ok: true }));
+
+    const outcome = await runJiraDigest({
+      userId: 'user-1',
+      recurrence,
+      digestConfig: config,
+      digestConfigHash: configHash,
+      revalidatePolicy: async () => ({ allowed: true }),
+      getAdapter: async (service) => ({
+        execute: service === 'myjira' ? jiraExecute : slackExecute,
+      }),
+    });
+
+    expect(outcome.state).toBe('digest_sent');
+    if (outcome.state === 'digest_sent') {
+      expect(outcome.text).toContain('ATI-99');
+      expect(outcome.text).toContain('Schema-compliant issue title');
+    }
+    expect(jiraExecute).toHaveBeenCalledWith(
+      'myjira.search_issues',
+      { siteId: 'site-1', projectKey: 'ATI', limit: 20 },
       { signal: undefined },
     );
   });

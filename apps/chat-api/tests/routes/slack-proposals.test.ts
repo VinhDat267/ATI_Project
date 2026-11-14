@@ -18,6 +18,8 @@ import {generateAccessToken} from '../../src/auth/jwt.js';
 import {SLACK_USER_SCOPES} from '../../src/services/slack/oauth-client.js';
 import {defaultSlackAssistantConfig} from '@wap/tool-schemas';
 import {CredentialRepo} from '../../src/db/repositories/credential-repo.js';
+import {TrelloTeamRepo} from '../../src/db/repositories/trello-team-repo.js';
+import {GitHubTeamRepo} from '../../src/db/repositories/github-team-repo.js';
 import {AdapterFactory} from '../../src/services/adapter-factory.js';
 import {encryptCredentials} from '@wap/tool-adapters';
 import {SlackEventReceiptRepo} from '../../src/db/repositories/slack-event-receipt-repo.js';
@@ -31,7 +33,7 @@ let env:Awaited<ReturnType<typeof createSlackReadEnvironment>>;
 beforeAll(async()=>{env=await createSlackReadEnvironment('slack_proposals_inbox');},30000);
 afterAll(async()=>{await env?.close();});
 
-async function setupFixture(){
+async function setupFixture(opts:{skipDefaultCredentials?:boolean}={}){
  env.fixture.clearHandlers();env.fixture.reset();
  const owner=await env.addUser({name:'Proposal Owner',workspaceId:'T_PROP_'+randomUUID().replaceAll('-',''),actorId:'U_OWNER'});
  const other=await env.db.person();
@@ -74,7 +76,33 @@ async function setupFixture(){
   messages,
   policy:env.policyService,
   invalidation:env.invalidationService,
+  encryptionKey:TEST_KEY,
  });
+ if(!opts.skipDefaultCredentials){
+  const creds=new CredentialRepo(env.db.pool,TEST_KEY);
+  await creds.saveCredentials('trello',encryptCredentials({refreshToken:'synthetic-refresh',accessToken:'synthetic-access',memberId:'M_1',username:'alice_trello'},TEST_KEY),owner.person.id);
+  await creds.saveCredentials('github',encryptCredentials({refreshToken:'synthetic-refresh',accessToken:'synthetic-access',githubUserId:'G_1',login:'octo_alice'},TEST_KEY),owner.person.id);
+  await creds.saveCredentials('gmail',encryptCredentials({refreshToken:'synthetic-refresh',email:'sender@example.test'},TEST_KEY),owner.person.id);
+  await creds.saveCredentials('mycalendar',encryptCredentials({refreshToken:'synthetic-refresh',email:'sender@example.test',allowedScope:{calendars:['primary']}},TEST_KEY),owner.person.id);
+  await creds.saveCredentials('mysheets',encryptCredentials({refreshToken:'synthetic-refresh',email:'sender@example.test',allowedScope:{spreadsheets:['spreadsheet_allowed_1234567890']}},TEST_KEY),owner.person.id);
+  const trelloTeam=new TrelloTeamRepo(env.db.pool);
+  await trelloTeam.replace({
+   scopeId:`personal:${owner.person.id}`,
+   chosenBy:owner.person.id,
+   workspaceId:'TRELLO_WORKSPACE',
+   workspaceName:'Trello workspace',
+   boards:[{boardId:'B_1',boardName:'Allowed board'}],
+  });
+  const ghTeam=new GitHubTeamRepo(env.db.pool);
+  await ghTeam.replace({
+   scopeId:`personal:${owner.person.id}`,
+   chosenBy:owner.person.id,
+   repos:[
+    {repoId:'R_1',fullName:'wap/platform',name:'platform'},
+    {repoId:'R_2',fullName:'acme/repo',name:'repo'},
+   ],
+  });
+ }
 
  const trelloCalls:any[]=[];
  const jiraSearchCalls:any[]=[];
@@ -543,24 +571,42 @@ describe('SLACK-06A protected inbox, refine/prepare/reject CAS, and cross-servic
   expect((await f.messages.listMessages(conv.id))[0]?.content).toBe('Slack content is unavailable.');
  },30000);
 
- it('F2 (R3 & R4): binds real destination credentials and Trello boardIds in Inbox-prepared plans and blocks accounts connected after preview',async()=>{
-  const {TrelloTeamRepo}=await import('../../src/db/repositories/trello-team-repo.js');
-  const {GitHubTeamRepo}=await import('../../src/db/repositories/github-team-repo.js');
-  const f=await setupFixture();
+ it('F2 (R3 & R4): binds real destination credentials and Trello boardIds in Inbox-prepared plans and blocks unconnected or out-of-scope targets',async()=>{
+  const f=await setupFixture({skipDefaultCredentials:true});
   const creds=new CredentialRepo(env.db.pool,TEST_KEY);
 
-  // R4: Prepare a Gmail plan BEFORE connecting Gmail; connecting later must fail with AUTH_ERROR
+  // R4 / AUD-W1-08: Preparing a Gmail plan BEFORE connecting Gmail must fail closed with AUTH_ERROR (never create credentialId: '')
   const unconnectedSeed=await f.seedProposal({
    intents:[{action:'task',service:'gmail',summary:'Draft confidential report'}],
   });
-  const unconnectedPrep=await f.proposalService.prepare(f.owner.person.id,unconnectedSeed.id,{
-   expectedRevision:1,
-   replyInThread:false,
-   targetOverride:{service:'gmail',toEmail:'recipient@example.test'},
+  let unconnectedErr:any=null;
+  try{
+   await f.proposalService.prepare(f.owner.person.id,unconnectedSeed.id,{
+    expectedRevision:1,
+    replyInThread:false,
+    targetOverride:{service:'gmail',toEmail:'recipient@example.test'},
+   });
+  }catch(e){
+   unconnectedErr=e;
+  }
+  expect(unconnectedErr?.category).toBe('AUTH_ERROR');
+  expect(unconnectedErr?.message).toBe('SERVICE_NOT_CONNECTED');
+
+  // Same fail-closed check when action='issue' or 'progress' pairs with explicit service='github'|'gmail'|'mycalendar' without targetOverride.service
+  const unconnectedIssueGithub = await f.seedProposal({
+    intents: [{ action: 'issue', service: 'github', summary: 'Create GitHub bug issue' }],
   });
-  if(unconnectedPrep.status!=='awaiting_approval')throw new Error('not prepared');
-  expect(unconnectedPrep.plan.connections.gmail.credentialId).toBe('');
-  expect(unconnectedPrep.plan.connections.gmail.email).toBe('');
+  let issueGhErr: any = null;
+  try {
+    await f.proposalService.prepare(f.owner.person.id, unconnectedIssueGithub.id, {
+      expectedRevision: 1,
+      replyInThread: false,
+    });
+  } catch (e) {
+    issueGhErr = e;
+  }
+  expect(issueGhErr?.category).toBe('AUTH_ERROR');
+  expect(issueGhErr?.message).toBe('SERVICE_NOT_CONNECTED');
 
   await creds.saveCredentials('trello',encryptCredentials({refreshToken:'synthetic-refresh',accessToken:'synthetic-access',memberId:'M_1',username:'alice_trello'},TEST_KEY),f.owner.person.id);
   await creds.saveCredentials('github',encryptCredentials({refreshToken:'synthetic-refresh',accessToken:'synthetic-access',githubUserId:'G_1',login:'octo_alice'},TEST_KEY),f.owner.person.id);
@@ -600,19 +646,54 @@ describe('SLACK-06A protected inbox, refine/prepare/reject CAS, and cross-servic
    createMySheetsAdapter:()=>({execute:async()=>({updatedRange:'Sheet1!A1:C1'})}),
   });
 
-  // Verify the pre-connection Gmail plan is rejected with AUTH_ERROR
-  let lateError:any=null;
-  try{
-   await factory.getAdapterForService('gmail',{
-    userId:f.owner.person.id,
-    workspaceMode:'personal',
-    phase:'execution',
-    connections:unconnectedPrep.plan.connections,
-   });
-  }catch(e){
-   lateError=e;
+  // AUD-W1-08: Reject targetOverride resource IDs that are not in the user's configured allowlist
+  const outOfScopeOverrides=[
+   {service:'mysheets' as const,spreadsheetId:'spreadsheet_unallowed_9999999999',sheet:'Sheet1'},
+   {service:'mycalendar' as const,calendarId:'unallowed_cal@group.calendar.google.com',startIso:'2026-11-05T09:00:00Z',endIso:'2026-11-05T09:30:00Z'},
+   {service:'trello' as const,boardId:'B_UNALLOWED',listId:'L_TODO'},
+   {service:'github' as const,repo:'evil/unallowed-repo'},
+  ];
+  for(const badOverride of outOfScopeOverrides){
+   const badSeed=await f.seedProposal();
+   await expect(
+    f.proposalService.prepare(f.owner.person.id,badSeed.id,{
+     expectedRevision:1,
+     replyInThread:false,
+     targetOverride:badOverride,
+    }),
+   ).rejects.toMatchObject({message:'TARGET_OUT_OF_SCOPE',category:'AUTH_ERROR'});
   }
-  expect(lateError?.category).toBe('AUTH_ERROR');
+
+  // AUD-W1-07: Reject credentials encrypted with removed dev fallback keys or stored as plaintext JSON
+  const devKeySeed=await f.seedProposal({
+   intents:[{action:'task',service:'gmail',summary:'Test dev key rejection'}],
+  });
+  await env.db.pool.query(
+   "UPDATE service_credentials SET config=$1 WHERE user_id=$2 AND service='gmail'",
+   [encryptCredentials({refreshToken:'r',email:'dev@example.test'},'01234567890123456789012345678901'),f.owner.person.id],
+  );
+  await expect(
+   f.proposalService.prepare(f.owner.person.id,devKeySeed.id,{
+    expectedRevision:1,
+    replyInThread:false,
+    targetOverride:{service:'gmail',toEmail:'recipient@example.test'},
+   }),
+  ).rejects.toMatchObject({message:'SERVICE_NOT_CONNECTED',category:'AUTH_ERROR'});
+
+  await env.db.pool.query(
+   "UPDATE service_credentials SET config=$1 WHERE user_id=$2 AND service='gmail'",
+   [JSON.stringify({refreshToken:'r',email:'plain@example.test'}),f.owner.person.id],
+  );
+  await expect(
+   f.proposalService.prepare(f.owner.person.id,devKeySeed.id,{
+    expectedRevision:1,
+    replyInThread:false,
+    targetOverride:{service:'gmail',toEmail:'recipient@example.test'},
+   }),
+  ).rejects.toMatchObject({message:'SERVICE_NOT_CONNECTED',category:'AUTH_ERROR'});
+
+  // Restore valid encrypted Gmail credential
+  await creds.saveCredentials('gmail',encryptCredentials({refreshToken:'later-account-refresh',email:'sender@example.test'},TEST_KEY),f.owner.person.id);
 
   // Verify Inbox-prepared plans for all 5 services bind real credentialIds, Trello boardId B_1, and sender email
   const inboxCases=[

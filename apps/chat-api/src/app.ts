@@ -56,6 +56,7 @@ import type { SlackInvalidationRunner } from './services/slack/slack-invalidatio
 import { createSlackEventsRouter, type SlackEventsRouterOptions } from './routes/slack-events.js';
 import type { TrelloTokenManager } from './services/trello/token-manager.js';
 import type { GitHubTokenManager } from './services/github/token-manager.js';
+import { GitHubOAuthClient } from './services/github/oauth-client.js';
 import type { NotionTokenManager } from './services/notion/token-manager.js';
 import type { JiraTokenManager } from './services/jira/jira-token-manager.js';
 import { JiraOAuthClient } from './services/jira/jira-oauth-client.js';
@@ -111,6 +112,10 @@ export interface TrelloAppOptions {
 /** GitHub as each member's own OAuth connection and team repositories. */
 export interface GitHubAppOptions {
   oauth?: GitHubOAuthConfig;
+  oauthClient?: {
+    repos?: (accessToken: string) => Promise<Array<any>>;
+    repositories?: (accessToken: string) => Promise<Array<any>>;
+  };
   fetchFn?: typeof fetch;
   githubTimeoutMs?: number;
   onConnectionChanged?: (userId: string) => void;
@@ -196,12 +201,18 @@ export interface AppOptions extends AdminUsersOptions {
   pool?: pg.Pool;
   enableWorkspaceConversations?: boolean;
   github?: GitHubAppOptions;
+  githubOAuthClient?: {
+    repos?: (accessToken: string) => Promise<Array<any>>;
+    repositories?: (accessToken: string) => Promise<Array<any>>;
+  };
   githubTokens?: Pick<GitHubTokenManager, 'forConnection'>;
   githubTeamRepo?: GitHubTeamRepo;
   telegram?: TelegramAppOptions;
   telegramTeamRepo?: TelegramTeamRepo;
   notion?: NotionAppOptions;
   mynotion?: NotionAppOptions;
+  notionConnectionRepo?: Pick<NotionConnectionRepo, 'getActive'>;
+  notionConnection?: (userId: string) => Promise<any>;
   jira?: JiraAppOptions;
   /** Scheduled workflows; present only when SCHEDULES_ENABLED is on and PostgreSQL is available. */
   schedules?: ScheduleRoutesOptions;
@@ -465,7 +476,15 @@ export function createApp(options: AppOptions): Express {
       jiraOAuthRepo: options.jira?.repo,
       jiraWorkspaceRepo: options.jiraWorkspaceRepo,
       trelloTeamRepo: options.trelloTeamRepo ?? options.trello?.teamRepo,
-      githubTeamRepo: options.githubTeamRepo ?? options.github?.teamRepo })
+      githubTeamRepo: options.githubTeamRepo ?? options.github?.teamRepo,
+      githubOAuthClient:
+        options.githubOAuthClient ??
+        options.github?.oauthClient ??
+        (options.github?.oauth ? new GitHubOAuthClient(options.github.oauth, options.github.fetchFn) : undefined),
+      githubTokens,
+      notionConnectionRepo:
+        options.notionConnectionRepo ?? (notionCfg?.oauth ? notionCfg.repo : undefined),
+      notionConnection: options.notionConnection })
   );
 
   if(options.slackAssistant&&sessionRepo)app.use(createSlackAssistantRoutes({...options.slackAssistant,jwtSecret:options.jwtSecret,sessionRepo}));

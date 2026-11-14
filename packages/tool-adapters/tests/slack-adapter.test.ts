@@ -265,4 +265,60 @@ describe('packages/tool-adapters (Task 5: Slack Adapter & Allowed Channels Filte
       );
     }
   });
+
+  it('AUD-W1-06: marks pre-dispatch abort and limiter abort as requestSent: false, post-dispatch network error as requestSent: true, and does not retry 429 on writes', async () => {
+    const fetchSpy = vi.fn();
+    const preAbortedController = new AbortController();
+    preAbortedController.abort();
+
+    const adapterPreAbort = new SlackAdapter({
+      credentials: { botToken: 'xoxb-valid' },
+      allowedScope: { channels: ['C2'] },
+      fetchFn: fetchSpy as any,
+    });
+
+    await expect(
+      adapterPreAbort.sendMessage({ channel: 'C2', text: 'Pre-aborted' }, { signal: preAbortedController.signal })
+    ).rejects.toMatchObject({
+      category: 'NETWORK',
+      retryable: false,
+      details: { requestSent: false },
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    // Limiter wait abort before fetchFn
+    const limiter = new GlobalRateLimiter({ maxRequests: 1, windowMs: 5000 });
+    await limiter.acquire('slack');
+    const limiterAbortController = new AbortController();
+    setTimeout(() => limiterAbortController.abort(), 15);
+    const adapterLimiterAbort = new SlackAdapter({
+      credentials: { botToken: 'xoxb-valid' },
+      allowedScope: { channels: ['C2'] },
+      rateLimiter: limiter,
+      fetchFn: fetchSpy as any,
+    });
+    await expect(
+      adapterLimiterAbort.sendMessage({ channel: 'C2', text: 'Limiter-aborted' }, { signal: limiterAbortController.signal })
+    ).rejects.toMatchObject({
+      details: { requestSent: false },
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    // Post-dispatch network failure sets requestSent: true
+    const networkFetch = vi.fn().mockRejectedValue(new Error('socket hang up'));
+    const adapterNetworkFail = new SlackAdapter({
+      credentials: { botToken: 'xoxb-valid' },
+      allowedScope: { channels: ['C2'] },
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 100, windowMs: 10 }),
+      fetchFn: networkFetch as any,
+    });
+    await expect(
+      adapterNetworkFail.sendMessage({ channel: 'C2', text: 'Dispatched then failed' })
+    ).rejects.toMatchObject({
+      category: 'NETWORK',
+      retryable: false,
+      details: { requestSent: true },
+    });
+    expect(networkFetch).toHaveBeenCalledTimes(1);
+  });
 });

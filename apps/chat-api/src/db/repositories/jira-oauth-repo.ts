@@ -439,7 +439,7 @@ export class JiraOAuthRepo {
       const accRes = await client.query<{ id: string }>(
         `SELECT id FROM jira_accounts
          WHERE user_id = $1 AND status = 'connected'
-         FOR SHARE`,
+         FOR UPDATE`,
         [userId]
       );
       const accRow = accRes.rows[0];
@@ -463,15 +463,18 @@ export class JiraOAuthRepo {
       const grantId = grantRow.id;
 
       const dedupedSites = deduplicateSites(sites);
+      const cloudIds = dedupedSites.map((s) => s.id);
 
+      let removedCount = 0;
       if (dedupedSites.length === 0) {
-        await client.query(`DELETE FROM jira_grant_sites WHERE grant_id = $1`, [grantId]);
+        const delRes = await client.query(`DELETE FROM jira_grant_sites WHERE grant_id = $1`, [grantId]);
+        removedCount = delRes.rowCount ?? 0;
       } else {
-        const cloudIds = dedupedSites.map((s) => s.id);
-        await client.query(
-          `DELETE FROM jira_grant_sites WHERE grant_id = $1 AND NOT (cloud_id = ANY($2))`,
+        const delRes = await client.query(
+          `DELETE FROM jira_grant_sites WHERE grant_id = $1 AND NOT (cloud_id = ANY($2::text[]))`,
           [grantId, cloudIds]
         );
+        removedCount = delRes.rowCount ?? 0;
         for (const site of dedupedSites) {
           await client.query(
             `INSERT INTO jira_grant_sites (
@@ -486,6 +489,22 @@ export class JiraOAuthRepo {
             [grantId, site.id, site.name, site.url, site.scopes]
           );
         }
+      }
+
+      const leaseRevokeRes = await client.query(
+        `UPDATE jira_authorization_leases
+         SET status = 'revoked', released_at = clock_timestamp()
+         WHERE jira_account_id = $1 AND status = 'active' AND NOT (cloud_id = ANY($2::text[]))`,
+        [accountId, cloudIds]
+      );
+
+      if (removedCount > 0 || (leaseRevokeRes.rowCount ?? 0) > 0) {
+        await client.query(
+          `UPDATE jira_accounts
+           SET identity_version = identity_version + 1, updated_at = NOW()
+           WHERE id = $1`,
+          [accountId]
+        );
       }
 
       await client.query('COMMIT');

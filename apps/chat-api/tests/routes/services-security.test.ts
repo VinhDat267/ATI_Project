@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../src/app.js';
-import { generateTokens } from '../../src/auth/jwt.js';
+import { generateAccessToken, generateTokens } from '../../src/auth/jwt.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
-import { decryptCredentials, encryptCredentials } from '@wap/tool-adapters';
+import { decryptCredentials, encryptCredentials, StepError } from '@wap/tool-adapters';
 import { getConfiguredToolCatalog, getToolCatalogFor } from '../../src/services/registered-services.js';
 
 const secret = 'service-route-secret-at-least-32-chars';
@@ -291,5 +291,275 @@ describe('service credential and health boundary', () => {
     } finally {
       warnSpy.mockRestore();
     }
+  });
+
+  it('reports Notion OAuth personalStatus, allowedScope, and NOTION_OAUTH_TOOLS when shared Notion is unconfigured (1h)', async () => {
+    const db1 = '00000000-0000-0000-0000-000000000001';
+    let activeRow: any = {
+      id: 'n-conn-1',
+      userId: 'user-a',
+      status: 'active',
+      encryptedToken: 'v1:encrypted-token',
+      workspaceId: 'ws-1',
+      workspaceName: 'Acme Notion',
+      botId: 'bot-1',
+      selectedDatabases: [{ id: db1, title: 'Tasks' }],
+    };
+
+    const app = createApp({
+      jwtSecret: secret,
+      credentialRepo: {
+        getCredentials: async () => null,
+        getPersonalCredentials: async () => null,
+        getPersonalConnectionStatus: async () => null,
+      } as any,
+      encryptionKey: key,
+      notionConnectionRepo: {
+        getActive: async () => activeRow,
+      } as any,
+    });
+
+    const resConnected = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
+    expect(resConnected.status).toBe(200);
+    const notionConnected = resConnected.body.services.find((s: any) => s.id === 'notion');
+    expect(notionConnected).toMatchObject({
+      connection: 'personal',
+      configured: true,
+      connected: true,
+      connectionStatus: 'healthy',
+      personalStatus: 'connected',
+      allowedScope: [db1],
+    });
+    expect(notionConnected.tools).toEqual(
+      expect.arrayContaining(['notion.create_page', 'notion.get_page', 'notion.update_page']),
+    );
+
+    activeRow = { ...activeRow, selectedDatabases: [] };
+    const resScopeRequired = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
+    const notionScope = resScopeRequired.body.services.find((s: any) => s.id === 'notion');
+    expect(notionScope).toMatchObject({
+      connected: false,
+      personalStatus: 'scope_required',
+      allowedScope: [],
+    });
+
+    activeRow = { ...activeRow, status: 'reconnect_required' };
+    const resReconnect = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
+    const notionReconnect = resReconnect.body.services.find((s: any) => s.id === 'notion');
+    expect(notionReconnect).toMatchObject({
+      connected: false,
+      personalStatus: 'reconnect_required',
+      allowedScope: [],
+    });
+
+    // Active row with missing encrypted secret must also fail closed to reconnect_required (never synthesize '{}')
+    const { encryptedToken: _omitted, ...rowWithoutSecret } = activeRow;
+    activeRow = { ...rowWithoutSecret, status: 'active' };
+    const resMissingSecret = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
+    const notionMissingSecret = resMissingSecret.body.services.find((s: any) => s.id === 'notion');
+    expect(notionMissingSecret).toMatchObject({
+      connected: false,
+      personalStatus: 'reconnect_required',
+      allowedScope: [],
+    });
+  });
+
+  it('AUD-W2-04: does not report myjira as connected/healthy or leak raw cloudIds in Personal Mode', async () => {
+    let jiraConnected = true;
+    const app = createApp({
+      jwtSecret: secret,
+      credentialRepo: {
+        getCredentials: async () => null,
+        getPersonalCredentials: async () => null,
+      } as any,
+      encryptionKey: key,
+      sessionRepo: {
+        findActiveUser: async () => ({ id: 'user-a', email: 'a@example.test', name: 'A', sid: '00000000-0000-0000-0000-000000000001' }),
+      } as any,
+      states: {} as any,
+      jira: {
+        enabled: true,
+        oauth: {
+          clientId: 'cid',
+          clientSecret: 'csec',
+          redirectUri: 'http://localhost:5174/cb',
+        },
+        repo: {
+          getConnectionStatus: async () => ({
+            connected: jiraConnected,
+            connectionState: jiraConnected ? 'connected' : 'not_connected',
+            sites: jiraConnected ? [{ cloudId: 'raw-cloud-id-secret', name: 'Secret Site', url: 'https://secret.atlassian.net' }] : [],
+          }),
+        } as any,
+        tokens: {} as any,
+      },
+    });
+
+    // Personal mode (no X-Workspace-Id / mode !== 'organization') with identity connected
+    const sidToken = generateAccessToken(
+      { id: 'user-a', email: 'a@example.test', name: 'A' },
+      secret,
+      '00000000-0000-0000-0000-000000000001',
+    ).accessToken;
+    const resPersonalConnected = await request(app).get('/api/services').set('Authorization', `Bearer ${sidToken}`);
+    expect(resPersonalConnected.status).toBe(200);
+    const myjiraPersonal = resPersonalConnected.body.services.find((s: any) => s.id === 'myjira');
+    expect(myjiraPersonal).toMatchObject({
+      connected: false,
+      configured: false,
+      connectionStatus: 'needs_scope',
+      personalStatus: 'scope_required',
+      allowedScope: [],
+    });
+    expect(JSON.stringify(myjiraPersonal)).not.toContain('raw-cloud-id-secret');
+
+    // Personal mode when not connected
+    jiraConnected = false;
+    const resPersonalUnconnected = await request(app).get('/api/services').set('Authorization', `Bearer ${sidToken}`);
+    const myjiraUnconnected = resPersonalUnconnected.body.services.find((s: any) => s.id === 'myjira');
+    expect(myjiraUnconnected).toMatchObject({
+      connected: false,
+      configured: false,
+      connectionStatus: 'unconfigured',
+      allowedScope: [],
+    });
+    expect(myjiraUnconnected.personalStatus).toBeUndefined();
+  });
+
+  it('verifies live GitHub repo membership when githubOAuthClient and githubTokens are provided (2e)', async () => {
+    const githubConfig = encryptCredentials({ accessToken: 'gho-live', login: 'octocat' }, key);
+    let callerRepos: Array<{ fullName: string; member?: boolean }> = [];
+    let tokenError: Error | null = null;
+    const seenTokenSignals: Array<AbortSignal | undefined> = [];
+    const seenRepoSignals: Array<AbortSignal | undefined> = [];
+
+    const app = createApp({
+      jwtSecret: secret,
+      credentialRepo: {
+        getCredentials: async () => null,
+        getPersonalCredentials: async () => null,
+        getPersonalConnectionStatus: async (service: string) =>
+          service === 'github' ? { id: 'c-gh', status: 'active', config: githubConfig, updated_at: new Date() } : null,
+      } as any,
+      encryptionKey: key,
+      githubTeamRepo: {
+        get: async () => ({ repos: [{ repoId: 'r-1', fullName: 'org/private-repo' }] }),
+      } as any,
+      githubTokens: {
+        forConnection: () => ({
+          getAccessToken: async (opts?: { signal?: AbortSignal }) => {
+            seenTokenSignals.push(opts?.signal);
+            if (tokenError) throw tokenError;
+            return 'gho-live';
+          },
+        }),
+      } as any,
+      githubOAuthClient: {
+        repos: async (_accessToken: string, signal?: AbortSignal) => {
+          seenRepoSignals.push(signal);
+          return callerRepos;
+        },
+      } as any,
+    });
+
+    // 0 accessible repos -> needs_membership, connected: false, connectionStatus: 'needs_scope'
+    const resNoAccess = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
+    expect(resNoAccess.status).toBe(200);
+    const ghNoAccess = resNoAccess.body.services.find((s: any) => s.id === 'github');
+    expect(ghNoAccess).toMatchObject({
+      connected: false,
+      configured: false,
+      connectionStatus: 'needs_scope',
+      personalStatus: 'needs_membership',
+      allowedScope: [],
+    });
+
+    // Accessible repo -> connected: true, connectionStatus: 'healthy'
+    callerRepos = [{ fullName: 'org/private-repo', member: true }];
+    const resAccess = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
+    const ghAccess = resAccess.body.services.find((s: any) => s.id === 'github');
+    expect(ghAccess).toMatchObject({
+      connected: true,
+      configured: true,
+      connectionStatus: 'healthy',
+      personalStatus: 'connected',
+      allowedScope: ['org/private-repo'],
+    });
+    expect(seenTokenSignals.every((s) => s instanceof AbortSignal)).toBe(true);
+    expect(seenRepoSignals.every((s) => s instanceof AbortSignal)).toBe(true);
+
+    // AUTH_ERROR StepError(400) from GitHubTokenManager -> reconnect_required (never stay connected)
+    tokenError = new StepError({ category: 'AUTH_ERROR', statusCode: 400, message: 'GitHub cần được kết nối lại.' });
+    const resAuthError = await request(app).get('/api/services').set('Authorization', `Bearer ${token}`);
+    const ghAuthError = resAuthError.body.services.find((s: any) => s.id === 'github');
+    expect(ghAuthError).toMatchObject({
+      connected: false,
+      configured: false,
+      connectionStatus: 'unconfigured',
+      personalStatus: 'reconnect_required',
+      allowedScope: [],
+    });
+  });
+
+  it('keeps notion shared (without personalStatus) when notion.repo is passed without notion.oauth', async () => {
+    const getActive = vi.fn().mockResolvedValue(null);
+    const appWithoutOAuth = createApp({
+      jwtSecret: secret,
+      credentialRepo: {
+        getCredentials: async () => null,
+        getPersonalCredentials: async () => null,
+      } as any,
+      encryptionKey: key,
+      notion: {
+        repo: { getActive } as any,
+      },
+    });
+
+    const resWithoutOAuth = await request(appWithoutOAuth)
+      .get('/api/services')
+      .set('Authorization', `Bearer ${token}`);
+    expect(resWithoutOAuth.status).toBe(200);
+    const notionShared = resWithoutOAuth.body.services.find((s: any) => s.id === 'notion');
+    expect(notionShared).toMatchObject({
+      id: 'notion',
+      connection: 'shared',
+      connected: false,
+      configured: false,
+      connectionStatus: 'unconfigured',
+    });
+    expect(notionShared.personalStatus).toBeUndefined();
+    expect(getActive).not.toHaveBeenCalled();
+
+    const appWithOAuth = createApp({
+      jwtSecret: secret,
+      credentialRepo: {
+        getCredentials: async () => null,
+        getPersonalCredentials: async () => null,
+      } as any,
+      encryptionKey: key,
+      notion: {
+        oauth: {
+          clientId: 'notion-client-id',
+          clientSecret: 'notion-client-secret',
+          redirectUri: 'http://localhost:5174/api/connections/notion/callback',
+          authorizationUrl: 'https://api.notion.com/v1/oauth/authorize',
+          apiBaseUrl: 'https://api.notion.com',
+        },
+        repo: { getActive } as any,
+      },
+    });
+
+    const resWithOAuth = await request(appWithOAuth)
+      .get('/api/services')
+      .set('Authorization', `Bearer ${token}`);
+    expect(resWithOAuth.status).toBe(200);
+    const notionPersonal = resWithOAuth.body.services.find((s: any) => s.id === 'notion');
+    expect(notionPersonal).toMatchObject({
+      id: 'notion',
+      connection: 'personal',
+      connected: false,
+      personalStatus: 'not_connected',
+    });
+    expect(getActive).toHaveBeenCalledWith('user-a');
   });
 });

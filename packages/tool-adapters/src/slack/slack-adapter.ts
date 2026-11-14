@@ -32,11 +32,58 @@ export class SlackAdapter extends BaseAdapter {
       headers.set('Content-Type', 'application/json; charset=utf-8');
     }
 
+    const signal = options.signal ?? undefined;
+    const isWrite = options.method?.toUpperCase() === 'POST' || rawUrl.includes('/chat.postMessage');
+    let writeDispatched = false;
+
+    if (signal?.aborted) {
+      throw new StepError({
+        message: 'Slack request aborted before dispatch',
+        category: 'NETWORK',
+        retryable: false,
+        details: { requestSent: false },
+      });
+    }
+
     let res: Response;
     for (let attempt = 0; ; attempt++) {
       const limiter = this.rateLimiter ?? (rawUrl.includes('/chat.postMessage') ? sharedSlackPostLimiter : undefined);
-      if (limiter) await this.waitForTransportSlot(limiter, this.service, options.signal ?? undefined);
+      if (limiter) {
+        try {
+          await this.waitForTransportSlot(limiter, this.service, signal);
+        } catch (err: any) {
+          if (!writeDispatched) {
+            if (err instanceof StepError) {
+              throw new StepError({
+                message: err.message,
+                category: err.category,
+                statusCode: err.statusCode,
+                retryable: err.retryable,
+                details: { ...err.details, requestSent: false },
+                cause: err.cause ?? err,
+              });
+            }
+            throw new StepError({
+              message: `Slack request aborted before dispatch: ${err?.message || err}`,
+              category: 'NETWORK',
+              retryable: false,
+              details: { requestSent: false },
+              cause: err,
+            });
+          }
+          throw err;
+        }
+      }
+      if (signal?.aborted && !writeDispatched) {
+        throw new StepError({
+          message: 'Slack request aborted before dispatch',
+          category: 'NETWORK',
+          retryable: false,
+          details: { requestSent: false },
+        });
+      }
       try {
+        if (isWrite) writeDispatched = true;
         res = await this.fetchFn(rawUrl, {
           ...options,
           headers,
@@ -45,12 +92,13 @@ export class SlackAdapter extends BaseAdapter {
         throw new StepError({
           message: `Slack network request failed: ${err?.message || err}`,
           category: 'NETWORK',
-          retryable: true,
+          retryable: !isWrite,
+          ...(isWrite ? { details: { requestSent: writeDispatched } } : {}),
           cause: err,
         });
       }
-      if (res.status !== 429 || attempt >= 1) break;
-      await this.waitForRetryAfter(res.headers?.get?.('Retry-After'), options.signal ?? undefined);
+      if (res.status !== 429 || isWrite || attempt >= 1) break;
+      await this.waitForRetryAfter(res.headers?.get?.('Retry-After'), signal);
     }
 
     if (!res.ok) {
@@ -78,7 +126,8 @@ export class SlackAdapter extends BaseAdapter {
           message: `Slack rate limit exceeded (429): ${errorText || res.statusText}`,
           category: 'RATE_LIMIT',
           statusCode: 429,
-          retryable: true,
+          retryable: !isWrite,
+          ...(isWrite ? { details: { requestSent: false } } : {}),
         });
       }
 
