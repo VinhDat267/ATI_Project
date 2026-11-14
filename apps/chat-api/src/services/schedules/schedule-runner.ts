@@ -75,16 +75,28 @@ const INTERRUPTED = 'Máy chủ khởi động lại khi đang lập kế hoạc
 
 async function inTransaction<T>(pool: pg.Pool, work: (client: pg.PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
+  let connectionErr: Error | undefined;
+  const onError = (err: unknown) => {
+    connectionErr = err instanceof Error ? err : new Error(String(err));
+  };
+  (client as any).on?.('error', onError);
   try {
     await client.query('BEGIN');
     const result = await work(client);
     await client.query('COMMIT');
     return result;
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => undefined);
+    try {
+      await client.query('ROLLBACK');
+    } catch (rbErr) {
+      if (!connectionErr) {
+        connectionErr = rbErr instanceof Error ? rbErr : new Error(String(rbErr));
+      }
+    }
     throw error;
   } finally {
-    client.release();
+    (client as any).removeListener?.('error', onError);
+    client.release(connectionErr);
   }
 }
 

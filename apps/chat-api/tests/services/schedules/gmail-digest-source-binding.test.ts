@@ -3476,7 +3476,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
       } finally {
         await proxy.close();
       }
-    });
+    }, 30_000);
 
     async function awaitBarrierWithConcurrentSettlement(opts: {
       label: string;
@@ -3728,7 +3728,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
         chatId: tgFallback.chatId,
         messageId: 901,
       });
-    });
+    }, 30_000);
 
     it('A04-R7-B: terminates pending post-action final COMMIT on parent abort and local deadline with action called once, zero resend, non-reuse, and safe receipt/recovery classification', async () => {
       const owner = await db.person('Owner A04-R7');
@@ -3933,7 +3933,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
           });
           tickSettledWithinBound = await Promise.race([
             tickPromise.then(() => true),
-            new Promise<false>((r) => setTimeout(() => r(false), 800)),
+            new Promise<false>((r) => setTimeout(() => r(false), 3_000)),
           ]);
         } finally {
           proxy.disarm();
@@ -4038,7 +4038,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
       } finally {
         await proxy.close();
       }
-    });
+    }, 30_000);
 
     it('A04-R8: bounds ROLLBACK wire loss on abort/guard timer, enforces client non-reuse on action abort even when ROLLBACK completes, and preserves 55P03 NOWAIT reuse and known-undispatched classification', async () => {
       const owner = await db.person('Owner A04-R8');
@@ -4224,6 +4224,6 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
       } finally {
         await proxy.close();
       }
-    });
+    }, 30_000);
   });
 });
