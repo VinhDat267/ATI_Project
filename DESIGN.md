@@ -1,310 +1,399 @@
 ---
-name: "ATI · Sân khấu điều phối"
-description: "Design system Agentic theo 12 bản mẫu của ATI: nền giấy ấm, thẻ trắng viền mảnh, một tín hiệu cam #FF5701, tiêu đề Playfair Display, chữ Be Vietnam Pro."
+version: alpha
+name: Planora
+description: >-
+  A warm editorial workflow workspace. Cream canvas and paper surfaces,
+  forest-green actions, expressive serif headings and Vietnamese sans-serif
+  controls make planning feel human, legible and deliberate. Motion tells
+  the request-to-plan-to-action story without competing with the work.
+status: draft-for-review
+updated: "2026-10-05"
+scope: "Planora v3 frontend; apps/chat-web only"
+reference: "https://getdesign.md"
+implementation_reference: "ef13c5695ce2da030ff613422b4f8d6e1d7e72c3"
 colors:
-  agentic-orange: "#FF5701"
-  agentic-orange-deep: "#E04C00"
-  apricot-wash: "#FFF3ED"
-  warm-paper: "#F8F8F6"
-  card-white: "#FFFFFF"
-  hairline-sand: "#E7E7E2"
-  hairline-faint: "#F0F0EB"
-  ink-graphite: "#111827"
-  slate-secondary: "#4B5563"
-  pebble-muted: "#6B7280"
-  ash-quiet: "#9CA3AF"
-  forest-success: "#16A34A"
-  forest-success-text: "#059669"
-  mint-wash: "#ECFDF5"
-  amber-warning: "#D97706"
-  amber-warning-text: "#92400E"
-  honey-wash: "#FFFBEB"
-  brick-danger: "#DC2626"
-  brick-danger-text: "#B91C1C"
-  blush-wash: "#FEF2F2"
-  sandbox-lemon: "#FEF9C3"
-  sandbox-ink: "#78350F"
-  night-canvas: "#0B1020"
-  night-inset: "#0E1528"
-  night-card: "#131B2F"
-  night-ink: "#F1F5F9"
-  night-secondary: "#B4BFCD"
-  night-muted: "#A1AEC0"
+  canvas: "#f8f4eb"
+  paper: "#fffdf7"
+  sidebar: "#eee9dd"
+  ink: "#2e382d"
+  muted: "#656b5b"
+  divider: "#deded0"
+  primary: "#3c5741"
+  primary-hover: "#2f4633"
+  primary-soft: "#e4e9d8"
+  on-primary: "#fffdf7"
+  pending-surface: "#f6e6cf"
+  pending-ink: "#85532b"
+  error-surface: "#f8e6df"
+  error-ink: "#9a3f32"
+  unknown-surface: "#eee6f2"
+  unknown-ink: "#654576"
 typography:
-  display:
-    fontFamily: "'Playfair Display', Georgia, serif"
-    fontSize: "2.25rem"
-    fontWeight: 700
-    lineHeight: "2.5rem"
-    letterSpacing: "-0.025em"
-  headline:
-    fontFamily: "'Playfair Display', Georgia, serif"
-    fontSize: "1.5rem"
-    fontWeight: 700
-    lineHeight: "2rem"
-    letterSpacing: "-0.025em"
-  title:
-    fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif"
-    fontSize: "1rem"
-    fontWeight: 600
-    lineHeight: "1.5rem"
-  body:
-    fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif"
-    fontSize: "0.875rem"
-    fontWeight: 400
-    lineHeight: "1.25rem"
-  body-sm:
-    fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif"
-    fontSize: "0.75rem"
-    fontWeight: 500
-    lineHeight: "1rem"
-  label:
-    fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif"
-    fontSize: "0.6875rem"
-    fontWeight: 600
-    lineHeight: "1rem"
-    letterSpacing: "0.05em"
-  micro:
-    fontFamily: "'Be Vietnam Pro', system-ui, -apple-system, sans-serif"
-    fontSize: "0.625rem"
-    fontWeight: 600
-    lineHeight: "1rem"
-    letterSpacing: "0.05em"
-  mono:
-    fontFamily: "'JetBrains Mono', ui-monospace, monospace"
-    fontSize: "0.75rem"
-    fontWeight: 500
-    lineHeight: "1rem"
-rounded:
-  sm: "4px"
-  md: "6px"
-  lg: "8px"
-  xl: "12px"
-  2xl: "16px"
-  3xl: "24px"
-  full: "9999px"
+  sans: "Be, 'Segoe UI', sans-serif"
+  serif: "'Times New Roman', Georgia, serif"
+  body-size: "14px"
+  body-line-height: 1.65
+  body-weights: [400, 500, 600]
 spacing:
-  "1": "4px"
-  "2": "8px"
-  "3": "12px"
-  "4": "16px"
-  "5": "20px"
-  "6": "24px"
-  "8": "32px"
-components:
-  button-primary:
-    backgroundColor: "{colors.agentic-orange}"
-    textColor: "{colors.card-white}"
-    typography: "{typography.body}"
-    rounded: "{rounded.xl}"
-    padding: "12px 16px"
-  button-primary-hover:
-    backgroundColor: "{colors.agentic-orange-deep}"
-    textColor: "{colors.card-white}"
-  button-secondary:
-    backgroundColor: "{colors.card-white}"
-    textColor: "{colors.slate-secondary}"
-    typography: "{typography.body-sm}"
-    rounded: "{rounded.xl}"
-    padding: "10px 16px"
-  button-secondary-hover:
-    backgroundColor: "{colors.warm-paper}"
-  button-night:
-    backgroundColor: "{colors.ink-graphite}"
-    textColor: "{colors.card-white}"
-    typography: "{typography.body-sm}"
-    rounded: "{rounded.lg}"
-    padding: "6px 12px"
-  tab-active:
-    backgroundColor: "{colors.agentic-orange}"
-    textColor: "{colors.card-white}"
-    typography: "{typography.body-sm}"
-    rounded: "{rounded.lg}"
-    padding: "6px 14px"
-  tab-idle:
-    textColor: "{colors.pebble-muted}"
-    typography: "{typography.body-sm}"
-    rounded: "{rounded.lg}"
-    padding: "6px 14px"
-  input-field:
-    backgroundColor: "{colors.card-white}"
-    textColor: "{colors.ink-graphite}"
-    typography: "{typography.body}"
-    rounded: "{rounded.xl}"
-    padding: "10px 14px"
-  card:
-    backgroundColor: "{colors.card-white}"
-    rounded: "{rounded.2xl}"
-    padding: "16px"
-  chip-success:
-    backgroundColor: "{colors.mint-wash}"
-    textColor: "{colors.forest-success-text}"
-    typography: "{typography.label}"
-    rounded: "{rounded.full}"
-    padding: "2px 10px"
-  toast-info:
-    backgroundColor: "{colors.ink-graphite}"
-    textColor: "{colors.card-white}"
-    typography: "{typography.body-sm}"
-    rounded: "{rounded.xl}"
-    padding: "10px 16px"
-  dialog:
-    backgroundColor: "{colors.card-white}"
-    rounded: "{rounded.3xl}"
-    padding: "24px"
-  sandbox-banner:
-    backgroundColor: "{colors.sandbox-lemon}"
-    textColor: "{colors.sandbox-ink}"
-    typography: "{typography.label}"
-    height: "32px"
+  scale: [4, 8, 12, 16, 24, 32, 48, 64]
+  unit: px
+  sidebar-width: "248px"
+  chat-max-width: "1120px"
+  public-max-width: "1280px"
+  auth-max-width: "1360px"
+  settings-max-width: "1040px"
+radius:
+  control: "12px"
+  dropdown: "14px"
+  story-card: "18px"
+  surface: "20px"
+  hero: "24px"
+  auth-editorial: "26px"
+  pill: "999px"
+motion:
+  fast: "160ms"
+  panel: "320ms"
+  enter: "520ms"
+  ease: "cubic-bezier(0.22, 1, 0.36, 1)"
 ---
 
-# Design System: ATI · Sân khấu điều phối
+# Planora — DESIGN.md
 
-Design system **Agentic** (Open Design) đúng như 12 bản mẫu trong [`docs/design/prototypes/`](docs/design/prototypes/README.md) thể hiện, và như bản React của chúng ([`docs/design/prototypes/react/`](docs/design/prototypes/react/README.md)) mà app chép vào từ FE-04b. Số liệu sử dụng, bảng chế độ tối đầy đủ, chỗ tham chiếu từng thành phần và các chỗ lệch giữa trang ở [`docs/design/design-system.md`](docs/design/design-system.md). Phần đầu YAML là chuẩn; phần chữ giải thích.
+Tài liệu thiết kế chính cho frontend v3. Giữ hướng B đã được chủ dự án chọn;
+bản chuẩn hóa này chờ review, không phải yêu cầu thay đổi giao diện đã chạy.
+Front matter là danh sách token có vai trò; chín mục dưới đây giải thích cách
+dùng theo cấu trúc tham khảo [getdesign.md](https://getdesign.md/) và
+[collection của VoltAgent](https://github.com/VoltAgent/awesome-design-md).
+Đây là tài liệu viết riêng từ code Planora, không phải file tải từ dịch vụ trả phí
+hoặc chứng nhận tuân thủ một JSON schema của Google.
 
-## Overview
+**Quyền lực:** DESIGN.md quy định thị giác và tương tác. Hành vi nghiệp vụ,
+quyền hạn, phê duyệt và phục hồi vẫn theo
+[đặc tả v3](docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md).
+`apps/chat-web/DESIGN.md` chỉ trỏ về tài liệu này. `System Design/DESIGN.md`
+là tham khảo lịch sử; không lấy palette Apple/indigo hoặc nhãn ATI cũ cho UI mới.
+Không áp dụng tài liệu này để sửa các package v2 được AGENTS.md bảo vệ.
 
-**Creative North Star: "Sân khấu điều phối"**
+## 1. Visual Theme & Atmosphere
 
-Mỗi lúc trên màn hình chỉ có một khoảnh khắc đang diễn: người dùng nói việc cần làm, ATI tìm đúng chỗ, hỏi lại khi thiếu, trình kế hoạch để duyệt, làm từng việc, rồi trao biên nhận. Sân khấu là một nền giấy ấm (#F8F8F6), các thẻ trắng viền mảnh đứng trên đó như đạo cụ, và chỉ một luồng sáng cam (#FF5701) chỉ vào việc cần làm tiếp. Mọi thứ khác lùi về sau: hội thoại đầy đủ nằm trong ngăn kéo, chi tiết kỹ thuật thu vào một nút.
+Planora là không gian tổ chức công việc: một lời nhắn, một kế hoạch có thể
+kiểm tra, các hành động được người dùng quyết định. Cảm giác như bàn làm việc
+với giấy và mực xanh, có trật tự nhưng không lạnh. Tên sản phẩm là **Planora**;
+ATI chỉ xuất hiện trong tài liệu môn học/lịch sử, không ở logo hay footer sản phẩm.
 
-Mật độ cao nhưng không chật: phần lớn nội dung trong thẻ dùng chữ 12px, tiêu đề Playfair Display mang cá tính, khoảng thở đến từ khoảng cách giữa các khối hơn là từ viền. Tông giọng điềm tĩnh và trung thực: giao diện không hiện điều chưa xảy ra (không có số issue trước khi việc chạy xong, không có phần trăm giả).
+Trang công khai thoáng và có điểm nhấn serif. Workspace ưu tiên đọc nội dung,
+đích nhận và quyết định; không thu nhỏ nội dung công việc thành poster quảng cáo.
+Giữ tinh thần khoảng 80% tĩnh, 20% chuyển động có mục đích.
 
-Chế độ tối giữ nguyên vai diễn: nền xanh đêm (#0B1020), thẻ #131B2F, chữ sáng #F1F5F9, và tia cam không đổi.
+### Phạm vi hoạt động — xác minh ngày 05/10/2026
 
-**Key Characteristics:**
-- Một tín hiệu cam cho hành động chính, phần tử đang chọn và viền focus.
-- Nền giấy ấm, thẻ trắng viền cát mảnh (#E7E7E2), bóng rất nhẹ.
-- Tiêu đề Playfair Display, chữ Be Vietnam Pro (đọc tốt tiếng Việt ở cỡ nhỏ), mã và ID JetBrains Mono.
-- Thông tin dày ở cỡ 11–12px, phân cấp bằng độ đậm và màu xám thay vì nhiều cỡ chữ.
-- Chuyển cảnh ngắn 200–300 ms, tắt khi người dùng giảm chuyển động.
+Website: https://planora-ivory-tau.vercel.app. Đã đọc `/api/health` và
+`/api/auth/config`, cả hai HTTP200; deployment `accounts-workspace`:
 
-## Colors
+| Mảng | Hiện trạng phải phản ánh trong UI |
+| --- | --- |
+| Giới thiệu, đăng nhập, workspace shell | Đã triển khai; đăng nhập bằng tài khoản đã cấp |
+| Hội thoại | API lưu thật; tạo, lịch sử, lưu trữ, xóa mềm và khôi phục |
+| Tài khoản | Thông tin phiên và đăng xuất thật; chưa có UI chỉnh hồ sơ/đổi mật khẩu |
+| Dịch vụ | Có UI/schema cấu hình theo quyền; logo không chứng minh đã kết nối |
+| AI chat, lập kế hoạch, thực thi | Có UI/luồng trong mã nguồn đầy đủ; **chưa bật ở backend cloud hiện tại** (`planning=false`, `execution=false`) |
+| Đăng ký/xác minh email | Có view trong code; **cloud đang đóng** (`signupEnabled=false`) |
+| Google, quên/reset mật khẩu | Chưa khả dụng; `googleEnabled=false`; không thêm nút giả |
+| Sheets, Calendar, Notion, Telegram, Jira | Roadmap; không hiển thị như tích hợp đang hoạt động |
 
-Bảng màu ấm và tiết chế: giấy, mực, cát, và một màu cam duy nhất làm tín hiệu.
+Đối với cloud, không hứa gửi tin nhắn sẽ tạo kế hoạch ngay. Nội dung minh họa
+trên landing mang nhãn ví dụ; success/running/connected trong workspace chỉ
+được suy ra từ API của chính thao tác đó. Render Free có cold start; trạng thái
+chờ mạng không được biến thành tiến độ AI giả.
 
-### Primary
-- **Cam Agentic** (#FF5701): nút chính, tab đang chọn, link nhấn, viền focus, ô nhập lớn đang focus (vòng sáng cam mờ). Chữ trên nút cam luôn trắng, đậm 600 trở lên.
-- **Cam sẫm** (#E04C00): hover của nút chính. Màn mới dùng giá trị này; một số trang bản mẫu dùng #E04D00 và được giữ nguyên.
-- **Nước mơ** (#FFF3ED): nền nhạt của chip và hộp nhấn cam; ở chế độ tối là cam mờ 14%.
+## 2. Color Palette & Roles
 
-### Neutral
-- **Giấy ấm** (#F8F8F6): nền trang, vùng lõm, thanh trên mờ 90% có nhoè nền.
-- **Thẻ trắng** (#FFFFFF): thẻ, ngăn kéo, hộp thoại, ô nhập.
-- **Viền cát** (#E7E7E2): viền mặc định của thẻ, ô nhập, đường chia; **viền mờ** (#F0F0EB) cho đường chia trong thẻ.
-- **Mực than chì** (#111827): chữ chính, nền nút tối và toast thông tin.
-- **Xám đá phiến** (#4B5563): chữ phụ, nhãn nút phụ.
-- **Xám sỏi** (#6B7280): nhãn, giờ, gợi ý.
-- **Xám tro** (#9CA3AF): placeholder và chú thích rất nhỏ.
+Token khai báo ở [index.css](apps/chat-web/src/index.css); tên semantic ở front
+matter ánh xạ tới CSS hiện có, không giả định các biến `--color-*` đã được tạo.
 
-### Trạng thái
-- **Xanh rừng** (#16A34A, chữ #059669 trên nền #ECFDF5): thành công, "Đã tạo/Đã ghi/Đã gửi".
-- **Hổ phách** (#D97706, chữ #92400E trên nền #FFFBEB): cảnh báo, chưa rõ kết quả.
-- **Gạch đỏ** (#DC2626, chữ #B91C1C trên nền #FEF2F2): lỗi, hành động phá huỷ.
-- **Chanh thử nghiệm** (#FEF9C3, chữ #78350F, viền trên hổ phách nhạt): dải "Chế độ thử nghiệm" khi máy chủ chạy sandbox.
+| Vai trò | CSS / giá trị | Quy tắc |
+| --- | --- | --- |
+| Canvas | `--bg` / `#f8f4eb` | Nền toàn trang, không gradient chủ đạo |
+| Paper | `--paper` / `#fffdf7` | Composer, kế hoạch, menu, modal |
+| Sidebar | `--side` / `#eee9dd` | Tách khu điều hướng bằng surface |
+| Ink | `--ink` / `#2e382d` | Heading, nội dung và tài nguyên quan trọng |
+| Muted | `--muted` / `#656b5b` | Metadata/giải thích; không giảm opacity nội dung bắt buộc đọc |
+| Divider | `--line` / `#deded0` | Hairline1px; không dùng để viết chữ |
+| Primary | `--green` / `#3c5741` | Một CTA chính trong mỗi vùng quyết định |
+| Primary hover | `#2f4633` | Hover nút xanh; chữ `--paper` |
+| Soft | `--soft` / `#e4e9d8` | Selected nav, nền status nhẹ |
+| Pending | `--warm` / `#f6e6cf`, `--clay` / `#85532b` | Chờ duyệt; focus outline dùng clay |
+| Error | `#f8e6df` / `#9a3f32` | Lỗi và xóa; bắt buộc có nhãn/icon |
+| Unknown | `#eee6f2` / `#654576` | Chưa rõ kết quả; không đồng nhất failed |
 
-### Chế độ tối
-- **Nền đêm** (#0B1020), **lõm đêm** (#0E1528), **thẻ đêm** (#131B2F); chữ **sáng đêm** (#F1F5F9), phụ (#B4BFCD), mờ (#A1AEC0). Màu tối do `docs/design/prototypes/theme.css` ghi đè theo tên class; class màu mới phải có dòng ghi đè tương ứng.
+Success dùng xanh và dấu kiểm; running có icon/nhãn trạng thái, không suy ra
+% nếu server không cung cấp. Chip roadmap viền đứt/nền trung tính với “Dự kiến”.
+Các nền minh họa hiện có: hero `#e9e9dc`, editorial auth `#e7eadb`, CTA `#e8ecdd`.
+Đây là các surface theo ngữ cảnh, không thêm accent mới cho mỗi service.
 
-**The One Signal Rule.** Mỗi vùng màn hình chỉ có một tín hiệu cam: nút chính, phần tử đang chọn hoặc viền focus. Cam không dùng để trang trí; hiếm mới có sức chỉ dẫn.
+## 3. Typography Rules
 
-**The Service Color Rule.** Màu nhận diện của dịch vụ (Trello #0079BF, Google Sheets #0F9D58, GitHub #24292E…) chỉ nằm trong logo và biểu tượng dịch vụ, không làm màu chữ hay nền của màn mới.
+Sans **Be Vietnam Pro**, tên family CSS `Be`, tự host400/500/600 ở
+`apps/chat-web/public/fonts/`, giấy phép OFL. Serif hệ thống **Times New Roman**
+rồi Georgia; không tải font mạng mới. Giữ dấu tiếng Việt, không upper-case
+đoạn văn dài. Code/ID/JSON dùng Consolas hoặc monospace hệ thống.
 
-## Typography
+| Ngữ cảnh | Mốc CSS hiện tại | Hướng dùng |
+| --- | --- | --- |
+| Body | Sans14px /1.65,400 | Văn bản thao tác; không ép còn10–11px |
+| Hero landing | Serif66px /1.08 ở desktop rộng | Chia dòng có chủ ý; italic xanh chỉ một phần |
+| Heading workspace chung | Serif40px /1.15 | Rõ hierarchy; không tranh với plan CTA |
+| How heading | Serif38px | Reveal theo dòng, giữ đủ chỗ cho dấu |
+| Auth heading | Serif50px /1.05 | Form dễ đọc, không tăng thành hero toàn màn |
+| Auth editorial | Serif46px /1.1 | Một thông điệp ngắn, không lặp quy trình homepage |
+| Heading cấp2 chung | Serif30px /1.25 | Tên vùng và kế hoạch |
+| Button chung | Sans13px,500 | Nhãn động từ rõ, giữ target44px |
+| Eyebrow | Sans11px,600, tracking0.1em | Nhãn section ngắn, không thay heading |
+| Metadata | Sans11–12px trong UI hiện có | Chỉ thời gian, nhãn phụ; không giấu lỗi ở đây |
 
-**Display Font:** Playfair Display (với Georgia, serif)
-**Body Font:** Be Vietnam Pro (với system-ui, sans-serif)
-**Label/Mono Font:** JetBrains Mono (với ui-monospace)
+Các mốc trên là selector desktop, không một thang bắt buộc cho mọi component.
+CSS context/media query có override; ưu tiên CSS cuối cùng được import.
+Yêu cầu cho UI mới: body/control tối thiểu14px, input mobile16px, title wrap
+tự nhiên. Đây là yêu cầu chất lượng cho lần sửa UI sau, chưa phải refactor đã làm.
+Không thêm weight700 cho family chỉ có ba tệp; ưu tiên500/600.
 
-**Character:** Playfair có chân, đậm, giãn chữ hẹp (-0.025em) cho tiêu đề mang dáng biên tập; Be Vietnam Pro không chân, dấu tiếng Việt rõ ở 11–14px, gánh toàn bộ nội dung thao tác.
+## 4. Component Stylings
 
-### Hierarchy
-- **Display** (700, 36px, dòng 40px; trang giới thiệu tới 42–52px ở desktop): tiêu đề trang và tiêu đề khoảnh khắc.
-- **Headline** (700, 24px, dòng 32px): tiêu đề thẻ lớn, tiêu đề hộp thoại.
-- **Title** (600, 16px, dòng 24px): tên thẻ, tên dịch vụ.
-- **Body** (400, 14px, dòng 20px): nội dung chính, ô nhập, nút chính.
-- **Body-sm** (500, 12px, dòng 16px): phần lớn nội dung trong thẻ, nút phụ, tab.
-- **Label** (600, 11px, giãn 0.05em, thường viết hoa): chip, nhãn nhóm, giờ.
-- **Micro** (600, 10px, viết hoa, giãn 0.05em): nhãn nhóm nhỏ nhất.
-- **Mono** (500, 12px): mã, ID, khoá, đường dẫn.
+### Buttons, inputs, feedback
 
-**The Weight Before Size Rule.** Phân cấp trong thẻ bằng độ đậm (500/600/700) và màu (mực, đá phiến, sỏi), không thêm cỡ chữ ngoài thang trên.
+Primary pill: xanh rừng, chữ paper, target tối thiểu44px, padding10×18px,
+gap9px, nhãn13px/500. Secondary: paper/viền1px, ink; tertiary nền trong.
+Danger là chữ đất đỏ và xác nhận riêng cho xóa. Disabled: opacity0.55,
+không hover/submit; pending có aria-busy và khóa thao tác trùng.
+Focus-visible outline2px clay, offset4px; không xóa focus keyboard.
 
-## Layout
+Auth input cao54px, bo12px, icon và toggle không chồng chữ; label luôn thấy,
+required/autocomplete đúng mục đích. Focus border xanh + ring nhẹ3px.
+Hiện/ẩn mật khẩu là nút có accessible name; không điền credential mẫu.
+Lỗi đặt gần form, `role=alert`, giữ dữ liệu có ích, không echo secret.
 
-Khung nội dung giữa trang, tối đa 1024px (`max-w-5xl`) cho thanh trên và dải thử nghiệm; nội dung hẹp hơn tuỳ trang (576–896px, `max-w-xl` → `max-w-4xl`), hộp thoại 448px (`max-w-md`); lề 16px ở điện thoại, 24px từ 640px. Khoảng cách theo bước 4px (4, 8, 12, 16, 20, 24, 32px; có cả 6px và 10px cho đệm nút). Thẻ đệm 16–24px, hộp thoại 24–32px, giữa các khối 24–32px. Thanh trên dính đầu trang. Từ 640px và 1024px bố cục mở rộng (lưới gợi ý 2×2, ngăn kéo 420px bên phải); dưới 640px mọi thứ xếp một cột, ngăn kéo phủ toàn màn.
+### Brand and service marks
 
-## Elevation & Depth
+[Brand.tsx](apps/chat-web/src/components/Brand.tsx) sở hữu monogram P và
+wordmark planora; favicon/avatar dùng cùng hình. Không vẽ lại logo ở mỗi view.
+`ServiceLogo` dùng asset tự host trong `public/logos`; icon chức năng dùng Lucide.
+Giữ màu, tỷ lệ và tên GitHub/Trello/Slack. Logo có tên cạnh bên là decorative.
+Nguồn/điều kiện dùng: [logo README](apps/chat-web/public/logos/README.md).
+Mốc kích thước: card32px, hero22px, plan23px, icon chung20px; không xoay logo
+service theo hover. Roadmap có logo nhưng vẫn phải mang trạng thái dự kiến.
 
-Phân tầng chủ yếu bằng tông nền (giấy → thẻ trắng) và viền cát; bóng rất nhẹ, chỉ đủ tách thẻ khỏi nền. Bóng đậm chỉ dành cho lớp nổi lên trên nội dung (hộp thoại, ngăn kéo, toast).
+### Public landing and footer
 
-### Shadow Vocabulary
-- **Mặc định thẻ** (`box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05)`): thẻ, nút, chip có viền.
-- **Thẻ nổi** (`box-shadow: 0 1px 3px rgba(0,0,0,.02), 0 8px 24px -4px rgba(0,0,0,.04)`): thẻ ở cockpit, ô nhập lớn.
-- **Nổi cao** (`box-shadow: 0 4px 6px -1px rgba(0,0,0,.02), 0 20px 32px -6px rgba(0,0,0,.07)`): khối nổi lớn.
-- **Vòng sáng cam** (`box-shadow: 0 0 0 3px rgba(255,87,1,.18)`): ô nhập lớn khi đang focus.
-- **Ngăn kéo** (`box-shadow: -8px 0 32px rgba(0,0,0,.08)`): ngăn bên phải.
-- **Lớp phủ:** nền đen 40% có nhoè sau hộp thoại và ngăn kéo.
+Thứ tự giữ nguyên: hero → marquee `#ecosystem` → Cách hoạt động `#how` và
+roadmap → thông tin Dịch vụ `#services` → CTA → footer. Navbar Dịch vụ tới
+`#services`, không tới marquee. CTA đi login/workspace theo phiên; dịch vụ
+yêu cầu login giữ đích `next=services`.
 
-**The Quiet Shadow Rule.** Thẻ ở trạng thái nghỉ chỉ có bóng mặc định; bóng lớn chỉ xuất hiện cho lớp đang nằm trên nội dung khác.
+How01/02/03 dùng paper card bo18px, border hairline, số serif và miniature
+UI request → plan → result. Mini UI có nhãn ví dụ, không đồng hồ/% giả.
+Footer dùng wordmark, hai dòng serif, link Cách hoạt động/Dịch vụ/Workspace
+và lên đầu trang có đích thật. Không ghi “Dự án ATI”, không link pháp lý rỗng.
 
-## Shapes
+### Auth editorial
 
-Góc bo mềm, tăng theo kích thước khối: chip vuông 4px, tab và nút nhỏ 8px (`rounded-lg`), nút và ô nhập 12px (`rounded-xl`), thẻ 16px (`rounded-2xl`), hộp thoại 24px (`rounded-3xl`); chip, huy hiệu và avatar bo tròn hẳn. Viền 1px màu cát cho mọi khối nền trắng; logo là ô vuông cam 32px bo 8px chữ "A" Playfair trắng.
+[LoginStory](apps/chat-web/src/components/LoginStory.tsx): lớp giấy và seal P,
+một thông điệp ngắn “Điều lớn lao, từ một khởi đầu nhỏ.”. Artwork decorative,
+không phải mini dashboard và không đưa lại ba tab quy trình homepage.
+Login/signup/verify chia sẻ editorial/footer; form là nội dung ưu tiên.
+CTA tạo tài khoản chỉ mở khi auth config cho phép. Đăng ký không tự cấp phiên;
+xác minh thành công không tự duyệt user. Hiện chờ admin khi backend trả trạng thái đó.
 
-## Components
+### Workspace, history and menus
 
-### Buttons
-- **Shape:** bo 12px (`rounded-xl`); nút nhỏ trên thanh trên bo 8px.
-- **Primary:** nền cam (#FF5701), chữ trắng 14px đậm 600, đệm 12×16px, bóng cam mờ; hover cam sẫm (#E04C00), nhấn co 99%.
-- **Secondary:** nền trắng, viền cát, chữ đá phiến (#4B5563) 12px đậm 500, đệm 10×16px; hover nền giấy.
-- **Night:** nền mực (#111827), chữ trắng 12px, bo 8px, đệm 6×12px; hover đen. Dùng cho "Xem hội thoại".
-- **Focus:** viền focus cam thấy được trên mọi nút (xem Do's and Don'ts).
+Shell dùng `Workspace`; sidebar: brand → Hội thoại mới → Hội thoại/Dịch vụ →
+tìm kiếm → **Gần đây** → tài khoản/đăng xuất. Lưu trữ và Đã xóa nằm ở Settings,
+không tạo ba tab cạnh lịch sử. Timestamp/tên lấy API, không dùng UUID như tên
+người dùng tự viết; ID fallback hợp lệ khi chưa có title.
 
-### Chips
-- **Style:** chữ 11px đậm 600, đệm 2×10px, bo tròn; màu theo trạng thái (nền nhạt, chữ đậm cùng họ).
-- **State:** chỉ hiện "Đã tạo/Đã ghi/Đã gửi" khi bước đã thành công.
+Menu ⋯ paper212px, bo14px, padding6px, hàng42px desktop/44px mobile,
+icon16px; separator trước Xóa. Popover ở top layer, canh phải/gap8px,
+clamp12px và lật lên nếu thiếu chỗ. Keyboard: Arrow/Home/End, Escape trả focus,
+click ngoài/scroll/resize đóng. Xóa cần modal xác nhận và là xóa mềm, khôi phục
+được ở Settings; không đổi nó thành xóa vĩnh viễn trong một lần “làm đẹp”.
 
-### Cards / Containers
-- **Corner Style:** 16px.
-- **Background:** thẻ trắng trên nền giấy; ở chế độ tối #131B2F trên #0B1020.
-- **Shadow Strategy:** mặc định thẻ, hoặc thẻ nổi ở cockpit (Elevation & Depth).
-- **Border:** 1px viền cát (#E7E7E2).
-- **Internal Padding:** 16–20px, 24px cho thẻ lớn.
+Composer chung: Enter gửi, Shift+Enter xuống dòng, IME không bị gửi sớm.
+Giữ draft riêng theo hội thoại trong phiên, không persist nội dung vào localStorage.
+Feed chỉ autoscroll khi gần cuối; `role=log`, không cướp vị trí đang đọc.
 
-### Inputs / Fields
-- **Style:** nền trắng, viền cát, bo 12px, chữ 14px, placeholder xám tro (#9CA3AF), đệm 10×14px.
-- **Focus:** viền chuyển cam và vòng cam mờ 2px; ô nhập lớn dạng thẻ dùng vòng sáng cam 3px.
-- **Error / Disabled:** chữ lỗi đỏ gạch (#DC2626) 11–12px dưới ô; chỉ một ô nhập chat hiện cùng lúc.
+### Plan, progress, result and recovery
 
-### Navigation
-- **Thanh trên:** dính đầu trang, nền giấy mờ 90% nhoè nền, viền dưới cát; trái là logo và nút quay lại, phải là cụm nút (lịch sử, xem hội thoại, sáng/tối, avatar). Nút sáng/tối 32×32 bo 10px.
-- **Tab:** tab đang chọn nền cam chữ trắng 12–14px đậm 600; tab khác chữ sỏi, hover chữ mực.
-- **Ngăn kéo:** trượt từ phải, rộng 420px (toàn màn dưới 640px), bóng lớn, có bẫy focus và Esc.
+Các trạng thái dùng **cùng workspace**, không thêm page cho mỗi giai đoạn.
+Plan step trình bày logo, số thứ tự, hành động/tool, read/write, tài nguyên,
+payload và phụ thuộc. Không bịa tên từ ID: dùng tên server cung cấp, nếu thiếu
+ghi “(ID)”. Cho đọc payload trước duyệt; JSON chỉ là fallback thu gọn.
 
-### Thẻ khoảnh khắc (signature)
-Mỗi khoảnh khắc của cockpit là một khối giữa trang: nhãn nhỏ viết hoa, tiêu đề Playfair, nội dung trong thẻ trắng, và một hành động cam duy nhất. Thẻ từng việc có ô biểu tượng dịch vụ, chip hành động, "Việc n", mô tả đậm và "Đích đến".
+Review dock phía trên composer: “Duyệt và thực thi” primary; “Sửa qua chat”
+secondary; “Hủy” tertiary. Thiếu plan ID hoặc đang submit thì khóa đúng nút.
+Sửa qua chat chỉ điền draft, không tự thực thi. Hủy lỗi thì giữ kế hoạch.
 
-### Dải thử nghiệm (signature)
-Dải vàng chanh cao 32px dưới thanh trên, chữ nâu hổ phách (#78350F) 11–12px, chỉ hiện khi máy chủ chạy sandbox.
+Gather/clarification dùng sự kiện thật; chạy/hoàn tất dựa snapshot/SSE/API,
+không suy diễn từ animation. Result ưu tiên tài nguyên/link HTTP(S) an toàn,
+`noopener noreferrer`; duration chỉ khi dữ liệu có. UNKNOWN nói rõ chưa biết
+đã ghi hay chưa, không Retry mù. Chỉ hiển thị Skip/Continue/Retry mà server cho
+phép. Đóng/Escape hộp thoại lỗi không Stop; Stop cần xác nhận riêng.
 
-## Do's and Don'ts
+### Services and account settings
 
-### Do:
-- **Do** chép class của thành phần gần nhất trong bản React (`docs/design/prototypes/react/src/pages/`) thay vì tự viết bộ class mới.
-- **Do** giữ một tín hiệu cam mỗi vùng (The One Signal Rule) và chữ trắng đậm 600 trên nút cam.
-- **Do** dùng thang chữ trong Typography; phân cấp bằng độ đậm và màu trước khi đổi cỡ.
-- **Do** thêm viền focus thấy được (`focus-visible:ring-2` màu #FF5701, không đổi kích thước) cho phần tử nào trong bản mẫu đang tắt viền focus.
-- **Do** chỉ dùng class màu đã có dòng ghi đè chế độ tối trong `theme.css`.
-- **Do** hiện đúng trạng thái thật: số issue, link và chip "Đã tạo" chỉ sau khi bước chạy xong; thanh tiến độ bằng số việc xong / tổng.
+Service card có logo, mô tả, trạng thái thật, Allowed Scope và hai thao tác
+**Kiểm tra kết nối / Cấu hình**. Credential input không điền sẵn secret, không
+lưu trong localStorage. Lưu thành công không đồng nghĩa kiểm tra kết nối thành
+công. Fields/scope lấy schema API; roadmap không có nút cấu hình hoạt động.
 
-### Don't:
-- **Don't** thêm màu ngoài bảng khi một màu có sẵn đáp ứng được.
-- **Don't** dùng màu nhận diện dịch vụ làm màu chữ hay nền (The Service Color Rule).
-- **Don't** dùng utility gradient của Tailwind v4 (`bg-linear-to-*`, `from-*`… ngoài danh sách `@source not inline`): nó làm hỏng gradient chế độ tối của bản mẫu.
-- **Don't** đặt chữ trắng trên nền cam ở cỡ dưới 14px; huy hiệu nhỏ dùng nền nước mơ và chữ cam đậm.
-- **Don't** hiện câu ước lượng chưa đo ("Thường mất khoảng 3–5 giây") hay phần trăm tiến độ giả.
-- **Don't** hiện hai ô nhập chat cùng lúc.
+Settings: account, archived, deleted; admin có duyệt tài khoản theo quyền API.
+Account hiển thị tên/email thật, link dịch vụ và đăng xuất; chưa hứa edit profile,
+avatar upload, đổi role/password bằng các control chưa được nối backend/UI.
+Restore cập nhật danh sách sau API success; mục Deleted không mở chat trước restore.
 
-Giới hạn đã được người dùng chấp nhận ngày 07/10/2026: chữ 10–12px và một số chữ xám nhỏ (#9CA3AF trên nền trắng 2,54:1) không đạt tương phản 4,5:1; vùng chạm một số nút 32px. Chỉ đo và ghi lại, không sửa nếu làm đổi hình thức bản mẫu.
+### Lazy loading and process loading
+
+| Chờ loại gì | Hiện trạng / cách hiển thị | Lỗi |
+| --- | --- | --- |
+| Chunk Services/Settings | React.lazy + Suspense; skeleton gần layout đích | ViewBoundary, nút tải lại |
+| Chunk Signup/Verify | Lazy, fallback status bằng chữ hiện có | Không claim đã có skeleton hoàn chỉnh |
+| API history/catalog/settings | Loading riêng vùng dữ liệu; empty chỉ sau success | Lỗi/thử lại, không coi lỗi là danh sách trống |
+| Login/approve/restore/config | Nút busy, khóa gửi trùng | Giữ ngữ cảnh, phản hồi theo thao tác |
+| Gather/planning | Nội dung tiến trình theo sự kiện thật | Clarification/lỗi kết thúc trạng thái đang chờ |
+| Execution | Timeline từng bước và snapshot bền vững | Recovery theo quyền server; không reset success |
+| Cloud cold start/offline | Đang kết nối/chưa truy cập được | Thử lại rõ ràng; không dựng AI progress |
+
+Landing, login và workspace hiện import trực tiếp; không nói “mọi page lazy”.
+Skeleton không chạy vô hạn khi request lỗi. Cache/optimistic UI không được cấp
+thành công cho thao tác ghi trước khi API xác nhận. Không phát thông báo screen
+reader mỗi frame của motion.
+
+## 5. Layout Principles
+
+Nhịp4/8/12/16/24/32/48/64px; khoảng lớn dành cho phân tách nội dung, không
+phải lấp bằng card. Desktop shell248px + `minmax(0,1fr)`, chat/review tối đa
+1120px. Public max1280px, lề48px; hero2cột gap70px. Auth max1360px,
+grid1.2/0.8, form max420px, gap52–100px. Settings max1040px, nav220px/gap42px.
+Đây là kích thước của các vùng khác nhau, không gom về một container tùy ý.
+
+### Bốn vùng trải nghiệm, bảy view hiện có
+
+| View | Route | Ghi chú |
+| --- | --- | --- |
+| Giới thiệu | `/` hoặc `/?view=landing` | Công khai kể cả khi đã login |
+| Đăng nhập | `/?view=login` | Trả về đích protected đã yêu cầu |
+| Đăng ký | `/?view=signup` | Phụ thuộc config; cloud hiện đóng |
+| Xác minh | `/?view=verify-email&token=…` | Token bỏ khỏi URL; không đưa vào log/ảnh |
+| Workspace | `/?view=workspace&c=…` | Chat/review/progress/result/recovery chung view |
+| Dịch vụ | `/?view=services&c=…` | Dùng workspace shell, cần phiên |
+| Cài đặt | `/?view=settings&c=…&section=account` | account/archived/deleted; admin là nội dung có điều kiện |
+
+History API/query string hiện có; không thêm router để đổi tên page.
+Protected route khi chưa có phiên chuyển login, whitelist `next`; giữ `c`/section
+khi thích hợp. Back/Forward, direct fragment và reload phải có nghĩa.
+Giữ lựa chọn ngay khi click; guard request chậm để hội thoại cũ không đè hội thoại mới.
+Plan state, error modal và menu không được tính như page riêng.
+
+## 6. Depth & Elevation
+
+Surface + border là công cụ chính. Paper khác canvas đủ nhẹ; card không “bay”
+mặc định. Shadow hero hiện có `0 6px 16px #2e382d08, 0 22px 42px -16px #2e382d24`.
+How hover được phép bóng mềm; không copy mức đó sang mọi input/menu.
+Modal/backdrop có mục đích tách quyết định, không blur/glassmorphism toàn trang.
+
+### Motion contract
+
+| Vùng | Biên độ/thời gian đã có | Ràng buộc |
+| --- | --- | --- |
+| Hero idle | Y0→−6→0px,4s ease-in-out | Wrapper float tách rotator; không scale/glow |
+| Hero drag | Y0.35°/px vô hạn; X−0.15°/px,±12° | Threshold5px, giữ click con, pause float/resume400ms |
+| Hero inertia | ≤0.08°/ms,≤240ms, friction85ms | Grab mới hủy, không reset rotation |
+| Hero mặt/cạnh | Perspective1200px; dày14px/10px | Backface hidden, mặt khuất inert/aria-hidden |
+| Marquee |18s linear,4nhóm, dịch−25% | Một accessible list; bản sao aria-hidden; không nút pause theo lựa chọn chủ dự án |
+| How story | Token6px + hairline theo scroll | Desktop ngang, mobile dọc; không giả tiến độ hệ thống |
+| How hover | Lift−6px,280ms | Fine pointer; không phóng chữ/logo |
+| Reveal |650–750ms, stagger75–150ms | Chỉ khi vào viewport; heading mask không cắt dấu |
+| Roadmap | Unfold350ms, line400ms | Click/keyboard/tap; không hover-only hay mốc thời gian bịa |
+| CTA | Magnetic±3px, arrow4px, paper shift±8px | Desktop fine pointer; không đuổi con trỏ |
+| Auth artwork | Float6px/6s, seal thêm3px/nghiêng2° | Chữ/form/bóng đứng yên |
+| Press/menu | Scale0.985/160ms; menu entrance160ms | Không bounce; focus không dịch khỏi màn |
+
+Hero mở desktop X6°/Y−12°, mobile X0°/Y0°; chỉ khởi tạo lúc mount, không reset
+khi float resume. Touch dùng `pan-y pinch-zoom`, vẫn cuộn trang dọc; arrow keys
+xoay15° khi rotator focus, không lấy phím controls con.
+
+Native IntersectionObserver/rAF/transform/opacity, refs cho scroll/pointer;
+không setState mỗi frame, không loop idle, không thêm animation library.
+Observer/listener/timer/frame được cleanup. Content tĩnh là baseline; enhancement
+chỉ bật khi API trình duyệt có sẵn. Reduced-motion tắt float/marquee/token/
+parallax/magnetic/inertia/reveal movement; manual hero drag và roadmap vẫn dùng
+được, nội dung không bị ẩn. CSS hiện tại còn tắt transition toàn cục ở reduce;
+không mô tả “opacity animation vẫn bật” như đã triển khai.
+
+## 7. Do's and Don'ts
+
+**Làm:** hierarchy bằng serif + khoảng trống; CTA rõ; payload/tài nguyên dễ đọc;
+labels tiếng Việt ngắn; status có chữ + icon; ví dụ đặt nhãn ngay trong vùng;
+focus/empty/error/retry có ý nghĩa. Tích hợp/capability căn cứ API, không logo.
+
+**Không:** neon/glow, gradient rực, particle, số liệu chưa đo, connected giả,
+avatar người dùng bịa, dashboard AI tương lai, card lồng vô cớ, chữ marketing
+lặp trên auth. Không hứa tính năng roadmap đang hoạt động, không khóa dọc bằng
+`touch-action:none`, không che nội dung bằng reveal khi JS/observer thiếu.
+Không công khai secret trong docs, build, URL, localStorage hoặc ảnh.
+
+Các trạng thái bắt buộc review cho component mới: default/hover/focus-visible/
+pressed/disabled/loading/error/empty/success nếu có. Không chỉ review screenshot
+happy path. Đối với dịch vụ, thêm denied/not-configured/disconnected; execution
+thêm failed/unknown/reconciliation-required. Các nhãn này phải khớp contract API,
+không tự đặt enum backend mới.
+
+## 8. Responsive Behavior
+
+| Breakpoint hiện có | Hành vi |
+| --- | --- |
+| ≥1024px | Sidebar shell cố định; content không tràn theo cột |
+| ≤1023px | Sidebar drawer; Escape/backdrop đóng, focus return, inert phía sau |
+| ≤1180px | Plan step chuyển chuỗi dọc (media761–1180 và mobile) |
+| ≤760px | Hero/How/Services1cột; workflow token dọc; auth form trước editorial; lề16–20px |
+| ≤700px | Settings nav thành hàng, profile fields xếp dọc |
+| 320px | Target44px, input16px, title/payload/ID wrap, không overflow page |
+
+Desktop hover/magnetic không chạy trên coarse pointer. Drawers/modals có focus
+trap/return, Escape theo đúng cấp; Escape menu không đóng cả drawer cùng lúc.
+Composer/review dock không che tin nhắn khi mở bàn phím. Dùng min-width0 cho
+cột và overflow-wrap cho ID; không sửa lỗi layout bằng overflow-x:hidden ở body.
+
+Yêu cầu nghiệm thu cho lần sửa UI sau:320×740,390×844,768×1024,1440×900;
+zoom200%, keyboard-only, reduced-motion, request lỗi/chậm. Đây là checklist,
+không phải tuyên bố toàn bộ matrix đã chạy trong lượt tài liệu này.
+
+## 9. Agent Prompt Guide
+
+Đọc DESIGN.md trước khi sửa UI; đọc AGENTS.md, handoff và spec v3 cho nghiệp vụ.
+Xác định component/CSS/hook đang sở hữu tương tác, mở rộng tại chỗ. Dùng token
+đã có; không tạo bản copy Brand/ServiceLogo/Modal hoặc rewrite hero logic.
+Nếu cần token mới, giải thích vai trò và cập nhật source lẫn tài liệu cùng task.
+
+Prompt áp dụng:
+
+> Thiết kế [component/view] cho Planora theo DESIGN.md tại gốc repo. Giữ nền
+> kem, paper, xanh rừng, serif editorial và Be Vietnam Pro. Tái sử dụng component
+> v3 hiện có; đọc capability/API trước khi hiện control. Có keyboard focus,
+> loading/error/empty, mobile và reduced-motion. Không thay bố cục ngoài phạm vi,
+> không thêm dịch vụ/metric/success giả; không gọi provider ghi khi chưa duyệt.
+
+### Evidence and maintenance
+
+Nguồn triển khai: [App](apps/chat-web/src/App.tsx),
+[base CSS](apps/chat-web/src/index.css), [auth CSS](apps/chat-web/src/login.css),
+[sidebar CSS](apps/chat-web/src/sidebar.css), [settings CSS](apps/chat-web/src/settings.css),
+[story CSS](apps/chat-web/src/landing-story.css), [motion CSS](apps/chat-web/src/motion.css),
+[hero hook](apps/chat-web/src/hooks/use-hero-motion.ts),
+[story hook](apps/chat-web/src/hooks/use-landing-story.ts).
+Cloud account/workspace được triển khai từ
+[backend commit669a413](https://github.com/VinhDat267/ATI_Project/tree/669a4131699445a54863d42521e92380abe92fbd/apps/chat-api/deploy).
+
+Thứ tự căn cứ: yêu cầu mới đã chốt → spec v3 về nghiệp vụ → capability/API
+thực tế → CSS/component hiện tại về giá trị → DESIGN.md giải thích. Nếu mâu
+thuẫn, ghi rõ lệch và sửa trong task phù hợp, không ngầm thay đổi production.
+Mỗi lần thay phong cách/component cập nhật đúng mục; handoff giữ bằng chứng
+test/browser và giới hạn ở log riêng, không biến DESIGN.md thành nhật ký deploy.
