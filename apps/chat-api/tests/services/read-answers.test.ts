@@ -10,10 +10,14 @@ describe('ANS-01 persisted answer and history boundary', () => {
   let db: Awaited<ReturnType<typeof createMigratedSchema>>;
   beforeAll(async () => { db = await createMigratedSchema('ans01'); });
   afterAll(async () => { await db?.close(); });
-  it('validates the on/off flag, defaulting to off', () => {
-    expect((validateEnv({}) as any).PLANNER_READ_ANSWERS).toBe(false);
-    expect((validateEnv({ PLANNER_READ_ANSWERS: 'on' }) as any).PLANNER_READ_ANSWERS).toBe(true);
-    expect(() => validateEnv({ PLANNER_READ_ANSWERS: 'maybe' })).toThrow(/PLANNER_READ_ANSWERS/);
+  it('validates the on/off flag, defaulting to on and when empty', () => {
+    expect(validateEnv({}).PLANNER_READ_ANSWERS).toBe(true);
+    expect(validateEnv({ PLANNER_READ_ANSWERS: '' }).PLANNER_READ_ANSWERS).toBe(true);
+    expect(validateEnv({ PLANNER_READ_ANSWERS: 'on' }).PLANNER_READ_ANSWERS).toBe(true);
+    expect(validateEnv({ PLANNER_READ_ANSWERS: 'off' }).PLANNER_READ_ANSWERS).toBe(false);
+    for (const invalid of ['maybe', 'true', 'ON', '1', 'false', 'OFF', '0', 'no']) {
+      expect(() => validateEnv({ PLANNER_READ_ANSWERS: invalid }), invalid).toThrow('PLANNER_READ_ANSWERS must be on or off');
+    }
   });
   it('saves an answer without a plan, emits correlation and idle, wraps it on the next turn', async () => {
     const person = await db.person('ANS');

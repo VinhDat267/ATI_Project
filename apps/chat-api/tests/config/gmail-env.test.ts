@@ -9,6 +9,7 @@ describe('GMAIL_ENABLED policy', () => {
   it('auto-enables Gmail when OAuth variables are complete and GMAIL_ENABLED is unset, stays off when unconfigured or explicitly off', () => {
     expect(validateEnv({}).GMAIL_ENABLED).toBe(false);
     expect(validateEnv({}).GMAIL_OAUTH).toBeUndefined();
+    expect(validateEnv(live)).toMatchObject({ GMAIL_ENABLED: false, GMAIL_OAUTH: undefined });
     expect(validateEnv({ ...live, GMAIL_OAUTH_CLIENT_ID: 'only-id' }).GMAIL_ENABLED).toBe(false);
 
     const sandboxAuto = validateEnv({ ...gmail, ...fake, GMAIL_ENABLED: undefined });

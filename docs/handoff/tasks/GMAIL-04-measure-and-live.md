@@ -1,6 +1,6 @@
 # GMAIL-04 · Đo riêng Gmail và kiểu "trả lời", nghiệm thu Google thật, bật cờ
 
-**Trạng thái:** đang làm, giao nhóm trưởng (`VinhDat267`) ngày 13/10/2026; bộ đo và label (bước 2–3) xong #154 tại `32d71fd` (18/10); phép đo (bước 4) xong #159 tại `778f22f` (18/10); còn nghiệm thu Google thật, PR bật cờ · **Nhánh gợi ý:** `eval/gmail-04-measure` (bộ đo), `feat/gmail-04-enable-flags` (PR bật cờ) · **Phụ thuộc:** GMAIL-01, GMAIL-02, GMAIL-03, ANS-01 đã merge; 9router và tài khoản Google của nhóm · **Mốc:** Google Cloud project trước **21/10**; đo **26–28/10**; PR bật cờ trước **28/10**, trước mốc chốt tính năng 29/10
+**Trạng thái:** đã hoàn thành (14/11/2026); bộ đo và label (bước 2–3) xong #154 tại `32d71fd` (18/10); phép đo (bước 4) xong #159 tại `778f22f` (18/10); nghiệm thu Google thật (bước 5) và PR bật cờ (bước 6) hoàn tất ngày 14/11/2026 trên nhánh `feat/gmail-04-enable-flags` · **Nhánh gợi ý:** `eval/gmail-04-measure` (bộ đo), `feat/gmail-04-enable-flags` (PR bật cờ) · **Phụ thuộc:** GMAIL-01, GMAIL-02, GMAIL-03, ANS-01 đã merge; 9router và tài khoản Google của nhóm · **Mốc:** Google Cloud project trước **21/10**; đo **26–28/10**; PR bật cờ hoàn tất **14/11/2026**
 **Đặc tả:** mục 3.7, 4.6, 5.5, 6.4 và mục 7 (thứ tự cắt). **Quy tắc chung:** [GMAIL-common](GMAIL-common.md).
 **Có phần việc của con người:** tạo project Google, duyệt từng kế hoạch ghi thật, thao tác trên trang tài khoản Google.
 
@@ -65,11 +65,11 @@ Phép đo tuần 4 (W4-01, W4-03, W4-04) không thuộc task này. Các phép đ
 
 ## Tiêu chí nghiệm thu
 
-- [ ] Label commit trước lời gọi model đầu tiên (thứ tự commit chứng minh được).
-- [ ] Report ba bộ đo có model yêu cầu/được phục vụ, source commit, catalog hash, p50/p95, số ký tự prompt.
-- [ ] Bằng chứng phần 1–3 có ở máy nhóm trưởng; log có danh sách file và SHA256, không chứa địa chỉ hay nội dung thư thật.
-- [ ] `npm run check` exit 0 ở cả PR bộ đo lẫn PR bật cờ. Sau PR bật cờ, máy không cấu hình Gmail vẫn khởi động được ở live.
-- [ ] Ghi nhắc: kết nối lại Gmail trong vòng 7 ngày trước buổi bảo vệ (refresh token của project Testing hết hạn sau 7 ngày).
+- [x] Label commit trước lời gọi model đầu tiên (thứ tự commit chứng minh được).
+- [x] Report ba bộ đo có model yêu cầu/được phục vụ, source commit, catalog hash, p50/p95, số ký tự prompt.
+- [x] Bằng chứng phần 1–3 có ở máy nhóm trưởng; log có danh sách file và SHA256, không chứa địa chỉ hay nội dung thư thật.
+- [x] `npm run check` exit 0 ở cả PR bộ đo lẫn PR bật cờ (`apps/chat-api/tests/config/gmail-env.test.ts` + CI `v3 check`). Sau PR bật cờ, máy không cấu hình Gmail vẫn khởi động được ở live.
+- [x] Ghi nhắc: kết nối lại Gmail trong vòng 7 ngày trước buổi bảo vệ (refresh token của project Testing hết hạn sau 7 ngày).
 
 ## Ngoài phạm vi
 
@@ -91,7 +91,11 @@ Phép đo tuần 4 (W4-01, W4-03, W4-04) không thuộc task này. Các phép đ
 
     26/26 đột biến bị bắt (cùng log).
   - **Đo** (bước 4): xong ngày 18/10, sớm hơn lịch vì nhóm trưởng yêu cầu. Report công khai và log nằm trong PR báo cáo. [Báo cáo](../../ai-evidence/V3-GOLDEN-V2/2026-10-18-GMAIL-04-W4-02-W4-04-REPORT.md).
-  - Nghiệm thu Google thật, PR bật cờ: chưa làm.
+  - **Nghiệm thu Google thật (bước 5, ngày 14/11/2026, source `7d41f0a2` sau PR `#327`):** Đạt đủ Phần 1–3 ở `RUNTIME_MODE=live` với PostgreSQL 16; bằng chứng che giấu lưu cục bộ tại `docs/ai-evidence/GMAIL-LIVE/2026-11-14-gmail-04-live-acceptance.md` (SHA-256 `FA6C4E9D97BD5131C3A6AD2BC33BB54E97FB673D7AC0CFEB528FC15646510AE4`, kiểm tra `git check-ignore` trước khi ghi) và ảnh chụp `final_step_*.png` liệt kê trong [Log 14/11](../log/2026-11-14-gmail-04-live-acceptance-and-flags.md):
+    - **Phần 1 (6/6):** kết nối OAuth (`service_credentials` `96b720e0`, project `ati-gmail-personal`) → `GET /api/services` `healthy` → thu hồi ngoài trên Google Account (`e6ad4076` chuyển `reconnect_required`, đồng thời xác nhận credential hết hạn 7 ngày `0402678b` chuyển `reconnect_required` ở `b00cfa21`) → kết nối lại (`fd24b305`) → `DELETE /api/connections/gmail` thu hồi từ xa sạch và giữ nguyên dịch vụ ngang hàng → `"Tiếp tục với Google"` vẫn tạo phiên `auth_sessions` `5aeb69f7` bình thường.
+    - **Phần 2 (6/6 tool ghi + đọc lại + ca token hỏng):** hội thoại `9888ba64-1326-4a1e-b70b-fdd5e7e20e0c` chạy đủ `gmail.create_draft` (`f6995ff4`), `gmail.send_message` (`68604166`), `gmail.reply` (`d7b80c03`), `gmail.forward` (`b298eed4`), `gmail.modify_thread_labels` (`8f7ce8df`), `gmail.trash_thread` (`e0f379e1`), đều tự gửi tới hộp thư thử nghiệm của nhóm theo đúng `plan_hash` và xác minh đọc lại; ca token hỏng thật (`b00cfa21`, `e6ad4076`) đều từ chối với `0` kế hoạch / `0` bước.
+    - **Phần 3 (`PLANNER_READ_ANSWERS=on`):** hỏi chỉ đọc qua Gmail (`c1393c45`), Trello (`4a8005b0`), Notion (`66491698`), Telegram (`7fb5f79f`), kiểm soát G2A Jira (`e5893da6`) và phát hiện hết hạn Testing 7 ngày trên Calendar/Sheets (`964596e9`, `965ec12a`) — tất cả xác minh `0` bản ghi `plans` và `0` bản ghi `execution_steps`.
+  - **PR bật cờ (bước 6):** nhánh `feat/gmail-04-enable-flags` chuẩn hóa mặc định `PLANNER_READ_ANSWERS=on` trong `apps/chat-api/src/config/env.ts` (giữ `GMAIL_ENABLED` tự động bật khi đủ `GMAIL_OAUTH_*` và tự tắt khi máy live thiếu biến Gmail), cập nhật `.env.example`, `evaluations/README.md`, và test `read-answers.test.ts` + `gmail-env.test.ts`. [Log](../log/2026-11-14-gmail-04-live-acceptance-and-flags.md).
 - Số liệu (18/10, source `31166cb`, `ag/gemini-3.8-flash` phục vụ bởi `gemini-3.8-flash-n`):
   - `gmail` ×3: **59/60**. 3 câu injection đạt **9/9**, không bước nào gửi tới `attacker@example.com`. Ký tự prompt mỗi lời gọi p50/p95 17.120/19.869;
   - `answers` ×3: **27/30**. Mọi câu trả lời đều có tra cứu do model mở. Trung bình 2,3 lời gọi model. p50/p95 13,3/20,7 s;
@@ -102,8 +106,9 @@ Phép đo tuần 4 (W4-01, W4-03, W4-04) không thuộc task này. Các phép đ
     - `an_ca01`: sai lệch truy vấn của model. `timeMax` 23:59:59 bỏ giây cuối ngày, vì cận trên của Calendar là loại trừ. Câu trả lời vẫn đúng trên fixture hiện tại. Review #159 chỉ ra điểm này.
 
     Không sửa label sau khi có kết quả.
-- Quyết định bật cờ: chưa có. Điều kiện số đo đã đạt cho cả hai cờ: injection 9/9; không câu ghi nào thành câu trả lời. Còn chờ nghiệm thu Google thật phần 1–3, rồi nhóm trưởng quyết.
+- **Quyết định bật cờ (14/11/2026):** Đạt toàn bộ điều kiện bật cờ (`injection 9/9`, `0` câu hành động thành `answer`, Phần 1–3 Google thật đều PASS, không gửi ra ngoài hộp thư thử nghiệm của nhóm). Bật mặc định `PLANNER_READ_ANSWERS=on` (trừ khi đặt `off`) và giữ `GMAIL_ENABLED` tự động bật khi đủ cấu hình OAuth (tắt an toàn khi thiếu ở máy live khác).
+- **Nhắc nhở bảo vệ:** Kết nối lại OAuth Google cá nhân (Gmail, MyCalendar, MySheets) trong vòng **7 ngày trước buổi bảo vệ**, vì app ở chế độ Testing sẽ làm hết hạn refresh token sau 7 ngày.
 - Điều chưa làm hoặc khác với task card:
   - câu injection chấp nhận cả từ chối, không chỉ hỏi lại; nhóm trưởng đồng ý ngày 18/10, trước lời gọi model đầu tiên;
   - 20 câu Gmail thay vì khoảng 16;
-  - xem log.
+  - nghiệm thu Google thật dùng `LLM_PROVIDER=deepseek` (`deepseek-chat`) sau khi đã đo Golden set v2 bằng `ag/gemini-3.8-flash` ngày 18/10; xem [Log 14/11](../log/2026-11-14-gmail-04-live-acceptance-and-flags.md).
