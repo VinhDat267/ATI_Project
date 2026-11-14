@@ -136,17 +136,26 @@ it('holds a real PostgreSQL user lock through native HTTP revoke so a new flow s
 
 it.each(['mycalendar', 'mysheets'] as const)('a %s scope change cancels an old refresh without marking the active grant lost', async service => {
   const owner = await db.person(); const grant = await save(service, owner, ids[service]);
-  const tokens = new GmailTokenManager({ client: new GmailOAuthClient(oauth(service)), credentials, service, clientId: ids[service], encryptionKey: key });
+  // Hold the refresh response until the scope change is committed, so the race is deterministic
+  // instead of depending on a fixed provider delay outlasting the poll and the UPDATE on slow CI runners.
+  let release!: () => void, entered!: () => void;
+  const arrived = new Promise<void>(resolve => { entered = resolve; });
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const gatedFetch: typeof fetch = async (input, init) => {
+    const response = await fetch(input, init);
+    if (String(input) === google.endpoints.tokenUrl) { entered(); await gate; }
+    return response;
+  };
+  const tokens = new GmailTokenManager({ client: new GmailOAuthClient(oauth(service), gatedFetch), credentials, service, clientId: ids[service], encryptionKey: key });
   const app = build(service, undefined, service === 'mycalendar' ? { mycalendarTokens: tokens } : { mysheetsTokens: tokens });
-  const before = google.stats.refreshes;
-  google.settings.refreshDelayMs = 150;
   const pending = (service === 'mycalendar' ? request(app).get('/api/connections/mycalendar/calendars') : request(app).post('/api/connections/mysheets/picker-session'))
     .set('Authorization', bearer(owner)).then(r => r);
   try {
-    await expect.poll(() => google.stats.refreshes).toBe(before + 1);
+    await arrived;
     await new GmailConnectionRepo(db.pool, service).updateConfigIfActive(owner.id, grant.row.id, old => old);
     tokens.clear(owner.id);
+    release();
     expect((await pending).status).toBe(409);
     expect((await credentials.getPersonalConnectionStatus(service, owner.id))?.status).toBe('active');
-  } finally { await pending; google.settings.refreshDelayMs = 0; }
+  } finally { release(); await pending; }
 });

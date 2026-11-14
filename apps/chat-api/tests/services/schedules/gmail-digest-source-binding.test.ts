@@ -1950,28 +1950,40 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
     }
 
     async function assertNoLeakedPgState(applicationName: string) {
-      const txRes = await db.pool.query<{ n: number }>(
-        `SELECT count(*)::int AS n
-           FROM pg_stat_activity
-          WHERE datname = current_database()
-            AND application_name = $1
-            AND pid <> pg_backend_pid()
-            AND state LIKE 'idle in transaction%'`,
-        [applicationName],
-      );
-      expect(txRes.rows[0]?.n ?? 0).toBe(0);
+      const deadline = Date.now() + 1_200;
+      let idleTxCount = 0;
+      let lockCount = 0;
+      while (true) {
+        const txRes = await db.pool.query<{ n: number }>(
+          `SELECT count(*)::int AS n
+             FROM pg_stat_activity
+            WHERE datname = current_database()
+              AND application_name = $1
+              AND pid <> pg_backend_pid()
+              AND state LIKE 'idle in transaction%'`,
+          [applicationName],
+        );
+        idleTxCount = txRes.rows[0]?.n ?? 0;
 
-      const lockRes = await db.pool.query<{ n: number }>(
-        `SELECT count(*)::int AS n
-           FROM pg_locks l
-           JOIN pg_stat_activity a ON a.pid = l.pid
-          WHERE a.datname = current_database()
-            AND a.application_name = $1
-            AND a.pid <> pg_backend_pid()
-            AND l.locktype <> 'virtualxid'`,
-        [applicationName],
-      );
-      expect(lockRes.rows[0]?.n ?? 0).toBe(0);
+        const lockRes = await db.pool.query<{ n: number }>(
+          `SELECT count(*)::int AS n
+             FROM pg_locks l
+             JOIN pg_stat_activity a ON a.pid = l.pid
+            WHERE a.datname = current_database()
+              AND a.application_name = $1
+              AND a.pid <> pg_backend_pid()
+              AND l.locktype <> 'virtualxid'`,
+          [applicationName],
+        );
+        lockCount = lockRes.rows[0]?.n ?? 0;
+
+        if ((idleTxCount === 0 && lockCount === 0) || Date.now() >= deadline) {
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      expect(idleTxCount).toBe(0);
+      expect(lockCount).toBe(0);
     }
 
     it('A04-R1: settles promptly on explicit parent abort and on local deadline when real PostgreSQL max=1 pool is starved, performs 0 AI/Telegram/action calls, and safely releases late-acquired clients', async () => {

@@ -35,13 +35,13 @@ describe('Telegram digest dispatch cancellation on PostgreSQL', () => {
     const config: TelegramDigestConfig = {
       credentialId: credential.id, telegramUserId: '777', username: 'tester',
       chatId: '777', chatTitle: 'Telegram của tôi',
-      sources: [{ service: 'notion', tool: 'notion.search_pages', args: { query: '' }, label: 'Notion' }],
+      sources: [{ service: 'calendar', tool: 'calendar.list_events', label: 'Calendar' }],
       recurrence: { type: 'daily', time: '08:00' }, timeZone: TZ,
     };
     const conv = (await db.pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [owner.id])).rows[0];
     const schedule = (await db.pool.query(
       `INSERT INTO schedules(user_id,conv_id,name,request,recurrence,services,status,next_run_at,kind,digest_config,digest_config_hash,digest_approved_at)
-       VALUES($1,$2,'Digest','Notion Telegram',$3,'{notion,telegram}','active','2026-11-02T01:00:00Z','telegram_digest',$4,$5,now()) RETURNING *`,
+       VALUES($1,$2,'Digest','Calendar Telegram',$3,'{calendar,telegram}','active','2026-11-02T01:00:00Z','telegram_digest',$4,$5,now()) RETURNING *`,
       [owner.id, conv.id, JSON.stringify(config.recurrence), JSON.stringify(config), computeTelegramDigestConfigHash(config)],
     )).rows[0];
     await certifyScheduleFixture(db.pool, schedule.id);

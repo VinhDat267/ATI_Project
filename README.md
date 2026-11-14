@@ -181,7 +181,7 @@ node node_modules/playwright/cli.js test --config apps/chat-web/playwright.confi
 
 ## Project status
 
-[`docs/handoff/CURRENT-STATE.md`](docs/handoff/CURRENT-STATE.md) is the source of truth for status, measurements and known issues. Each number there has a date and a commit. In short, as of 2026-10-11:
+[`docs/handoff/CURRENT-STATE.md`](docs/handoff/CURRENT-STATE.md) is the one-page source of truth for the status of each service and known issues. The summary below is a historical snapshot as of 2026-10-11:
 
 - **Done:** all 8 services with adapters, accounts (email signup with admin approval, Gmail SMTP, Google login, session management), and the redesigned interface (FE-04 → FE-11).
 - **Measured with the real model** (2026-10-08, three runs per set): core 150/150 correct, free-form 52/54, multi-service 129/132.
@@ -192,26 +192,26 @@ Production readiness has not been claimed.
 
 ## Working on this repository
 
-Several people and AI agents (Codex, Claude Code and others) work here, and none of them remember each other's sessions. Shared memory lives in [`docs/handoff/`](docs/handoff/README.md).
+The team builds with AI agents (Codex, Antigravity, Claude Code and others), and none of them remember each other's sessions. The working rules are in [`AGENTS.md`](AGENTS.md): ship small, CI is the gate.
 
-1. **Before you start**, read `CURRENT-STATE.md` and the three newest files in `docs/handoff/log/`, then run `git status`. If the folder has changes that are not yours, work in a separate `git worktree`.
-2. **Take one task card** from [`docs/handoff/tasks/`](docs/handoff/tasks/), on its own branch. Write the failing test first. Database logic is tested on real PostgreSQL and timeouts with a real `AbortSignal`; no mocks that only pretend.
-3. **Finish** by filling in the task card's result section and adding one new file to `docs/handoff/log/` in the same PR. Do not edit `CURRENT-STATE.md` or `ROADMAP.md`; the reviewer updates them after merge.
-4. **Review and merge.** An independent reviewer reruns the tests and follows [`REVIEW-CHECKLIST.md`](docs/handoff/REVIEW-CHECKLIST.md). A PR merges only when CI is green and the review passes.
+1. **Start** by reading the one-page [`CURRENT-STATE.md`](docs/handoff/CURRENT-STATE.md), then branch from `origin/main` (use a separate `git worktree` if the folder has changes that are not yours).
+2. **Build** with tests for the behavior you change. Database logic is tested on real PostgreSQL and timeouts with a real `AbortSignal`; no mocks that only pretend.
+3. **Open a PR** (what / why / how it was tested). If the status of a service changes, update its row in `CURRENT-STATE.md` in the same PR.
+4. **Merge when CI is green.** PRs touching DB migrations, OAuth/tokens, real provider writes, data deletion or CI also get a quick diff review ([checklist](docs/handoff/REVIEW-CHECKLIST.md)).
 
 Conventions:
 
-- Conventional Commits; `git add` only the files of your task.
-- PR descriptions follow [the template](.github/pull_request_template.md), with the files changed, real test output and commit hashes.
-- Module ownership and branch strategy: [`docs/team-workflow.md`](docs/team-workflow.md). Rules for AI agents: [`AGENTS.md`](AGENTS.md).
+- Conventional Commits; `git add` only the files of your change. Branch and commit rules: [`docs/team-workflow.md`](docs/team-workflow.md).
+- PR descriptions follow [the template](.github/pull_request_template.md).
+- The previous, heavier process (detailed state log, weekly roadmap, task cards, per-PR logs) is archived in [`docs/archive/handoff-2026-11-12/`](docs/archive/handoff-2026-11-12/README.md).
 - This repository is public. Never commit `.env`, tokens, live-run evidence (`docs/ai-evidence/V3-LIVE-EXECUTION/`, `docs/ai-evidence/AUTH-LIVE/`) or course reports.
 
 ## Documentation
 
 | Document | Purpose |
 |---|---|
-| [CURRENT-STATE](docs/handoff/CURRENT-STATE.md) | Where the project is: numbers, recent merges, known issues, decisions |
-| [ROADMAP](docs/handoff/ROADMAP.md) and [task cards](docs/handoff/tasks/) | What is next and how each task is accepted |
+| [CURRENT-STATE](docs/handoff/CURRENT-STATE.md) | One page: status of each service, work in progress, known issues |
+| [ROADMAP](docs/handoff/ROADMAP.md) | Short priority list |
 | [v3 design spec](docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md) | Authoritative behavior, flows, tool catalog and schema |
 | [UI redesign spec](docs/superpowers/specs/2026-10-05-ui-redesign-agentic-design.md) and [design system](docs/design/design-system.md) | The Agentic interface and its 12 prototypes |
 | [Multi-service scope](docs/MULTI-SERVICE-SCOPE.md) | Acceptance criteria for adding services |
