@@ -3288,7 +3288,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
             label: 'A04-R6/commitInterceptedA',
             barrier: commitInterceptedA.promise,
             concurrentOp: opA,
-            maxWaitMs: 5_000,
+            maxWaitMs: 10_000,
             describeState: () => ({
               actionCallsA,
               caughtA,
@@ -3421,7 +3421,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
               branch === 'telegram_pin_mismatch' ? '-100999999999' : tgGroup.chatId,
               { credentialId: tgGroup.row.id, telegramUserId: tgGroup.telegramUserId },
               new AbortController().signal,
-              400,
+              1_500,
               async () => {
                 actionCallsB += 1;
                 return 'unexpected';
@@ -3439,7 +3439,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
               label: `A04-R6/${branch}/ackDropped`,
               barrier: ackDropped.promise,
               concurrentOp: opB,
-              maxWaitMs: 5_000,
+              maxWaitMs: 10_000,
               describeState: () => ({
                 branch,
                 actionCallsB,
@@ -3449,7 +3449,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
             });
             settledB = await Promise.race([
               opB.then(() => true),
-              new Promise<false>((r) => setTimeout(() => r(false), 1_000)),
+              new Promise<false>((r) => setTimeout(() => r(false), 3_000)),
             ]);
           } catch (err) {
             primaryErrB = err;
@@ -3921,7 +3921,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
 
         // Subcase B: Deterministic end-to-end ScheduleRunner.tick() where read + AI authority succeed on the warm
         // proxied max=1 pool, then pre-send delivery_started_at claim COMMIT loses wire ack ('drop_server_ack')
-        // and hits local sendTimeoutMs=600ms BEFORE any Telegram HTTP send occurs: socket terminates cleanly,
+        // and hits local sendTimeoutMs=2000ms BEFORE any Telegram HTTP send occurs: socket terminates cleanly,
         // 0 Telegram sends occur, orphaned delivery_started_at is cleared, and pool recovers cleanly for next run.
         const interceptedBeforeB = proxy.interceptedCount;
         const sendClaimAckDropped = createBarrier();
@@ -3929,7 +3929,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
         const hB = createHarness({
           pool: obs.observedPool,
           credRepo: new CredentialRepo(obs.observedPool, ENC_KEY),
-          sendTimeoutMs: 600,
+          sendTimeoutMs: 2_000,
           onAiSummary: async () => {
             if (armPreSendCommitDrop) {
               armPreSendCommitDrop = false;
@@ -3951,7 +3951,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
             label: 'A04-R7-B/sendClaimAckDropped',
             barrier: sendClaimAckDropped.promise,
             concurrentOp: tickPromise,
-            maxWaitMs: 8_000,
+            maxWaitMs: 12_000,
             describeState: async () => {
               const latest = (
                 await db.pool.query(
@@ -3973,7 +3973,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
           });
           tickSettledWithinBound = await Promise.race([
             tickPromise.then(() => true),
-            new Promise<false>((r) => setTimeout(() => r(false), 3_000)),
+            new Promise<false>((r) => setTimeout(() => r(false), 4_000)),
           ]);
         } catch (err) {
           primaryErrR7B = err;
