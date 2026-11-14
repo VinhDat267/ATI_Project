@@ -189,7 +189,7 @@ function extractBlockText(type: string, data: any): string {
     case 'video':
     case 'file':
     case 'pdf':
-      return [caption, String(data?.external?.url || data?.file?.url || '')].filter(Boolean).join(' - ');
+      return [caption, String(data?.external?.url || '')].filter(Boolean).join(' - ');
     case 'divider':
       return '---';
     default:
@@ -349,7 +349,7 @@ export class NotionAdapter extends BaseAdapter {
       return result;
     }
     if (toolName === 'notion.query_database') {
-      only(args, ['databaseId', 'query', 'status', 'dateOnOrAfter', 'dateOnOrBefore', 'limit']);
+      only(args, ['databaseId', 'query', 'status', 'dateOnOrAfter', 'dateOnOrBefore', 'dateProperty', 'limit']);
       const id = this.checkedDatabase(args.databaseId);
       const maximum = limit(args.limit, 20);
       const query = args.query === undefined ? '' : text(args.query, 2000);
@@ -377,12 +377,12 @@ export class NotionAdapter extends BaseAdapter {
         throw new StepError({ message: 'Notion database has no status property to filter by', category: 'VALIDATION', retryable: false });
       }
       const dateEntries = propEntries.filter(([, def]) => def?.type === 'date');
-      const dateEntry =
-        dateEntries.find(([name]) => /due|hạn|deadline/i.test(name.trim())) ??
-        dateEntries.find(([name]) => /date|ngày/i.test(name.trim())) ??
-        dateEntries[0];
+      const dateProperty = args.dateProperty === undefined ? undefined : text(args.dateProperty, 200, true);
+      const dateEntry = dateProperty
+        ? dateEntries.find(([name]) => name === dateProperty)
+        : dateEntries.length === 1 ? dateEntries[0] : undefined;
       if ((dateOnOrAfter || dateOnOrBefore) && !dateEntry) {
-        throw new StepError({ message: 'Notion database has no date property to filter by', category: 'VALIDATION', retryable: false });
+        throw new StepError({ message: dateEntries.length === 0 ? 'Notion database has no date property to filter by' : 'Specify dateProperty using a date column from the Notion database schema', category: 'VALIDATION', retryable: false });
       }
       const clauses: object[] = [];
       if (query) {

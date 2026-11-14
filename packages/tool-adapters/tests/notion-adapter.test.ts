@@ -527,11 +527,15 @@ it('validates status and date filters in query_database, enforces client-side da
     if (call.url.endsWith('/data_sources/' + DS)) return ok(multiSelectSource());
     return ok({ object: 'list', results: [pageInRange, pageOutOfRange], has_more: false });
   });
+  await expect(dateAdapter.execute('notion.query_database', {
+    databaseId: DB, dateOnOrAfter: '2026-10-01',
+  })).rejects.toThrow(/Specify dateProperty/);
   const filtered = await dateAdapter.execute('notion.query_database', {
     databaseId: DB,
     status: 'Đang làm',
     dateOnOrAfter: '2026-10-01',
     dateOnOrBefore: '2026-10-10',
+    dateProperty: 'Deadline',
   });
   expect(filtered.pages.map((p: any) => p.id)).toEqual(['22222222-3333-4444-5555-666666666661']);
   const queryCall = calls.find(c => c.url.endsWith('/query'))!;
@@ -561,6 +565,7 @@ it('extracts non-rich_text blocks and formats code, callout, toggle, divider, an
           { object: 'block', id: '10000000-0000-0000-0000-000000000006', type: 'child_page', child_page: { title: 'Trang con' } },
           { object: 'block', id: '10000000-0000-0000-0000-000000000007', type: 'equation', equation: { expression: 'E = mc^2' } },
           { object: 'block', id: '10000000-0000-0000-0000-000000000008', type: 'bookmark', bookmark: { caption: rich('Tài liệu'), url: 'https://example.com/doc' } },
+          { object: 'block', id: '10000000-0000-0000-0000-000000000010', type: 'file', file: { caption: rich('Private PDF'), file: { url: 'https://files.example.test/private?signature=fixture' } } },
           { object: 'block', id: '10000000-0000-0000-0000-000000000009', type: 'image', image: { caption: rich('Ảnh kiến trúc'), external: { url: 'https://example.com/arch.png' } } },
         ],
         has_more: false,
@@ -569,6 +574,7 @@ it('extracts non-rich_text blocks and formats code, callout, toggle, divider, an
     return ok(page());
   });
   const detail = await adapter.execute('notion.get_page', { pageId: PAGE });
+  expect(JSON.stringify(detail)).not.toContain('signature=fixture');
   expect(detail.content).toBe(
     [
       '> 💡 Chú ý quan trọng',
@@ -579,6 +585,7 @@ it('extracts non-rich_text blocks and formats code, callout, toggle, divider, an
       'Trang con',
       'E = mc^2',
       'Tài liệu - https://example.com/doc',
+      'Private PDF',
       'Ảnh kiến trúc - https://example.com/arch.png',
     ].join('\n'),
   );

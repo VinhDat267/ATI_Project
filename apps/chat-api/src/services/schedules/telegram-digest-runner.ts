@@ -1260,9 +1260,12 @@ export class TelegramDigestRunner {
         });
 
         let rawResult: unknown;
+        let truncated = false;
         if (source.service === 'notion') {
           if (!notionBinding || !this.options.notionSources) return notionBlocked();
-          rawResult = await this.options.notionSources.read(userId, notionBinding, signal);
+          const result = await this.options.notionSources.read(userId, notionBinding, signal);
+          truncated = result.truncated === true;
+          rawResult = result;
         } else if (source.service === 'gmail') {
           rawResult = await adapter.execute(
             'gmail.search_threads',
@@ -1387,6 +1390,7 @@ export class TelegramDigestRunner {
           label: source.label,
           status: count > 0 ? 'ok' : 'empty',
           itemCount: count,
+          ...(truncated ? { truncated } : {}),
         });
         sections.push(`• ${source.label} (${count}):\n${lines.join('\n')}`);
       } catch (err: any) {
