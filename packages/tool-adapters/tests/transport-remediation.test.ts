@@ -19,23 +19,27 @@ describe('adapter transport controls', () => {
     expect(sentAt[1]! - sentAt[0]!).toBeGreaterThanOrEqual(70);
   });
 
-  it.each(['trello', 'slack'] as const)('%s retries HTTP 429 once, then succeeds', async (service) => {
+  it.each(['trello', 'slack'] as const)('%s retries HTTP 429 once on read, then succeeds', async (service) => {
     let calls = 0;
     const fetchFn = async () => {
       calls++;
       return calls === 1
         ? new Response('limited', { status: 429, headers: { 'Retry-After': '0' } })
-        : new Response(JSON.stringify(service === 'slack' ? { ok: true, ts: '1', channel: 'C1' } : { id: 'c1' }));
+        : new Response(JSON.stringify(service === 'slack' ? { ok: true, channels: [] } : { id: 'c1' }));
     };
     const adapter = service === 'trello'
       ? new TrelloBaseAdapter({ credentials: { accessToken: 't' }, fetchFn: fetchFn as typeof fetch })
       : new SlackAdapter({ credentials: { botToken: 'token' }, fetchFn: fetchFn as typeof fetch });
 
-    await expect(adapter.request(service === 'trello' ? '/cards' : '/chat.postMessage', { method: 'POST' })).resolves.toBeDefined();
+    await expect(
+      adapter.request(service === 'trello' ? '/cards' : '/conversations.list', {
+        method: service === 'trello' ? 'POST' : 'GET',
+      })
+    ).resolves.toBeDefined();
     expect(calls).toBe(2);
   });
 
-  it.each(['trello', 'slack'] as const)('%s stops after one 429 retry', async (service) => {
+  it.each(['trello', 'slack'] as const)('%s stops after one 429 retry on read', async (service) => {
     let calls = 0;
     const fetchFn = async () => {
       calls++;
@@ -45,8 +49,31 @@ describe('adapter transport controls', () => {
       ? new TrelloBaseAdapter({ credentials: { accessToken: 't' }, fetchFn: fetchFn as typeof fetch })
       : new SlackAdapter({ credentials: { botToken: 'token' }, fetchFn: fetchFn as typeof fetch });
 
-    await expect(adapter.request(service === 'trello' ? '/cards' : '/chat.postMessage', { method: 'POST' })).rejects.toMatchObject({ category: 'RATE_LIMIT', statusCode: 429 });
+    await expect(
+      adapter.request(service === 'trello' ? '/cards' : '/conversations.list', {
+        method: service === 'trello' ? 'POST' : 'GET',
+      })
+    ).rejects.toMatchObject({ category: 'RATE_LIMIT', statusCode: 429 });
     expect(calls).toBe(2);
+  });
+
+  it('AUD-W1-06: Slack write (POST /chat.postMessage) does not retry HTTP 429 and sets retryable: false, requestSent: false', async () => {
+    let calls = 0;
+    const fetchFn = async () => {
+      calls++;
+      return new Response('limited', { status: 429, headers: { 'Retry-After': '0' } });
+    };
+    const adapter = new SlackAdapter({ credentials: { botToken: 'token' }, fetchFn: fetchFn as typeof fetch });
+
+    await expect(
+      adapter.request('/chat.postMessage', { method: 'POST', body: JSON.stringify({ channel: 'C1', text: 'hi' }) })
+    ).rejects.toMatchObject({
+      category: 'RATE_LIMIT',
+      statusCode: 429,
+      retryable: false,
+      details: { requestSent: false },
+    });
+    expect(calls).toBe(1);
   });
 
   it('cancels Retry-After wait when the step signal aborts', async () => {

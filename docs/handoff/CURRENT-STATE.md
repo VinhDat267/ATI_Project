@@ -14,13 +14,13 @@
 | Dịch vụ | Trạng thái | Gần nhất | Còn thiếu |
 |---|---|---|---|
 | Trello | OAuth cá nhân, chọn workspace và bảng; digest sang Slack/Telegram; chuẩn hóa `requestSent: false` pre-dispatch | #325 | Nghiệm thu thật |
-| Slack | Bot dùng chung; có `slack.read_messages` | — | Slack cá nhân (`myslack`) chưa có trong runtime registry |
-| GitHub | OAuth cá nhân, 9 tool; scope theo workspace (#305); chuẩn hóa `requestSent: false` pre-dispatch | #325 | Credential phải `active`, nghiệm thu thật |
-| Sheets / MySheets | Sheets Digest v2 (#289–#299), khóa chặn ghi Drive (#300); chuẩn hóa `requestSent: false` pre-dispatch (SheetsAdapter) | #325 | Runbook staging GAS-03 chưa chạy |
+| Slack | Bot dùng chung; có `slack.read_messages`; chặn retry 429 trên `postMessage` & siết allowlist `SlackProposalService` | #324 | Slack cá nhân (`myslack`) chưa có trong runtime registry |
+| GitHub | OAuth cá nhân, 9 tool; scope theo workspace (#305); chuẩn hóa `requestSent: false` pre-dispatch (#325); kiểm tra live repo membership trên `/api/services` | #324 | Credential phải `active`, nghiệm thu thật |
+| Sheets / MySheets | Sheets Digest v2 (#289–#299), khóa chặn ghi Drive (#300); chuẩn hóa `requestSent: false` pre-dispatch (#325) & chuẩn hóa `mimeType` Drive | #324 | Runbook staging GAS-03 chưa chạy |
 | Calendar / MyCalendar | Remediation v2 (#315); chuẩn hóa `requestSent: false` pre-dispatch (CalendarAdapter) | #325 | Test chập chờn ở trên; nghiệm thu thật |
-| Notion | OAuth bền vững (#317) | **PR #319** (ràng buộc nguồn digest): CI đỏ ở `static-guard` | Khoảng 10 lỗi audit còn mở (độ phủ dữ liệu, bộ lọc ngày/trạng thái, biên nhận Slack, phân trang tìm database, Privacy); nghiệm thu thật |
+| Notion | OAuth bền vững (#317), ràng buộc nguồn digest (#319), hiển thị đúng trạng thái OAuth cá nhân trên `/api/services` | #324 | Khoảng 10 lỗi audit còn mở (độ phủ dữ liệu, bộ lọc ngày/trạng thái, biên nhận Slack, phân trang tìm database, Privacy); nghiệm thu thật |
 | Telegram | Bot cá nhân; chặn digest sai binding (#303); chuẩn hóa `requestSent: false` pre-dispatch | #325 | Nghiệm thu thật |
-| Jira / MyJira | G2A read containment (#318); chuẩn hóa `requestSent: false` pre-dispatch | #325 | Chỉ dùng trong "Không gian Chung" (site `ati-workflow-test`) |
+| Jira / MyJira | G2A read containment (#318), `requestSent: false` pre-dispatch (#325); thu hồi lease `syncSites`, ẩn `cloudId` ở Personal Mode, sửa `jira-digest-runner` | #324 | Chỉ dùng trong "Không gian Chung" (site `ati-workflow-test`) |
 | Gmail | Gửi/nháp/đọc/nhãn qua OAuth cá nhân; ràng buộc nguồn Telegram digest + kiểm soát origin OAuth | #327 (G2 + đóng `GMAIL-AUDIT-08`..`12`) + `GMAIL-04` nghiệm thu Google Cloud OAuth thật & mặc định `PLANNER_READ_ANSWERS=on` (14/11/2026) | Kết nối lại OAuth trong vòng 7 ngày trước buổi bảo vệ (project Testing hết hạn refresh token sau 7 ngày) |
 
 ## Chạy và kiểm tra

@@ -1,5 +1,5 @@
 import type { PlanStep, ToolDefinition } from '@wap/tool-schemas';
-import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, TRELLO_OAUTH_TOOLS, TELEGRAM_OAUTH_TOOLS, SHEETS_EXTENDED_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, MYJIRA_TOOLS, SLACK_PROPOSAL_WORKFLOW_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, TRELLO_OAUTH_TOOLS, TELEGRAM_OAUTH_TOOLS, NOTION_OAUTH_TOOLS, SLACK_EXTENDED_TOOLS, SHEETS_EXTENDED_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, MYJIRA_TOOLS, SLACK_PROPOSAL_WORKFLOW_TOOLS } from '@wap/tool-schemas';
 import { resolveArgs } from './resolver.js';
 import { executeSlackRead } from './slack/read-guard.js';
 import { isSlackReadTool } from '@wap/tool-schemas';
@@ -14,7 +14,7 @@ import type {
 // Personal tools (Gmail, MyCalendar, MySheets, MyJira) are opt-in and outside ALL_TOOLS, but their writes must never fall to the name heuristic
 // (e.g. reply/forward/trash would read as reads: shorter timeout and no UNKNOWN, so a mail could be resent).
 const catalog = new Map<string, ToolDefinition>(
-  [...ALL_TOOLS, ...GITHUB_OAUTH_TOOLS, ...TRELLO_OAUTH_TOOLS, ...TELEGRAM_OAUTH_TOOLS, ...SHEETS_EXTENDED_TOOLS, ...GMAIL_TOOLS, ...MYCALENDAR_TOOLS, ...MYSHEETS_TOOLS, ...MYJIRA_TOOLS].map((t) => [t.name, t])
+  [...ALL_TOOLS, ...GITHUB_OAUTH_TOOLS, ...TRELLO_OAUTH_TOOLS, ...TELEGRAM_OAUTH_TOOLS, ...NOTION_OAUTH_TOOLS, ...SLACK_EXTENDED_TOOLS, ...SHEETS_EXTENDED_TOOLS, ...GMAIL_TOOLS, ...MYCALENDAR_TOOLS, ...MYSHEETS_TOOLS, ...MYJIRA_TOOLS].map((t) => [t.name, t])
 );
 
 export function isWriteTool(toolName: string): boolean {

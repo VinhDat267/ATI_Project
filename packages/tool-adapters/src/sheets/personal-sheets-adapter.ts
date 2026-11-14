@@ -914,14 +914,20 @@ export class PersonalSheetsAdapter extends BaseAdapter {
           invalid('query must be a string up to 100 chars');
         }
         const query = typeof args.query === 'string' ? args.query.trim() : '';
-        const mimeTypeFilter = args.mimeType === undefined ? 'all' : args.mimeType;
+        const rawMimeType = args.mimeType === undefined ? 'all' : args.mimeType;
+        const mimeTypeFilter =
+          rawMimeType === 'document'
+            ? 'doc'
+            : rawMimeType === 'spreadsheet'
+              ? 'sheet'
+              : rawMimeType;
         if (
           mimeTypeFilter !== 'doc' &&
           mimeTypeFilter !== 'sheet' &&
           mimeTypeFilter !== 'folder' &&
           mimeTypeFilter !== 'all'
         ) {
-          invalid('mimeType must be doc, sheet, folder, or all');
+          invalid('mimeType must be document, spreadsheet, doc, sheet, folder, or all');
         }
         const limit = bounded(args.limit, 20);
         const clauses: string[] = ['trashed = false'];

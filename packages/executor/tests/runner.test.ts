@@ -209,4 +209,10 @@ describe('Gmail tools are classified from the Gmail catalog, not the name heuris
     expect(adapterCalled).toBe(false);
     expect(sameProjectResult.output).toEqual({ id: '100', key: 'OLD-1', url: 'https://example.atlassian.net/browse/OLD-1' });
   });
+
+  it('includes NOTION_OAUTH_TOOLS and SLACK_EXTENDED_TOOLS in the executor catalog', () => {
+    expect(isWriteTool('notion.update_page')).toBe(true);
+    expect(isWriteTool('notion.get_page')).toBe(false);
+    expect(isWriteTool('slack.read_messages')).toBe(false);
+  });
 });

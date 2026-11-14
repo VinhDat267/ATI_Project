@@ -115,6 +115,7 @@ function revisionNumber(value:unknown):number{
 }
 export interface SlackProposalTargetOverride {
  service?:SlackIntentService;
+ boardId?:string;
  listId?:string;
  projectKey?:string;
  spreadsheetId?:string;
@@ -136,9 +137,10 @@ export function validateSlackProposalPrepareInput(value:unknown):SlackProposalPr
  if(v.instruction!==undefined)out.instruction=string(v.instruction,2000,1);
  if(v.replyInThread!==undefined)out.replyInThread=boolean(v.replyInThread);
  if(v.targetOverride!==undefined){
-  const o=object(v.targetOverride,['service','listId','projectKey','spreadsheetId','sheet','calendarId','startIso','endIso','repo','toEmail']);
+  const o=object(v.targetOverride,['service','boardId','listId','projectKey','spreadsheetId','sheet','calendarId','startIso','endIso','repo','toEmail']);
   const targetOverride:SlackProposalTargetOverride={};
   if(o.service!==undefined)targetOverride.service=oneOf<SlackIntentService>(o.service,services);
+  if(o.boardId!==undefined)targetOverride.boardId=string(o.boardId,256,1);
   if(o.listId!==undefined)targetOverride.listId=string(o.listId,256,1);
   if(o.projectKey!==undefined)targetOverride.projectKey=string(o.projectKey,128,1);
   if(o.spreadsheetId!==undefined)targetOverride.spreadsheetId=string(o.spreadsheetId,256,1);

@@ -1917,4 +1917,33 @@ describe('PersonalSheetsAdapter', () => {
     });
     expect(postCalled).toBe(false);
   });
+
+  it('AUD-W4-01b: mysheets.list_drive_files accepts both schema enum values (document, spreadsheet) and legacy values (doc, sheet)', async () => {
+    const queries: string[] = [];
+    const { adapter } = setup({
+      handler: (url) => {
+        queries.push(url.searchParams.get('q') ?? '');
+        return json({
+          files: [
+            {
+              id: 'file-1234567890',
+              name: 'Project Spec',
+              mimeType: 'application/vnd.google-apps.document',
+              webViewLink: 'https://docs.google.com/document/d/file-1234567890/edit',
+            },
+          ],
+        });
+      },
+    });
+
+    await adapter.execute('mysheets.list_drive_files', { mimeType: 'document' });
+    await adapter.execute('mysheets.list_drive_files', { mimeType: 'spreadsheet' });
+    await adapter.execute('mysheets.list_drive_files', { mimeType: 'doc' });
+    await adapter.execute('mysheets.list_drive_files', { mimeType: 'sheet' });
+
+    expect(queries[0]).toContain("mimeType = 'application/vnd.google-apps.document'");
+    expect(queries[1]).toContain("mimeType = 'application/vnd.google-apps.spreadsheet'");
+    expect(queries[2]).toContain("mimeType = 'application/vnd.google-apps.document'");
+    expect(queries[3]).toContain("mimeType = 'application/vnd.google-apps.spreadsheet'");
+  });
 });
