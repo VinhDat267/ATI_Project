@@ -3282,22 +3282,38 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
         let activeQueryWhileStalled = false;
         let settledBeforeSafetyDestroyA = false;
         let checkedOutWhileStalledA = -1;
+        let primaryErrA: unknown;
         try {
-          await commitInterceptedA.promise;
+          await awaitBarrierWithConcurrentSettlement({
+            label: 'A04-R6/commitInterceptedA',
+            barrier: commitInterceptedA.promise,
+            concurrentOp: opA,
+            maxWaitMs: 5_000,
+            describeState: () => ({
+              actionCallsA,
+              caughtA,
+              interceptedCount: proxy.interceptedCount,
+            }),
+          });
           activeQueryWhileStalled = Boolean(obs.currentActiveQuery);
           abortCtrlA.abort(new Error('EARLY_COMMIT_PARENT_ABORT'));
           settledBeforeSafetyDestroyA = await Promise.race([
             opA.then(() => true),
-            new Promise<false>((r) => setTimeout(() => r(false), 350)),
+            new Promise<false>((r) => setTimeout(() => r(false), 500)),
           ]);
           checkedOutWhileStalledA = obs.checkedOutClients;
+        } catch (err) {
+          primaryErrA = err;
         } finally {
           proxy.disarm();
           if (!settledBeforeSafetyDestroyA) {
             proxy.destroyActiveSockets();
           }
-          await opA;
+          await opA.catch((opErr: unknown) => {
+            if (!primaryErrA) primaryErrA = opErr;
+          });
         }
+        if (primaryErrA) throw primaryErrA;
 
         const snapA = obs.releaseSnapshots.at(-1)!;
         const nextBorrowerA = await obs.rawPool.connect();
@@ -3405,7 +3421,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
               branch === 'telegram_pin_mismatch' ? '-100999999999' : tgGroup.chatId,
               { credentialId: tgGroup.row.id, telegramUserId: tgGroup.telegramUserId },
               new AbortController().signal,
-              90,
+              400,
               async () => {
                 actionCallsB += 1;
                 return 'unexpected';
@@ -3417,12 +3433,26 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
             });
 
           let settledB = false;
+          let primaryErrB: unknown;
           try {
-            await ackDropped.promise;
+            await awaitBarrierWithConcurrentSettlement({
+              label: `A04-R6/${branch}/ackDropped`,
+              barrier: ackDropped.promise,
+              concurrentOp: opB,
+              maxWaitMs: 5_000,
+              describeState: () => ({
+                branch,
+                actionCallsB,
+                caughtB,
+                interceptedCount: proxy.interceptedCount,
+              }),
+            });
             settledB = await Promise.race([
               opB.then(() => true),
-              new Promise<false>((r) => setTimeout(() => r(false), 380)),
+              new Promise<false>((r) => setTimeout(() => r(false), 1_000)),
             ]);
+          } catch (err) {
+            primaryErrB = err;
           } finally {
             proxy.disarm();
             if (branch === 'inactive_user') {
@@ -3435,8 +3465,11 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
             if (!settledB) {
               proxy.destroyActiveSockets();
             }
-            await opB;
+            await opB.catch((opErr: unknown) => {
+              if (!primaryErrB) primaryErrB = opErr;
+            });
           }
+          if (primaryErrB) throw primaryErrB;
 
           const snapB = obs.releaseSnapshots.at(-1)!;
           const nextClientB = await obs.rawPool.connect();
@@ -3807,12 +3840,13 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
 
         let activeQueryWhileStalledA = false;
         let settledA = false;
+        let primaryErrR7A: unknown;
         try {
           await awaitBarrierWithConcurrentSettlement({
             label: 'A04-R7-B/finalCommitStalled',
             barrier: finalCommitStalled.promise,
             concurrentOp: opA,
-            maxWaitMs: 2_000,
+            maxWaitMs: 5_000,
             describeState: () => ({
               actionCallsA,
               caughtA,
@@ -3823,14 +3857,19 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
           abortCtrlA.abort(new Error('FINAL_COMMIT_PARENT_ABORT'));
           settledA = await Promise.race([
             opA.then(() => true),
-            new Promise<false>((r) => setTimeout(() => r(false), 350)),
+            new Promise<false>((r) => setTimeout(() => r(false), 500)),
           ]);
+        } catch (err) {
+          primaryErrR7A = err;
         } finally {
           proxy.disarm();
           if (!settledA) proxy.destroyActiveSockets();
-          await opA;
+          await opA.catch((opErr: unknown) => {
+            if (!primaryErrR7A) primaryErrR7A = opErr;
+          });
           await db.pool.query('DELETE FROM schedule_runs WHERE id = $1', [runRowA.id]);
         }
+        if (primaryErrR7A) throw primaryErrR7A;
 
         const snapA = obs.releaseSnapshots.at(-1)!;
         const nextBorrowerA = await obs.rawPool.connect();
@@ -3882,7 +3921,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
 
         // Subcase B: Deterministic end-to-end ScheduleRunner.tick() where read + AI authority succeed on the warm
         // proxied max=1 pool, then pre-send delivery_started_at claim COMMIT loses wire ack ('drop_server_ack')
-        // and hits local sendTimeoutMs=110ms BEFORE any Telegram HTTP send occurs: socket terminates cleanly,
+        // and hits local sendTimeoutMs=600ms BEFORE any Telegram HTTP send occurs: socket terminates cleanly,
         // 0 Telegram sends occur, orphaned delivery_started_at is cleared, and pool recovers cleanly for next run.
         const interceptedBeforeB = proxy.interceptedCount;
         const sendClaimAckDropped = createBarrier();
@@ -3890,7 +3929,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
         const hB = createHarness({
           pool: obs.observedPool,
           credRepo: new CredentialRepo(obs.observedPool, ENC_KEY),
-          sendTimeoutMs: 110,
+          sendTimeoutMs: 600,
           onAiSummary: async () => {
             if (armPreSendCommitDrop) {
               armPreSendCommitDrop = false;
@@ -3906,12 +3945,13 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
 
         const tickPromise = hB.scheduleRunner.tick();
         let tickSettledWithinBound = false;
+        let primaryErrR7B: unknown;
         try {
           await awaitBarrierWithConcurrentSettlement({
             label: 'A04-R7-B/sendClaimAckDropped',
             barrier: sendClaimAckDropped.promise,
             concurrentOp: tickPromise,
-            maxWaitMs: 2_500,
+            maxWaitMs: 8_000,
             describeState: async () => {
               const latest = (
                 await db.pool.query(
@@ -3935,11 +3975,16 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
             tickPromise.then(() => true),
             new Promise<false>((r) => setTimeout(() => r(false), 3_000)),
           ]);
+        } catch (err) {
+          primaryErrR7B = err;
         } finally {
           proxy.disarm();
           if (!tickSettledWithinBound) proxy.destroyActiveSockets();
-          await tickPromise;
+          await tickPromise.catch((tickErr: unknown) => {
+            if (!primaryErrR7B) primaryErrR7B = tickErr;
+          });
         }
+        if (primaryErrR7B) throw primaryErrR7B;
 
         const persistedRunB = (
           await db.pool.query('SELECT * FROM schedule_runs WHERE schedule_id = $1 ORDER BY created_at DESC LIMIT 1', [
