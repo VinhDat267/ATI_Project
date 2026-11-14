@@ -967,6 +967,8 @@ export class ScheduleService {
           userId,
           services: fields.services,
           request: fields.request,
+          workspaceMode: wsMode,
+          workspaceId: wsId,
         });
         if (!evaluated.candidate.canAutoDigest || !evaluated.config || !evaluated.configHash) {
           if ((metadata.digestCandidate as CalendarDigestCandidate | undefined)?.canAutoDigest) {
@@ -1733,7 +1735,7 @@ export class ScheduleService {
           previous.status === 'needs_attention' ||
           previous.delivery_resolution != null ||
           (previous.delivery_started_at != null && previous.status !== 'digest_failed') ||
-          (typeof previous.error === 'string' && previous.error.includes('SHEETS_DELIVERY_UNKNOWN')) ||
+          (typeof previous.error === 'string' && /(?:SHEETS|GITHUB|CALENDAR|NOTION|TRELLO|TELEGRAM)_DELIVERY_UNKNOWN/.test(previous.error)) ||
           !REPLANNABLE.has(prevState)
         ) {
           throw new ScheduleConflict('RUN_NOT_REPLANNABLE');

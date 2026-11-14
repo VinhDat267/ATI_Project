@@ -307,20 +307,23 @@ describe('PR3: Digest receipts, workspace-scoped Slack lookup, notion_digest err
       )
     ).rows[0].id as string;
 
-    // Seed Slack credentials only for Org B (channel C0999999999) and Personal/null workspace (channel C0111111111)
+    // Seed Slack credentials for Org B (channel C0999999999), Personal user (C0111111111), and Legacy null/null (C0222222222)
     await db.pool.query(
       `INSERT INTO service_credentials (service, user_id, workspace_id, config, status)
        VALUES
          ('slack', NULL, $1, $2, 'active'),
-         ('slack', NULL, NULL, $3, 'active')`,
+         ('slack', $3, NULL, $4, 'active'),
+         ('slack', NULL, NULL, $5, 'active')`,
       [
         orgB,
         encryptCredentials({ botToken: 'xoxb-orgb', allowedScope: { channels: ['C0999999999'] } }, KEY),
+        owner.id,
         encryptCredentials({ botToken: 'xoxb-personal', allowedScope: { channels: ['C0111111111'] } }, KEY),
+        encryptCredentials({ botToken: 'xoxb-legacy', allowedScope: { channels: ['C0222222222'] } }, KEY),
       ],
     );
 
-    // Org A has no Slack credential -> must NOT pick up Org B or Personal Slack credential
+    // Org A has no Slack credential -> must NOT pick up Org B, Personal, or Legacy Slack credential
     const evalOrgA = await evaluateCalendarDigestCandidate({
       pool: db.pool,
       encryptionKey: KEY,
@@ -331,6 +334,18 @@ describe('PR3: Digest receipts, workspace-scoped Slack lookup, notion_digest err
       workspaceId: orgA,
     });
     expect(evalOrgA.candidate.canAutoDigest).toBe(false);
+
+    // Organization mode missing workspaceId -> fail-closed
+    const evalOrgMissing = await evaluateCalendarDigestCandidate({
+      pool: db.pool,
+      encryptionKey: KEY,
+      userId: owner.id,
+      services: ['mycalendar', 'slack'],
+      request: 'Gửi bản tin lịch mỗi sáng lên Slack',
+      workspaceMode: 'organization',
+      workspaceId: null,
+    });
+    expect(evalOrgMissing.candidate.canAutoDigest).toBe(false);
 
     // Org B picks up Org B's Slack channel C0999999999
     const evalOrgB = await evaluateCalendarDigestCandidate({
@@ -348,7 +363,74 @@ describe('PR3: Digest receipts, workspace-scoped Slack lookup, notion_digest err
       channelId: 'C0999999999',
     });
 
-    // Personal mode picks up workspace_id IS NULL Slack channel C0111111111
+    // Updating calendar_digest in Organization mode preserves kind='calendar_digest' using Org B Slack scope
+    await db.pool.query(
+      "INSERT INTO workspace_members(workspace_id, user_id, role, status) VALUES($1, $2, 'member', 'active')",
+      [orgB, owner.id],
+    );
+    const orgConvId = (
+      await db.pool.query(
+        "INSERT INTO conversations(user_id, workspace_id, workspace_mode) VALUES($1, $2, 'organization') RETURNING id",
+        [owner.id, orgB],
+      )
+    ).rows[0].id as string;
+    const calService = new ScheduleService({ pool: db.pool, timeZone: VN, encryptionKey: KEY });
+    const createCalMeta = {
+      type: 'schedule_proposal',
+      proposal: {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Cal Org B',
+        request: 'Gửi bản tin lịch mỗi sáng lên Slack',
+        recurrence: dailyRecurrence,
+        summary: 'Lịch Org B',
+      },
+      scheduleId: null,
+      baseVersion: null,
+      services: ['mycalendar', 'slack'],
+      nextRuns: [new Date(now.getTime() + 60_000).toISOString()],
+      previous: null,
+      digestCandidate: evalOrgB.candidate,
+    };
+    const createMsgId = (
+      await db.pool.query(
+        "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', 'Lịch Org B', $2::jsonb) RETURNING id",
+        [orgConvId, JSON.stringify(createCalMeta)],
+      )
+    ).rows[0].id as string;
+    const createdOrgCal = await calService.confirmProposal({
+      userId: owner.id,
+      convId: orgConvId,
+      messageId: createMsgId,
+      now,
+      scope: { workspaceMode: 'organization', workspaceId: orgB },
+      approvalMode: 'auto_digest',
+    });
+    expect(createdOrgCal.schedule.kind).toBe('calendar_digest');
+
+    const updateCalMeta = {
+      ...createCalMeta,
+      proposal: { ...createCalMeta.proposal, action: 'update', summary: 'Cập nhật giờ Org B' },
+      scheduleId: createdOrgCal.schedule.id,
+      baseVersion: createdOrgCal.schedule.version,
+    };
+    const updateMsgId = (
+      await db.pool.query(
+        "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', 'Cập nhật Org B', $2::jsonb) RETURNING id",
+        [orgConvId, JSON.stringify(updateCalMeta)],
+      )
+    ).rows[0].id as string;
+    const updatedOrgCal = await calService.confirmProposal({
+      userId: owner.id,
+      convId: orgConvId,
+      messageId: updateMsgId,
+      now: new Date(now.getTime() + 1000),
+      scope: { workspaceMode: 'organization', workspaceId: orgB },
+      approvalMode: 'auto_digest',
+    });
+    expect(updatedOrgCal.schedule.kind).toBe('calendar_digest');
+
+    // Personal mode picks up user_id = owner.id, workspace_id IS NULL Slack channel C0111111111 (never legacy C0222222222)
     const evalPersonal = await evaluateCalendarDigestCandidate({
       pool: db.pool,
       encryptionKey: KEY,
@@ -362,6 +444,22 @@ describe('PR3: Digest receipts, workspace-scoped Slack lookup, notion_digest err
     expect(evalPersonal.config?.destination).toEqual({
       service: 'slack',
       channelId: 'C0111111111',
+    });
+
+    // Legacy mode picks up user_id IS NULL, workspace_id IS NULL Slack channel C0222222222
+    const evalLegacy = await evaluateCalendarDigestCandidate({
+      pool: db.pool,
+      encryptionKey: KEY,
+      userId: owner.id,
+      services: ['mycalendar', 'slack'],
+      request: 'Gửi bản tin lịch mỗi sáng lên Slack',
+      workspaceMode: 'legacy',
+      workspaceId: null,
+    });
+    expect(evalLegacy.candidate.canAutoDigest).toBe(true);
+    expect(evalLegacy.config?.destination).toEqual({
+      service: 'slack',
+      channelId: 'C0222222222',
     });
 
     // Verify Calendar runner receipt validation & persistence for Slack
@@ -574,6 +672,50 @@ describe('PR3: Digest receipts, workspace-scoped Slack lookup, notion_digest err
       request: 'Gửi bản tin Notion Sprint Tasks lên Slack #team',
       services: ['notion', 'slack'],
       recurrence: dailyRecurrence,
+      workspaceMode: 'legacy',
+      notionSources: {
+        prepare: async () => mockBinding,
+      },
+      getAdapter: async (serviceName, context) => {
+        if (serviceName === 'slack') {
+          seenContexts.push({ candidate: 'notion_legacy', context });
+          return { execute: async () => [{ id: 'C0123456789', name: 'team' }] };
+        }
+        return null;
+      },
+    });
+
+    await evaluateGithubDigestCandidate({
+      userId: owner.id,
+      scopeId: `personal:${owner.id}`,
+      workspaceMode: 'legacy',
+      workspaceId: null,
+      request: 'Gửi bản tin GitHub repo nhom/ati lên Slack #team',
+      services: ['github', 'slack'],
+      recurrence: dailyRecurrence,
+      githubConnection: async () => ({
+        status: 'connected',
+        connection: {
+          credentialId: GH_CRED_ID,
+          githubUserId: '1001',
+          login: 'octocat',
+          repos: ['nhom/ati'],
+        },
+      }),
+      getAdapter: async (serviceName, context) => {
+        if (serviceName === 'slack') {
+          seenContexts.push({ candidate: 'github_legacy', context });
+          return { execute: async () => [{ id: 'C0123456789', name: 'team' }] };
+        }
+        return null;
+      },
+    });
+
+    await evaluateNotionDigestCandidate({
+      userId: owner.id,
+      request: 'Gửi bản tin Notion Sprint Tasks lên Slack #team',
+      services: ['notion', 'slack'],
+      recurrence: dailyRecurrence,
       workspaceMode: 'personal',
       notionSources: {
         prepare: async () => mockBinding,
@@ -602,6 +744,24 @@ describe('PR3: Digest receipts, workspace-scoped Slack lookup, notion_digest err
         context: {
           userId: owner.id,
           workspaceMode: 'personal',
+          workspaceId: null,
+          phase: 'planning',
+        },
+      },
+      {
+        candidate: 'notion_legacy',
+        context: {
+          userId: owner.id,
+          workspaceMode: 'legacy',
+          workspaceId: null,
+          phase: 'planning',
+        },
+      },
+      {
+        candidate: 'github_legacy',
+        context: {
+          userId: owner.id,
+          workspaceMode: 'legacy',
           workspaceId: null,
           phase: 'planning',
         },

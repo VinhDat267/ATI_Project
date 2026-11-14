@@ -233,8 +233,14 @@ export async function evaluateGithubDigestCandidate(
         Boolean(input.scopeId) &&
         !input.scopeId!.startsWith('personal:') &&
         input.scopeId !== 'default');
-    const workspaceMode = isOrgScope ? ('organization' as const) : (input.workspaceMode ?? ('personal' as const));
     const workspaceId = isOrgScope ? (input.workspaceId ?? input.scopeId ?? null) : null;
+    if (isOrgScope && !workspaceId) {
+      return {
+        canAutoDigest: false,
+        disabledReason: 'Không tìm thấy kênh Slack nhận báo cáo tự động hợp lệ cho workspace hiện tại.',
+      };
+    }
+    const workspaceMode = isOrgScope ? ('organization' as const) : (input.workspaceMode ?? ('personal' as const));
     const slackAdapter = await input.getAdapter?.('slack', {
       userId,
       workspaceMode,

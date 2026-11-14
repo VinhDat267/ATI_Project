@@ -231,22 +231,29 @@ export async function evaluateCalendarDigestCandidate(
   }
 
   // 2. Check destination service (slack or telegram)
-  const isOrgSlack =
-    destService === 'slack' &&
-    input.workspaceMode === 'organization' &&
-    Boolean(input.workspaceId);
+  if (destService === 'slack' && input.workspaceMode === 'organization' && !input.workspaceId) {
+    return {
+      candidate: {
+        canAutoDigest: false,
+        defaultMode: 'manual',
+        disabledReason: 'Dịch vụ Slack chưa được kích hoạt.',
+      },
+    };
+  }
+  const slackScope =
+    destService !== 'slack'
+      ? null
+      : input.workspaceMode === 'organization'
+        ? { sql: 'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id = $2 LIMIT 1', params: [destService, input.workspaceId] }
+        : input.workspaceMode === 'personal'
+          ? { sql: 'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id = $2 AND workspace_id IS NULL LIMIT 1', params: [destService, userId] }
+          : { sql: 'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id IS NULL LIMIT 1', params: [destService] };
   const destRow = (
     await pool.query(
       destService === 'telegram'
         ? 'SELECT config, status FROM service_credentials WHERE service = $1 AND (user_id = $2 OR user_id IS NULL) ORDER BY user_id IS NULL ASC LIMIT 1'
-        : isOrgSlack
-          ? 'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id = $2 LIMIT 1'
-          : 'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id IS NULL LIMIT 1',
-      destService === 'telegram'
-        ? [destService, userId]
-        : isOrgSlack
-          ? [destService, input.workspaceId]
-          : [destService],
+        : slackScope!.sql,
+      destService === 'telegram' ? [destService, userId] : slackScope!.params,
     )
   ).rows[0];
 

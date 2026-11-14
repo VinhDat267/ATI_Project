@@ -493,22 +493,26 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
 
     // Verify destination service (slack or telegram)
     const destService = config.destination.service;
-    const isOrgSlack =
-      destService === 'slack' &&
-      run.workspaceMode === 'organization' &&
-      Boolean(run.workspaceId);
+    if (destService === 'slack' && run.workspaceMode === 'organization' && !run.workspaceId) {
+      return {
+        state: 'blocked',
+        pauseReason: 'Dịch vụ Slack không còn hoạt động.',
+      };
+    }
+    const slackScope =
+      destService !== 'slack'
+        ? null
+        : run.workspaceMode === 'organization'
+          ? { sql: 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id = $2 LIMIT 1', params: [destService, run.workspaceId] }
+          : run.workspaceMode === 'personal'
+            ? { sql: 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND user_id = $2 AND workspace_id IS NULL LIMIT 1', params: [destService, run.userId] }
+            : { sql: 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id IS NULL LIMIT 1', params: [destService] };
     const destRow = (
       await options.pool.query(
         destService === 'telegram'
           ? 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND (user_id = $2 OR user_id IS NULL) ORDER BY user_id IS NULL ASC LIMIT 1'
-          : isOrgSlack
-            ? 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id = $2 LIMIT 1'
-            : 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL AND workspace_id IS NULL LIMIT 1',
-        destService === 'telegram'
-          ? [destService, run.userId]
-          : isOrgSlack
-            ? [destService, run.workspaceId]
-            : [destService],
+          : slackScope!.sql,
+        destService === 'telegram' ? [destService, run.userId] : slackScope!.params,
       )
     ).rows[0];
 

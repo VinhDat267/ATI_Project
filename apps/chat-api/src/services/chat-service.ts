@@ -1687,6 +1687,8 @@ export class ChatService {
       digestCandidate = await evaluateGithubDigestCandidate({
         userId: actor.userId,
         scopeId: githubScopeId,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
         request: proposal.request,
         services,
         recurrence,
@@ -1766,6 +1768,8 @@ export class ChatService {
       digestCandidate = await evaluateGithubDigestCandidate({
         userId: actor.userId,
         scopeId: githubScopeId,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
         request: proposal.request,
         services,
         recurrence,

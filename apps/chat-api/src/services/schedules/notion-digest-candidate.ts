@@ -98,7 +98,7 @@ export async function evaluateNotionDigestCandidate(
   try {
     const slackAdapter = await input.getAdapter?.('slack', {
       userId,
-      workspaceMode: 'personal',
+      workspaceMode: input.workspaceMode ?? 'personal',
       workspaceId: null,
       phase: 'planning',
     });
