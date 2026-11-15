@@ -49,7 +49,7 @@ test('FE-04b: signed-out 404 uses the prototype layer and leaving installs the c
   await expect(page.locator('style[data-proto-page-css="404"]')).toHaveCount(0);
   await page.goto('/login');
   const loginButton = page.getByRole('button', { name: 'Đăng nhập', exact: true });
-  expect(await loginButton.evaluate(el => ({ size: getComputedStyle(el).fontSize, minHeight: getComputedStyle(el).minHeight }))).toEqual({ size: '14px', minHeight: '0px' });
+  await expect(loginButton).toHaveCSS('font-size', '14px');
   expect((await loginButton.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(await gradientPropertyRules(page)).toEqual([]);
 });

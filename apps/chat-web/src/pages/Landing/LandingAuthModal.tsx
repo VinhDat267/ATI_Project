@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Loader2, LockKeyhole, ShieldCheck, X } from 'lucide-react';
 import landingPlaybooks from '../../assets/landing-playbooks.json';
 import { ServiceLogo } from '../../components/ServiceLogo';
-import { evaluatePasswordStrength } from '../../utils/password-strength';
+import { evaluatePasswordGuidance } from '../../utils/password-guidance';
 
 export type AuthModalMode = 'login' | 'signup';
 export type AuthModalView = 'form' | 'google' | 'forgot' | 'success';
@@ -201,7 +201,8 @@ export function LandingAuthModal({
   const isSplitView = view === 'form' || view === 'forgot';
   const showEmailFormBelowGoogle = isLoginView || signupEnabled;
   const showGoogleDivider = googleEnabled && showEmailFormBelowGoogle;
-  const pwdStrength = evaluatePasswordStrength(signupPassword, signupPwdBlurred);
+  const passwordGuidance = evaluatePasswordGuidance(signupPassword, signupPwdBlurred);
+  const passwordTooShort = passwordGuidance.tone === 'danger';
   const activeError = error || authError;
 
   const handleBackdropClick = (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -551,21 +552,6 @@ export function LandingAuthModal({
                       Gửi lại email xác minh
                     </button>
                   </div>
-
-                  <p className="text-[11px] text-[var(--pl-ink-subtle)] leading-relaxed pt-1">
-                    Khi tiếp tục, bạn đồng ý với{' '}
-                    <a
-                      href="/privacy"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        onNavigate('/privacy');
-                      }}
-                      className="auth-link font-medium"
-                    >
-                      Chính sách an toàn &amp; Dữ liệu
-                    </a>{' '}
-                    của Planora.
-                  </p>
                 </form>
               )}
 
@@ -632,8 +618,10 @@ export function LandingAuthModal({
                         minLength={12}
                         value={signupPassword}
                         onChange={(event) => setSignupPassword(event.target.value)}
+                        onFocus={() => setSignupPwdBlurred(false)}
                         onBlur={() => setSignupPwdBlurred(true)}
                         aria-describedby="signup-password-strength"
+                        aria-invalid={passwordTooShort || undefined}
                         placeholder="Ít nhất 12 ký tự"
                         className="auth-input w-full pl-3.5 pr-11 py-2.5 text-sm rounded-xl transition-all"
                       />
@@ -654,7 +642,7 @@ export function LandingAuthModal({
                     <div id="signup-password-strength" className="mt-2 space-y-1.5">
                       <div className="flex items-center gap-1.5" aria-hidden="true">
                         {([0, 1, 2, 3] as const).map((idx) => {
-                          const barTone = idx < pwdStrength.filledBars ? pwdStrength.barTone : 'empty';
+                          const barTone = idx < passwordGuidance.filledBars ? passwordGuidance.barTone : 'empty';
                           return (
                             <span
                               key={idx}
@@ -664,9 +652,12 @@ export function LandingAuthModal({
                           );
                         })}
                       </div>
-                      <p className={`text-[11px] leading-snug font-medium auth-tone-${pwdStrength.tone}`}>
-                        {pwdStrength.label}
+                      <p className={`text-[11px] leading-snug font-medium auth-tone-${passwordGuidance.tone}`}>
+                        {passwordGuidance.label}
                       </p>
+                    </div>
+                    <div role="status" aria-atomic="true" className="sr-only">
+                      {passwordTooShort ? 'Mật khẩu cần ít nhất 12 ký tự.' : ''}
                     </div>
                   </div>
 
@@ -694,21 +685,6 @@ export function LandingAuthModal({
                       </button>
                     </span>
                   </div>
-
-                  <p className="text-[11px] text-[var(--pl-ink-subtle)] leading-relaxed">
-                    Khi tiếp tục, bạn đồng ý với{' '}
-                    <a
-                      href="/privacy"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        onNavigate('/privacy');
-                      }}
-                      className="auth-link font-medium"
-                    >
-                      Chính sách an toàn &amp; Dữ liệu
-                    </a>{' '}
-                    của Planora.
-                  </p>
                 </form>
               )}
 
@@ -716,6 +692,23 @@ export function LandingAuthModal({
                 <div className="auth-mobile-notice mt-4 p-4 rounded-2xl text-xs sm:text-sm leading-relaxed">
                   <p role="status">Đăng ký bằng email hiện đang đóng.</p>
                 </div>
+              )}
+
+              {(showEmailFormBelowGoogle || googleEnabled) && (
+                <p className="mt-4 text-[11px] text-[var(--pl-ink-subtle)] leading-relaxed">
+                  Khi tiếp tục, bạn đồng ý với{' '}
+                  <a
+                    href="/privacy"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      onNavigate('/privacy');
+                    }}
+                    className="auth-link font-medium"
+                  >
+                    Chính sách an toàn &amp; Dữ liệu
+                  </a>{' '}
+                  của Planora.
+                </p>
               )}
             </div>
           )}

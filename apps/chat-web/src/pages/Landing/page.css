@@ -2037,31 +2037,16 @@ html.dark .auth-strength-danger {
 html.dark .auth-strength-warning {
   background-color: #FBBF24;
 }
-.auth-strength-success {
-  background-color: #16A34A;
-}
-html.dark .auth-strength-success {
-  background-color: #34D399;
+.auth-strength-filled {
+  background-color: var(--pl-ink-subtle);
 }
 
 .auth-tone-muted {
   color: var(--pl-ink-muted);
-}
-.auth-tone-warning {
-  color: #9A3412;
-}
-html.dark .auth-tone-warning {
-  color: #FCD34D;
 }
 .auth-tone-danger {
   color: #B91C1C;
 }
 html.dark .auth-tone-danger {
   color: #FCA5A5;
-}
-.auth-tone-success {
-  color: #047857;
-}
-html.dark .auth-tone-success {
-  color: #6EE7B7;
 }

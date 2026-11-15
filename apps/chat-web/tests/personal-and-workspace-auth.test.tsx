@@ -117,7 +117,7 @@ describe('Personal and Workspace Auth (Task 5)', () => {
       );
 
       fireEvent.change(screen.getByLabelText(/^Email/i), { target: { value: 'unverified@example.test' } });
-      fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: 'Password12345!' } });
+      fireEvent.change(screen.getByLabelText('Mật khẩu', { exact: true }), { target: { value: 'Password12345!' } });
       fireEvent.click(screen.getByRole('button', { name: /Đăng nhập/i }));
 
       expect(await screen.findByText('Bạn cần xác minh địa chỉ email')).toBeInTheDocument();

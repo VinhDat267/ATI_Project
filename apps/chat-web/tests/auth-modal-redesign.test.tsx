@@ -73,7 +73,7 @@ describe('Auth modal redesign', () => {
     expect(within(getShowcase()).getByText(/30 phút/)).toBeInTheDocument();
   });
 
-  it('shows deferred live password strength on signup and resets state when switching tabs', async () => {
+  it('shows password guidance without claiming strength and announces length errors on blur', async () => {
     const { container } = open('/signup');
     const meter = await waitFor(() => {
       const el = container.querySelector('#signup-password-strength');
@@ -88,23 +88,32 @@ describe('Auth modal redesign', () => {
     expect(meter.querySelector('.auth-tone-danger')).toBeNull();
 
     const pwdInput = screen.getByLabelText('Mật khẩu', { exact: true }) as HTMLInputElement;
+    const announcement = screen.getByRole('status');
+    expect(announcement).toBeEmptyDOMElement();
+    expect(pwdInput).toHaveAccessibleDescription(expect.stringContaining('Tối thiểu 12 ký tự'));
 
     // Typing < 12 characters before blur: shows remaining char count without premature red danger styling
     fireEvent.change(pwdInput, { target: { value: 'abc' } });
     expect(meter).toHaveTextContent('Còn thiếu 9 ký tự nữa');
     expect(meter.querySelector('.auth-strength-danger')).toBeNull();
     expect(meter.querySelector('.auth-tone-danger')).toBeNull();
+    expect(announcement).toBeEmptyDOMElement();
 
-    // Blurring while < 12 chars: shows explicit warning
     fireEvent.blur(pwdInput);
     expect(meter).toHaveTextContent('Mật khẩu cần ít nhất 12 ký tự');
     expect(meter.querySelectorAll('[data-strength-bar="danger"]')).toHaveLength(1);
     expect(meter.querySelector('.auth-tone-danger')).not.toBeNull();
+    expect(announcement).toHaveTextContent('Mật khẩu cần ít nhất 12 ký tự');
 
-    // Typing a strong 12+ character password fills all 4 strength bars
-    fireEvent.change(pwdInput, { target: { value: 'Planora!2026Safe' } });
-    expect(meter).toHaveTextContent('Độ mạnh: Tuyệt vời');
-    expect(meter.querySelectorAll('[data-strength-bar="success"]')).toHaveLength(4);
+    fireEvent.focus(pwdInput);
+    expect(announcement).toBeEmptyDOMElement();
+    fireEvent.change(pwdInput, { target: { value: 'Password123!' } });
+    expect(meter).toHaveTextContent('Đạt 4/4 gợi ý về ký tự');
+    expect(meter).toHaveTextContent('Ưu tiên mật khẩu dài, riêng cho Planora.');
+    expect(meter).not.toHaveTextContent(/độ mạnh|an toàn|tuyệt vời/i);
+    expect(meter.querySelectorAll('[data-strength-bar="filled"]')).toHaveLength(4);
+    fireEvent.blur(pwdInput);
+    expect(announcement).toBeEmptyDOMElement();
 
     // Switching back to login and returning to signup resets transient signup password state
     fireEvent.click(screen.getByRole('tab', { name: 'Đăng nhập' }));
@@ -118,6 +127,7 @@ describe('Auth modal redesign', () => {
     expect(freshMeter).toHaveTextContent('Tối thiểu 12 ký tự');
     expect(freshMeter.querySelectorAll('[data-strength-bar="empty"]')).toHaveLength(4);
     expect(freshMeter.querySelector('.auth-tone-danger')).toBeNull();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
   });
 
   it('omits Google divider when Google OAuth is disabled and shows it when enabled, preserving secondary actions', async () => {
@@ -140,5 +150,19 @@ describe('Auth modal redesign', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Đăng ký' }));
     await waitFor(() => expect(window.location.pathname).toBe('/signup'));
     expect(screen.getByRole('button', { name: 'Đăng nhập' })).toBeInTheDocument();
+  });
+
+  it('keeps the privacy link available before continuing with Google when email signup is closed', async () => {
+    signupEnabled = false;
+    googleEnabled = true;
+    open('/signup');
+    const modal = within(screen.getByRole('dialog'));
+    await modal.findByRole('button', { name: 'Tiếp tục với Google' });
+
+    const policy = modal.getByRole('link', { name: 'Chính sách an toàn & Dữ liệu' });
+    expect(policy).toHaveAttribute('href', '/privacy');
+    expect(modal.queryByText(/hoặc tiếp tục bằng email/i)).toBeNull();
+    fireEvent.click(policy);
+    await waitFor(() => expect(window.location.pathname).toBe('/privacy'));
   });
 });
