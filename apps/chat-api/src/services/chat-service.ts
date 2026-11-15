@@ -15,6 +15,7 @@ import {
   MYJIRA_G2A_TOOLS,
   MYJIRA_SERVICE,
   type CalendarDigestCandidate,
+  type GmailWriteSource,
   type PersonalSpreadsheetItem,
   type PlanConnections,
   type PlannerResponse,
@@ -23,6 +24,7 @@ import {
   type ScheduleProposalMetadata,
   type ScheduleResponse,
   type ScheduleView,
+  type TelegramDigestConfig,
   type WorkflowContext,
 } from '@wap/tool-schemas';
 import { filterPermittedWorkflowDefaults } from './workflow-context-guard.js';
@@ -47,17 +49,23 @@ import { sandboxKeepsSharedJira } from '../config/gmail-tools-runtime.js';
 import { isWriteTool, resolveRef } from '@wap/executor';
 import type { SlackWriteRuntime } from './slack/slack-write-runtime.js';
 import type { SlackReadProposalService } from './slack/slack-read-proposals.js';
-import { eventsOverlap } from '@wap/tool-adapters';
+import { eventsOverlap, StepError } from '@wap/tool-adapters';
 import { extractNotionDatabaseId } from './notion/oauth-client.js';
 import { JiraPlanBinder, JiraBindingError, createSourceRefsFromConnection } from './jira/jira-plan-binding.js';
 import type { JiraHistorySanitizer } from './jira/jira-history-sanitizer.js';
 import type { JiraPolicyService } from './jira/jira-policy-service.js';
 import { validateJiraApprovalBinding } from './jira/jira-approval-guard.js';
 
-/** Only the server writes plan connections; the model's version is never kept or shown back to it. */
+/** Drop server-owned fields from model plans and history sent back to the model. */
 function withoutConnections(plan: PlanResponse): PlanResponse {
   const { connections: _ignored, ...rest } = plan;
-  return rest;
+  if (!Array.isArray(rest.steps)) return rest;
+  const steps = rest.steps.map(step => {
+    if (!step.tool.startsWith('gmail.') || !step.args || !Object.hasOwn(step.args, 'approvedSource')) return step;
+    const { approvedSource: _source, ...args } = step.args;
+    return { ...step, args };
+  });
+  return { ...rest, steps };
 }
 
 export function resolveTargetSpreadsheet(
@@ -446,6 +454,39 @@ export class ChatService {
         reasons.push('Gmail chưa được kết nối hoặc cần kết nối lại.');
       } else {
         gmailConn = gmail;
+        const needsSnapshot = bound.steps.filter(step =>
+          ['gmail.forward', 'gmail.update_draft', 'gmail.send_draft'].includes(step.tool)
+        );
+        if (needsSnapshot.length > 0) {
+          const draftIds = needsSnapshot.filter(step => step.tool !== 'gmail.forward').map(step => step.args.draftId);
+          if (new Set(draftIds).size !== draftIds.length) {
+            return { kind: 'refusal', reason: 'Hãy duyệt từng thao tác trên cùng thư nháp Gmail. Sau khi cập nhật, lập kế hoạch gửi từ phiên bản mới.' };
+          }
+          try {
+            const adapter = await this.getAdapter?.('gmail', {
+              userId, phase: 'planning', connections: { gmail }, conversationId,
+            });
+            if (!adapter) throw new Error('Gmail planning adapter unavailable');
+            const previewSignal = signal ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000);
+            for (const step of needsSnapshot) {
+              const approvedSource: GmailWriteSource = await adapter.execute(
+                'gmail.prepare_write', { tool: step.tool, args: step.args }, { signal: previewSignal },
+              );
+              if (!approvedSource?.messageId || (step.tool !== 'gmail.forward' && !approvedSource.rawSha256)) {
+                throw new Error('Missing Gmail source revision');
+              }
+              const index = bound.steps.indexOf(step);
+              bound.steps[index] = { ...step, args: { ...step.args, approvedSource } };
+            }
+          } catch (error) {
+            signal?.throwIfAborted();
+            return {
+              kind: 'refusal',
+              reason: error instanceof StepError && error.category === 'VALIDATION'
+                ? error.message : 'Không thể xác minh nguồn thư Gmail để xem trước. Hãy làm mới và lập lại kế hoạch.',
+            };
+          }
+        }
       }
     }
 
@@ -1549,6 +1590,7 @@ export class ChatService {
     rawProposal: ScheduleResponse,
     actor: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' },
     schedule: ScheduleView | null,
+    userTexts: string[],
     conv?: { workspace_mode?: string | null; workspace_id?: string | null } | null
   ): Promise<PlannerResponse | ScheduleProposalMetadata> {
     if (!this.schedules) throw new Error('Schedules are off');
@@ -1744,6 +1786,8 @@ export class ChatService {
         notionBinding,
         githubLookup: ghLookup,
         gmailBinding,
+        gmailUserTexts: userTexts,
+        existingDigest: current?.kind === 'telegram_digest' ? current.digestConfig as TelegramDigestConfig : null,
       });
     } else if (
       (proposal.action === 'create' || proposal.action === 'update') &&
@@ -2046,7 +2090,7 @@ export class ChatService {
     }
     let proposal: ScheduleProposalMetadata | null = null;
     if (response.kind === 'schedule') {
-      const prepared = await this.prepareProposal(response, actor, target.schedule ?? null, conv);
+      const prepared = await this.prepareProposal(response, actor, target.schedule ?? null, userTexts, conv);
       if ('type' in prepared) proposal = prepared; else response = prepared;
     }
     const emit = (event: string, payload: Record<string, unknown>) => this.eventEmitter.emit(event, { conversationId, ...payload, ...correlation });

@@ -91,6 +91,13 @@ const json = (response, status, body) => {
   response.end(JSON.stringify(body));
 };
 const random = () => randomBytes(24).toString('base64url');
+function fixturePage(list, params, field) {
+  const limit = Number(params.get('maxResults') ?? 10);
+  const token = params.get('pageToken');
+  const offset = token && /^fixture-page-\d+$/.test(token) ? Number(token.slice(13)) : 0;
+  const next = offset + limit;
+  return { [field]: list.slice(offset, next), ...(next < list.length ? { nextPageToken: `fixture-page-${next}` } : {}) };
+}
 function defaultThreads() {
   const message = { id: 'message-1', labelIds: ['INBOX', 'UNREAD'], snippet: 'Chào nhóm, họp lúc 9 giờ.', payload: {
     mimeType: 'text/plain', headers: [
@@ -121,8 +128,31 @@ export async function startFakeGoogleGmail(options = {}) {
   const settings = {
     email, grantedScopes: [GMAIL_MODIFY_SCOPE, CALENDAR_EVENTS_SCOPE, CALENDAR_READONLY_SCOPE, DRIVE_FILE_SCOPE], issueRefreshToken: true, accessTokenTtlSeconds: 3600,
     accessTokenPrefix: 'ya29.fake', exchange: 'ok', exchangeDelayMs: 0, refresh: 'ok', refreshDelayMs: 0, revoke: 'ok', profile: 'ok', profileResponse: null,
-    threads: defaultThreads(), calendars: defaultCalendars(email), calendarEvents: [], driveFiles: defaultDriveFiles(), grantedFiles: [], apiResponses: [], ...options.settings,
+    threads: defaultThreads(), drafts: null, attachments: {}, calendars: defaultCalendars(email), calendarEvents: [], driveFiles: defaultDriveFiles(), grantedFiles: [], apiResponses: [], ...options.settings,
   };
+  if (!Array.isArray(settings.drafts)) {
+    settings.drafts = [
+      {
+        id: 'draft-seed-1',
+        message: {
+          id: 'draft-msg-seed-1',
+          threadId: 'thread-1',
+          labelIds: ['DRAFT'],
+          snippet: 'Bản nháp xác nhận họp lúc 9h.',
+          payload: {
+            mimeType: 'text/plain',
+            headers: [
+              { name: 'From', value: settings.email },
+              { name: 'To', value: 'lan@example.com' },
+              { name: 'Subject', value: 'Re: Họp nhóm ATI' },
+              { name: 'Date', value: 'Wed, 14 Oct 2026 10:00:00 +0700' },
+            ],
+            body: { data: Buffer.from('Mình xác nhận họp lúc 9h nhé.').toString('base64url') },
+          },
+        },
+      },
+    ];
+  }
   const stats = { authorizations: 0, exchanges: 0, refreshes: 0, revocations: 0, profiles: 0, apiRequests: [], writes: 0 };
   const codes = new Map();
   const refreshTokens = new Map();
@@ -275,7 +305,7 @@ export async function startFakeGoogleGmail(options = {}) {
       if (url.pathname.startsWith('/gmail/v1/users/me/')) {
         const path = url.pathname.slice('/gmail/v1/users/me/'.length);
         let body;
-        if (request.method === 'POST') { let raw = ''; for await (const chunk of request) raw += chunk; body = JSON.parse(raw || '{}'); stats.writes++; }
+        if (request.method === 'POST' || request.method === 'PUT') { let raw = ''; for await (const chunk of request) raw += chunk; body = JSON.parse(raw || '{}'); stats.writes++; }
         stats.apiRequests.push({ method: request.method, path, query: Object.fromEntries(url.searchParams), body });
         const scripted = settings.apiResponses.shift();
         if (scripted?.mode === 'hang') return hang(response);
@@ -291,11 +321,93 @@ export async function startFakeGoogleGmail(options = {}) {
         const token = /^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1];
         const entry = accessTokens.get(token);
         if (!entry || entry.expiresAt <= now()) return json(response, 401, { error: { code: 401 } });
-        if (path === 'threads' && request.method === 'GET') return json(response, 200, { threads: settings.threads.slice(0, Number(url.searchParams.get('maxResults') ?? 10)).map(t => ({ id: t.id })) });
+        const parseRawMimeDraft = (rawB64Url, fallbackThreadId) => {
+          const decoded = Buffer.from(rawB64Url || '', 'base64url').toString('utf8');
+          const [rawHdr = ''] = decoded.split(/\r?\n\r?\n/);
+          const headers = rawHdr.split(/\r?\n/).map((line) => {
+            const idx = line.indexOf(':');
+            return idx > 0 ? { name: line.slice(0, idx).trim(), value: line.slice(idx + 1).trim() } : null;
+          }).filter(Boolean);
+          return {
+            headers,
+            threadId: fallbackThreadId ?? 'draft-thread',
+          };
+        };
+        if (path === 'threads' && request.method === 'GET') {
+          return json(response, 200, fixturePage(settings.threads.map(thread => ({ id: thread.id })), url.searchParams, 'threads'));
+        }
         if (path === 'labels' && request.method === 'GET') return json(response, 200, { labels: ['INBOX', 'UNREAD', 'STARRED'].map(id => ({ id, name: id, type: 'system' })) });
         if (path === 'labels' && request.method === 'POST') return json(response, 200, { id: `label-${stats.writes}`, name: body.name, type: 'user' });
         if (path === 'messages/send') return json(response, 200, { id: `sent-${stats.writes}`, threadId: body.threadId ?? `new-thread-${stats.writes}` });
-        if (path === 'drafts') return json(response, 200, { id: `draft-${stats.writes}`, message: { id: `draft-message-${stats.writes}`, threadId: body.message.threadId ?? 'draft-thread' } });
+        if (path === 'drafts' && request.method === 'GET') {
+          const q = (url.searchParams.get('q') ?? '').trim().toLowerCase();
+          const list = (settings.drafts ?? []).filter((d) => {
+            if (!q) return true;
+            const subj = (d.message?.payload?.headers ?? []).find((h) => h.name.toLowerCase() === 'subject')?.value ?? '';
+            return subj.toLowerCase().includes(q) || String(d.message?.snippet ?? '').toLowerCase().includes(q);
+          }).slice(0, Number(url.searchParams.get('maxResults') ?? 10));
+          return json(response, 200, { drafts: list.map((d) => ({ id: d.id, message: { id: d.message?.id, threadId: d.message?.threadId } })) });
+        }
+        if (path === 'drafts' && request.method === 'POST') {
+          const draftId = `draft-${stats.writes}`;
+          const messageId = `draft-message-${stats.writes}`;
+          const parsed = parseRawMimeDraft(body?.message?.raw, body?.message?.threadId);
+          const created = {
+            id: draftId,
+            message: {
+              id: messageId,
+              threadId: parsed.threadId,
+              labelIds: ['DRAFT'],
+              snippet: '',
+              raw: body?.message?.raw,
+              payload: { mimeType: 'text/plain', headers: parsed.headers, body: { data: '' } },
+            },
+          };
+          settings.drafts.push(created);
+          return json(response, 200, { id: draftId, message: { id: messageId, threadId: parsed.threadId } });
+        }
+        if (path === 'drafts/send' && request.method === 'POST') {
+          const idx = (settings.drafts ?? []).findIndex((d) => d.id === body?.id);
+          const existing = idx >= 0 ? settings.drafts[idx] : null;
+          if (!existing) return json(response, 404, { error: { code: 404, errors: [{ reason: 'notFound' }] } });
+          settings.drafts.splice(idx, 1);
+          return json(response, 200, { id: `sent-${stats.writes}`, threadId: body?.message?.threadId ?? existing.message?.threadId ?? `new-thread-${stats.writes}` });
+        }
+        const draftMatch = /^drafts\/([^/]+)$/.exec(path);
+        if (draftMatch) {
+          const draftId = decodeURIComponent(draftMatch[1]);
+          const existing = (settings.drafts ?? []).find((d) => d.id === draftId);
+          if (!existing) return json(response, 404, { error: { code: 404, errors: [{ reason: 'notFound' }] } });
+          if (request.method === 'GET') {
+            if (url.searchParams.get('format') !== 'raw') return json(response, 200, existing);
+            const message = existing.message;
+            const payload = message.payload;
+            const headers = (payload?.headers ?? []).map(({ name, value }) => `${name}: ${value}`).join('\r\n');
+            const text = Buffer.from(payload?.body?.data ?? '', 'base64url').toString('utf8');
+            const raw = message.raw ?? Buffer.from(`${headers}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${text}`).toString('base64url');
+            return json(response, 200, { id: existing.id, message: { id: message.id, threadId: message.threadId, raw } });
+          }
+          if (request.method === 'PUT') {
+            const parsed = parseRawMimeDraft(body?.message?.raw, body?.message?.threadId ?? existing.message?.threadId);
+            existing.message = {
+              ...existing.message,
+              id: `draft-message-${stats.writes}`,
+              threadId: parsed.threadId,
+              raw: body?.message?.raw,
+              payload: { mimeType: 'text/plain', headers: parsed.headers, body: { data: '' } },
+            };
+            return json(response, 200, { id: existing.id, message: { id: existing.message.id, threadId: parsed.threadId } });
+          }
+        }
+        const attMatch = /^messages\/([^/]+)\/attachments\/([^/]+)$/.exec(path);
+        if (attMatch && request.method === 'GET') {
+          const msgId = decodeURIComponent(attMatch[1]);
+          const attId = decodeURIComponent(attMatch[2]);
+          const data = settings.attachments?.[`${msgId}:${attId}`] ?? settings.attachments?.[attId];
+          if (!data) return json(response, 404, { error: { code: 404, errors: [{ reason: 'notFound' }] } });
+          const rawBuf = Buffer.isBuffer(data) ? data : Buffer.from(String(data), 'utf8');
+          return json(response, 200, { size: rawBuf.length, data: rawBuf.toString('base64url') });
+        }
         if (path === 'threads/batchModify' && request.method === 'POST') {
           const ids = new Set(Array.isArray(body.ids) ? body.ids : []);
           settings.threads = settings.threads.map(thread => ids.has(thread.id)

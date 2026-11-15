@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { isSlackReadTool, requiresReportEvidence, reportOutputTargets, type ToolDefinition, type PlannerResponse, type PlanStep, type ReportEvidence } from '@wap/tool-schemas';
-import { normalizedRecipient, observedThreads, observedWorkspaceRecipients, userEmailAddresses } from './recipients.js';
+import { normalizedRecipient, observedDrafts, observedThreads, observedWorkspaceRecipients, userEmailAddresses } from './recipients.js';
 import type { ReportArtifactStore } from './reports/artifacts.js';
 
 export interface ValidationSuccess {
@@ -332,7 +332,10 @@ function findUngrounded(steps: PlanStep[], catalog: Map<string, ToolDefinition>,
   const typed = userTokens(grounding.userTexts);
   const typedEmails = userEmailAddresses(grounding.userTexts);
   const accountEmail = normalizedRecipient(grounding.memory.gmail_account?.email);
-  const seenEmails = new Set(observedThreads(grounding.memory).flatMap(t => t.participants.map(normalizedRecipient).filter((a): a is string => Boolean(a))));
+  const seenEmails = new Set([
+    ...observedThreads(grounding.memory).flatMap(t => t.participants.map(normalizedRecipient).filter((a): a is string => Boolean(a))),
+    ...observedDrafts(grounding.memory).flatMap(d => d.participants.map(normalizedRecipient).filter((a): a is string => Boolean(a))),
+  ]);
   const workspaceEmails = new Set(observedWorkspaceRecipients(grounding.memory).keys());
   const createdSheetsByResource = new Map<string, Set<string>>([
     ['mysheet', new Set()],

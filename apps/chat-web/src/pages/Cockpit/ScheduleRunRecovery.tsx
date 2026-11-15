@@ -37,7 +37,8 @@ export function isUncertainSheetsDeliveryRun(
     Boolean(run.deliveryStartedAt) &&
     typeof run.error === 'string' &&
     (run.error.includes('SHEETS_DELIVERY_UNKNOWN') ||
-      run.error.includes('TRELLO_DELIVERY_UNKNOWN'))
+      run.error.includes('TRELLO_DELIVERY_UNKNOWN') ||
+      run.error.includes('TELEGRAM_DELIVERY_UNKNOWN'))
   );
 }
 
@@ -260,6 +261,7 @@ export function ScheduleRunRecovery({ message, navigate }: { message: ChatMessag
         typeof run.error === 'string' &&
         (run.error.includes('SHEETS_DELIVERY_UNKNOWN') ||
           run.error.includes('TRELLO_DELIVERY_UNKNOWN') ||
+          run.error.includes('TELEGRAM_DELIVERY_UNKNOWN') ||
           run.error.includes('SHEETS_APPEND_UNKNOWN_OUTCOME'))
       )
   );

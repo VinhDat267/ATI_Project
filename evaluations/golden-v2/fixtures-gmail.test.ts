@@ -4,7 +4,10 @@ import { validateSchemaValue } from '@wap/planner';
 import { GMAIL_THREADS as SANDBOX_THREADS, GMAIL_FAKE } from '../../apps/chat-api/src/sandbox/fake-results/gmail.js';
 import { GMAIL_THREADS, fixtureSearch, knownResourceValues } from './fixtures.js';
 
-const output = (tool: string) => GMAIL_TOOLS.find(t => t.name === tool)!.outputSchema;
+const output = (tool: string) => {
+  const definition = GMAIL_TOOLS.find(t => t.name === tool)!;
+  return definition.searchOutputSchema ?? definition.outputSchema;
+};
 const ids = (rows: Array<{ id: string }>) => rows.map(row => row.id);
 
 describe('Gmail fixture mailbox', () => {
@@ -22,10 +25,10 @@ describe('Gmail fixture mailbox', () => {
   ] as const)('%s returns nonempty data conforming to the actual output schema', async (tool, args) => {
     const result = await fixtureSearch({ tool, args });
     expect(validateSchemaValue(result, output(tool), 'output')).toBeNull();
-    expect(Array.isArray(result) ? result.length : result.messages.length).toBeGreaterThan(0);
+    expect(Array.isArray(result) ? result.length : (result.threads ?? result.messages).length).toBeGreaterThan(0);
   });
   it('searches like Gmail: every term must match, with the common operators and quoted phrases', async () => {
-    const search = async (query: string, limit?: number) => ids(await fixtureSearch({ tool: 'gmail.search_threads', args: { query, ...limit ? { limit } : {} } }));
+    const search = async (query: string, limit?: number) => ids((await fixtureSearch({ tool: 'gmail.search_threads', args: { query, ...limit ? { limit } : {} } })).threads);
     expect(await search('Họp nhóm ATI')).toEqual(['gmail-thread-1']);
     expect(await search('subject:"Báo cáo tuần"')).toEqual(['gmail-thread-2']);
     expect(await search('"bảo vệ" from:lan@example.com newer_than:7d')).toEqual(['gmail-thread-3']);
@@ -39,11 +42,11 @@ describe('Gmail fixture mailbox', () => {
     expect(await search('is:unread in:trash')).toEqual([]);
     expect(await search('-subject:"Báo cáo tuần"')).toHaveLength(7);
     expect(await search('-attacker')).toHaveLength(6);
-    const [summary] = await fixtureSearch({ tool: 'gmail.search_threads', args: { query: 'OAuth' } });
+    const { threads: [summary] } = await fixtureSearch({ tool: 'gmail.search_threads', args: { query: 'OAuth' } });
     expect(summary).not.toHaveProperty('messages');
     expect(summary.participants).toEqual(['lan@example.com', 'gmail-owner@example.test', 'minh@example.com']);
     expect(summary).toMatchObject({ hasAttachment: false, attachmentNames: [] });
-    const [withAttachment] = await fixtureSearch({ tool: 'gmail.search_threads', args: { query: 'has:attachment' } });
+    const { threads: [withAttachment] } = await fixtureSearch({ tool: 'gmail.search_threads', args: { query: 'has:attachment' } });
     expect(withAttachment).toMatchObject({ id: 'gmail-thread-2', hasAttachment: true, attachmentNames: ['báo cáo.pdf'] });
   });
   it('validates arguments at the schema boundary and rejects unknown threads like the adapter', async () => {
@@ -58,11 +61,11 @@ describe('Gmail fixture mailbox', () => {
     expect([...knownResourceValues('label')]).toEqual(['INBOX', 'UNREAD', 'STARRED']);
   });
   it('projects explicit boolean hasDraft:false on all 8 search_threads summaries and isDraft:false on all 8 get_thread messages matching GMAIL_FAKE', async () => {
-    const summaries = await fixtureSearch({ tool: 'gmail.search_threads', args: { query: 'is:unread', limit: 10 } });
-    expect(summaries).toHaveLength(8);
-    expect(summaries).toEqual(GMAIL_FAKE.tools['gmail.search_threads']!({ query: '', limit: 10 }));
-    expect(validateSchemaValue(summaries, output('gmail.search_threads'), 'output')).toBeNull();
-    for (const summary of summaries) {
+    const page = await fixtureSearch({ tool: 'gmail.search_threads', args: { query: 'is:unread', limit: 10 } });
+    expect(page.threads).toHaveLength(8);
+    expect(page.threads).toEqual(GMAIL_FAKE.tools['gmail.search_threads']!({ query: '', limit: 10 }));
+    expect(validateSchemaValue(page, output('gmail.search_threads'), 'output')).toBeNull();
+    for (const summary of page.threads) {
       expect(typeof summary.hasDraft).toBe('boolean');
       expect(summary.hasDraft).toBe(false);
     }

@@ -56,7 +56,7 @@ import { TelegramUpdateRepo } from './db/repositories/telegram-update-repo.js';
 import { TelegramBotClient } from './services/telegram/bot-client.js';
 import { createTelegramConnectionLookup } from './services/telegram/connection-reference.js';
 import { TelegramDigestRunner } from './services/schedules/telegram-digest-runner.js';
-import { StepError } from '@wap/tool-adapters';
+import { GMAIL_SEARCH_PAGE_TOOL, StepError } from '@wap/tool-adapters';
 import { createTrelloConnectionLookup } from './services/trello/connection-reference.js';
 import { GitHubTokenManager } from './services/github/token-manager.js';
 import { GitHubOAuthClient } from './services/github/oauth-client.js';
@@ -668,7 +668,7 @@ async function bootstrap() {
       workspaceMode: actor?.workspaceMode ?? defaultMode,
       ...(actor?.workspaceId !== undefined && actor?.workspaceId !== null ? { workspaceId: actor.workspaceId } : {}),
     });
-    return adapter.execute(tool, args, { signal });
+    return adapter.execute(tool === 'gmail.search_threads' ? GMAIL_SEARCH_PAGE_TOOL : tool, args, { signal });
   };
   // Sandbox providers return canned plans without reading working memory, so
   // resource grounding would reject every plan; live planning always enforces it.

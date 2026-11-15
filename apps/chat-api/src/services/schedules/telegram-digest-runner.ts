@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { decryptCredentials, detectCalendarConflicts, StepError } from '@wap/tool-adapters';
+import { decryptCredentials, detectCalendarConflicts, GMAIL_DIGEST_READ_TOOL, StepError } from '@wap/tool-adapters';
 import {
   normalizeTelegramChatId,
   TELEGRAM_CHAT_ID_PATTERN,
@@ -28,6 +28,7 @@ import {
 } from './digest-scope-guard.js';
 import {
   assertGmailDigestBinding,
+  isValidGmailDigestQuery,
   validateTelegramDigestGmailConfig,
 } from './gmail-digest-binding.js';
 import {
@@ -208,8 +209,9 @@ export function summarizeSourceItems(
 
   const nowMs = now.getTime();
   const soonLimitMs = nowMs + 24 * 3600_000;
+  const maxItems = service === 'gmail' ? 10 : 5;
 
-  const lines = items.slice(0, 5).map((item, idx) => {
+  const lines = items.slice(0, maxItems).map((item, idx) => {
     if (typeof item === 'string') return `  ${idx + 1}. ${item}`;
     if (Array.isArray(item)) return `  ${idx + 1}. ${item.join(' | ')}`;
     const title =
@@ -274,12 +276,22 @@ export function summarizeSourceItems(
       const badgeSuffix = propBadges.length > 0 ? ` (${propBadges.slice(0, 3).join(' · ')})` : '';
       return `  - ${String(title)}${badgeSuffix}`;
     }
+    if (item && typeof item === 'object' && typeof item.repo === 'string' && typeof item.number === 'number') {
+      const stateTag =
+        typeof item.state === 'string' && item.state.trim()
+          ? item.draft === true
+            ? ` [${item.state.trim()} · draft]`
+            : ` [${item.state.trim()}]`
+          : '';
+      const authorTag = typeof item.author === 'string' && item.author.trim() ? ` (@${item.author.trim()})` : '';
+      return `  - [${item.repo}#${item.number}] ${String(title)}${stateTag}${authorTag}`;
+    }
     const prefix = item?.number ? `#${item.number} ` : item?.key && item?.key !== title ? `${item.key}: ` : '';
     return `  - ${prefix}${String(title)}`;
   });
 
-  if (items.length > 5) {
-    lines.push(`  ... và ${items.length - 5} mục khác`);
+  if (items.length > maxItems) {
+    lines.push(`  ... và ${items.length - maxItems} mục khác`);
   }
 
   return { count: items.length, lines };
@@ -1248,9 +1260,13 @@ export class TelegramDigestRunner {
           if (!notionBinding || !this.options.notionSources) return notionBlocked();
           rawResult = await this.options.notionSources.read(userId, notionBinding, signal);
         } else if (source.service === 'gmail') {
+          const rawQuery = (source.args as Record<string, unknown> | undefined)?.query;
+          if (!isValidGmailDigestQuery(rawQuery)) {
+            return { status: 'blocked', error: 'Bộ lọc Gmail đã duyệt không hợp lệ.', pauseSchedule: true };
+          }
           rawResult = await adapter.execute(
-            'gmail.search_threads',
-            { query: 'in:inbox is:unread' },
+            GMAIL_DIGEST_READ_TOOL,
+            { query: rawQuery.trim() },
             { signal },
           );
         } else if (source.service === 'mycalendar' && source.tool === 'mycalendar.list_events') {
@@ -1423,7 +1439,7 @@ export class TelegramDigestRunner {
     // 4. Optional AI highlight summary: verify bounded PostgreSQL egress authority first (and commit/release
     // all PostgreSQL locks BEFORE external LLM HTTP I/O), then execute summarizeWithAi under remaining budget.
     let aiHighlight = '';
-    if (!notionBinding && this.options.summarizeWithAi) {
+    if (!notionBinding && this.options.summarizeWithAi && digestConfig.includeAiSummary !== false) {
       const aiTimeoutMs = this.options.aiTimeoutMs ?? 10_000;
       const aiDeadlineAt = Date.now() + (Number.isFinite(aiTimeoutMs) ? Math.max(0, aiTimeoutMs) : 0);
       let aiAuth: { kind: 'ok'; value: true } | { kind: 'outcome'; outcome: DigestRunOutcome };

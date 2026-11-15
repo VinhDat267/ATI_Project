@@ -1,6 +1,9 @@
 import type pg from 'pg';
+import { decryptCredentials } from '@wap/tool-adapters';
 import {
   isSheetsDigestConfigV2,
+  normalizeTelegramChatId,
+  TELEGRAM_CHAT_ID_PATTERN,
   type CalendarDigestCandidate,
   type GithubDigestConfig,
   type ScheduleApprovalMode,
@@ -41,7 +44,13 @@ import {
   type FetchOrgSheetsMetadataFn,
 } from './sheets-digest-candidate.js';
 import { canonicalizeDigestConfig, computeDigestConfigHash } from './github-digest-candidate.js';
-import { approvedTelegramNotionBinding, computeTelegramDigestConfigHash, telegramNotionSource } from './telegram-digest-candidate.js';
+import {
+  approvedTelegramNotionBinding,
+  computeTelegramDigestConfigHash,
+  evaluateTelegramDigestCandidate,
+  telegramNotionSource,
+  type TelegramConnectionLookupResult,
+} from './telegram-digest-candidate.js';
 import { canonicalNotionDigestBinding, lockApprovedNotionSource, NOTION_DIGEST_REAPPROVAL, type NotionDigestSourceAuthority } from '../notion/digest-source-authority.js';
 import {
   buildConfirmedTrelloDigestDelivery,
@@ -50,6 +59,7 @@ import {
   getTrelloDigestPinnedCredentialIds,
 } from './trello-digest-candidate.js';
 import {
+  isValidGmailDigestQuery,
   loadGmailDigestBinding,
   validateTelegramDigestGmailConfig,
 } from './gmail-digest-binding.js';
@@ -429,10 +439,10 @@ export class ScheduleService {
         if (!existing || metadata.scheduleId !== existing.id) {
           throw new ScheduleConflict('STALE_PROPOSAL');
         }
-        if (existing.kind !== 'sheets_digest') {
+        if (existing.kind !== 'sheets_digest' && existing.kind !== 'telegram_digest') {
           throw new ScheduleConflict(
             'REAUTHORIZATION_NOT_READY',
-            'Chỉ lịch tổng hợp Google Sheets (sheets_digest) mới hỗ trợ cấp quyền lại v2.',
+            'Chỉ lịch tổng hợp Google Sheets hoặc Telegram mới hỗ trợ cấp quyền lại.',
           );
         }
         if (metadata.proposal?.action !== 'update') {
@@ -514,7 +524,7 @@ export class ScheduleService {
             (metadata.services.includes('mycalendar') ||
               (metadata.services.includes('calendar') && !metadata.services.includes('github')))));
       const isSheetsSchedule =
-        Boolean(metadata.reauthorize) ||
+        (Boolean(metadata.reauthorize) && existing?.kind === 'sheets_digest') ||
         existing?.kind === 'sheets_digest' ||
         (!candidateHasTelegramSources &&
           !hasGithubDigestCandidate &&
@@ -558,13 +568,15 @@ export class ScheduleService {
             !metadata.services.includes('telegram') &&
             (metadata.services.includes('notion') || existing?.kind === 'notion_digest')));
       const isTelegramSchedule =
-        !metadata.reauthorize &&
+        (!metadata.reauthorize || existing?.kind === 'telegram_digest') &&
         !isCalendarSchedule &&
         !isSheetsSchedule &&
         !isGithubSchedule &&
         !isTrelloSchedule &&
         !isNotionSchedule &&
-        (metadata.services.includes('telegram') || existing?.kind === 'telegram_digest');
+        (metadata.services.includes('telegram') ||
+          existing?.kind === 'telegram_digest' ||
+          candidateHasTelegramSources);
       let digestFields: {
         kind: 'plan' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest' | 'trello_digest' | 'notion_digest';
         digestConfig: unknown | null;
@@ -578,32 +590,45 @@ export class ScheduleService {
       };
       let telegramDigestConfig: TelegramDigestConfig | null = null;
       let telegramDigestHash: string | null = null;
+      const previousTelegramConfig = existing?.kind === 'telegram_digest'
+        ? existing.digest_config as TelegramDigestConfig | null
+        : null;
 
       if (wantAutoDigest && (proposal.action === 'create' || proposal.action === 'update') && !isGithubSchedule && !isTrelloSchedule && !isNotionSchedule && !isReadOnlyJiraDigestConfirm) {
         if (isTelegramSchedule) {
           const candidate = metadata.digestCandidate as TelegramDigestCandidate | undefined;
           if (!candidate || candidate.canAutoDigest !== true || !candidate.config || !candidate.configHash) {
-            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED', candidate?.disabledReason);
           }
-          await this.verifyTelegramDigestGmailConfigInTx(client, userId, candidate.config, metadata.services);
-          let computedHash: string;
+          let candidateHash: string;
           try {
-            computedHash = computeTelegramDigestConfigHash(candidate.config);
+            candidateHash = computeTelegramDigestConfigHash(candidate.config);
           } catch {
             throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
           }
-          if (computedHash !== candidate.configHash) {
+          if (candidateHash !== candidate.configHash) {
             throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
           }
-          if (telegramNotionSource(candidate.config) || metadata.services.includes('notion')) {
-            const binding = approvedTelegramNotionBinding(candidate.config);
+          const confirmedAiSetting = includeAiSummary ??
+            (metadata.reauthorize ? undefined : previousTelegramConfig?.includeAiSummary);
+          const effectiveConfig: TelegramDigestConfig =
+            confirmedAiSetting === undefined ? candidate.config : { ...candidate.config, includeAiSummary: confirmedAiSetting };
+          await this.verifyTelegramDigestGmailConfigInTx(client, userId, effectiveConfig, metadata.services);
+          let computedHash: string;
+          try {
+            computedHash = computeTelegramDigestConfigHash(effectiveConfig);
+          } catch {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+          }
+          if (telegramNotionSource(effectiveConfig) || metadata.services.includes('notion')) {
+            const binding = approvedTelegramNotionBinding(effectiveConfig);
             if (!binding || wsMode === 'organization' ||
                 (verifyNotionSource && verifiedNotionSource !== JSON.stringify(canonicalNotionDigestBinding(binding))) ||
                 !(await lockApprovedNotionSource(client, userId, binding))) {
               throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', NOTION_DIGEST_REAPPROVAL);
             }
           }
-          telegramDigestConfig = candidate.config;
+          telegramDigestConfig = effectiveConfig;
           telegramDigestHash = computedHash;
           digestFields = {
             kind: 'telegram_digest',
@@ -931,10 +956,14 @@ export class ScheduleService {
             if ((previouslyNotion && proposal.request !== existing.request) || (previewNotion && !previouslyNotion)) {
               throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', NOTION_DIGEST_REAPPROVAL);
             }
-            const updatedConfig: TelegramDigestConfig =
+            const proposedConfig: TelegramDigestConfig =
               !previouslyNotion && tgCandidate?.canAutoDigest && tgCandidate.config
                 ? tgCandidate.config
                 : { ...previousConfig, recurrence: fields.recurrence };
+            const updatedConfig: TelegramDigestConfig =
+              previousConfig.includeAiSummary === undefined
+                ? proposedConfig
+                : { ...proposedConfig, includeAiSummary: previousConfig.includeAiSummary };
             if (previouslyNotion) {
               const binding = approvedTelegramNotionBinding(updatedConfig);
               if (!binding || wsMode === 'organization' || !(await lockApprovedNotionSource(client, userId, binding))) {
@@ -1145,8 +1174,115 @@ export class ScheduleService {
     return (
       reason === 'REAUTH_REQUIRED' ||
       /\bREAUTH_REQUIRED\b/i.test(reason) ||
-      /cấp quyền lại|xác nhận lại lịch|phiên bản cũ\s*\(v1\)/iu.test(reason)
+      /cấp quyền lại|xác nhận lại lịch|phiên bản cũ\s*\(v1\)|kết nối lại|hộp thư đã xác nhận|bị ngắt hoặc thay đổi/iu.test(reason)
     );
+  }
+
+  private async loadLiveTelegramLookup(
+    db: Queryable,
+    userId: string,
+  ): Promise<TelegramConnectionLookupResult> {
+    const encryptionKey = this.options.encryptionKey ?? process.env.ENCRYPTION_KEY ?? '';
+    if (!encryptionKey || !isUuid(userId)) {
+      return { status: 'not_connected', selectedChats: [] };
+    }
+    const res = await db.query<{ id: string; config: string; status: string }>(
+      `SELECT id, config, status
+         FROM service_credentials
+        WHERE service = 'telegram' AND user_id = $1 AND workspace_id IS NULL
+        ORDER BY created_at DESC LIMIT 1`,
+      [userId],
+    );
+    const row = res.rows[0];
+    if (!row) {
+      return { status: 'not_connected', selectedChats: [] };
+    }
+    if (row.status !== 'active') {
+      return { status: 'reconnect_required', selectedChats: [] };
+    }
+    let decrypted: Record<string, any>;
+    try {
+      decrypted = decryptCredentials(row.config, encryptionKey) as Record<string, any>;
+    } catch {
+      return { status: 'reconnect_required', selectedChats: [] };
+    }
+    const telegramUserIdRaw =
+      typeof decrypted.telegramUserId === 'string' ? decrypted.telegramUserId.trim() : '';
+    const telegramUserId = telegramUserIdRaw ? normalizeTelegramChatId(telegramUserIdRaw) : '';
+    if (!telegramUserId) {
+      return { status: 'reconnect_required', selectedChats: [] };
+    }
+    const selectedChats: TelegramConnectionLookupResult['selectedChats'] = [];
+    const seenChatIds = new Set<string>();
+    for (const rawChat of Array.isArray(decrypted.selectedChats) ? decrypted.selectedChats : []) {
+      if (!rawChat || typeof rawChat.chatId !== 'string') continue;
+      const trimmed = rawChat.chatId.trim();
+      if (!TELEGRAM_CHAT_ID_PATTERN.test(trimmed)) continue;
+      const chatId = normalizeTelegramChatId(trimmed);
+      if (seenChatIds.has(chatId)) continue;
+      seenChatIds.add(chatId);
+      const chatType =
+        rawChat.type === 'private' ||
+        rawChat.type === 'group' ||
+        rawChat.type === 'supergroup' ||
+        rawChat.type === 'channel'
+          ? rawChat.type
+          : chatId.startsWith('-')
+            ? 'supergroup'
+            : 'private';
+      const title =
+        typeof rawChat.title === 'string' && rawChat.title.trim()
+          ? rawChat.title.trim()
+          : chatId;
+      selectedChats.push({ chatId, title, type: chatType });
+    }
+    return {
+      status: 'connected',
+      selectedChats,
+      telegramUserId,
+      username: typeof decrypted.username === 'string' ? decrypted.username : '',
+      connection: {
+        credentialId: row.id,
+        telegramUserId,
+        username: typeof decrypted.username === 'string' ? decrypted.username : '',
+        chatIds: selectedChats.map((c) => c.chatId),
+      },
+    };
+  }
+
+  private async loadLiveGithubLookup(db: Queryable, userId: string) {
+    const encryptionKey = this.options.encryptionKey ?? process.env.ENCRYPTION_KEY ?? '';
+    if (!encryptionKey || !isUuid(userId)) {
+      return { status: 'not_connected' as const };
+    }
+    const res = await db.query<{ id: string; config: string; status: string }>(
+      `SELECT id, config, status
+         FROM service_credentials
+        WHERE service = 'github' AND user_id = $1 AND workspace_id IS NULL
+        ORDER BY created_at DESC LIMIT 1`,
+      [userId],
+    );
+    const row = res.rows[0];
+    if (!row || row.status !== 'active') {
+      return { status: 'not_connected' as const };
+    }
+    try {
+      const decrypted = decryptCredentials(row.config, encryptionKey) as Record<string, any>;
+      const repos = Array.isArray(decrypted.repos)
+        ? decrypted.repos.filter((r): r is string => typeof r === 'string' && r.trim().length > 0)
+        : [];
+      return {
+        status: 'connected' as const,
+        connection: {
+          credentialId: row.id,
+          githubUserId: String(decrypted.githubUserId ?? ''),
+          login: String(decrypted.login ?? ''),
+          repos,
+        },
+      };
+    } catch {
+      return { status: 'not_connected' as const };
+    }
   }
 
   private async assertSheetsDigestCanResumeInTx(client: pg.PoolClient, row: ScheduleRow): Promise<void> {
@@ -1185,7 +1321,7 @@ export class ScheduleService {
     scheduleId: string;
     baseVersion: number;
     expiresAt: string;
-    candidate: SheetsDigestCandidate;
+    candidate: SheetsDigestCandidate | TelegramDigestCandidate;
     metadata: ScheduleProposalMetadata;
   }> {
     const { userId, scheduleId, scope } = input;
@@ -1195,10 +1331,10 @@ export class ScheduleService {
     // Phase A (Outside DB Transaction): Snapshot read & Candidate/Metadata resolution
     const snap = await this.repo.ownedSchedule(scheduleId, userId, this.options.pool, false, scope);
     if (!snap) throw new ScheduleNotFound();
-    if (snap.kind !== 'sheets_digest') {
+    if (snap.kind !== 'sheets_digest' && snap.kind !== 'telegram_digest') {
       throw new ScheduleConflict(
         'REAUTHORIZATION_NOT_READY',
-        'Chỉ lịch tổng hợp Google Sheets (sheets_digest) mới hỗ trợ cấp quyền lại v2.',
+        'Chỉ lịch tổng hợp Google Sheets hoặc Telegram mới hỗ trợ cấp quyền lại.',
       );
     }
     if (snap.status === 'cancelled' || snap.status === 'completed') {
@@ -1255,175 +1391,250 @@ export class ScheduleService {
       }
     }
 
-    const prevConfig =
-      snap.kind === 'sheets_digest' && snap.digest_config && typeof snap.digest_config === 'object'
-        ? (snap.digest_config as SheetsDigestConfig)
+    const prevTgConfig =
+      snap.kind === 'telegram_digest' && snap.digest_config && typeof snap.digest_config === 'object'
+        ? (snap.digest_config as TelegramDigestConfig)
         : null;
-    const prevSource = prevConfig?.source;
-    const prevDest = prevConfig?.destination;
+    let tgCandidate: TelegramDigestCandidate | null = null;
+    let sheetsCandidate: SheetsDigestCandidate | null = null;
 
-    const effectiveServices =
-      prevSource?.service && prevDest?.service
-        ? [prevSource.service, prevDest.service]
-        : snap.services;
-
-    const requestHints: string[] = [snap.request];
-    const reqLower = snap.request.toLowerCase();
-    if (trustedScope.workspaceMode === 'organization' && prevSource?.service === 'mysheets') {
-      if (!reqLower.includes('mysheets') && !reqLower.includes('cá nhân')) {
-        requestHints.push('từ Google Sheets cá nhân');
+    if (snap.kind === 'telegram_digest') {
+      if (telegramNotionSource(prevTgConfig) || snap.services.includes('notion')) {
+        throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', NOTION_DIGEST_REAPPROVAL);
       }
-    } else if (trustedScope.workspaceMode === 'organization' && prevSource?.service === 'sheets') {
-      if (!reqLower.includes('tổ chức') && !reqLower.includes('sheets chung')) {
-        requestHints.push('từ Google Sheets tổ chức');
+      const needsGmail =
+        snap.services.includes('gmail') ||
+        Boolean(prevTgConfig?.sources?.some((s) => s.service === 'gmail'));
+      const [telegramLookup, gmailBinding, githubLookup] = await Promise.all([
+        this.loadLiveTelegramLookup(this.options.pool, userId),
+        needsGmail
+          ? loadGmailDigestBinding(
+              this.options.pool,
+              userId,
+              this.options.gmailOAuthClientId,
+              this.options.encryptionKey,
+            )
+          : Promise.resolve(null),
+        snap.services.includes('github')
+          ? this.loadLiveGithubLookup(this.options.pool, userId)
+          : Promise.resolve(null),
+      ]);
+      const effectiveIncludeAi =
+        typeof input.includeAiSummary === 'boolean'
+          ? input.includeAiSummary
+          : typeof prevTgConfig?.includeAiSummary === 'boolean'
+            ? prevTgConfig.includeAiSummary
+            : undefined;
+      const prevGmailSource = prevTgConfig?.sources?.find((s) => s.service === 'gmail');
+      const prevGmailQuery = prevGmailSource?.args?.query;
+      const reauthorizeGmailQuery = prevGmailSource && isValidGmailDigestQuery(prevGmailQuery)
+        ? {
+            query: prevGmailQuery.trim(),
+            label: prevGmailSource.label.replace(/\s*\([^()]+\)\s*$/, '').trim() || 'Email chưa đọc',
+          }
+        : undefined;
+      tgCandidate = evaluateTelegramDigestCandidate({
+        proposal: {
+          kind: 'schedule',
+          action: 'update',
+          name: snap.name,
+          request: snap.request,
+          recurrence: snap.recurrence,
+          summary: `Cấp quyền lại lịch "${snap.name}".`,
+        },
+        services: snap.services,
+        timeZone: this.options.timeZone,
+        telegramLookup,
+        githubLookup,
+        gmailBinding,
+        existingDigest: prevTgConfig,
+        reauthorizeGmailQuery,
+        includeAiSummary: effectiveIncludeAi,
+      });
+      if (!tgCandidate.canAutoDigest || !tgCandidate.config || !tgCandidate.configHash) {
+        throw new ScheduleConflict(
+          'REAUTHORIZATION_NOT_READY',
+          tgCandidate.disabledReason ?? SCHEDULE_CONFLICTS.REAUTHORIZATION_NOT_READY,
+        );
       }
-    }
-    if (prevSource?.spreadsheetId && !reqLower.includes(prevSource.spreadsheetId.toLowerCase())) {
-      requestHints.push(prevSource.spreadsheetId);
-    }
-    if (
-      prevSource?.spreadsheetTitle &&
-      !reqLower.includes(prevSource.spreadsheetTitle.toLowerCase())
-    ) {
-      requestHints.push(prevSource.spreadsheetTitle);
-    }
-    if (prevSource?.sheetName && !reqLower.includes(prevSource.sheetName.toLowerCase())) {
-      requestHints.push(`tab "${prevSource.sheetName}"`);
-    }
-    if (
-      prevDest &&
-      'channelId' in prevDest &&
-      prevDest.channelId &&
-      !reqLower.includes(prevDest.channelId.toLowerCase())
-    ) {
-      requestHints.push(prevDest.channelId);
-    }
-    if (
-      prevDest?.service === 'telegram' &&
-      prevDest.chatId &&
-      !reqLower.includes(prevDest.chatId.toLowerCase())
-    ) {
-      requestHints.push(prevDest.chatId);
-    }
-    if (
-      prevDest?.service === 'gmail' &&
-      prevDest.recipientEmail &&
-      !reqLower.includes(prevDest.recipientEmail.toLowerCase())
-    ) {
-      requestHints.push(prevDest.recipientEmail);
-    }
+      if (prevTgConfig?.chatId && tgCandidate.config.chatId !== prevTgConfig.chatId) {
+        throw new ScheduleConflict(
+          'REAUTHORIZATION_NOT_READY',
+          `Cuộc trò chuyện Telegram "${prevTgConfig.chatTitle || prevTgConfig.chatId}" không còn trong phạm vi cấp quyền hiện tại.`,
+        );
+      }
+    } else {
+      const prevConfig =
+        snap.digest_config && typeof snap.digest_config === 'object'
+          ? (snap.digest_config as SheetsDigestConfig)
+          : null;
+      const prevSource = prevConfig?.source;
+      const prevDest = prevConfig?.destination;
 
-    const effectiveRequest = requestHints.join(' ');
+      const effectiveServices =
+        prevSource?.service && prevDest?.service
+          ? [prevSource.service, prevDest.service]
+          : snap.services;
 
-    const candidate = await analyzeSheetsDigestCandidate({
-      userId,
-      workspaceMode: trustedScope.workspaceMode,
-      workspaceId: trustedScope.workspaceId,
-      request: effectiveRequest,
-      recurrence: snap.recurrence,
-      services: effectiveServices,
-      credentialRepo: this.options.credentialRepo,
-      encryptionKey: this.options.encryptionKey,
-      gmailOAuthClientId: this.options.gmailOAuthClientId,
-      mysheetsEnabled: this.options.mysheetsEnabled,
-      fetchOrgSheetsMetadata: this.options.fetchOrgSheetsMetadata,
-      emitV2: true,
-      explicitRange: prevSource?.range,
-      includeAiSummary:
+      const requestHints: string[] = [snap.request];
+      const reqLower = snap.request.toLowerCase();
+      if (trustedScope.workspaceMode === 'organization' && prevSource?.service === 'mysheets') {
+        if (!reqLower.includes('mysheets') && !reqLower.includes('cá nhân')) {
+          requestHints.push('từ Google Sheets cá nhân');
+        }
+      } else if (trustedScope.workspaceMode === 'organization' && prevSource?.service === 'sheets') {
+        if (!reqLower.includes('tổ chức') && !reqLower.includes('sheets chung')) {
+          requestHints.push('từ Google Sheets tổ chức');
+        }
+      }
+      if (prevSource?.spreadsheetId && !reqLower.includes(prevSource.spreadsheetId.toLowerCase())) {
+        requestHints.push(prevSource.spreadsheetId);
+      }
+      if (
+        prevSource?.spreadsheetTitle &&
+        !reqLower.includes(prevSource.spreadsheetTitle.toLowerCase())
+      ) {
+        requestHints.push(prevSource.spreadsheetTitle);
+      }
+      if (prevSource?.sheetName && !reqLower.includes(prevSource.sheetName.toLowerCase())) {
+        requestHints.push(`tab "${prevSource.sheetName}"`);
+      }
+      if (
+        prevDest &&
+        'channelId' in prevDest &&
+        prevDest.channelId &&
+        !reqLower.includes(prevDest.channelId.toLowerCase())
+      ) {
+        requestHints.push(prevDest.channelId);
+      }
+      if (
+        prevDest?.service === 'telegram' &&
+        prevDest.chatId &&
+        !reqLower.includes(prevDest.chatId.toLowerCase())
+      ) {
+        requestHints.push(prevDest.chatId);
+      }
+      if (
+        prevDest?.service === 'gmail' &&
+        prevDest.recipientEmail &&
+        !reqLower.includes(prevDest.recipientEmail.toLowerCase())
+      ) {
+        requestHints.push(prevDest.recipientEmail);
+      }
+
+      const effectiveRequest = requestHints.join(' ');
+
+      const candidate = await analyzeSheetsDigestCandidate({
+        userId,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
+        request: effectiveRequest,
+        recurrence: snap.recurrence,
+        services: effectiveServices,
+        credentialRepo: this.options.credentialRepo,
+        encryptionKey: this.options.encryptionKey,
+        gmailOAuthClientId: this.options.gmailOAuthClientId,
+        mysheetsEnabled: this.options.mysheetsEnabled,
+        fetchOrgSheetsMetadata: this.options.fetchOrgSheetsMetadata,
+        emitV2: true,
+        explicitRange: prevSource?.range,
+        includeAiSummary:
+          typeof input.includeAiSummary === 'boolean'
+            ? input.includeAiSummary
+            : typeof prevConfig?.includeAiSummary === 'boolean'
+              ? prevConfig.includeAiSummary
+              : undefined,
+      });
+
+      if (
+        !candidate.canAutoDigest ||
+        !candidate.config ||
+        !isSheetsDigestConfigV2(candidate.config) ||
+        !candidate.configHash
+      ) {
+        throw new ScheduleConflict(
+          'REAUTHORIZATION_NOT_READY',
+          candidate.reason ?? SCHEDULE_CONFLICTS.REAUTHORIZATION_NOT_READY,
+        );
+      }
+
+      if (prevSource?.spreadsheetId && candidate.config.source.spreadsheetId !== prevSource.spreadsheetId) {
+        throw new ScheduleConflict(
+          'REAUTHORIZATION_NOT_READY',
+          `Bảng tính "${prevSource.spreadsheetTitle || prevSource.spreadsheetId}" không còn trong phạm vi cấp quyền hiện tại.`,
+        );
+      }
+      if (prevDest && 'channelId' in prevDest) {
+        if (
+          candidate.config.destination.service !== prevDest.service ||
+          !('channelId' in candidate.config.destination) ||
+          candidate.config.destination.channelId !== prevDest.channelId
+        ) {
+          throw new ScheduleConflict(
+            'REAUTHORIZATION_NOT_READY',
+            `Kênh Slack "${prevDest.channelId}" không còn trong phạm vi cấp quyền hiện tại.`,
+          );
+        }
+      } else if (prevDest?.service === 'telegram') {
+        if (
+          candidate.config.destination.service !== 'telegram' ||
+          candidate.config.destination.chatId !== prevDest.chatId
+        ) {
+          throw new ScheduleConflict(
+            'REAUTHORIZATION_NOT_READY',
+            `Nhóm Telegram "${prevDest.chatId}" không còn trong phạm vi cấp quyền hiện tại.`,
+          );
+        }
+      } else if (prevDest?.service === 'gmail') {
+        if (
+          candidate.config.destination.service !== 'gmail' ||
+          candidate.config.destination.recipientEmail.toLowerCase() !==
+            prevDest.recipientEmail.toLowerCase()
+        ) {
+          throw new ScheduleConflict(
+            'REAUTHORIZATION_NOT_READY',
+            'Địa chỉ email nhận báo cáo không khớp với lịch hiện tại.',
+          );
+        }
+      }
+
+      if (prevSource) {
+        if (prevSource.sheetName && !candidate.config.source.sheetName) {
+          candidate.config.source.sheetName = prevSource.sheetName;
+        }
+        if (prevSource.range && !candidate.config.source.range) {
+          const rangeCheck = validateAndCanonicalizeDigestRange(prevSource.range);
+          if (!rangeCheck.ok) {
+            throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', rangeCheck.reason);
+          }
+          candidate.config.source.range = rangeCheck.canonicalRange;
+        }
+        if (typeof prevSource.tailRows === 'number' && prevSource.tailRows > 0) {
+          candidate.config.source.tailRows = prevSource.tailRows;
+        }
+      }
+      const effectiveIncludeAi =
         typeof input.includeAiSummary === 'boolean'
           ? input.includeAiSummary
           : typeof prevConfig?.includeAiSummary === 'boolean'
             ? prevConfig.includeAiSummary
-            : undefined,
-    });
-
-    if (
-      !candidate.canAutoDigest ||
-      !candidate.config ||
-      !isSheetsDigestConfigV2(candidate.config) ||
-      !candidate.configHash
-    ) {
-      throw new ScheduleConflict(
-        'REAUTHORIZATION_NOT_READY',
-        candidate.reason ?? SCHEDULE_CONFLICTS.REAUTHORIZATION_NOT_READY,
-      );
+            : candidate.config.includeAiSummary;
+      candidate.config.includeAiSummary = effectiveIncludeAi;
+      if (candidate.preview) {
+        candidate.preview = {
+          ...candidate.preview,
+          ...(candidate.config.source.sheetName ? { sheetName: candidate.config.source.sheetName } : {}),
+          ...(candidate.config.source.range ? { range: candidate.config.source.range } : {}),
+          includeAiSummary: effectiveIncludeAi,
+        };
+      }
+      candidate.configHash = computeSheetsDigestHash({
+        userId,
+        recurrence: snap.recurrence,
+        config: candidate.config,
+      });
+      sheetsCandidate = candidate;
     }
-
-    if (prevSource?.spreadsheetId && candidate.config.source.spreadsheetId !== prevSource.spreadsheetId) {
-      throw new ScheduleConflict(
-        'REAUTHORIZATION_NOT_READY',
-        `Bảng tính "${prevSource.spreadsheetTitle || prevSource.spreadsheetId}" không còn trong phạm vi cấp quyền hiện tại.`,
-      );
-    }
-    if (prevDest && 'channelId' in prevDest) {
-      if (
-        candidate.config.destination.service !== prevDest.service ||
-        !('channelId' in candidate.config.destination) ||
-        candidate.config.destination.channelId !== prevDest.channelId
-      ) {
-        throw new ScheduleConflict(
-          'REAUTHORIZATION_NOT_READY',
-          `Kênh Slack "${prevDest.channelId}" không còn trong phạm vi cấp quyền hiện tại.`,
-        );
-      }
-    } else if (prevDest?.service === 'telegram') {
-      if (
-        candidate.config.destination.service !== 'telegram' ||
-        candidate.config.destination.chatId !== prevDest.chatId
-      ) {
-        throw new ScheduleConflict(
-          'REAUTHORIZATION_NOT_READY',
-          `Nhóm Telegram "${prevDest.chatId}" không còn trong phạm vi cấp quyền hiện tại.`,
-        );
-      }
-    } else if (prevDest?.service === 'gmail') {
-      if (
-        candidate.config.destination.service !== 'gmail' ||
-        candidate.config.destination.recipientEmail.toLowerCase() !==
-          prevDest.recipientEmail.toLowerCase()
-      ) {
-        throw new ScheduleConflict(
-          'REAUTHORIZATION_NOT_READY',
-          'Địa chỉ email nhận báo cáo không khớp với lịch hiện tại.',
-        );
-      }
-    }
-
-    if (prevSource) {
-      if (prevSource.sheetName && !candidate.config.source.sheetName) {
-        candidate.config.source.sheetName = prevSource.sheetName;
-      }
-      if (prevSource.range && !candidate.config.source.range) {
-        const rangeCheck = validateAndCanonicalizeDigestRange(prevSource.range);
-        if (!rangeCheck.ok) {
-          throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', rangeCheck.reason);
-        }
-        candidate.config.source.range = rangeCheck.canonicalRange;
-      }
-      if (typeof prevSource.tailRows === 'number' && prevSource.tailRows > 0) {
-        candidate.config.source.tailRows = prevSource.tailRows;
-      }
-    }
-    const effectiveIncludeAi =
-      typeof input.includeAiSummary === 'boolean'
-        ? input.includeAiSummary
-        : typeof prevConfig?.includeAiSummary === 'boolean'
-          ? prevConfig.includeAiSummary
-          : candidate.config.includeAiSummary;
-    candidate.config.includeAiSummary = effectiveIncludeAi;
-    if (candidate.preview) {
-      candidate.preview = {
-        ...candidate.preview,
-        ...(candidate.config.source.sheetName ? { sheetName: candidate.config.source.sheetName } : {}),
-        ...(candidate.config.source.range ? { range: candidate.config.source.range } : {}),
-        includeAiSummary: effectiveIncludeAi,
-      };
-    }
-    candidate.configHash = computeSheetsDigestHash({
-      userId,
-      recurrence: snap.recurrence,
-      config: candidate.config,
-    });
 
     // Phase B (Inside DB Transaction): Lock, Verify & Persist Sealed Proposal Message
     return this.transaction(async (client) => {
@@ -1454,10 +1665,10 @@ export class ScheduleService {
       );
       const current = schedRes.rows[0];
       if (!current) throw new ScheduleNotFound();
-      if (current.kind !== 'sheets_digest') {
+      if (current.kind !== snap.kind || (current.kind !== 'sheets_digest' && current.kind !== 'telegram_digest')) {
         throw new ScheduleConflict(
           'REAUTHORIZATION_NOT_READY',
-          'Chỉ lịch tổng hợp Google Sheets (sheets_digest) mới hỗ trợ cấp quyền lại v2.',
+          'Loại lịch đã thay đổi hoặc không hỗ trợ cấp quyền lại.',
         );
       }
 
@@ -1474,21 +1685,6 @@ export class ScheduleService {
         );
       }
 
-      const txTrustedScope = resolveTrustedScheduleScope(owner.rows[0]);
-      const verified = await verifySheetsDigestCandidateInTx(client, {
-        userId,
-        recurrence: current.recurrence,
-        config: candidate.config!,
-        expectedHash: candidate.configHash,
-        trustedScope: txTrustedScope,
-        encryptionKey: this.options.encryptionKey,
-        gmailOAuthClientId: this.options.gmailOAuthClientId,
-        mysheetsEnabled: this.options.mysheetsEnabled,
-      });
-      if (!verified.ok) {
-        throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', verified.reason);
-      }
-
       const expiresAt = new Date(now.getTime() + 15 * 60_000).toISOString();
       const firstRun = this.next(current, now);
       const upcoming = [
@@ -1496,14 +1692,65 @@ export class ScheduleService {
         ...nextRuns(current.recurrence, firstRun, this.options.timeZone, 2),
       ].map((d) => d.toISOString());
 
-      const sealedCandidate: SheetsDigestCandidate = {
-        ...candidate,
-        canAutoDigest: true,
-        config: verified.config,
-        configHash: verified.configHash,
-      };
+      let sealedCandidate: SheetsDigestCandidate | TelegramDigestCandidate;
+      let proposalSummary: string;
+      let metadataServices: string[];
 
-      const proposalSummary = `Cấp quyền lại lịch "${current.name}" (Google Sheets v2).`;
+      if (current.kind === 'telegram_digest') {
+        if (!tgCandidate?.config || !tgCandidate.configHash) {
+          throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', SCHEDULE_CONFLICTS.REAUTHORIZATION_NOT_READY);
+        }
+        if (telegramNotionSource(tgCandidate.config) || current.services.includes('notion')) {
+          throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', NOTION_DIGEST_REAPPROVAL);
+        }
+        try {
+          await this.verifyTelegramDigestGmailConfigInTx(client, userId, tgCandidate.config, current.services);
+        } catch (err) {
+          if (err instanceof ScheduleConflict) {
+            throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', err.message);
+          }
+          throw err;
+        }
+        const liveTg = await this.loadLiveTelegramLookup(client, userId);
+        if (
+          liveTg.status !== 'connected' ||
+          liveTg.connection?.credentialId !== tgCandidate.config.credentialId ||
+          liveTg.connection?.telegramUserId !== tgCandidate.config.telegramUserId ||
+          !liveTg.selectedChats.some((c) => c.chatId === tgCandidate.config!.chatId)
+        ) {
+          throw new ScheduleConflict(
+            'REAUTHORIZATION_NOT_READY',
+            'Kết nối Telegram nhận bản tin không còn hợp lệ.',
+          );
+        }
+        sealedCandidate = tgCandidate;
+        proposalSummary = `Cấp quyền lại lịch "${current.name}" (Telegram digest).`;
+        metadataServices = current.services;
+      } else {
+        const txTrustedScope = resolveTrustedScheduleScope(owner.rows[0]);
+        const verified = await verifySheetsDigestCandidateInTx(client, {
+          userId,
+          recurrence: current.recurrence,
+          config: sheetsCandidate!.config!,
+          expectedHash: sheetsCandidate!.configHash,
+          trustedScope: txTrustedScope,
+          encryptionKey: this.options.encryptionKey,
+          gmailOAuthClientId: this.options.gmailOAuthClientId,
+          mysheetsEnabled: this.options.mysheetsEnabled,
+        });
+        if (!verified.ok) {
+          throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', verified.reason);
+        }
+        sealedCandidate = {
+          ...sheetsCandidate!,
+          canAutoDigest: true,
+          config: verified.config,
+          configHash: verified.configHash,
+        };
+        proposalSummary = `Cấp quyền lại lịch "${current.name}" (Google Sheets v2).`;
+        metadataServices = [verified.config.source.service, verified.config.destination.service];
+      }
+
       const metadata: ScheduleProposalMetadata = {
         type: 'schedule_proposal',
         scheduleId: current.id,
@@ -1511,7 +1758,7 @@ export class ScheduleService {
         reauthorize: true,
         expiresAt,
         digestCandidate: sealedCandidate,
-        services: [verified.config.source.service, verified.config.destination.service],
+        services: metadataServices,
         nextRuns: upcoming,
         previous: {
           name: current.name,
@@ -1725,7 +1972,10 @@ export class ScheduleService {
           previous.status === 'needs_attention' ||
           previous.delivery_resolution != null ||
           (previous.delivery_started_at != null && previous.status !== 'digest_failed') ||
-          (typeof previous.error === 'string' && previous.error.includes('SHEETS_DELIVERY_UNKNOWN')) ||
+          (typeof previous.error === 'string' &&
+            (previous.error.includes('SHEETS_DELIVERY_UNKNOWN') ||
+              previous.error.includes('TELEGRAM_DELIVERY_UNKNOWN') ||
+              previous.error.includes('TRELLO_DELIVERY_UNKNOWN'))) ||
           !REPLANNABLE.has(prevState)
         ) {
           throw new ScheduleConflict('RUN_NOT_REPLANNABLE');

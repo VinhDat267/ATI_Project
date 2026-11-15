@@ -175,13 +175,15 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
             ? await apiClient.confirmSchedule(convId, message.id, approvalMode)
             : await apiClient.confirmSchedule(convId, message.id)
           : approvalMode === 'auto_digest' || isReauthorize
-            ? isSheetsCandidate && includeAiSummary !== initialIncludeAiSummary
+            ? (isSheetsCandidate || isTelegramCandidate) && includeAiSummary !== initialIncludeAiSummary
               ? await apiClient.confirmSchedule(convId, message.id, {
                   approvalMode: 'auto_digest',
                   includeAiSummary,
                 })
               : await apiClient.confirmSchedule(convId, message.id, 'auto_digest')
-            : await apiClient.confirmSchedule(convId, message.id);
+            : isTelegramCandidate
+              ? await apiClient.confirmSchedule(convId, message.id, 'manual')
+              : await apiClient.confirmSchedule(convId, message.id);
       if (currentMessage.current === message.id) setConfirmed(result.schedule); schedulesChanged();
     } catch (reason: any) {
       setError(reason.message || 'Không thể xác nhận lịch.');
@@ -240,8 +242,16 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
               data-testid="reauthorize-proposal-banner"
               className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 v3-space-y-1"
             >
-              <p className="font-semibold">Đề xuất cấp quyền lại lịch Google Sheets (v2)</p>
-              <p>Xác nhận lại nguồn bảng tính, kênh nhận và phạm vi tài khoản gửi tự động trước khi bật lại lịch.</p>
+              <p className="font-semibold">
+                {isTelegramCandidate
+                  ? 'Đề xuất cấp quyền lại lịch bản tin Telegram'
+                  : 'Đề xuất cấp quyền lại lịch Google Sheets (v2)'}
+              </p>
+              <p>
+                {isTelegramCandidate
+                  ? 'Xác nhận lại tài khoản nguồn (như hộp thư Gmail) và cuộc trò chuyện Telegram nhận bản tin trước khi bật lại lịch.'
+                  : 'Xác nhận lại nguồn bảng tính, kênh nhận và phạm vi tài khoản gửi tự động trước khi bật lại lịch.'}
+              </p>
             </div>
           )}
           {proposal.action === 'update' && previous?.name !== proposal.name && change('Tên lịch', previous?.name, proposal.name)}
@@ -253,14 +263,15 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
             <>
               <fieldset className="border border-[#E7E7E2] rounded-xl p-3.5 bg-[#F8F8F6] v3-space-y-2.5">
                 <legend className="text-xs font-semibold text-[#6B7280] px-1">Chế độ khi tới giờ</legend>
-                <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm text-[#111827] cursor-pointer transition-colors ${approvalMode === 'manual' ? 'border-[#FF5701] bg-[#FFF6EE]/40' : 'border-[#E7E7E2] bg-white'}`}>
+                <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm transition-colors ${isReauthorize ? 'text-[#9CA3AF] cursor-not-allowed border-[#E7E7E2] bg-neutral-50' : approvalMode === 'manual' ? 'text-[#111827] cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'text-[#111827] cursor-pointer border-[#E7E7E2] bg-white'}`}>
                   <input
                     id="schedule-mode-manual"
                     type="radio"
                     name={`schedule-mode-${message.id}`}
                     value="manual"
+                    disabled={isReauthorize}
                     checked={approvalMode === 'manual'}
-                    onChange={() => setApprovalMode('manual')}
+                    onChange={() => { if (!isReauthorize) setApprovalMode('manual'); }}
                     className="mt-1 text-[#FF5701] focus:ring-[#FF5701]"
                   />
                   <span>
@@ -298,21 +309,55 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                   </span>
                 </label>
               </fieldset>
-              {approvalMode === 'auto_digest' && digestCandidate.canAutoDigest && digestCandidate.config && (
-                <div
-                  id="schedule-auto-digest-scope"
-                  className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 v3-space-y-1.5"
-                >
-                  <p className="font-semibold">Phạm vi tự gửi đã khóa:</p>
-                  {Array.isArray(digestCandidate.config.sources) && digestCandidate.config.sources.length > 0 && (
-                    <p>• Nguồn dữ liệu: {digestCandidate.config.sources.map((s: any) => s.label ?? s.service).join(', ')}</p>
-                  )}
-                  <p>• Nơi nhận: Telegram · {digestCandidate.config.chatTitle}</p>
-                  <p>• {digestCandidate.config.sources?.some((source: { service: string }) => source.service === 'notion')
-                    ? 'Lịch chỉ đọc database Notion đã duyệt và gửi bản tin vào cuộc trò chuyện đã chọn.'
-                    : 'Lịch đọc dữ liệu từ nguồn đã chọn và gửi bản tin vào cuộc trò chuyện đã chọn.'}</p>
-                </div>
-              )}
+              {approvalMode === 'auto_digest' && digestCandidate.canAutoDigest && digestCandidate.config && (() => {
+                const gmailSource = Array.isArray(digestCandidate.config.sources)
+                  ? digestCandidate.config.sources.find((s: any) => s?.service === 'gmail')
+                  : undefined;
+                const gmailQuery =
+                  typeof gmailSource?.args?.query === 'string' && gmailSource.args.query.trim()
+                    ? gmailSource.args.query.trim()
+                    : null;
+                return (
+                  <div
+                    id="schedule-auto-digest-scope"
+                    className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 v3-space-y-1.5"
+                  >
+                    <p className="font-semibold">Phạm vi tự gửi đã khóa:</p>
+                    {Array.isArray(digestCandidate.config.sources) && digestCandidate.config.sources.length > 0 && (
+                      <p>• Nguồn dữ liệu: {digestCandidate.config.sources.map((s: any) => s.label ?? s.service).join(', ')}</p>
+                    )}
+                    {gmailQuery && (
+                      <p data-testid="gmail-digest-locked-query">
+                        • Bộ lọc Gmail đã khóa:{' '}
+                        <code className="px-1.5 py-0.5 rounded bg-white/80 border border-emerald-200">{gmailQuery}</code>
+                      </p>
+                    )}
+                    <p>• Nơi nhận: Telegram · {digestCandidate.config.chatTitle}</p>
+                    <p>• {digestCandidate.config.sources?.some((source: { service: string }) => source.service === 'notion')
+                      ? 'Lịch chỉ đọc database Notion đã duyệt và gửi bản tin vào cuộc trò chuyện đã chọn.'
+                      : 'Lịch đọc dữ liệu từ nguồn đã chọn và gửi bản tin vào cuộc trò chuyện đã chọn.'}</p>
+                    {!digestCandidate.config.sources?.some((source: { service: string }) => source.service === 'notion') && (
+                      <div className="pt-1.5 border-t border-emerald-200/80">
+                        <label className="flex items-start gap-2 cursor-pointer text-xs text-[#111827]">
+                          <input
+                            data-testid="checkbox-telegram-include-ai-summary"
+                            type="checkbox"
+                            checked={includeAiSummary}
+                            onChange={(e) => setIncludeAiSummary(e.target.checked)}
+                            className="mt-0.5 rounded border-emerald-400 text-[#FF5701] focus:ring-[#FF5701]"
+                          />
+                          <span>
+                            <span className="font-semibold">Tóm tắt bằng AI bên thứ ba:</span>{' '}
+                            {includeAiSummary
+                              ? 'Gửi tiêu đề và đoạn trích các mục mới tới nhà cung cấp mô hình AI bên thứ ba đã cấu hình để viết đoạn tóm tắt nổi bật.'
+                              : 'Chỉ gửi bản tin tổng hợp thuần từ máy chủ Planora — không gửi nội dung tới mô hình AI bên thứ ba.'}
+                          </span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               <p className="text-sm text-[#4B5563] leading-relaxed">
                 {approvalMode === 'auto_digest'
                   ? 'Tới giờ, Planora chỉ đọc dữ liệu từ các dịch vụ nguồn đã chọn và tự động gửi bản tin về đúng cuộc trò chuyện Telegram đã khóa.'

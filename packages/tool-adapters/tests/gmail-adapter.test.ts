@@ -1,4 +1,5 @@
 import { createServer, type Server } from 'node:http';
+import { deflateRawSync, deflateSync } from 'node:zlib';
 import { afterEach, describe, expect, it } from 'vitest';
 import * as adapters from '../src/index.js';
 import { startFakeGoogleGmail, type FakeGoogleGmail } from '../../../scripts/fake-google-gmail.mjs';
@@ -1362,6 +1363,284 @@ describe('Gmail native HTTP adapter', () => {
 
       const view = await adapter.execute('gmail.get_thread', { threadId: 'thread-html-blocks' });
       expect(view.messages[0]!.body).toBe('Alpha\nBeta\nGamma\nDelta');
+    });
+  });
+
+  describe('Attachment extraction, attachment-preserving forward, and full draft lifecycle', () => {
+    function crc32(buf: Buffer): number {
+      let crc = 0xffffffff;
+      for (const byte of buf) {
+        crc ^= byte;
+        for (let bit = 0; bit < 8; bit++) {
+          crc = (crc & 1) !== 0 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+        }
+      }
+      return (crc ^ 0xffffffff) >>> 0;
+    }
+
+    function buildZipBuffer(files: Record<string, string | Buffer>): Buffer {
+      const locals: Buffer[] = [];
+      const centrals: Buffer[] = [];
+      let offset = 0;
+      for (const [name, content] of Object.entries(files)) {
+        const nameBuf = Buffer.from(name, 'utf8');
+        const raw = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8');
+        const compressed = deflateRawSync(raw);
+        const crc = crc32(raw);
+
+        const local = Buffer.alloc(30 + nameBuf.length);
+        local.writeUInt32LE(0x04034b50, 0);
+        local.writeUInt16LE(20, 4);
+        local.writeUInt16LE(0, 6);
+        local.writeUInt16LE(8, 8);
+        local.writeUInt16LE(0, 10);
+        local.writeUInt16LE(0, 12);
+        local.writeUInt32LE(crc, 14);
+        local.writeUInt32LE(compressed.length, 18);
+        local.writeUInt32LE(raw.length, 22);
+        local.writeUInt16LE(nameBuf.length, 26);
+        local.writeUInt16LE(0, 28);
+        nameBuf.copy(local, 30);
+        locals.push(local, compressed);
+
+        const central = Buffer.alloc(46 + nameBuf.length);
+        central.writeUInt32LE(0x02014b50, 0);
+        central.writeUInt16LE(20, 4);
+        central.writeUInt16LE(20, 6);
+        central.writeUInt16LE(0, 8);
+        central.writeUInt16LE(8, 10);
+        central.writeUInt16LE(0, 12);
+        central.writeUInt16LE(0, 14);
+        central.writeUInt32LE(crc, 16);
+        central.writeUInt32LE(compressed.length, 20);
+        central.writeUInt32LE(raw.length, 24);
+        central.writeUInt16LE(nameBuf.length, 28);
+        central.writeUInt16LE(0, 30);
+        central.writeUInt16LE(0, 32);
+        central.writeUInt16LE(0, 34);
+        central.writeUInt16LE(0, 36);
+        central.writeUInt32LE(0, 38);
+        central.writeUInt32LE(offset, 42);
+        nameBuf.copy(central, 46);
+        centrals.push(central);
+
+        offset += local.length + compressed.length;
+      }
+      const centralDir = Buffer.concat(centrals);
+      const eocd = Buffer.alloc(22);
+      eocd.writeUInt32LE(0x06054b50, 0);
+      eocd.writeUInt16LE(0, 4);
+      eocd.writeUInt16LE(0, 6);
+      eocd.writeUInt16LE(Object.keys(files).length, 8);
+      eocd.writeUInt16LE(Object.keys(files).length, 10);
+      eocd.writeUInt32LE(centralDir.length, 12);
+      eocd.writeUInt32LE(offset, 16);
+      eocd.writeUInt16LE(0, 20);
+      return Buffer.concat([...locals, centralDir, eocd]);
+    }
+
+    it('extracts text from CSV, DOCX, XLSX, and FlateDecode PDF attachments via gmail.read_attachment', async () => {
+      const { adapter, server } = await setup();
+      const csvBuf = Buffer.from('MaHoaDon,KhachHang,TongTien\nINV-001,Cong ty ABC,15000000\n', 'utf8');
+      const docxBuf = buildZipBuffer({
+        'word/document.xml': '<w:document><w:body><w:p><w:r><w:t>Hợp đồng ATI &amp; Đối tác</w:t></w:r></w:p><w:p><w:r><w:t>Giá trị: 250 triệu</w:t></w:r></w:p></w:body></w:document>',
+      });
+      const xlsxBuf = buildZipBuffer({
+        'xl/sharedStrings.xml': '<sst><si><t>Sản phẩm</t></si><si><t>Doanh thu</t></si><si><t>Gói Pro</t></si></sst>',
+        'xl/worksheets/sheet1.xml': '<worksheet><sheetData><row><c t="s"><v>0</v></c><c t="s"><v>1</v></c></row><row><c t="s"><v>2</v></c><c><v>9800</v></c></row></sheetData></worksheet>',
+      });
+      const pdfStream = deflateSync(Buffer.from('BT /F1 12 Tf 72 720 Td (Invoice INV-2026 Total 420 USD) Tj ET', 'latin1'));
+      const pdfBuf = Buffer.concat([
+        Buffer.from('%PDF-1.4\n4 0 obj\n<< /Length ' + pdfStream.length + ' /Filter /FlateDecode >>\nstream\n', 'latin1'),
+        pdfStream,
+        Buffer.from('\nendstream\nendobj\n%%EOF', 'latin1'),
+      ]);
+
+      server.settings.attachments['m-att:att-csv'] = csvBuf;
+      server.settings.attachments['m-att:att-docx'] = docxBuf;
+      server.settings.attachments['m-att:att-xlsx'] = xlsxBuf;
+      server.settings.attachments['m-att:att-pdf'] = pdfBuf;
+      server.settings.attachments['m-att:att-big'] = Buffer.alloc(16, 0x41);
+      server.settings.threads = [{
+        id: 'thread-att-suite',
+        messages: [{
+          id: 'm-att',
+          labelIds: ['INBOX'],
+          payload: {
+            mimeType: 'multipart/mixed',
+            headers: [
+              { name: 'From', value: 'Lan <lan@example.com>' },
+              { name: 'Subject', value: 'Tài liệu đính kèm' },
+              { name: 'Date', value: 'Wed, 14 Oct 2026 09:00:00 +0700' },
+              { name: 'Message-ID', value: '<att-suite@example.com>' },
+            ],
+            parts: [
+              { mimeType: 'text/plain', body: { data: Buffer.from('Xem tệp đính kèm nhé.').toString('base64url') } },
+              { mimeType: 'text/csv', filename: 'bao-cao.csv', body: { size: csvBuf.length, attachmentId: 'att-csv' } },
+              { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename: 'hop-dong.docx', body: { size: docxBuf.length, attachmentId: 'att-docx' } },
+              { mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', filename: 'doanh-so.xlsx', body: { size: xlsxBuf.length, attachmentId: 'att-xlsx' } },
+              { mimeType: 'application/pdf', filename: 'invoice.pdf', body: { size: pdfBuf.length, attachmentId: 'att-pdf' } },
+              { mimeType: 'application/octet-stream', filename: 'too-big.bin', body: { size: 6 * 1024 * 1024, attachmentId: 'att-big' } },
+            ],
+          },
+        }],
+      }];
+
+      const csv = await adapter.execute('gmail.read_attachment', { threadId: 'thread-att-suite', filename: 'bao-cao.csv' });
+      expect(csv).toMatchObject({ filename: 'bao-cao.csv', extracted: true, truncated: false });
+      expect(csv.text).toContain('INV-001,Cong ty ABC,15000000');
+
+      const docx = await adapter.execute('gmail.read_attachment', { threadId: 'thread-att-suite', filename: 'hop-dong.docx' });
+      expect(docx.extracted).toBe(true);
+      expect(docx.text).toContain('Hợp đồng ATI & Đối tác');
+      expect(docx.text).toContain('Giá trị: 250 triệu');
+
+      const xlsx = await adapter.execute('gmail.read_attachment', { threadId: 'thread-att-suite', filename: 'doanh-so.xlsx' });
+      expect(xlsx.extracted).toBe(true);
+      expect(xlsx.text).toContain('Sản phẩm\tDoanh thu');
+      expect(xlsx.text).toContain('Gói Pro\t9800');
+
+      const pdf = await adapter.execute('gmail.read_attachment', { threadId: 'thread-att-suite', filename: 'invoice.pdf' });
+      expect(pdf.extracted).toBe(true);
+      expect(pdf.text).toContain('Invoice INV-2026 Total 420 USD');
+
+      await expect(
+        adapter.execute('gmail.read_attachment', { threadId: 'thread-att-suite', filename: 'too-big.bin' }),
+      ).rejects.toMatchObject({ category: 'VALIDATION', message: expect.stringContaining('5 MB') });
+    });
+
+    it('forwards attachments as multipart/mixed only when includeAttachments=true while defaulting to plain text', async () => {
+      const { adapter, server } = await setup();
+      const fileBytes = Buffer.from('Hello attachment bytes!', 'utf8');
+      server.settings.attachments['m-fwd:att-1'] = fileBytes;
+      server.settings.threads = [{
+        id: 'thread-fwd-att',
+        messages: [{
+          id: 'm-fwd',
+          labelIds: ['INBOX'],
+          payload: {
+            mimeType: 'multipart/mixed',
+            headers: [
+              { name: 'From', value: 'Lan <lan@example.com>' },
+              { name: 'Subject', value: 'Báo giá Q4' },
+              { name: 'Date', value: 'Wed, 14 Oct 2026 09:00:00 +0700' },
+              { name: 'Message-ID', value: '<fwd@example.com>' },
+            ],
+            parts: [
+              { mimeType: 'text/plain', body: { data: Buffer.from('Đính kèm bảng giá.').toString('base64url') } },
+              { mimeType: 'text/plain', filename: 'bang-gia.txt', body: { size: fileBytes.length, attachmentId: 'att-1' } },
+            ],
+          },
+        }],
+      }];
+
+      const args = { threadId: 'thread-fwd-att', to: ['minh@example.com'], includeAttachments: true };
+      const approvedSource = await adapter.execute('gmail.prepare_write', { tool: 'gmail.forward', args });
+      await adapter.execute('gmail.forward', { ...args, approvedSource });
+      const req = server.stats.apiRequests.find((r) => r.method === 'POST' && r.path === 'messages/send')!;
+      const mime = Buffer.from(req.body.raw, 'base64url').toString('utf8');
+      expect(mime).toContain('Content-Type: multipart/mixed; boundary=');
+      expect(mime).toContain('filename="bang-gia.txt"');
+      expect(mime).toContain(fileBytes.toString('base64'));
+    });
+
+    it('lists, updates (PUT), and securely sends drafts only when recipients match approved preview', async () => {
+      const { adapter, server } = await setup();
+      const drafts = await adapter.execute('gmail.list_drafts', {});
+      expect(drafts).toHaveLength(1);
+      expect(drafts[0]).toMatchObject({ id: 'draft-seed-1', threadId: 'thread-1', subject: 'Re: Họp nhóm ATI', to: ['lan@example.com'] });
+
+      const updateArgs = {
+        draftId: 'draft-seed-1',
+        threadId: 'thread-1',
+        to: ['lan@example.com'],
+        cc: ['minh@example.com'],
+        subject: 'Re: Họp nhóm ATI',
+        body: 'Nội dung bản nháp đã cập nhật.',
+      };
+      const updateSource = await adapter.execute('gmail.prepare_write', { tool: 'gmail.update_draft', args: updateArgs });
+      const updated = await adapter.execute('gmail.update_draft', { ...updateArgs, approvedSource: updateSource });
+      expect(updated).toMatchObject({ draftId: 'draft-seed-1', threadId: 'thread-1' });
+      expect(server.stats.apiRequests.some((r) => r.method === 'PUT' && r.path === 'drafts/draft-seed-1')).toBe(true);
+
+      const sendArgs = { draftId: 'draft-seed-1', to: ['lan@example.com'], cc: ['minh@example.com'] };
+      const approvedSource = await adapter.execute('gmail.prepare_write', { tool: 'gmail.send_draft', args: sendArgs });
+      const draft = server.settings.drafts[0]!.message;
+      const originalRaw = draft.raw;
+      draft.raw = Buffer.from('Bcc: hidden@example.com\r\n' + Buffer.from(originalRaw, 'base64url').toString('utf8')).toString('base64url');
+      const writesBeforeBlockedSend = server.stats.writes;
+      await expect(
+        adapter.execute('gmail.send_draft', { ...sendArgs, approvedSource }),
+      ).rejects.toMatchObject({ category: 'VALIDATION', details: { requestSent: false } });
+      expect(server.stats.writes).toBe(writesBeforeBlockedSend);
+
+      draft.raw = originalRaw;
+      const sentDraft = await adapter.execute('gmail.send_draft', { ...sendArgs, approvedSource });
+      expect(sentDraft).toMatchObject({ id: expect.stringMatching(/^sent-/), threadId: 'thread-1' });
+    });
+
+    it('rejects gmail.send_draft when recipient headers swap between To and Bcc', async () => {
+      const { adapter, server } = await setup();
+      server.settings.drafts[0]!.message.payload.headers = [
+        { name: 'To', value: 'lan@example.com' },
+        { name: 'Bcc', value: 'minh@example.com' },
+        { name: 'Subject', value: 'Re: Họp nhóm ATI' },
+      ];
+      const writesBefore = server.stats.writes;
+      await expect(
+        adapter.execute('gmail.prepare_write', {
+          tool: 'gmail.send_draft',
+          args: { draftId: 'draft-seed-1', to: ['lan@example.com', 'minh@example.com'] },
+        }),
+      ).rejects.toMatchObject({ category: 'VALIDATION', details: { requestSent: false } });
+      expect(server.stats.writes).toBe(writesBefore);
+    });
+
+    it('enforces cumulative 15 MB decompression budget across multi-stream PDFs and multi-entry ZIPs', async () => {
+      const { adapter, server } = await setup();
+      const nineMbSpaces = ' '.repeat(9 * 1024 * 1024);
+      const stream1 = deflateSync(Buffer.from(`BT /F1 12 Tf (FirstStreamOK) Tj ET ${nineMbSpaces}`, 'latin1'));
+      const stream2 = deflateSync(Buffer.from(`BT /F1 12 Tf (SecondStreamShouldStop) Tj ET ${nineMbSpaces}`, 'latin1'));
+      const multiStreamPdf = Buffer.concat([
+        Buffer.from('%PDF-1.4\n1 0 obj\n<< /Filter /FlateDecode >>\nstream\n', 'latin1'),
+        stream1,
+        Buffer.from('\nendstream\nendobj\n2 0 obj\n<< /Filter /FlateDecode >>\nstream\n', 'latin1'),
+        stream2,
+        Buffer.from('\nendstream\nendobj\n%%EOF', 'latin1'),
+      ]);
+      const nineMbXmlPad = ' '.repeat(9 * 1024 * 1024);
+      const multiEntryZip = buildZipBuffer({
+        'word/pad1.xml': Buffer.from(`<w:t>${nineMbXmlPad}</w:t>`, 'utf8'),
+        'word/document.xml': Buffer.from(`<w:document><w:body><w:p><w:r><w:t>${nineMbXmlPad}OverBudgetDoc</w:t></w:r></w:p></w:body></w:document>`, 'utf8'),
+      });
+      server.settings.attachments['m-bomb:pdf'] = multiStreamPdf;
+      server.settings.attachments['m-bomb:docx'] = multiEntryZip;
+      server.settings.threads = [{
+        id: 'thread-bomb',
+        messages: [{
+          id: 'm-bomb',
+          labelIds: ['INBOX'],
+          payload: {
+            mimeType: 'multipart/mixed',
+            headers: [
+              { name: 'From', value: 'lan@example.com' },
+              { name: 'Subject', value: 'Check budget' },
+            ],
+            parts: [
+              { mimeType: 'application/pdf', filename: 'multi.pdf', body: { size: multiStreamPdf.length, attachmentId: 'pdf' } },
+              { mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', filename: 'multi.docx', body: { size: multiEntryZip.length, attachmentId: 'docx' } },
+            ],
+          },
+        }],
+      }];
+
+      const pdfRes = await adapter.execute('gmail.read_attachment', { threadId: 'thread-bomb', filename: 'multi.pdf' });
+      expect(pdfRes.extracted).toBe(true);
+      expect(pdfRes.text).toContain('FirstStreamOK');
+      expect(pdfRes.text).not.toContain('SecondStreamShouldStop');
+
+      const docxRes = await adapter.execute('gmail.read_attachment', { threadId: 'thread-bomb', filename: 'multi.docx' });
+      expect(docxRes.extracted).toBe(false);
     });
   });
 });

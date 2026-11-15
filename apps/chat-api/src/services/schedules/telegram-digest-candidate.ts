@@ -11,9 +11,13 @@ import type {
 import type { TelegramConnectionLookupResult } from '../telegram/connection-reference.js';
 import type { GitHubConnectionLookupResult } from '../github/connection-reference.js';
 import {
+  DEFAULT_GMAIL_DIGEST_QUERY,
   isValidGmailDigestBinding,
+  isValidGmailDigestQuery,
   validateTelegramDigestGmailConfig,
 } from './gmail-digest-binding.js';
+
+export type { TelegramConnectionLookupResult };
 
 import { isNotionDigestSourceBinding, NOTION_DIGEST_REAPPROVAL } from '../notion/digest-source-authority.js';
 
@@ -142,6 +146,7 @@ export function computeTelegramDigestConfigHash(config: TelegramDigestConfig): s
     chatId: config.chatId,
     chatTitle: config.chatTitle,
     ...(gmailValidation.kind === 'gmail_bound' ? { sourceBindingVersion: 1 as const } : {}),
+    ...(typeof config.includeAiSummary === 'boolean' ? { includeAiSummary: config.includeAiSummary } : {}),
     sources: config.sources.map((s) => ({
       service: s.service,
       tool: s.tool,
@@ -206,6 +211,104 @@ export function buildTelegramDigestSourceArgs(
   return { callArgs: base };
 }
 
+type GmailDigestQuery = { query: string; label: string };
+const UNSUPPORTED_GMAIL_DIGEST_FILTER =
+  'Bộ lọc Gmail chưa thể áp dụng đầy đủ cho lịch tự gửi. Hãy sửa bộ lọc hoặc chọn duyệt thủ công từng lượt.';
+const EXPLICIT_GMAIL_FILTER = /(?<![\p{L}\p{N}_@./:-])(-?)([A-Za-z][A-Za-z0-9_-]*):(\S*)/gu;
+const POSITIVE_ONLY_GMAIL_FILTERS = new Set(['in:inbox', 'label:inbox', 'is:unread']);
+const GMAIL_PROSE_NEGATION =
+  /\b(?:khong(?:\s+(?:phai|co|kem))?|bo\s+qua|loai\s+tru|except|excluding|without|not)(?:\s+(?:thu|email|mail))?(?:\s*[:(-])?$/;
+const GMAIL_SUBJECT_FILTER =
+  /\b(?:(?:co|voi|theo)\s+(?:tieu de|chu de)|(?:tieu de|chu de)\s+(?:chua|co|la|bang|bat dau|ket thuc)|(?:with|having|by)\s+(?:the\s+)?subject|subject\s+(?:contains?|starts?|ends?|equals?|includes?|is))\b/;
+const SCHEDULE_METADATA_CHANGE =
+  /^(?:(?:vui long|hay|giup toi)\s+)?(?:doi|sua|chinh|cap nhat)\s+(?:lai\s+)?(?:ten|tieu de|gio|thoi gian|ngay|tan suat)(?:\s+cua)?\s+(?:lich|ban tin)\b/;
+const ADDITIONAL_MAILBOX_REQUEST =
+  /(?:[,;.]|\bva\b)\s*(?:chi\s+)?(?:loc|lay|doc|tim|tom tat|bo qua|loai tru|them dieu kien|doi bo loc)\b/;
+
+function readExplicitGmailFilters(requestText: string) {
+  const filters = new Set<string>();
+  let explicit = false;
+  let invalid = false;
+  const prose = requestText.replace(EXPLICIT_GMAIL_FILTER, (token, sign: string, key: string, value: string, offset: number) => {
+    const operator = key.toLowerCase();
+    if (!value && !sign && !/^(?:from|to|subject|label|has|is|in|newer_than|older_than|before|after)$/i.test(operator)) {
+      return token;
+    }
+    explicit = true;
+    if (GMAIL_PROSE_NEGATION.test(foldVietnamese(requestText.slice(0, offset)))) invalid = true;
+    const lower = value.toLowerCase();
+    const filter = `${operator}:${lower}`;
+    if (!sign && POSITIVE_ONLY_GMAIL_FILTERS.has(filter)) return ' ';
+    if (operator === 'from' && /^[a-z0-9._%+-]+(?:@[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)?$/.test(lower)) {
+      filters.add(`${sign}from:${lower}`);
+    } else if (operator === 'label' && /^[\p{L}\p{N}_/.-]+$/u.test(value)) {
+      filters.add(`${sign}label:${value}`);
+    } else if (filter === 'has:attachment' || (operator === 'newer_than' && /^\d+[dmy]$/.test(lower))) {
+      filters.add(`${sign}${filter}`);
+    } else {
+      invalid = true;
+    }
+    return ' ';
+  });
+  return { prose, filters, invalid: invalid || (explicit && /[{}|]|\bOR\b/i.test(prose)) };
+}
+
+function readGmailFilters(requestText: string, includeNaturalFilters = true): { filters: Set<string>; invalid: boolean } {
+  const { prose, filters, invalid } = readExplicitGmailFilters(requestText);
+  if (invalid || !includeNaturalFilters) return { filters, invalid };
+
+  const foldedProse = foldVietnamese(prose).replace(/\s+/g, ' ');
+  if (GMAIL_SUBJECT_FILTER.test(foldedProse)) return { filters, invalid: true };
+
+  for (const match of foldedProse.matchAll(/(?:^|[\s,(:;])(?:tu|cua)\s+([a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})/g)) {
+    const prefix = foldedProse.slice(0, match.index).trimEnd();
+    if (GMAIL_PROSE_NEGATION.test(prefix)) return { filters, invalid: true };
+    filters.add(`from:${match[1]}`);
+  }
+  const attachmentExclusion =
+    /\b(?:khong(?: co| kem)?|thieu|(?:bo qua|loai tru)(?: (?:thu|email|mail))?(?: co)?)\s+(?:tep |file )?dinh kem\b|\b(?:no|without(?: any)?)\s+attachments?\b/g;
+  const withoutAttachmentExclusions = foldedProse.replace(attachmentExclusion, ' ');
+  if (withoutAttachmentExclusions !== foldedProse) {
+    filters.add('-has:attachment');
+  }
+  if (/\bdinh kem\b|\battachments?\b/.test(withoutAttachmentExclusions)) {
+    filters.add('has:attachment');
+  }
+  if (filters.has('-has:attachment') && filters.has('has:attachment')) return { filters, invalid: true };
+  for (const [pattern, query] of [
+    [/\b(?:hoa don|invoice)\b/, '(hóa đơn OR invoice)'],
+    [/\b(?:bao gia|quote|quotation)\b/, '(báo giá OR quote)'],
+    [/\b(?:hop dong|contract)\b/, '(hợp đồng OR contract)'],
+    [/\b(?:vip|khan cap|urgent)\b/, '(VIP OR khẩn OR urgent)'],
+  ] as const) {
+    const match = pattern.exec(foldedProse);
+    if (!match) continue;
+    if (GMAIL_PROSE_NEGATION.test(foldedProse.slice(0, match.index).trimEnd())) return { filters, invalid: true };
+    filters.add(query);
+  }
+  return { filters, invalid: false };
+}
+
+export function resolveGmailDigestQueryAndLabel(
+  requestText: string,
+  userTexts: readonly string[] = [],
+): GmailDigestQuery | { disabledReason: string } {
+  const unsupported = { disabledReason: UNSUPPORTED_GMAIL_DIGEST_FILTER };
+  const { filters, invalid } = readGmailFilters(requestText);
+  if (invalid) return unsupported;
+
+  // A name can contain filter words without changing which mail the digest reads.
+  for (const userText of userTexts) {
+    const folded = foldVietnamese(userText).replace(/\s+/g, ' ');
+    const metadataOnly = SCHEDULE_METADATA_CHANGE.test(folded) && !ADDITIONAL_MAILBOX_REQUEST.test(folded);
+    const requested = readGmailFilters(userText, !metadataOnly);
+    if (requested.invalid || [...requested.filters].some(filter => !filters.has(filter))) return unsupported;
+  }
+  const query = [DEFAULT_GMAIL_DIGEST_QUERY, ...filters].join(' ');
+  if (!isValidGmailDigestQuery(query)) return unsupported;
+  return { query, label: filters.size ? `Email chưa đọc (${[...filters].join(', ')})` : 'Email chưa đọc' };
+}
+
 export interface EvaluateTelegramDigestInput {
   proposal: ScheduleResponse;
   services: string[];
@@ -214,7 +317,10 @@ export interface EvaluateTelegramDigestInput {
   githubLookup?: Pick<GitHubConnectionLookupResult, 'status' | 'connection'> | null;
   gmailBinding?: GmailDigestBinding | null;
   existingDigest?: TelegramDigestConfig | null;
+  gmailUserTexts?: readonly string[];
+  reauthorizeGmailQuery?: GmailDigestQuery;
   notionBinding?: NotionDigestSourceBinding;
+  includeAiSummary?: boolean;
 }
 
 export function evaluateTelegramDigestCandidate(
@@ -367,10 +473,14 @@ export function evaluateTelegramDigestCandidate(
           disabledReason: 'Hãy kết nối Gmail cá nhân hợp lệ trước khi bật Tự gửi.',
         };
       }
+      const resolvedGmail = input.reauthorizeGmailQuery ?? resolveGmailDigestQueryAndLabel(requestText, input.gmailUserTexts);
+      if ('disabledReason' in resolvedGmail) {
+        return { canAutoDigest: false, disabledReason: resolvedGmail.disabledReason };
+      }
       sources.push({
         ...source,
-        args: { query: 'in:inbox is:unread' },
-        label: `${source.label} (${input.gmailBinding.email})`,
+        args: { query: resolvedGmail.query },
+        label: `${resolvedGmail.label} (${input.gmailBinding.email})`,
         binding: {
           kind: 'gmail',
           credentialId: input.gmailBinding.credentialId,
@@ -389,6 +499,12 @@ export function evaluateTelegramDigestCandidate(
   }
 
   const hasGmailSource = sources.some((s) => s.service === 'gmail');
+  const resolvedIncludeAiSummary =
+    typeof input.includeAiSummary === 'boolean'
+      ? input.includeAiSummary
+      : typeof input.existingDigest?.includeAiSummary === 'boolean'
+        ? input.existingDigest.includeAiSummary
+        : undefined;
   const config: TelegramDigestConfig = {
     credentialId: connection.credentialId,
     telegramUserId: connection.telegramUserId,
@@ -396,6 +512,7 @@ export function evaluateTelegramDigestCandidate(
     chatId: targetChat.chatId,
     chatTitle: targetChat.title,
     ...(hasGmailSource ? { sourceBindingVersion: 1 as const } : {}),
+    ...(typeof resolvedIncludeAiSummary === 'boolean' ? { includeAiSummary: resolvedIncludeAiSummary } : {}),
     sources,
     recurrence: proposal.recurrence!,
     timeZone,

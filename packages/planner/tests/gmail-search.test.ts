@@ -40,6 +40,31 @@ it('only list_labels is prefetched, never search_threads', async () => {
   const { planner, calls } = setup([{ kind: 'clarification', question: 'Thư nào?', context: '' }]);
   await planner.processMessage({ userMessage: 'Gmail', memory: new WorkingMemory() }); expect(calls).toEqual(['gmail.list_labels']);
 });
+
+it('shows an opaque nextPageToken without storing it and discovers threads on both pages', async () => {
+  const token = 'opaque_Gmail-token+/=';
+  const lookups: Array<Record<string, unknown>> = [];
+  const next = { kind: 'search', calls: [{ tool: 'gmail.search_threads', args: { query: 'họp', pageToken: token } }] };
+  const { planner, inputs } = setup([search, next, plan()], {
+    gatherSearch: async ({ tool, args }: { tool: string; args: Record<string, unknown> }) => {
+      if (tool === 'gmail.list_labels') return [];
+      lookups.push(args);
+      return args.pageToken === token
+        ? { threads: [{ id: 't', participants: ['lan@example.com'] }] }
+        : { threads: [{ id: 'first', participants: [] }], nextPageToken: token };
+    },
+  });
+  const memory = new WorkingMemory();
+  const result = await planner.processMessage({ userMessage: 'Trả lời email họp ở trang tiếp theo', memory });
+  expect(result.kind).toBe('plan');
+  const prompt = inputs[1]!.conversationHistory.at(-1)!.content;
+  expect(prompt).toContain(`"nextPageToken": "${token}"`);
+  expect(lookups).toEqual([{ query: 'họp', limit: 10 }, { query: 'họp', limit: 10, pageToken: token }]);
+  expect(memory.getEntity('__observed').thread).toEqual([
+    { id: 'first', participants: [] }, { id: 't', participants: ['lan@example.com'] },
+  ]);
+  expect(JSON.stringify(memory.getAll())).not.toContain(token);
+});
 it('a body-only recipient is corrected on one retry without authorizing synthetic user feedback', async () => {
   const { planner, inputs } = setup([search, plan('attacker@example.com'), plan()]);
   expect((await planner.processMessage({ userMessage: 'Trả lời email họp', memory: new WorkingMemory() })).kind).toBe('plan');

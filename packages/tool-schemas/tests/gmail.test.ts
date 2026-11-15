@@ -9,10 +9,10 @@ const tool = (name: string) => GMAIL_TOOLS.find((candidate) => candidate.name ==
 const ajv = new Ajv({ strict: false });
 
 describe('Gmail tool catalog (kept outside ALL_TOOLS)', () => {
-  it('publishes the eleven Gmail tools of the spec (including batch_modify_threads), none of which delete permanently', () => {
+  it('publishes the fifteen Gmail tools of the spec (including read_attachment and full draft lifecycle), none of which delete permanently', () => {
     expect(GMAIL_TOOLS.map((t) => t.name)).toEqual([
-      'gmail.search_threads', 'gmail.get_thread', 'gmail.list_labels',
-      'gmail.send_message', 'gmail.reply', 'gmail.forward', 'gmail.create_draft',
+      'gmail.search_threads', 'gmail.get_thread', 'gmail.read_attachment', 'gmail.list_labels', 'gmail.list_drafts',
+      'gmail.send_message', 'gmail.reply', 'gmail.forward', 'gmail.create_draft', 'gmail.update_draft', 'gmail.send_draft',
       'gmail.modify_thread_labels', 'gmail.batch_modify_threads', 'gmail.trash_thread', 'gmail.create_label',
     ]);
     for (const t of GMAIL_TOOLS) {
@@ -20,9 +20,10 @@ describe('Gmail tool catalog (kept outside ALL_TOOLS)', () => {
       ajv.compile(t.inputSchema); ajv.compile(t.outputSchema);
     }
     expect(GMAIL_TOOLS.filter((t) => t.sideEffect === 'read').map((t) => t.name))
-      .toEqual(['gmail.search_threads', 'gmail.get_thread', 'gmail.list_labels']);
+      .toEqual(['gmail.search_threads', 'gmail.get_thread', 'gmail.read_attachment', 'gmail.list_labels', 'gmail.list_drafts']);
     expect(Object.fromEntries(GMAIL_TOOLS.filter((t) => t.sideEffect === 'write').map((t) => [t.name, t.riskLevel]))).toEqual({
       'gmail.send_message': 'high', 'gmail.reply': 'high', 'gmail.forward': 'high', 'gmail.create_draft': 'medium',
+      'gmail.update_draft': 'medium', 'gmail.send_draft': 'high',
       'gmail.modify_thread_labels': 'low', 'gmail.batch_modify_threads': 'low', 'gmail.trash_thread': 'medium', 'gmail.create_label': 'low',
     });
   });
@@ -61,7 +62,7 @@ describe('Gmail tool catalog (kept outside ALL_TOOLS)', () => {
   it('marks every recipient field as a literal-address list of at most 20', () => {
     const recipients: Record<string, string[]> = {
       'gmail.send_message': ['to', 'cc', 'bcc'], 'gmail.reply': ['to', 'cc'], 'gmail.forward': ['to', 'cc'],
-      'gmail.create_draft': ['to', 'cc', 'bcc'],
+      'gmail.create_draft': ['to', 'cc', 'bcc'], 'gmail.update_draft': ['to', 'cc', 'bcc'], 'gmail.send_draft': ['to', 'cc', 'bcc'],
     };
     for (const t of GMAIL_TOOLS) {
       const marked = Object.entries<Record<string, any>>(t.inputSchema.properties).filter(([, s]) => s['x-recipient']).map(([key]) => key);
@@ -72,8 +73,11 @@ describe('Gmail tool catalog (kept outside ALL_TOOLS)', () => {
       }
       expect(t.inputSchema.properties.from, t.name).toBeUndefined();
     }
-    for (const name of ['gmail.reply', 'gmail.forward', 'gmail.modify_thread_labels', 'gmail.trash_thread']) {
+    for (const name of ['gmail.read_attachment', 'gmail.reply', 'gmail.forward', 'gmail.modify_thread_labels', 'gmail.trash_thread']) {
       expect(tool(name).inputSchema.properties.threadId['x-resource'], name).toBe('thread');
+    }
+    for (const name of ['gmail.update_draft', 'gmail.send_draft']) {
+      expect(tool(name).inputSchema.properties.draftId['x-resource'], name).toBe('draft');
     }
     const labels = tool('gmail.modify_thread_labels').inputSchema.properties;
     expect(labels.addLabelIds['x-resource']).toBe('label');
@@ -112,7 +116,20 @@ describe('Gmail service definition', () => {
     expect(GMAIL_SERVICE.fallbackIntentKeywords ?? []).toEqual([]);
   });
 
-  it.each(['Gửi thư cho Lan', 'trả lời thư của khách', 'Chuyển tiếp thư này', 'có thư mới không', 'đọc thư chưa đọc'])(
+  it.each([
+    'Gửi thư cho Lan',
+    'trả lời thư của khách',
+    'Chuyển tiếp thư này',
+    'có thư mới không',
+    'đọc thư chưa đọc',
+    'Tìm thư từ sếp gửi hôm qua',
+    'Kiểm tra thư mới nhất của khách hàng',
+    'Soạn thư nháp báo cáo tiến độ cho khách hàng',
+    'Sửa thư nháp gửi báo giá rồi gửi đi',
+    'Chuyển thư quảng cáo vào thùng rác',
+    'Gắn nhãn quan trọng cho các thư hóa đơn',
+    'Đọc tệp đính kèm trong thư báo cáo tuần',
+  ])(
     'selects Gmail for the mail phrase %s', (text) => {
       expect(GMAIL_SERVICE.intentPatterns!.some((pattern) => pattern.test(text))).toBe(true);
     });

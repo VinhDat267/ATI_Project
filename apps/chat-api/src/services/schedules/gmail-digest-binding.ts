@@ -31,8 +31,57 @@ interface GmailCredentialRow {
   config: unknown;
 }
 
-const FIXED_GMAIL_DIGEST_QUERY = 'in:inbox is:unread';
+export const DEFAULT_GMAIL_DIGEST_QUERY = 'in:inbox is:unread';
 const EMAIL_PATTERN = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
+
+export function isValidGmailDigestQuery(query: unknown): query is string {
+  if (typeof query !== 'string') return false;
+  const trimmed = query.trim();
+  if (trimmed.length < 1 || trimmed.length > 300 || /[\u0000-\u001f\u007f]/.test(trimmed)) {
+    return false;
+  }
+  if (trimmed !== 'in:inbox' && !trimmed.startsWith('in:inbox ')) {
+    return false;
+  }
+  if (
+    /\b(?:in|is|label):(?:anywhere|trash|spam|sent|drafts|chats|all)\b/i.test(trimmed) ||
+    /-\s*(?:in|label):inbox\b/i.test(trimmed) ||
+    /[{}]/.test(trimmed)
+  ) {
+    return false;
+  }
+  let depth = 0;
+  let inQuotes = false;
+  for (let i = 0; i < trimmed.length; i++) {
+    const ch = trimmed[i]!;
+    if (ch === '"' && trimmed[i - 1] !== '\\') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (inQuotes) continue;
+    if (ch === '(') {
+      depth++;
+      continue;
+    }
+    if (ch === ')') {
+      depth--;
+      if (depth < 0) return false;
+      continue;
+    }
+    if (depth === 0) {
+      if (ch === '|') return false;
+      if (trimmed.startsWith('OR', i)) {
+        const prev = trimmed[i - 1];
+        const next = trimmed[i + 2];
+        const leftBound = prev === undefined || /[\s)"]/.test(prev);
+        const rightBound = next === undefined || /[\s("'-]/.test(next);
+        if (leftBound && rightBound) return false;
+      }
+    }
+  }
+  if (inQuotes || depth !== 0) return false;
+  return true;
+}
 
 export function normalizeGmailAddress(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
@@ -125,17 +174,17 @@ export function validateTelegramDigestGmailConfig(config: unknown): TelegramDige
 
   const gmailSource = gmailSources[0]!;
   const args = gmailSource.args;
-  const hasFixedUnreadQuery =
+  const hasBoundedInboxQuery =
     Boolean(args) &&
     typeof args === 'object' &&
     !Array.isArray(args) &&
     Object.keys(args as Record<string, unknown>).length === 1 &&
-    (args as Record<string, unknown>).query === FIXED_GMAIL_DIGEST_QUERY;
+    isValidGmailDigestQuery((args as Record<string, unknown>).query);
 
   if (
     gmailSource.service !== 'gmail' ||
     gmailSource.tool !== 'gmail.search_threads' ||
-    !hasFixedUnreadQuery
+    !hasBoundedInboxQuery
   ) {
     return {
       kind: 'invalid',

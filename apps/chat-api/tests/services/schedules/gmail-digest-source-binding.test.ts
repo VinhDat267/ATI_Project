@@ -6,7 +6,9 @@ import express from 'express';
 import request from 'supertest';
 import pg from 'pg';
 import {
+  createGmailToolAdapter,
   encryptCredentials,
+  GMAIL_DIGEST_READ_TOOL,
   GlobalRateLimiter,
   StepError,
   TelegramAdapter,
@@ -182,6 +184,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
     requestText?: string;
     workspaceMode?: 'personal' | 'organization';
     workspaceId?: string | null;
+    includeAiSummary?: boolean;
   }) {
     const targetPool = input.pool ?? db.pool;
     const convRepo = new ConversationRepo(targetPool);
@@ -195,21 +198,22 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
     const services = input.services ?? ['gmail', 'telegram'];
     const requestText =
       input.requestText ?? 'Tóm tắt email chưa đọc trong hộp thư đến gửi vào Telegram của tôi';
+    const proposal: ScheduleResponse = {
+      kind: 'schedule',
+      action: 'create',
+      name: 'Bản tin Gmail sáng',
+      request: requestText,
+      recurrence: { type: 'daily', time: '08:00' },
+      summary: 'Mỗi sáng 8h gửi bản tin Gmail vào Telegram',
+    };
+    const processMessage = vi.fn(async () => proposal);
 
     const emitted: Array<{ event: string; payload: any }> = [];
     const chatService = new ChatService({
       msgRepo,
       convRepo,
       planner: {
-        processMessage: async () =>
-          ({
-            kind: 'schedule',
-            action: 'create',
-            name: 'Bản tin Gmail sáng',
-            request: requestText,
-            recurrence: { type: 'daily', time: '08:00' },
-            summary: 'Mỗi sáng 8h gửi bản tin Gmail vào Telegram',
-          }) satisfies ScheduleResponse,
+        processMessage,
         routeSchedule: async () => ({ services, unavailable: [] }),
       },
       eventEmitter: { emit: (event, payload) => emitted.push({ event, payload }) },
@@ -275,13 +279,14 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
       messageId: proposalEvent!.payload.messageId,
       approvalMode: 'auto_digest',
       now: PROPOSAL_NOW,
+      ...(typeof input.includeAiSummary === 'boolean' ? { includeAiSummary: input.includeAiSummary } : {}),
       scope:
         input.workspaceMode === 'organization'
           ? { workspaceMode: 'organization', workspaceId: input.workspaceId ?? null }
           : undefined,
     });
 
-    return { conv, proposalEvent: proposalEvent!, confirmed, scheduleService, chatService, emitted };
+    return { conv, proposalEvent: proposalEvent!, confirmed, scheduleService, chatService, emitted, proposal, processMessage };
   }
 
   function createHarness(opts: {
@@ -303,6 +308,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
     }>;
     aiTimeoutMs?: number;
     sendTimeoutMs?: number;
+    now?: () => Date;
     botClient?: {
       getChatMember: (chatId: string, userId: string, signal?: AbortSignal) => Promise<boolean>;
     };
@@ -462,7 +468,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
       timeZone: TZ,
       encryptionKey: ENC_KEY,
       gmailOAuthClientId: GMAIL_CLIENT_ID,
-      now: () => TICK_NOW,
+      now: () => opts.now?.() ?? TICK_NOW,
       planRun: async () => {
         throw new Error('Should not invoke manual planRun for telegram_digest');
       },
@@ -567,7 +573,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
       expect(h.gmailCalls[0]).toMatchObject({
         userId: owner.id,
         accessToken: 'ya29.tok-for-1//rt-alice-same-id',
-        tool: 'gmail.search_threads',
+        tool: GMAIL_DIGEST_READ_TOOL,
         args: { query: 'in:inbox is:unread' },
         context: {
           userId: owner.id,
@@ -4254,5 +4260,298 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
         await proxy.close();
       }
     }, 30_000);
+  });
+
+  describe('GMAIL-COMPLETE: Filtered Digest Queries, includeAiSummary Opt-Out & telegram_digest Reauthorize', () => {
+    it('GMAIL-MESSAGE-FILTER: publishes only the matching message in a thread with a later sent reply', async () => {
+      const owner = await db.person('Digest message filter owner');
+      const credRepo = new CredentialRepo(db.pool, ENC_KEY);
+      const tg = await seedTelegramPersonal(credRepo, owner.id);
+      await seedGmailPersonal(credRepo, owner.id, { email: 'owner@example.test' });
+      await proposeAndConfirmGmailDigest({
+        userId: owner.id, tg, requestText: 'Tóm tắt email chưa đọc from:alice@example.test gửi Telegram',
+      });
+
+      const message = (id: string, labels: string[], from: string, snippet: string, filename: string) => ({
+        id, threadId: 'one-thread', labelIds: labels, snippet,
+        payload: {
+          headers: [{ name: 'From', value: from }, { name: 'Subject', value: 'Cùng một chủ đề' }],
+          parts: [{ filename }],
+        },
+      });
+      const matching = message('matched', ['INBOX', 'UNREAD'], 'alice@example.test', 'Đoạn trích khớp', 'matching.txt');
+      const sent = message('later-sent', ['SENT'], 'owner@example.test', 'Đoạn trích thư gửi đi', 'private.txt');
+      const upstream = createGmailToolAdapter({
+        tokens: { getAccessToken: async () => 'test-access-token' },
+        baseUrl: 'https://gmail.fixture.test',
+        fetchFn: async (url) => {
+          const path = new URL(String(url));
+          if (path.pathname.endsWith('/threads')) return Response.json({ threads: [{ id: 'one-thread' }] });
+          if (path.pathname.endsWith('/threads/one-thread')) return Response.json({ id: 'one-thread', messages: [matching, sent] });
+          if (path.pathname.endsWith('/messages') && path.searchParams.get('q') === 'in:inbox is:unread from:alice@example.test') {
+            return Response.json({ messages: [{ id: matching.id, threadId: matching.threadId }] });
+          }
+          if (path.pathname.endsWith('/messages/matched')) return Response.json(matching);
+          return Response.json({ error: { code: 404 } }, { status: 404 });
+        },
+      });
+      const harness = createHarness({
+        credRepo,
+        onGmailRead: ({ tool, args, signal }) => upstream.execute(tool, args, { signal }),
+      });
+      await harness.scheduleRunner.tick();
+
+      expect(harness.telegramWrites).toHaveLength(1);
+      expect(harness.telegramWrites[0]!.text).toContain('[alice@example.test]');
+      expect(harness.telegramWrites[0]!.text).toContain('Đoạn trích khớp');
+      expect(harness.telegramWrites[0]!.text).toContain('matching.txt');
+      expect(harness.telegramWrites[0]!.text).not.toMatch(/\[owner@example\.test\]|Đoạn trích thư gửi đi|private\.txt/);
+      expect(harness.aiCalls).toHaveLength(1);
+      expect(harness.aiCalls[0]!).toContain('Đoạn trích khớp');
+      expect(harness.aiCalls[0]!).not.toMatch(/Đoạn trích thư gửi đi|private\.txt/);
+    });
+
+    it.each([
+      'có bộ lọc from:billing@example.test',
+      'có bộ lọc subject:Planora',
+      'từ billing@example.test',
+      'không có tệp đính kèm',
+      'có tiêu đề chứa Planora',
+      'hóa đơn',
+    ])(
+      'disallows auto delivery if the planner drops the user filter %s',
+      async qualifier => {
+        const owner = await db.person('Digest filter owner');
+        const credRepo = new CredentialRepo(db.pool, ENC_KEY);
+        const tg = await seedTelegramPersonal(credRepo, owner.id);
+        await seedGmailPersonal(credRepo, owner.id, { email: 'owner@example.test' });
+        const fixture = await proposeAndConfirmGmailDigest({ userId: owner.id, tg });
+
+        fixture.emitted.length = 0;
+        fixture.processMessage.mockResolvedValue({ ...fixture.proposal, action: 'update' });
+        await fixture.chatService.handleUserMessage({
+          conversationId: fixture.conv.id,
+          userId: owner.id,
+          content: `Chỉ tóm tắt thư Gmail ${qualifier} gửi vào Telegram`,
+        });
+        await vi.waitFor(() => expect(fixture.emitted.some(e => e.event === 'schedule_proposal')).toBe(true));
+        const update = fixture.emitted.find(e => e.event === 'schedule_proposal')!;
+        expect(update.payload.metadata.digestCandidate).toMatchObject({
+          canAutoDigest: false,
+          disabledReason: expect.stringContaining('Bộ lọc Gmail'),
+        });
+        await expect(fixture.scheduleService.confirmProposal({
+          userId: owner.id,
+          convId: fixture.conv.id,
+          messageId: update.payload.messageId,
+          now: PROPOSAL_NOW,
+          approvalMode: 'auto_digest',
+        })).rejects.toMatchObject({ code: 'AUTO_DIGEST_NOT_ALLOWED' });
+      },
+    );
+
+    it.each(['auto_digest', 'manual', undefined] as const)(
+      'respects mode %s and does not re-enable third-party AI on an ordinary schedule update',
+      async (approvalMode) => {
+        const owner = await db.person('Digest update owner');
+        const credRepo = new CredentialRepo(db.pool, ENC_KEY);
+        const tg = await seedTelegramPersonal(credRepo, owner.id);
+        await seedGmailPersonal(credRepo, owner.id, { email: 'owner@example.test' });
+        const fixture = await proposeAndConfirmGmailDigest({ userId: owner.id, tg, includeAiSummary: false });
+
+        fixture.emitted.length = 0;
+        fixture.processMessage.mockResolvedValue({
+          ...fixture.proposal,
+          action: 'update',
+          name: 'Bản tin sáng đổi tên',
+        });
+        await fixture.chatService.handleUserMessage({
+          conversationId: fixture.conv.id,
+          userId: owner.id,
+          content: 'Đổi tên lịch thành Bản tin hóa đơn',
+        });
+        await vi.waitFor(() => expect(fixture.emitted.some(e => e.event === 'schedule_proposal')).toBe(true));
+        const update = fixture.emitted.find(e => e.event === 'schedule_proposal')!;
+        const candidate = update.payload.digestCandidate ?? update.payload.metadata?.digestCandidate;
+        expect(candidate?.config?.includeAiSummary).toBe(false);
+
+        const revised = await fixture.scheduleService.confirmProposal({
+          userId: owner.id,
+          convId: fixture.conv.id,
+          messageId: update.payload.messageId,
+          now: PROPOSAL_NOW,
+          approvalMode,
+        });
+        if (approvalMode === 'manual') {
+          expect(revised.schedule.kind).toBe('plan');
+          expect(revised.schedule.digestConfig).toBeNull();
+        } else {
+          expect(revised.schedule.kind).toBe('telegram_digest');
+          expect((revised.schedule.digestConfig as TelegramDigestConfig).includeAiSummary).toBe(false);
+          const h = createHarness({ credRepo });
+          await h.scheduleRunner.tick();
+          expect(h.aiCalls).toHaveLength(0);
+          expect(h.telegramWrites).toHaveLength(1);
+        }
+      },
+    );
+
+    it('derives bounded filtered Gmail query from natural Vietnamese request and executes it on tick', async () => {
+      const owner = await db.person('Filtered Digest Owner');
+      const credRepo = new CredentialRepo(db.pool, ENC_KEY);
+      const tg = await seedTelegramPersonal(credRepo, owner.id);
+      await seedGmailPersonal(credRepo, owner.id, {
+        email: 'alice@example.test',
+        refreshToken: '1//rt-alice-filtered',
+      });
+
+      const { confirmed, scheduleService } = await proposeAndConfirmGmailDigest({
+        userId: owner.id,
+        tg,
+        requestText:
+          'Mỗi sáng 8h tóm tắt email hóa đơn chưa đọc từ billing@vendor.test có tệp đính kèm gửi vào Telegram của tôi',
+      });
+
+      const cfg = confirmed.schedule.digestConfig as TelegramDigestConfig;
+      expect(cfg.sources[0]?.args?.query).toBe(
+        'in:inbox is:unread from:billing@vendor.test has:attachment (hóa đơn OR invoice)',
+      );
+      expect(cfg.sources[0]?.label).toContain('alice@example.test');
+      expect((confirmed.schedule.digest as any)?.sources?.[0]?.query).toBe(
+        'in:inbox is:unread from:billing@vendor.test has:attachment (hóa đơn OR invoice)',
+      );
+
+      const h = createHarness({ credRepo });
+      await h.scheduleRunner.tick();
+
+      expect(h.gmailCalls).toHaveLength(1);
+      expect(h.gmailCalls[0]!.args).toEqual({
+        query: 'in:inbox is:unread from:billing@vendor.test has:attachment (hóa đơn OR invoice)',
+      });
+      expect(h.telegramWrites).toHaveLength(1);
+
+      const listed = await scheduleService.list(owner.id, TICK_NOW);
+      const found = listed.find((s) => s.id === confirmed.schedule.id);
+      expect((found?.digest as any)?.sources?.[0]?.query).toBe(
+        'in:inbox is:unread from:billing@vendor.test has:attachment (hóa đơn OR invoice)',
+      );
+    });
+
+    it('skips AI model summary call (0 aiCalls) when confirmProposal sets includeAiSummary: false', async () => {
+      const owner = await db.person('No AI Digest Owner');
+      const credRepo = new CredentialRepo(db.pool, ENC_KEY);
+      const tg = await seedTelegramPersonal(credRepo, owner.id);
+      await seedGmailPersonal(credRepo, owner.id, {
+        email: 'noai@example.test',
+        refreshToken: '1//rt-noai',
+      });
+
+      const { confirmed } = await proposeAndConfirmGmailDigest({
+        userId: owner.id,
+        tg,
+        includeAiSummary: false,
+      });
+
+      const cfg = confirmed.schedule.digestConfig as TelegramDigestConfig;
+      expect(cfg.includeAiSummary).toBe(false);
+      expect((confirmed.schedule.digest as any)?.includeAiSummary).toBe(false);
+
+      const h = createHarness({ credRepo });
+      await h.scheduleRunner.tick();
+
+      expect(h.gmailCalls).toHaveLength(1);
+      expect(h.aiCalls).toHaveLength(0);
+      expect(h.telegramWrites).toHaveLength(1);
+      expect(h.telegramWrites[0]!.text).toContain('Báo cáo tài chính Q4');
+
+      const runRow = (
+        await db.pool.query('SELECT status, error FROM schedule_runs WHERE schedule_id = $1', [
+          confirmed.schedule.id,
+        ])
+      ).rows[0];
+      expect(runRow).toEqual({ status: 'digest_sent', error: null });
+    });
+
+    it('supports full transactional reauthorize preview and confirm for paused Gmail telegram_digest after credential replacement', async () => {
+      const owner = await db.person('Reauth TG Digest Owner');
+      const credRepo = new CredentialRepo(db.pool, ENC_KEY);
+      const tg = await seedTelegramPersonal(credRepo, owner.id);
+      const gmailA = await seedGmailPersonal(credRepo, owner.id, {
+        email: 'alice@example.test',
+        refreshToken: '1//rt-alice-reauth',
+      });
+
+      const { confirmed, conv, scheduleService } = await proposeAndConfirmGmailDigest({
+        userId: owner.id,
+        tg,
+      });
+
+      // Replace personal Gmail with Account B -> tick blocks & pauses schedule
+      const gmailB = await seedGmailPersonal(credRepo, owner.id, {
+        email: 'bob@example.test',
+        refreshToken: '1//rt-bob-reauth',
+      });
+      expect(gmailB.row.id).not.toBe(gmailA.row.id);
+
+      const h1 = createHarness({ credRepo });
+      await h1.scheduleRunner.tick();
+      expect(h1.gmailCalls).toHaveLength(0);
+
+      const pausedRow = (
+        await db.pool.query('SELECT status, version, digest_config FROM schedules WHERE id = $1', [
+          confirmed.schedule.id,
+        ])
+      ).rows[0];
+      expect(pausedRow.status).toBe('paused');
+
+      // Phase 1: createReauthorizePreview creates sealed reauthorize proposal without mutating schedules row
+      const preview = await scheduleService.createReauthorizePreview({
+        userId: owner.id,
+        scheduleId: confirmed.schedule.id,
+        now: TICK_NOW,
+      });
+      expect(preview.metadata.reauthorize).toBe(true);
+      expect(preview.baseVersion).toBe(pausedRow.version);
+      expect((preview.candidate.config as TelegramDigestConfig).sources[0]?.binding).toEqual({
+        kind: 'gmail',
+        credentialId: gmailB.row.id,
+        email: 'bob@example.test',
+        oauthClientId: GMAIL_CLIENT_ID,
+      });
+
+      const unchangedBeforeConfirm = (
+        await db.pool.query('SELECT status, digest_config FROM schedules WHERE id = $1', [
+          confirmed.schedule.id,
+        ])
+      ).rows[0];
+      expect(unchangedBeforeConfirm.status).toBe('paused');
+      expect(unchangedBeforeConfirm.digest_config.sources[0].binding.credentialId).toBe(gmailA.row.id);
+
+      // Phase 2: confirmProposal reactivates schedule and rebinds to Account B
+      const reauthorized = await scheduleService.confirmProposal({
+        userId: owner.id,
+        convId: conv.id,
+        messageId: preview.proposalMessageId,
+        approvalMode: 'auto_digest',
+        now: TICK_NOW,
+      });
+      expect(reauthorized.schedule.status).toBe('active');
+      expect(reauthorized.schedule.pauseReason).toBeNull();
+      expect((reauthorized.schedule.digestConfig as TelegramDigestConfig).sources[0]?.binding?.credentialId).toBe(
+        gmailB.row.id,
+      );
+
+      const NEXT_DAY_TICK = new Date('2026-11-03T01:00:30.000Z');
+      const h2 = createHarness({ credRepo, now: () => NEXT_DAY_TICK });
+      await h2.scheduleRunner.tick();
+
+      expect(h2.gmailCalls).toHaveLength(1);
+      expect(h2.gmailCalls[0]!.accessToken).toBe('ya29.tok-for-1//rt-bob-reauth');
+      expect(h2.gmailCalls[0]!.context?.connections?.gmail).toEqual({
+        credentialId: gmailB.row.id,
+        email: 'bob@example.test',
+      });
+      expect(h2.telegramWrites).toHaveLength(1);
+    });
   });
 });

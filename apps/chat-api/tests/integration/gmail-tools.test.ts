@@ -103,3 +103,70 @@ it('real PostgreSQL token manager refresh 503 fails a write before any Gmail API
   expect(result).toMatchObject({ status: 'failed', error: { category: 'SERVER_ERROR', details: { requestSent: false } } }); expect(google.stats.writes).toBe(0); expect(google.stats.refreshes).toBe(1);
   google.settings.refresh = 'ok';
 });
+
+it('seals the Gmail forward source into the approved plan before a newer message arrives', async () => {
+  const convRepo = new ConversationRepo(db.pool);
+  const msgRepo = new MessageRepo(db.pool);
+  const factory = new AdapterFactory({
+    credentialRepo: credentials, encryptionKey: key, gmailTokens: tokens,
+    createGmailAdapter: ({ tokens: provider }) => createGmailToolAdapter({ tokens: provider, baseUrl: google.origin }),
+  });
+  const chat = new ChatService({
+    convRepo, msgRepo, planRepo: plans,
+    gmailConnection: createGmailConnectionLookup(credentials, key),
+    getAdapter: (service, context) => factory.getAdapterForService(service, context),
+    eventEmitter: { emit(event, payload) { events.push({ event, payload }); } },
+    planner: {
+      routeSchedule: async () => ({ services: ['gmail'], unavailable: [] }),
+      processMessage: async () => ({
+        kind: 'plan', thinking: '', summary: 'Chuyển tiếp thư kèm tệp', warnings: [],
+        steps: [{
+          id: 'forward', tool: 'gmail.forward', description: 'Chuyển tiếp thư', dependsOn: [],
+          args: { threadId: 'thread-review-forward', to: ['lan@example.com'], includeAttachments: true },
+        }],
+      }),
+    },
+  });
+  const execution = new ExecutionService({ planRepo: plans, stepRepo: steps, convRepo, adapterFactory: factory });
+  const realApp = createApp({
+    jwtSecret: secret, userRepo: db.users, credentialRepo: credentials, encryptionKey: key,
+    convRepo, msgRepo, planRepo: plans, chatService: chat, executionService: execution,
+  });
+  const threadId = 'thread-review-forward';
+  const message = (id: string, body: string) => ({
+    id, labelIds: ['INBOX'], payload: {
+      headers: [{ name: 'From', value: 'sender@example.com' }, { name: 'Subject', value: 'Review fixture' }],
+      mimeType: 'multipart/mixed',
+      parts: [
+        { mimeType: 'text/plain', body: { data: Buffer.from(body).toString('base64url') } },
+        { mimeType: 'text/plain', filename: `${id}.txt`, body: { size: 4, data: Buffer.from('file').toString('base64url') } },
+      ],
+    },
+  });
+  const cachedThread = { id: threadId, messages: [message('original', 'Approved body')] };
+  google.settings.threads.push(cachedThread);
+  try {
+    if (!await credentials.getPersonalCredentials('gmail', a.id)) await connect(a);
+    const conv = await conversation(a);
+    const writes = google.stats.writes;
+    const response = await request(realApp).post(`/api/conversations/${conv}/messages`).set('Authorization', auth(a)).send({ content: 'Chuyển tiếp email kèm tệp' });
+    expect(response.status).toBe(202);
+    const preview = await waitFor(async () => events.find(e => e.event === 'plan_preview' && e.payload.conversationId === conv));
+    const source = { messageId: 'original', subject: 'Review fixture', body: 'Approved body', attachments: [{ filename: 'original.txt', size: 4 }] };
+    expect(preview.payload.plan.steps[0].args.approvedSource).toMatchObject(source);
+    expect(google.stats.writes).toBe(writes);
+    const row = (await plans.getPendingPlan(conv))!;
+    expect(row.plan_json.steps[0].args.approvedSource).toMatchObject(source);
+
+    cachedThread.messages.push(message('newer', 'Unapproved body'));
+    expect((await request(realApp).post(`/api/plans/${row.id}/approve`).set('Authorization', auth(a)).send({ planHash: row.plan_hash })).status).toBe(200);
+    await waitFor(async () => (await plans.getPlan(row.id))?.status === 'completed');
+    const sent = google.stats.apiRequests.filter(entry => entry.path === 'messages/send').at(-1);
+    const mime = Buffer.from(sent?.body?.raw, 'base64url').toString('utf8');
+    expect(mime).toContain('filename="original.txt"');
+    expect(mime).not.toContain('newer.txt');
+    expect(google.stats.writes).toBe(writes + 1);
+  } finally {
+    google.settings.threads = google.settings.threads.filter(thread => thread.id !== threadId);
+  }
+});

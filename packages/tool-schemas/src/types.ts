@@ -23,6 +23,8 @@ export interface ToolDefinition {
   observedFields?: string[];
   inputSchema: JSONSchema;
   outputSchema: JSONSchema;
+  /** An optional paginated projection used for planner lookups while plan steps keep outputSchema. */
+  searchOutputSchema?: JSONSchema;
   examples?: Array<{
     description?: string;
     input: Record<string, any>;
@@ -604,6 +606,7 @@ export interface TelegramDigestConfig {
   chatId: string;
   chatTitle: string;
   sourceBindingVersion?: 1;
+  includeAiSummary?: boolean;
   sources: TelegramDigestSource[];
   recurrence: ScheduleRecurrence;
   timeZone: string;
@@ -744,7 +747,8 @@ export interface ScheduleView {
     | {
         chatId: string;
         chatTitle: string;
-        sources: Array<{ service: string; label: string }>;
+        sources: Array<{ service: string; label: string; query?: string }>;
+        includeAiSummary?: boolean;
         approvedAt: string | null;
       }
     | null;
