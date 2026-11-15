@@ -46,6 +46,9 @@ beforeEach(async () => {
       res.statusCode = catalogueStatus;
       res.end(JSON.stringify(catalogueStatus === 200 ? { services, canConfigure } : { error: 'offline' })); return;
     }
+    if (req.url === '/api/connections/github') {
+      res.end(JSON.stringify({ status: 'not_connected', repos: [] })); return;
+    }
     const found = services.find(s => req.url?.startsWith(`/api/services/${s.id}/`));
     if (!found) { res.statusCode = 404; res.end('{}'); return; }
     if (req.url?.endsWith('/test')) {
@@ -120,13 +123,15 @@ it('does not claim catalogue counts or empty groups while the first catalogue re
 });
 it('does not claim catalogue counts or empty groups after the first catalogue request fails, and recovers on retry', async () => {
   catalogueStatus = 503; mount();
-  expect(await screen.findByRole('alert')).toHaveTextContent('Không thể kết nối máy chủ. Hãy kiểm tra mạng và thử lại.');
+  const retry = await screen.findByRole('button', { name: 'Thử lại' });
+  const errorMessage = 'Không thể kết nối máy chủ. Hãy kiểm tra mạng và thử lại.';
+  expect(retry.closest('[role="alert"]')).toHaveTextContent(errorMessage);
   expect(screen.queryByText(/Tất cả \d+ dịch vụ đều đã được thiết lập\./)).not.toBeInTheDocument();
   expect(screen.queryByText('Chưa có dịch vụ nào được thiết lập.')).not.toBeInTheDocument();
   expect(screen.queryByText(/\d+ \/ \d+ dịch vụ đã thiết lập/)).not.toBeInTheDocument();
-  catalogueStatus = 200; fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
+  catalogueStatus = 200; fireEvent.click(retry);
   expect(await screen.findByText('1 / 2 dịch vụ đã thiết lập · 0 kết nối tốt')).toBeInTheDocument();
-  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.queryByText(errorMessage)).not.toBeInTheDocument();
 });
 
 it('groups by configured, summarizes actual shared service count and presents four textual states and checked time', async () => {

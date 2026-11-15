@@ -1,5 +1,7 @@
 import { authStorage } from './auth-storage';
-import { getActiveWorkspaceId, getExplicitWorkspaceId, setActiveWorkspaceId } from './workspace-storage';
+import {
+  getActiveWorkspaceId, getActiveWorkspaceSelection, getExplicitWorkspaceId, setActiveWorkspaceId,
+} from './workspace-storage';
 import type {
   ScheduleApprovalMode,
   ScheduleProposalMetadata,
@@ -118,6 +120,8 @@ export class ApiClient {
     isRetry = false
   ): Promise<T> {
     const { accessToken: requestToken, refreshToken: requestRefresh } = authStorage.getStoredTokens();
+    const workspaceSelection = getActiveWorkspaceSelection();
+    const requestWorkspaceId = new Headers(options.headers).get('X-Workspace-Id') ?? workspaceSelection.id;
     const response = await this.requestRaw(url, options, isRetry);
 
     let data: any = null;
@@ -148,7 +152,9 @@ export class ApiClient {
           errCode === 'WORKSPACE_MEMBER_DISABLED' ||
           errCode === 'WORKSPACE_ACCESS_DENIED') &&
         !url.includes('/api/workspaces/join') &&
-        getActiveWorkspaceId() !== 'personal'
+        requestWorkspaceId !== 'personal' &&
+        requestWorkspaceId === workspaceSelection.id &&
+        workspaceSelection === getActiveWorkspaceSelection()
       ) {
         setActiveWorkspaceId('personal');
       }
@@ -382,14 +388,14 @@ export class ApiClient {
       body: JSON.stringify({ workspaceId, boardIds }),
     });
   }
-  getGitHubConnection() {
+  getGitHubConnection(workspaceId = getActiveWorkspaceId()) {
     return this.request<{
       status: 'unconfigured' | 'not_connected' | 'reconnect_required' | 'needs_scope' | 'needs_membership' | 'connected';
       login?: string;
       repos: Array<{ repoId: string; fullName: string; name: string; accessible: boolean }>;
     }>('/api/connections/github', {
       credentials: 'include',
-      headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
+      headers: { 'X-Workspace-Id': workspaceId },
     });
   }
   startGitHubConnection(options: { returnTo?: string } = {}) {
@@ -415,15 +421,15 @@ export class ApiClient {
       headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
     });
   }
-  getGitHubCandidateRepos() {
+  getGitHubCandidateRepos(workspaceId = getActiveWorkspaceId()) {
     return this.request<{
       repos: Array<{ repoId: string; fullName: string; name: string; private?: boolean }>;
     }>('/api/connections/github/candidate-repos', {
       credentials: 'include',
-      headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
+      headers: { 'X-Workspace-Id': workspaceId },
     });
   }
-  saveGitHubScope(repos: string[]) {
+  saveGitHubScope(repos: string[], workspaceId = getActiveWorkspaceId()) {
     return this.request<{
       chosenBy: string;
       updatedAt: string;
@@ -431,7 +437,7 @@ export class ApiClient {
     }>('/api/connections/github/scope', {
       method: 'PUT',
       credentials: 'include',
-      headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
+      headers: { 'X-Workspace-Id': workspaceId },
       body: JSON.stringify({ repos }),
     });
   }

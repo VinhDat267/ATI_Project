@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { ALL_TOOLS } from '../../../packages/tool-schemas/src/index';
+import { ALL_TOOLS, getToolDefinition } from '../../../packages/tool-schemas/src/index';
 import { App } from '../src/App';
-import { SAMPLE_PROMPTS } from '../src/pages/Guide/data';
+import { GITHUB_OAUTH_PROMPTS, SAMPLE_PROMPTS } from '../src/pages/Guide/data';
 import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
 import { useChatStore } from '../src/store/chat-store';
@@ -49,6 +49,7 @@ describe('FE-10 public guide and privacy routes', () => {
     expect(promptsTab).toHaveAttribute('role', 'tab');
     fireEvent.click(promptsTab);
     expect(document.querySelector('#section-prompts')).toHaveTextContent('Tạo thẻ lỗi, issue GitHub, ghi Sheets và báo Slack');
+    expect(document.querySelector('#section-prompts')).toHaveTextContent('Đọc thảo luận Issue, mở Pull Request, mời Reviewer và báo Slack');
     fireEvent.click(within(screen.getByRole('banner')).getByRole('link', { name: /Về không gian làm việc/ }));
     expect(window.location.pathname).toBe('/');
   });
@@ -63,6 +64,8 @@ describe('FE-10 public guide and privacy routes', () => {
     expect(main).toHaveTextContent('Phiên đăng nhập có hạn 7 ngày');
     expect(main).toHaveTextContent('Tài khoản Jira Cloud bạn kết nối');
     expect(main).toHaveTextContent('không tự thu hồi grant phía Atlassian');
+    expect(main).toHaveTextContent('Tài khoản GitHub bạn kết nối');
+    expect(main).toHaveTextContent('không tự thu hồi grant phía GitHub');
     expect(main.textContent).not.toMatch(/gỡ khoá|bản nháp|lịch sử của cả nhóm|security@/i);
   });
 
@@ -83,6 +86,15 @@ it('FE-10: every sample prompt declares real catalog tools for the same services
     expect(sample.tools, sample.id).not.toHaveLength(0);
     for (const toolName of sample.tools) {
       const tool = catalog.get(toolName);
+      expect(tool, `${sample.id}: ${toolName}`).toBeDefined();
+      expect(sample.services, `${sample.id}: ${toolName}`).toContain(tool!.service);
+    }
+  }
+  expect(GITHUB_OAUTH_PROMPTS.length).toBeGreaterThan(0);
+  for (const sample of GITHUB_OAUTH_PROMPTS) {
+    expect(sample.tools, sample.id).not.toHaveLength(0);
+    for (const toolName of sample.tools) {
+      const tool = getToolDefinition(toolName);
       expect(tool, `${sample.id}: ${toolName}`).toBeDefined();
       expect(sample.services, `${sample.id}: ${toolName}`).toContain(tool!.service);
     }

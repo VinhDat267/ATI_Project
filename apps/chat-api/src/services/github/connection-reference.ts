@@ -107,7 +107,10 @@ export function createGitHubConnectionLookup(deps: {
         memberRepos,
       };
     } catch (err) {
-      if (err instanceof GitHubOAuthError && err.kind === 'invalid_grant') {
+      if (
+        (err instanceof GitHubOAuthError && err.kind === 'invalid_grant') ||
+        (err as any)?.category === 'AUTH_ERROR'
+      ) {
         await deps.credentialRepo.markReconnectRequired('github', userId, record.id).catch(() => {});
       }
       return { status: 'reconnect_required', teamRepos, memberRepos: [] };

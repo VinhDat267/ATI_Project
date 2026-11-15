@@ -125,7 +125,7 @@ export const SERVICE_GUIDES: Record<string, ServiceGuide> = {
         scopeLabel: 'Repository được chọn',
         sampleScope: 'VinhDat267/ati-test (1–10 kho)',
         timeEstimate: 'Khoảng 30 giây',
-        summary: 'Đọc danh sách Pull Request đang mở, kiểm tra Issue tồn đọng, tạo Issue mới và gắn nhãn phân loại.',
+        summary: 'Đọc bình luận, kiểm tra Issue & Pull Request đang mở, tạo Issue/Pull Request mới, mời người review và nhận bản tin tiến độ định kỳ.',
         importantNotice: 'Planora không bao giờ xoá kho mã, không tự động gộp nhánh (merge code), và chỉ thao tác trên các kho mã bạn đã tích chọn.',
         steps: [
           {
@@ -567,6 +567,24 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
       }
     ];
 
+export const GITHUB_OAUTH_PROMPTS: SamplePrompt[] = [
+      {
+        id: 'p19',
+        category: 'sprint-bug',
+        categoryLabel: 'Lỗi Sprint & Kỹ thuật',
+        title: 'Đọc thảo luận Issue, mở Pull Request, mời Reviewer và báo Slack',
+        prompt: 'Đọc bình luận trên issue #42 trong kho ati-test, tạo Pull Request từ nhánh fix/issue-42 vào main, mời @tuan vào review và gửi thông báo kèm link PR vào kênh Slack #ati-test',
+        services: ['github', 'slack'],
+        tools: ['github.get_issue', 'github.list_comments', 'github.create_pull_request', 'github.request_reviewers', 'slack.search_channels', 'slack.send_message'],
+        workflow: [
+          'GitHub: Đọc chi tiết và luồng bình luận trên issue #42 trong kho ati-test',
+          'GitHub: Tạo Pull Request từ nhánh fix/issue-42 vào main và mời @tuan review sau khi bạn phê duyệt',
+          'Slack: Gửi thông báo kèm đường dẫn trực tiếp tới Pull Request vừa mở vào kênh #ati-test'
+        ],
+        badge: 'Chu trình PR & Review'
+      }
+    ];
+
 export const CAPABILITIES_DATA: Capability[] = [
       {
         id: 'trello',
@@ -602,18 +620,17 @@ export const CAPABILITIES_DATA: Capability[] = [
       {
         id: 'github',
         name: 'GitHub',
-        role: 'Quản lý kho mã & Theo dõi Issue lỗi',
+        role: 'Quản lý kho mã, Issue & Pull Request',
         canDo: [
-          'Tìm kiếm kho mã trong danh sách cho phép',
-          'Xem và tìm kiếm các issue đang mở hoặc đã đóng',
-          'Tạo issue mới với tiêu đề và mô tả chi tiết',
-          'Gắn nhãn đã có sẵn trong kho',
-          'Dẫn liên kết chéo tới card Trello và bảng tính'
+          'Tìm kho mã, lọc issue và Pull Request (kể cả thảo luận/bình luận)',
+          'Tạo mới, cập nhật tiêu đề, mô tả, trạng thái đóng/mở và gán người phụ trách issue',
+          'Tạo Pull Request (chọn nhánh head -> base, draft) và gán người review PR',
+          'Gắn nhãn có sẵn, bình luận và gửi bản tin tự động định kỳ sang Slack/Telegram',
+          'Dẫn liên kết chéo tới Jira, Trello, Notion và bảng tính'
         ],
         cannotDo: [
-          'Đọc lịch sử thay đổi mã / pull request',
-          'Đóng issue',
-          'Gán người phụ trách'
+          'Chỉnh sửa mã nguồn trực tiếp hoặc tự động merge/push branch',
+          'Quản lý ngoài danh sách tối đa 10 repository được chọn trong workspace'
         ]
       },
       {

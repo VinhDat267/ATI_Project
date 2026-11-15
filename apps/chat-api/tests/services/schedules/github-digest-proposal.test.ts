@@ -235,6 +235,73 @@ describe('Task 7: GitHub digest schedule proposal and approvalMode confirmation 
     expect(confirmRes.body.error.code).toBe('AUTO_DIGEST_NOT_ALLOWED');
   });
 
+  it.each([
+    'Gửi bản tin GitHub repo nhom/ati lên Slack #team, include draft PRs',
+    'Show the latest comment on the PRs in GitHub repo nhom/ati in the Slack #team digest',
+    'Send the open issue count for GitHub repo nhom/ati to Slack #team',
+    'Summarize stale PRs and open issues from GitHub repo nhom/ati to Slack #team',
+  ])('keeps read-only status phrases eligible for auto digest: %s', async (scheduleRequest) => {
+    const convId = (await conversations.createConversation(owner.id)).id;
+    provider.setPlanResponses([{
+      kind: 'schedule',
+      action: 'create',
+      name: 'GitHub digest',
+      request: scheduleRequest,
+      recurrence: { type: 'daily', time: '08:00' },
+      summary: scheduleRequest,
+    }]);
+
+    const event = await send(convId, `Every day at 08:00, ${scheduleRequest}`);
+    expect(event).toMatchObject({ event: 'schedule_proposal' });
+    const proposal = await latestProposal(convId);
+    expect(proposal.metadata.digestCandidate).toMatchObject({ canAutoDigest: true });
+  });
+
+  it.each([
+    ['Slack #team', 'create a pull request'],
+    ['Telegram Dev Alerts', 'tạo một PR'],
+    ['Slack #team', 'request a review'],
+    ['Telegram Dev Alerts', 'đóng các issue cũ'],
+    ['Slack #team', 'leave a comment on the PR'],
+    ['Slack #team', 'comment on the PR'],
+    ['Slack #team', 'draft a PR'],
+    ['Slack #team', 'open an issue'],
+    ['Slack #team', 'open issue #17'],
+    ['Slack #team', 'open new issues'],
+    ['Slack #team', 'assign @alice to issue #17'],
+    ['Slack #team', 'ask Alice to review PR #17'],
+  ])('requires per-run approval for a %s digest that also asks to %s', async (destination, action) => {
+    const convId = (await conversations.createConversation(owner.id)).id;
+    const scheduleRequest = `Gửi bản tin GitHub repo nhom/ati lên ${destination} và ${action}`;
+    provider.setPlanResponses([{
+      kind: 'schedule',
+      action: 'create',
+      name: 'Bản tin GitHub kèm tác vụ',
+      request: scheduleRequest,
+      recurrence: { type: 'daily', time: '08:00' },
+      summary: scheduleRequest,
+    }]);
+
+    const event = await send(convId, `Mỗi sáng 8 giờ, ${scheduleRequest}`);
+    expect(event).toMatchObject({ event: 'schedule_proposal' });
+    const proposal = await latestProposal(convId);
+    expect(proposal.metadata.digestCandidate).toMatchObject({ canAutoDigest: false });
+
+    const confirm = (approvalMode: 'auto_digest' | 'manual') => request(app)
+      .post(`/api/conversations/${convId}/schedule-proposals/${proposal.id}/confirm`)
+      .set('Authorization', bearer(owner))
+      .send({ approvalMode });
+
+    const denied = await confirm('auto_digest');
+    expect(denied.status).toBe(409);
+    expect(denied.body.error.code).toBe('AUTO_DIGEST_NOT_ALLOWED');
+
+    const manual = await confirm('manual');
+    expect(manual.status).toBe(200);
+    const row = (await db.pool.query('SELECT kind, request FROM schedules WHERE id=$1', [manual.body.schedule.id])).rows[0];
+    expect(row).toEqual({ kind: 'plan', request: scheduleRequest });
+  });
+
   it('recomputes digest_config_hash when updating recurrence on an existing github_digest schedule', async () => {
     const convId = (await conversations.createConversation(owner.id)).id;
     provider.setPlanResponses([

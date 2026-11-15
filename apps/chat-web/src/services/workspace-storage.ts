@@ -5,9 +5,11 @@ const STORAGE_KEY = 'wap_active_workspace_id';
 const PENDING_INVITE_KEY = 'wap_pending_invite_code';
 
 let cachedOrganizations: WorkspaceSummary[] = [];
+let activeSelection: Readonly<{ id: string }> | undefined;
 const listeners = new Set<() => void>();
 
 function notify() {
+  getActiveWorkspaceSelection();
   for (const listener of Array.from(listeners)) {
     try {
       listener();
@@ -43,6 +45,13 @@ export function getExplicitWorkspaceId(): string | null {
 
 export function getActiveWorkspaceId(): string {
   return getExplicitWorkspaceId() || 'personal';
+}
+
+// Identity changes each time the active workspace changes, including when switching back.
+export function getActiveWorkspaceSelection() {
+  const id = getActiveWorkspaceId();
+  if (activeSelection?.id !== id) activeSelection = { id };
+  return activeSelection;
 }
 
 export function setActiveWorkspaceId(id: string): void {

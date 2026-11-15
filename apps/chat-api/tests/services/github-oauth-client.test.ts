@@ -130,4 +130,32 @@ describe('GitHubOAuthClient', () => {
     await expect(client.user('gho_token', controller.signal)).rejects.toMatchObject({ kind: 'network' });
     expect(fetchFn).not.toHaveBeenCalled();
   });
+
+  it('paginates /user/repos across multiple pages up to 100 per page and deduplicates case-insensitively', async () => {
+    const page1 = Array.from({ length: 100 }, (_, i) => ({
+      id: i + 1,
+      name: `repo-${i + 1}`,
+      full_name: `nhom/repo-${i + 1}`,
+      private: i % 2 === 0,
+    }));
+    const page2 = [
+      { id: 1, name: 'repo-1', full_name: 'Nhom/Repo-1', private: true }, // duplicate across pages
+      { id: 101, name: 'repo-101', full_name: 'nhom/repo-101', private: false },
+    ];
+    const fetchFn = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(page1), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(page2), { status: 200 }));
+
+    const client = new GitHubOAuthClient(config, fetchFn as any);
+    const repos = await client.repos('gho_token', new AbortController().signal);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(fetchFn.mock.calls[0]![0]).toBe(
+      'https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member'
+    );
+    expect(fetchFn.mock.calls[1]![0]).toBe(
+      'https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member&page=2'
+    );
+    expect(repos).toHaveLength(101);
+    expect(repos[100]).toEqual({ id: '101', name: 'repo-101', fullName: 'nhom/repo-101', private: false });
+  });
 });

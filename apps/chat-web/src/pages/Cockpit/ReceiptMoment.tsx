@@ -268,10 +268,18 @@ function GitHubReceiptMetrics({ step }: { step: ExecutionStepInfo }) {
   if (step.tool.endsWith('.list_pull_requests') && Array.isArray(step.output)) {
     pills.push({ text: `🔀 ${step.output.length} Pull Requests` }); // taste-skill-ignore
   }
+  if (step.tool.endsWith('.list_comments') && Array.isArray(step.output)) {
+    pills.push({ text: `💬 ${step.output.length} bình luận` }); // taste-skill-ignore
+  }
   const out = resultObject(step.output);
   if (out) {
     if (typeof out.number === 'number') {
-      pills.push({ text: `🐙 Issue #${out.number}` }); // taste-skill-ignore
+      const isPrTool =
+        step.tool.endsWith('_pull_request') || step.tool.endsWith('.request_reviewers');
+      pills.push({ text: isPrTool ? `🔀 PR #${out.number}` : `🐙 Issue #${out.number}` }); // taste-skill-ignore
+    }
+    if (typeof out.headRef === 'string' && out.headRef && typeof out.baseRef === 'string' && out.baseRef) {
+      pills.push({ text: `${out.headRef} → ${out.baseRef}` });
     }
     if (typeof out.state === 'string' && out.state) {
       pills.push({ text: `Trạng thái: ${out.state}` });
@@ -281,6 +289,9 @@ function GitHubReceiptMetrics({ step }: { step: ExecutionStepInfo }) {
     }
     if (Array.isArray(out.assignees) && out.assignees.length > 0) {
       pills.push({ text: `👤 Phụ trách: ${out.assignees.join(', ')}` }); // taste-skill-ignore
+    }
+    if (Array.isArray(out.reviewers) && out.reviewers.length > 0) {
+      pills.push({ text: `👁️ Reviewer: ${out.reviewers.join(', ')}` }); // taste-skill-ignore
     }
   }
   if (pills.length === 0) return null;

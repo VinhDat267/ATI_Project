@@ -398,7 +398,8 @@ test('GITHUB-DIGEST: [SEEDED_INTEGRATION] extended GitHub tools plan destination
     await expect(page.getByText('✓ Đã cập nhật issue', { exact: true })).toBeVisible();
     await expect(page.getByText('✓ Đã đọc PR', { exact: true })).toBeVisible();
     await expect(page.getByText('✓ Đã bình luận', { exact: true })).toBeVisible();
-    await expect(page.getByText('PR #18', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'PR #18', exact: true })).toBeVisible();
+    await expect(page.getByTestId('github-receipt-metrics').getByText('PR #18', { exact: true })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('github-receipt-moment.png'), fullPage: true });
 
     // Verify PostgreSQL execution_steps outputs

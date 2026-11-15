@@ -243,4 +243,32 @@ describe('GitHub connection routes', () => {
     expect(await credentials.getPersonalConnectionStatus('github', alice.id)).toBeNull();
     expect(await credentials.getPersonalConnectionStatus('github', bob.id)).not.toBeNull();
   });
+
+  it('returns 502 GITHUB_UPSTREAM_UNAVAILABLE on transient GitHub API error without marking reconnect_required or false needs_membership', async () => {
+    const app = build();
+    await credentials.saveCredentials(
+      'github',
+      encryptCredentials({ accessToken: 'gho_alice', login: 'alice_octo', githubUserId: '1' }, key),
+      alice.id
+    );
+    await teamRepo.replace({
+      scopeId: workspaceId,
+      chosenBy: alice.id,
+      repos: [{ repoId: '101', fullName: 'nhom/ati', name: 'ati' }],
+    });
+
+    fakeReposResponse = { status: 503, body: { message: 'Upstream unavailable' } };
+    const statusRes = await request(app)
+      .get('/api/connections/github')
+      .set('Authorization', bearer(alice))
+      .set('x-workspace-id', workspaceId);
+    expect(statusRes.status).toBe(502);
+    expect(statusRes.body).toEqual({
+      error: 'Không kiểm tra được quyền truy cập GitHub lúc này. Vui lòng thử lại.',
+      code: 'GITHUB_UPSTREAM_UNAVAILABLE',
+    });
+
+    const stored = await credentials.getPersonalConnectionStatus('github', alice.id);
+    expect(stored?.status).toBe('active');
+  });
 });

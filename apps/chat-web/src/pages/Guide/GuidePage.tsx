@@ -11,7 +11,7 @@ import { useGmailEnabled, useMySheetsEnabled } from '../../hooks/use-gmail-enabl
 import { useSchedulesEnabled } from '../../hooks/use-schedules';
 import { GMAIL_GUIDE, GMAIL_PROMPTS, GMAIL_CAPABILITY } from './gmail-data';
 import { MYSHEETS_GUIDE, MYSHEETS_PROMPTS, MYSHEETS_SCHEDULE_PROMPT, MYSHEETS_CAPABILITY } from './mysheets-data';
-import { CAPABILITIES_DATA as BASE_CAPABILITIES, SAMPLE_PROMPTS as BASE_PROMPTS, SERVICE_GUIDES as BASE_GUIDES, SERVICE_SVGS, GUIDE_HERO_FLOW_SERVICES, GUIDE_OAUTH_SHOWCASE_CARDS, type ServiceGuide } from './data';
+import { CAPABILITIES_DATA as BASE_CAPABILITIES, GITHUB_OAUTH_PROMPTS, SAMPLE_PROMPTS as BASE_PROMPTS, SERVICE_GUIDES as BASE_GUIDES, SERVICE_SVGS, GUIDE_HERO_FLOW_SERVICES, GUIDE_OAUTH_SHOWCASE_CARDS, type ServiceGuide } from './data';
 
 const SERVICE_GUIDES = BASE_GUIDES, SAMPLE_PROMPTS = BASE_PROMPTS, CAPABILITIES_DATA = BASE_CAPABILITIES;
 type MainTab = 'keys' | 'prompts' | 'capabilities';
@@ -286,6 +286,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
   const mysheetsPrompts = schedulesEnabled ? [...MYSHEETS_PROMPTS, MYSHEETS_SCHEDULE_PROMPT] : MYSHEETS_PROMPTS;
   const SAMPLE_PROMPTS = [
     ...BASE_PROMPTS,
+    ...GITHUB_OAUTH_PROMPTS,
     ...(gmailEnabled ? GMAIL_PROMPTS : []),
     ...(mysheetsEnabled ? mysheetsPrompts : []),
   ];

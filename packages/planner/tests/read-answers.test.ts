@@ -19,12 +19,19 @@ describe('ANS-01 read answers', () => {
   it('keeps the off prompt and search envelope byte-identical to the registered baseline', () => {
     const date = { now: new Date('2026-10-14T00:00:00Z'), timeZone: 'Asia/Ho_Chi_Minh' };
     const hash = (s: string) => createHash('sha256').update(s).digest('hex');
-    const offPrompt = buildSystemPrompt(ALL_TOOLS, date, { search: true, readAnswers: false } as any);
-    expect(offPrompt).toBe(buildSystemPrompt(ALL_TOOLS, date, { search: true } as any));
+    const offPrompt = buildSystemPrompt(ALL_TOOLS, date, { search: true, readAnswers: false });
+    expect(offPrompt).toBe(buildSystemPrompt(ALL_TOOLS, date, { search: true }));
+    // GitHub v3 changes the GitHub tool schemas and adds provider-specific rules.
     expect(hash(offPrompt))
-      .toBe('df2fb8753c9d83ae75c4065ae22ef4f684b137ddd58647f758a6c7c858d2ae92');
+      .toBe('239f1f12bac23337d7bf49af89b31fbc8391d5d2a26697c4846db5ef24775515');
     expect(hash(formatSearchResults([{ tool: 'slack.search_channels', args: { query: 'frontend' }, result: [] }])))
       .toBe('1edfb5917d31a91aa046dca5ea220a6c131deed29412fa206df107eb32ef9850');
+  });
+  it('includes GitHub rules only for a catalogue with GitHub tools', () => {
+    const githubPrompt = buildSystemPrompt([...GITHUB_TOOLS, ...GITHUB_OAUTH_TOOLS]);
+    expect(githubPrompt).toContain('### GitHub Rules:');
+    expect(githubPrompt).toContain('github.request_reviewers');
+    expect(buildSystemPrompt(SLACK_TOOLS)).not.toContain('### GitHub Rules:');
   });
   it('teaches read lookup then answer only when enabled', () => {
     const prompt = buildSystemPrompt(SLACK_TOOLS, undefined, { search: true, readAnswers: true } as any);

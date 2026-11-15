@@ -415,6 +415,23 @@ describe('Personal and Workspace Auth (Task 5)', () => {
       expect(getActiveWorkspaceId()).toBe('personal');
     });
 
+    it.each(['ws-current', 'ws-previous'])('keeps the selected workspace %s when an earlier GitHub status request is denied', async (workspaceId) => {
+      authStorage.setStoredTokens({ accessToken: 'test-token', user: testUser });
+      setActiveWorkspaceId('ws-previous');
+      let reply!: (response: Response) => void;
+      vi.spyOn(globalThis, 'fetch').mockReturnValueOnce(new Promise((resolve) => { reply = resolve; }));
+
+      const status = apiClient.getGitHubConnection();
+      setActiveWorkspaceId('ws-current');
+      setActiveWorkspaceId(workspaceId);
+      reply(new Response(JSON.stringify({ error: 'WORKSPACE_ACCESS_DENIED' }), {
+        status: 403, headers: { 'Content-Type': 'application/json' },
+      }));
+
+      await expect(status).rejects.toMatchObject({ status: 403 });
+      expect(getActiveWorkspaceId()).toBe(workspaceId);
+    });
+
     it('clears active workspace and cached organizations when logging out from AuthGate', async () => {
       const navigate = vi.fn();
       authStorage.setStoredTokens({ accessToken: 'token-123', user: testUser });

@@ -110,29 +110,37 @@ export class GitHubOAuthClient {
   }
 
   async repos(accessToken: string, signal?: AbortSignal): Promise<GitHubRepoSummary[]> {
-    const body = await this.send(
-      `${this.config.apiBaseUrl}/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member`,
-      {
+    const baseUrl = `${this.config.apiBaseUrl}/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member`;
+    const result: GitHubRepoSummary[] = [];
+    const seen = new Set<string>();
+    const maxPages = 5;
+
+    for (let page = 1; page <= maxPages; page++) {
+      const url = page === 1 ? baseUrl : `${baseUrl}&page=${page}`;
+      const body = await this.send(url, {
         method: 'GET',
         headers: this.apiHeaders(accessToken),
         signal,
-      }
-    );
-    if (!Array.isArray(body)) {
-      throw new GitHubOAuthError('server');
-    }
-    const result: GitHubRepoSummary[] = [];
-    for (const r of body) {
-      const id = r?.id !== undefined && r?.id !== null ? String(r.id).trim() : '';
-      const fullName = typeof r?.full_name === 'string' ? r.full_name.trim() : '';
-      const name = typeof r?.name === 'string' && r.name.trim() ? r.name.trim() : (fullName.split('/')[1] ?? '');
-      if (!id || !fullName || !name || !isValidGitHubRepoFullName(fullName)) continue;
-      result.push({
-        id,
-        name,
-        fullName,
-        private: Boolean(r?.private),
       });
+      if (!Array.isArray(body)) {
+        throw new GitHubOAuthError('server');
+      }
+      for (const r of body) {
+        const id = r?.id !== undefined && r?.id !== null ? String(r.id).trim() : '';
+        const fullName = typeof r?.full_name === 'string' ? r.full_name.trim() : '';
+        const name = typeof r?.name === 'string' && r.name.trim() ? r.name.trim() : (fullName.split('/')[1] ?? '');
+        if (!id || !fullName || !name || !isValidGitHubRepoFullName(fullName)) continue;
+        const key = fullName.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        result.push({
+          id,
+          name,
+          fullName,
+          private: Boolean(r?.private),
+        });
+      }
+      if (body.length < 100) break;
     }
     return result;
   }
