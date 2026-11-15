@@ -428,14 +428,17 @@ html.dark {
 .pl-brand-mark {
   width: 24px;
   height: 24px;
-  border-radius: 7px;
-  background-color: var(--pl-accent);
-  color: #FFFFFF;
+  color: #F8FAFC;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  font-size: 0.8125rem;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.pl-brand-mark--lg {
+  width: 28px;
+  height: 28px;
 }
 
 .pl-nav-links {

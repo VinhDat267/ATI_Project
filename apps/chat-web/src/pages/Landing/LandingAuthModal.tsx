@@ -2,6 +2,7 @@ import type { FormEvent, MouseEvent as ReactMouseEvent, ReactNode, RefObject } f
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Loader2, LockKeyhole, ShieldCheck, X } from 'lucide-react';
 import landingPlaybooks from '../../assets/landing-playbooks.json';
+import { PlanoraMark } from '../../components/PlanoraMark';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import { evaluatePasswordGuidance } from '../../utils/password-guidance';
 
@@ -108,7 +109,7 @@ const FORGOT_GUARANTEES = [
 function PlanoraBrandMark() {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="pl-brand-mark">P</div>
+      <PlanoraMark className="w-6 h-6 text-[var(--pl-ink)] shrink-0" />
       <span className="auth-display font-semibold text-xl tracking-tight text-[var(--pl-ink)]">
         Planora
       </span>

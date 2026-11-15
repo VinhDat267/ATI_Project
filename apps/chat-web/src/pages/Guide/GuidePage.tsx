@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { MainNav } from '../../components/layout/MainNav';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
+import { PlanoraMark } from '../../components/PlanoraMark';
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
@@ -353,9 +354,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
             {/* Cụm Logo & Điều hướng */}
             <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
               <a href="/" onClick={appLink(navigate, '/')} className="flex items-center gap-2.5 group flex-shrink-0" title="Về không gian làm việc">
-                <div className="w-8 h-8 rounded-lg bg-[#C84300] flex items-center justify-center text-white font-sans font-bold text-base shadow-2xs">
-                  P
-                </div>
+                <PlanoraMark className="w-7 h-7 text-[#111827] dark:text-[#F1F5F9] flex-shrink-0 group-hover:scale-105 transition-transform" />
                 <span className="font-sans font-bold text-lg tracking-tight text-[#111827]">
                   Planora
                 </span>

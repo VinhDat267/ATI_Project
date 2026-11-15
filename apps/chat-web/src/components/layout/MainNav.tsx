@@ -5,6 +5,7 @@
 // (review #162, nhóm trưởng chốt 20/10/2026).
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
+import { PlanoraMark } from '../PlanoraMark';
 import type { User } from '../../types';
 import { UserNavMenu } from './UserNavMenu';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
@@ -67,9 +68,7 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
       <div data-main-nav className="max-w-7xl mx-auto grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 sm:px-6 py-2">
         <div className="col-start-1 flex items-center gap-2 min-w-0 max-w-full justify-self-start">
           <a href="/" onClick={follow('/')} aria-label="Planora · Về không gian làm việc" title="Về không gian làm việc" className="flex items-center gap-2 group flex-shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">
-              P
-            </div>
+            <PlanoraMark className="w-7 h-7 text-[#111827] dark:text-[#F1F5F9] flex-shrink-0 group-hover:scale-105 transition-transform" />
             <span className="font-display font-bold text-lg tracking-tight text-[#111827] hidden sm:inline">
               Planora
             </span>

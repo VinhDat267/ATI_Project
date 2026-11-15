@@ -3,6 +3,7 @@ import { useGmailEnabled, useMyCalendarEnabled, useMySheetsEnabled } from '../..
 import { MainNav } from '../../components/layout/MainNav';
 import type { MouseEvent } from 'react';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
+import { PlanoraMark } from '../../components/PlanoraMark';
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import type { User } from '../../types';
 import css from './page.css?inline';
@@ -38,9 +39,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
             {/* Cụm trái: Logo Planora & Nhãn trang */}
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <a href="/" onClick={appLink(navigate, '/')} className="flex items-center gap-2 group focus-visible:v3-outline-none focus-visible:ring-2 focus-visible:ring-[#FF5701] rounded-lg flex-shrink-0" aria-label="Về trang chủ Planora">
-                <div className="w-8 h-8 rounded-xl bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-base shadow-sm group-hover:bg-[#E04D00] transition-colors">
-                  P
-                </div>
+                <PlanoraMark className="w-7 h-7 text-[#111827] dark:text-[#F1F5F9] flex-shrink-0 group-hover:scale-105 transition-transform" />
                 <span className="font-display font-bold text-xl text-[#111827] tracking-tight">
                   Planora
                 </span>
@@ -779,9 +778,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
       <footer className="mt-auto border-t border-[#E7E7E2] bg-white py-8 px-4 sm:px-6" data-od-id="privacy-footer">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-[#6B7280]">
           <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded bg-[#FF5701] text-white flex items-center justify-center font-display font-bold text-[10px]">
-              P
-            </div>
+            <PlanoraMark className="w-4 h-4 text-[#111827] dark:text-[#F1F5F9] flex-shrink-0" />
             <span className="font-semibold text-[#111827]">
               Planora
             </span>
