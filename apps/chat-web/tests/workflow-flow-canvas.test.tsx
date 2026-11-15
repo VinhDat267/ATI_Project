@@ -105,9 +105,9 @@ describe('WorkflowFlowCanvas — Make.com Orbital Workflow Visualizer', () => {
 
     const routerNode = screen.getByTestId('workflow-router-node');
     expect(routerNode).toBeInTheDocument();
-    expect(canvas).toHaveTextContent('Router');
-    expect(canvas).toHaveTextContent('1st');
-    expect(canvas).toHaveTextContent('2nd');
+    expect(canvas).toHaveTextContent('Phân luồng');
+    expect(canvas).toHaveTextContent('Nhánh 1');
+    expect(canvas).toHaveTextContent('Nhánh 2');
 
     expect(screen.getByTestId('workflow-node-github')).toBeInTheDocument();
     expect(screen.getByTestId('workflow-node-trello')).toBeInTheDocument();
@@ -185,7 +185,7 @@ describe('WorkflowFlowCanvas — Make.com Orbital Workflow Visualizer', () => {
     expect(canvas).toHaveAttribute('data-auto-digest', 'true');
     expect(screen.getByTestId('workflow-node-mycalendar')).toBeInTheDocument();
     expect(screen.getByTestId('workflow-node-slack')).toBeInTheDocument();
-    expect(canvas).toHaveTextContent(/Auto-Digest/i);
+    expect(canvas).toHaveTextContent(/Bản tin tự động/i);
   });
 
   it('integrates WorkflowFlowCanvas into PlanMoment, ExecutionMoment, ReceiptMoment, and ScheduleMoment without breaking DOM contracts', () => {
@@ -673,5 +673,78 @@ describe('WorkflowFlowCanvas — Make.com Orbital Workflow Visualizer', () => {
     const highlightedReceiptCards = document.querySelectorAll('#receipt-chain [data-highlighted-step="true"]');
     expect(highlightedReceiptCards).toHaveLength(1);
     expect(highlightedReceiptCards[0]).toHaveTextContent(/Thông báo cho nhóm qua Slack/i);
+  });
+
+  it('keeps compact router and auto-digest chains single-row on sm+, uses high-contrast theme-aware connectors with arrowheads, and renders data-flow pills in a balanced grid', () => {
+    const fourServiceSteps: PlanStep[] = [
+      {
+        id: 'step_1',
+        tool: 'trello.create_card',
+        description: 'Tạo thẻ Trello',
+        args: { listId: 'list-1', name: 'Card 1' },
+      },
+      {
+        id: 'step_2',
+        tool: 'github.create_issue',
+        description: 'Tạo issue GitHub',
+        args: { repo: 'acme/web-store', title: { $ref: 'step_1.output.url' } },
+        dependsOn: ['step_1'],
+      },
+      {
+        id: 'step_3',
+        tool: 'sheets.append_rows',
+        description: 'Ghi Sheets',
+        args: { spreadsheetId: 'sheet-1', sheet: 'Sự cố', rows: [['a', { $ref: 'step_2.output.url' }]] },
+        dependsOn: ['step_2'],
+      },
+      {
+        id: 'step_4',
+        tool: 'slack.send_message',
+        description: 'Nhắn Slack',
+        args: {
+          channel: 'C04',
+          text: { $template: '${step_1.output.url} ${step_2.output.url}' },
+        },
+        dependsOn: ['step_2'],
+      },
+    ];
+
+    const { unmount } = render(
+      <WorkflowFlowCanvas steps={fourServiceSteps} mode="preview" compact hideInlineInspector />
+    );
+
+    const canvas = screen.getByTestId('workflow-flow-canvas');
+    expect(
+      canvas.querySelectorAll('[stroke="#24292F"], [stroke="#111111"], [stroke="#4A154B"]')
+    ).toHaveLength(0);
+
+    const connectors = canvas.querySelectorAll('[data-flow-connector="true"]');
+    expect(connectors.length).toBeGreaterThanOrEqual(2);
+    connectors.forEach((connector) => {
+      expect(connector.className).toContain('dark:text-');
+    });
+
+    expect(canvas.querySelectorAll('[data-connector-arrow="true"]').length).toBeGreaterThanOrEqual(2);
+    expect(canvas.querySelectorAll('[stroke-dasharray="4 4"]').length).toBeGreaterThanOrEqual(3);
+
+    const routerRow = screen.getByTestId('workflow-upstream-chain').parentElement as HTMLElement;
+    expect(routerRow.className).toContain('sm:flex-nowrap');
+    expect(routerRow.className).toContain('justify-between');
+    expect(routerRow.className).toContain('w-full');
+
+    const dataFlowStrip = screen.getByTestId('workflow-data-flow-strip');
+    const gridWrapper = dataFlowStrip.querySelector('.grid');
+    expect(gridWrapper).not.toBeNull();
+    expect(gridWrapper!.className).toContain('sm:grid-cols-2');
+    unmount();
+
+    render(
+      <WorkflowFlowCanvas services={['mycalendar', 'slack']} isAutoDigest mode="schedule" compact hideInlineInspector />
+    );
+
+    const schedUpstream = screen.getByTestId('workflow-upstream-chain');
+    expect(schedUpstream.className).toContain('sm:flex-nowrap');
+    expect(schedUpstream.className).toContain('w-full');
+    expect(screen.getByTestId('workflow-flow-canvas').querySelectorAll('[data-connector-arrow="true"]').length).toBeGreaterThanOrEqual(2);
   });
 });

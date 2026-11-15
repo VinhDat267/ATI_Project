@@ -9,8 +9,60 @@ interface Operation { action:string; done:string; receipt:string; kind:string; l
 const palettes:Record<string,Palette>=Object.fromEntries(Object.entries(assets.services).map(([id,value])=>[id,{...value.suggestion,...value}]));
 const operations:Record<string,Operation>=assets.operations;
 export function serviceRecoveryLink(id:string):{url:string;argument:string;query:string}|undefined {return (assets.services as Record<string,{recoveryLink?:{url:string;argument:string;query:string}}>)[id]?.recoveryLink;}
+const FRIENDLY_SERVICE_NAMES: Record<string, string> = (assets as { serviceNames?: Record<string, string> }).serviceNames ?? {};
+
+const FRIENDLY_FIELD_LABELS: Record<string, string> = {
+  htmlLink: 'Đường dẫn sự kiện',
+  shortUrl: 'Đường dẫn thẻ Trello',
+  url: 'Đường dẫn kết quả',
+  webViewLink: 'Đường dẫn xem trực tuyến',
+  updatedRange: 'Vùng dữ liệu đã cập nhật',
+  spreadsheetUrl: 'Đường dẫn trang tính',
+  spreadsheetId: 'Trang tính đích',
+  cardId: 'Thẻ Trello',
+  id: 'Mã mục vừa tạo',
+  issueKey: 'Mã công việc Jira',
+  key: 'Mã công việc',
+  messageId: 'Mã tin nhắn',
+  threadId: 'Chuỗi hội thoại email',
+  eventId: 'Sự kiện Lịch',
+  subject: 'Tiêu đề email',
+  title: 'Tiêu đề',
+  name: 'Tên mục',
+  summary: 'Tóm tắt nội dung',
+  text: 'Nội dung',
+  body: 'Nội dung',
+  items: 'Danh sách kết quả',
+  rows: 'Dữ liệu bảng tính',
+  cards: 'Danh sách thẻ',
+  messages: 'Danh sách email',
+  events: 'Danh sách lịch hẹn',
+  issues: 'Danh sách công việc',
+  start: 'Thời gian bắt đầu',
+  end: 'Thời gian kết thúc',
+  due: 'Hạn hoàn thành',
+  dueDate: 'Hạn hoàn thành',
+  channel: 'Kênh nhận tin',
+  to: 'Người nhận',
+  from: 'Người gửi',
+};
+
+export function friendlyFieldLabel(field: string): string {
+  const trimmed = field.trim();
+  if (!trimmed) return 'Dữ liệu kết quả';
+  const direct = FRIENDLY_FIELD_LABELS[trimmed] ?? FRIENDLY_FIELD_LABELS[trimmed.toLowerCase()];
+  if (direct) return direct;
+  const lastSegment = trimmed.split('.').pop()?.replace(/\[\d*\]/g, '') ?? trimmed;
+  if (FRIENDLY_FIELD_LABELS[lastSegment]) return FRIENDLY_FIELD_LABELS[lastSegment];
+  return lastSegment.replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
 export const serviceId=(tool:string)=>toolDefinition(tool)?.service ?? tool.split('.')[0];
-export const serviceName=(id:string,services:ServiceInfo[])=>services.find(service=>service.id===id)?.name ?? getServiceDefinition(id)?.name ?? (id==='myslack' ? 'Slack của bạn' : id==='myjira' ? 'Atlassian Jira' : id);
+export const serviceName=(id:string,services:ServiceInfo[]=[])=>{
+  const resolved=services.find(service=>service.id===id)?.name;
+  if (resolved && resolved !== id && resolved !== 'MyCalendar' && resolved !== 'MySheets') return resolved;
+  return FRIENDLY_SERVICE_NAMES[id] ?? getServiceDefinition(id)?.name ?? resolved ?? id;
+};
 export function servicePalette(id:string) { const palette=palettes[id] ?? {icon:'bg-neutral-100 border-neutral-200',name:'text-neutral-800'}; return {...palette,badge:palette.badge ?? `${palette.icon.split(' ').filter(cls=>cls.startsWith('bg-')).join(' ')} ${palette.name}`,receiptHover:palette.receiptHover ?? 'hover:border-neutral-300'}; }
 export function operation(tool:string):Operation {
   if(tool==='myslack.chat_postMessage')return {action:'Gửi tin',done:'Đã gửi',receipt:'Đã gửi trên Slack',kind:'Tin nhắn',link:'Mở Slack'};

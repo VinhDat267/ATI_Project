@@ -1,209 +1,246 @@
 {
   "playbooks": [
     {
-      "id": "playbook-bug-sync",
-      "tabTitle": "Đồng bộ lỗi liên công cụ",
-      "flowSummary": "Trello → GitHub → Router → [Google Sheets, Slack]",
-      "prompt": "Tạo card trên bảng Trello cho lỗi đăng nhập Google, tạo issue trên kho GitHub kèm nhãn bug, ghi một dòng vào bảng tính Google Sheets và gửi thông báo vào kênh Slack của nhóm.",
+      "id": "playbook-incident-sync",
+      "tabTitle": "Đồng bộ sự cố khách hàng",
+      "flowSummary": "Trello → GitHub → Chia nhánh: [Google Sheets, Slack]",
+      "prompt": "Tạo thẻ 'Lỗi thanh toán QR đơn #408' ở cột Cần làm trên bảng Vận hành, mở issue tương ứng trên repo acme/web-store, rồi ghi vào bảng Theo dõi sự cố và báo kênh #van-hanh kèm đường dẫn.",
+      "scopeSummary": "Bảng Vận hành · Repo acme/web-store · Tệp Theo dõi sự cố · Kênh #van-hanh",
+      "handoffSummary": "Tự động truyền đường dẫn thẻ Trello và issue GitHub vừa tạo sang dòng bảng tính và tin nhắn báo cáo",
       "resourceLabels": {
-        "list-doing": "Danh sách Doing",
-        "org/ati-test": "Kho ati-test",
-        "sheet-tracker": "ATI Test Tracker",
-        "C123456": "Kênh #ati-test"
+        "list_todo_ops": "Bảng Vận hành · Cần làm",
+        "acme/web-store": "acme/web-store",
+        "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms": "Bảng Theo dõi sự cố",
+        "C04VANHANH": "#van-hanh"
       },
       "steps": [
         {
           "id": "step_1",
           "tool": "trello.create_card",
-          "description": "Tạo card \"Sửa lỗi đăng nhập Google\" trong danh sách Doing",
+          "description": "Tạo thẻ \"Lỗi thanh toán QR đơn #408\" trong cột Cần làm trên bảng Vận hành",
           "args": {
-            "idList": "list-doing",
-            "name": "Sửa lỗi đăng nhập Google"
+            "listId": "list_todo_ops",
+            "name": "Lỗi thanh toán QR đơn #408",
+            "desc": "Khách quét mã VietQR thành công nhưng đơn hàng chưa chuyển trạng thái."
           }
         },
         {
           "id": "step_2",
           "tool": "github.create_issue",
-          "description": "Tạo issue trong kho ati-test kèm đường dẫn card",
+          "description": "Mở issue trên acme/web-store kèm đường dẫn thẻ Trello từ Bước 1",
           "dependsOn": ["step_1"],
           "args": {
-            "repo": "org/ati-test",
-            "title": "Lỗi đăng nhập Google",
-            "body": { "$ref": "step_1.output.url" }
+            "repo": "acme/web-store",
+            "title": "Lỗi thanh toán QR đơn #408",
+            "body": { "$template": "Đối chiếu từ thẻ công việc Trello: ${step_1.output.url}" }
           }
         },
         {
           "id": "step_3",
           "tool": "sheets.append_rows",
-          "description": "Thêm dòng theo dõi vào bảng tính ATI Test Tracker",
+          "description": "Ghi dòng sự cố mới vào tab Sự cố kèm đường dẫn issue GitHub từ Bước 2",
           "dependsOn": ["step_2"],
           "args": {
-            "spreadsheetId": "sheet-tracker",
-            "range": "Tasks!A:D",
-            "values": [["29/09/2026", "Lỗi thanh toán #42", "Cao", "$step_2.url"]]
+            "spreadsheetId": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
+            "sheet": "Sự cố",
+            "rows": [
+              [
+                "15/11/2026",
+                "Lỗi thanh toán QR đơn #408",
+                "Cao",
+                { "$ref": "step_2.output.url" }
+              ]
+            ]
           }
         },
         {
           "id": "step_4",
           "tool": "slack.send_message",
-          "description": "Gửi thông báo tổng hợp vào kênh #ati-test",
+          "description": "Gửi thông báo vào kênh #van-hanh kèm đường dẫn thẻ Trello và issue GitHub",
           "dependsOn": ["step_2"],
           "args": {
-            "channel": "C123456",
-            "text": "Đã tạo card và mở issue: $step_2.url"
+            "channel": "C04VANHANH",
+            "text": {
+              "$template": "Đã mở thẻ Trello (${step_1.output.url}) và issue GitHub (${step_2.output.url}) cho sự cố thanh toán QR đơn #408."
+            }
           }
         }
       ]
     },
     {
-      "id": "playbook-morning-digest",
-      "tabTitle": "Báo cáo lịch họp & Auto-Digest mỗi sáng",
-      "flowSummary": "Google Calendar → Google Sheets → Router → [Slack, Telegram]",
-      "prompt": "Mỗi sáng 08:00, đọc lịch họp hôm nay trên Google Calendar, cập nhật bảng theo dõi trên Google Sheets và gửi bản tin tóm tắt đồng thời qua kênh Slack và nhóm Telegram.",
+      "id": "playbook-release-review",
+      "tabTitle": "Chốt lịch nghiệm thu & giao việc",
+      "flowSummary": "Google Calendar → Notion → Chia nhánh: [Trello, Slack]",
+      "prompt": "Đặt lịch 'Nghiệm thu giao diện Quý 4' lúc 14:00–15:00 ngày mai trên Lịch Sản phẩm, tạo trang biên bản chuẩn bị trong Notion, rồi thêm thẻ chuẩn bị bản dựng trên Trello và nhắn kênh #san-pham.",
+      "scopeSummary": "Lịch Sản phẩm · Cơ sở dữ liệu Tài liệu Quý 4 · Bảng Sprint Quý 4 · Kênh #san-pham",
+      "handoffSummary": "Điền liên kết sự kiện Lịch biểu và trang biên bản Notion vào thẻ việc Trello và tin nhắn nhóm",
       "resourceLabels": {
-        "cal-team": "Lịch họp nhóm",
-        "sheet-sprint": "Bảng Sprint Q4",
-        "C998877": "Kênh #bao-cao-sang",
-        "chat-ops": "Nhóm Vận hành"
+        "team-product@group.calendar.google.com": "Lịch Sản phẩm",
+        "a1b2c3d4-e5f6-4789-abcd-ef0123456789": "Tài liệu Quý 4",
+        "list_sprint_q4": "Bảng Sprint Quý 4 · Cần làm",
+        "C04SANPHAM": "#san-pham"
       },
       "steps": [
         {
           "id": "step_1",
           "tool": "calendar.create_event",
-          "description": "Đồng bộ các cuộc họp trong ngày trên Lịch họp nhóm",
+          "description": "Đặt lịch \"Nghiệm thu giao diện Quý 4\" (14:00–15:00) trên Lịch Sản phẩm",
           "args": {
-            "calendarId": "cal-team",
-            "summary": "Tổng hợp lịch họp sáng"
+            "calendarId": "team-product@group.calendar.google.com",
+            "summary": "Nghiệm thu giao diện Quý 4",
+            "start": "2026-11-16T14:00:00+07:00",
+            "end": "2026-11-16T15:00:00+07:00"
           }
         },
         {
           "id": "step_2",
-          "tool": "sheets.append_rows",
-          "description": "Ghi danh sách cuộc họp vào Bảng Sprint Q4",
+          "tool": "notion.create_page",
+          "description": "Tạo trang \"Biên bản nghiệm thu giao diện Quý 4\" kèm liên kết lịch họp",
           "dependsOn": ["step_1"],
           "args": {
-            "spreadsheetId": "sheet-sprint",
-            "range": "Digest!A:C",
-            "values": [["08:00", { "$ref": "step_1.output.summary" }, "Đã đồng bộ"]]
+            "databaseId": "a1b2c3d4-e5f6-4789-abcd-ef0123456789",
+            "title": "Biên bản nghiệm thu giao diện Quý 4",
+            "content": { "$template": "Lịch họp nghiệm thu đã chốt: ${step_1.output.url}" }
+          }
+        },
+        {
+          "id": "step_3",
+          "tool": "trello.create_card",
+          "description": "Tạo thẻ chuẩn bị bản dựng trên Bảng Sprint Quý 4 đính kèm trang Notion",
+          "dependsOn": ["step_2"],
+          "args": {
+            "listId": "list_sprint_q4",
+            "name": "Chuẩn bị bản dựng nghiệm thu Quý 4",
+            "desc": { "$template": "Tài liệu chuẩn bị trên Notion: ${step_2.output.url}" }
+          }
+        },
+        {
+          "id": "step_4",
+          "tool": "slack.send_message",
+          "description": "Thông báo lịch nghiệm thu và liên kết trang biên bản vào #san-pham",
+          "dependsOn": ["step_2"],
+          "args": {
+            "channel": "C04SANPHAM",
+            "text": {
+              "$template": "Đã chốt lịch nghiệm thu 14:00 ngày mai (${step_1.output.url}) và tạo trang biên bản Notion (${step_2.output.url})."
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "playbook-revenue-audit",
+      "tabTitle": "Đọc doanh thu & mở phiếu đối soát",
+      "flowSummary": "Google Sheets → Jira → Chia nhánh: [Slack, Telegram]",
+      "prompt": "Đọc 10 dòng cuối tab Đơn hàng trong bảng Doanh thu tuần, tạo đầu việc rà soát công nợ trên dự án Jira OPS, rồi gửi thông báo tới kênh #dieu-hanh trên Slack và nhóm Ban điều hành trên Telegram.",
+      "scopeSummary": "Bảng Doanh thu tuần · Dự án Jira OPS · Kênh #dieu-hanh · Nhóm Ban điều hành",
+      "handoffSummary": "Đọc dữ liệu thực tế từ Google Sheets, tạo mã công việc Jira rồi gửi liên kết đối chiếu tới hai kênh điều hành",
+      "resourceLabels": {
+        "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms": "Bảng Doanh thu tuần",
+        "OPS": "Dự án Jira OPS",
+        "C04DIEUHANH": "#dieu-hanh",
+        "-100198273645": "Ban điều hành"
+      },
+      "steps": [
+        {
+          "id": "step_1",
+          "tool": "sheets.read_range",
+          "description": "Đọc 10 dòng cuối trong tab Đơn hàng của Bảng Doanh thu tuần",
+          "args": {
+            "spreadsheetId": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
+            "range": "Đơn hàng!tail:10",
+            "headerAware": true
+          }
+        },
+        {
+          "id": "step_2",
+          "tool": "jira.create_issue",
+          "description": "Tạo đầu việc rà soát công nợ cuối tuần trên Dự án Jira OPS",
+          "dependsOn": ["step_1"],
+          "args": {
+            "projectKey": "OPS",
+            "summary": "Rà soát các đơn hàng chờ đối soát cuối tuần",
+            "description": "Tổng hợp từ 10 dòng cuối tab Đơn hàng trong bảng Doanh thu tuần."
           }
         },
         {
           "id": "step_3",
           "tool": "slack.send_message",
-          "description": "Gửi bản tin lịch họp sáng vào kênh #bao-cao-sang",
+          "description": "Gửi liên kết phiếu đối soát Jira vào kênh #dieu-hanh",
           "dependsOn": ["step_2"],
           "args": {
-            "channel": "C998877",
-            "text": "Bản tin lịch họp sáng: $step_1.summary"
+            "channel": "C04DIEUHANH",
+            "text": { "$template": "Đã đọc bảng Doanh thu tuần và mở phiếu đối soát Jira: ${step_2.output.url}" }
           }
         },
         {
           "id": "step_4",
           "tool": "telegram.send_message",
-          "description": "Gửi thông báo nhắc lịch họp qua Telegram Nhóm Vận hành",
+          "description": "Báo cáo phiếu đối soát tới nhóm Ban điều hành trên Telegram",
           "dependsOn": ["step_2"],
           "args": {
-            "chatId": "chat-ops",
-            "text": "Nhắc lịch họp sáng: $step_1.summary"
-          }
-        }
-      ]
-    },
-    {
-      "id": "playbook-sprint-coord",
-      "tabTitle": "Điều phối công việc & lịch biểu",
-      "flowSummary": "Trello → Google Calendar → Router → [Google Sheets, Slack]",
-      "prompt": "Tạo thẻ việc mới trên bảng Trello cho buổi nghiệm thu Sprint, đặt lịch họp trên Google Calendar, ghi vào bảng tiến độ Google Sheets và báo tin vào kênh Slack.",
-      "resourceLabels": {
-        "list-sprint": "Bảng Sprint Review",
-        "cal-team": "Lịch họp nhóm",
-        "sheet-sprint": "Bảng Sprint Q4",
-        "C123456": "Kênh #ati-test"
-      },
-      "steps": [
-        {
-          "id": "step_1",
-          "tool": "trello.create_card",
-          "description": "Tạo thẻ chuẩn bị nghiệm thu trên Bảng Sprint Review",
-          "args": {
-            "idList": "list-sprint",
-            "name": "Nghiệm thu Sprint Q4"
-          }
-        },
-        {
-          "id": "step_2",
-          "tool": "calendar.create_event",
-          "description": "Tạo lịch họp nghiệm thu kèm link thẻ công việc",
-          "dependsOn": ["step_1"],
-          "args": {
-            "calendarId": "cal-team",
-            "summary": { "$ref": "step_1.output.url" }
-          }
-        },
-        {
-          "id": "step_3",
-          "tool": "sheets.append_rows",
-          "description": "Cập nhật dòng lịch nghiệm thu vào Bảng Sprint Q4",
-          "dependsOn": ["step_2"],
-          "args": {
-            "spreadsheetId": "sheet-sprint",
-            "range": "Sprint!A:D",
-            "values": [["30/09/2026", "Nghiệm thu Sprint Q4", "$step_1.url", "Đã lên lịch"]]
-          }
-        },
-        {
-          "id": "step_4",
-          "tool": "slack.send_message",
-          "description": "Thông báo lịch nghiệm thu vào kênh #ati-test",
-          "dependsOn": ["step_2"],
-          "args": {
-            "channel": "C123456",
-            "text": "Đã lên lịch nghiệm thu Sprint Q4: $step_2.htmlLink"
+            "chatId": "-100198273645",
+            "text": { "$template": "Báo cáo cuối ngày: Đã tạo phiếu đối soát công nợ trên Jira (${step_2.output.url})." }
           }
         }
       ]
     }
   ],
+  "stageResourceLabels": {
+    "list_todo_ops": "Bảng Vận hành · Cần làm",
+    "acme/web-store": "acme/web-store",
+    "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms": "Bảng Theo dõi sự cố",
+    "C04VANHANH": "#van-hanh"
+  },
   "stage3Steps": [
     {
       "id": "step_1",
       "tool": "trello.create_card",
-      "description": "Tạo card \"Sửa lỗi đăng nhập Google\" trong danh sách Doing",
+      "description": "Tạo thẻ \"Lỗi thanh toán QR đơn #408\" trong cột Cần làm",
       "args": {
-        "idList": "list-doing",
-        "name": "Sửa lỗi đăng nhập Google"
+        "listId": "list_todo_ops",
+        "name": "Lỗi thanh toán QR đơn #408"
       }
     },
     {
       "id": "step_2",
       "tool": "github.create_issue",
-      "description": "Tạo issue trong kho ati-test có link card",
+      "description": "Mở issue trên acme/web-store kèm đường dẫn thẻ Trello",
       "dependsOn": ["step_1"],
       "args": {
-        "repo": "org/ati-test",
-        "title": "Lỗi thanh toán #42",
-        "body": { "$ref": "step_1.output.url" }
+        "repo": "acme/web-store",
+        "title": "Lỗi thanh toán QR đơn #408",
+        "body": { "$template": "Đối chiếu từ thẻ công việc Trello: ${step_1.output.url}" }
       }
     },
     {
       "id": "step_3",
       "tool": "sheets.append_rows",
-      "description": "Thêm một dòng vào trang Tasks",
+      "description": "Thêm dòng vào tab Sự cố kèm đường dẫn issue GitHub",
       "dependsOn": ["step_2"],
       "args": {
-        "spreadsheetId": "sheet-tracker",
-        "range": "Tasks!A:D",
-        "values": [["29/09/2026", "Lỗi thanh toán #42", "Cao", "$step_2.url"]]
+        "spreadsheetId": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
+        "sheet": "Sự cố",
+        "rows": [
+          [
+            "15/11/2026",
+            "Lỗi thanh toán QR đơn #408",
+            "Cao",
+            { "$ref": "step_2.output.url" }
+          ]
+        ]
       }
     },
     {
       "id": "step_4",
       "tool": "slack.send_message",
-      "description": "Gửi tin vào kênh #ati-test",
+      "description": "Nhắn tin vào kênh #van-hanh kèm liên kết đối chiếu",
       "dependsOn": ["step_2"],
       "args": {
-        "channel": "C123456",
-        "text": "Đã tạo card và issue: $step_2.url"
+        "channel": "C04VANHANH",
+        "text": {
+          "$template": "Đã mở thẻ Trello (${step_1.output.url}) và issue GitHub (${step_2.output.url}) cho sự cố thanh toán QR đơn #408."
+        }
       }
     }
   ],
@@ -211,31 +248,33 @@
     {
       "id": "step_1",
       "tool": "trello.create_card",
-      "description": "1. Tạo card \"Sửa lỗi đăng nhập Google\"",
-      "args": {}
+      "description": "1. Tạo thẻ \"Lỗi thanh toán QR đơn #408\"",
+      "args": { "listId": "list_todo_ops", "name": "Lỗi thanh toán QR đơn #408" }
     },
     {
       "id": "step_2",
       "tool": "github.create_issue",
-      "description": "2. Tạo issue trong kho ati-test",
+      "description": "2. Mở issue #109 trên acme/web-store",
       "dependsOn": ["step_1"],
-      "args": {
-        "body": { "$ref": "step_1.output.url" }
-      }
+      "args": { "repo": "acme/web-store", "body": { "$ref": "step_1.output.url" } }
     },
     {
       "id": "step_3",
       "tool": "sheets.append_rows",
-      "description": "3. Ghi vào bảng tính Tasks",
+      "description": "3. Ghi vào bảng Theo dõi sự cố",
       "dependsOn": ["step_2"],
-      "args": {}
+      "args": {
+        "spreadsheetId": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
+        "sheet": "Sự cố",
+        "rows": [["15/11/2026", "Lỗi thanh toán QR đơn #408", "Cao", { "$ref": "step_2.output.url" }]]
+      }
     },
     {
       "id": "step_4",
       "tool": "slack.send_message",
-      "description": "4. Gửi tin vào kênh #ati-test",
+      "description": "4. Gửi tin vào kênh #van-hanh",
       "dependsOn": ["step_2"],
-      "args": {}
+      "args": { "channel": "C04VANHANH", "text": { "$template": "Đã ghi nhận sự cố: ${step_2.output.url}" } }
     }
   ],
   "stage4Statuses": {
@@ -248,31 +287,29 @@
     {
       "id": "step_1",
       "tool": "trello.create_card",
-      "description": "Đã tạo card \"Sửa lỗi đăng nhập Google\"",
-      "args": {}
+      "description": "Đã tạo thẻ \"Lỗi thanh toán QR đơn #408\"",
+      "args": { "listId": "list_todo_ops" }
     },
     {
       "id": "step_2",
       "tool": "github.create_issue",
-      "description": "Đã tạo Issue #42 trong ati-test",
+      "description": "Đã mở issue #109 trên acme/web-store",
       "dependsOn": ["step_1"],
-      "args": {
-        "body": { "$ref": "step_1.output.url" }
-      }
+      "args": { "repo": "acme/web-store", "body": { "$ref": "step_1.output.url" } }
     },
     {
       "id": "step_3",
       "tool": "sheets.append_rows",
-      "description": "Đã ghi Dòng 104 trang Tasks",
+      "description": "Đã ghi dòng Sự cố!A18 trên Google Sheets",
       "dependsOn": ["step_2"],
-      "args": {}
+      "args": { "spreadsheetId": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms", "sheet": "Sự cố", "rows": [["15/11/2026", "Lỗi thanh toán QR đơn #408", "Cao", { "$ref": "step_2.output.url" }]] }
     },
     {
       "id": "step_4",
       "tool": "slack.send_message",
-      "description": "Đã gửi tin nhắn vào #ati-test",
+      "description": "Đã gửi thông báo vào kênh #van-hanh",
       "dependsOn": ["step_2"],
-      "args": {}
+      "args": { "channel": "C04VANHANH", "text": { "$template": "Đã mở thẻ và issue: ${step_2.output.url}" } }
     }
   ],
   "stage5Statuses": {
@@ -281,37 +318,82 @@
     "step_3": "succeeded",
     "step_4": "succeeded"
   },
-  "stage5SchedulePrompt": "Mỗi sáng 08:00, tự động thực hiện: Tạo card trên bảng Trello cho lỗi đăng nhập Google, tạo issue trên kho GitHub, ghi vào bảng tính Google Sheets và báo kênh Slack.",
-  "digestSteps": [
+  "stage5SchedulePrompt": "Mỗi thứ 2 đến thứ 6 lúc 09:00, lập kế hoạch kiểm tra các đơn thanh toán lỗi mới, mở thẻ Trello, ghi vào bảng Theo dõi sự cố và gửi tổng hợp lên #van-hanh để tôi duyệt trước khi chạy.",
+  "digestPresets": [
     {
-      "id": "step_1",
-      "tool": "mycalendar.list_events",
-      "description": "Đọc lịch họp hôm nay từ Lịch họp nhóm",
-      "args": {}
-    },
-    {
-      "id": "step_2",
-      "tool": "mysheets.read_range",
-      "description": "Đọc tiến độ từ Bảng Sprint Q4",
-      "dependsOn": ["step_1"],
-      "args": {
-        "range": { "$ref": "step_1.output.summary" }
+      "id": "digest-calendar-slack",
+      "tabLabel": "Lịch họp sáng",
+      "scheduleText": "08:00 · Thứ 2 – Thứ 6",
+      "services": ["calendar", "slack"],
+      "sourceLabel": "Lịch Sản phẩm (chỉ đọc sự kiện 24 giờ tới)",
+      "destinationLabel": "1 kênh duy nhất: Slack #bao-cao-sang",
+      "prompt": "Mỗi 08:00 sáng từ Thứ 2 đến Thứ 6, đọc các cuộc họp trong ngày từ Lịch Sản phẩm và gửi bản tin tóm tắt vào kênh #bao-cao-sang trên Slack.",
+      "previewTitle": "Bản tin lịch họp hôm nay · 3 cuộc họp",
+      "previewBullets": [
+        "09:30 – 10:15 · Rà soát tiến độ tuần cùng nhóm Kỹ thuật",
+        "14:00 – 15:00 · Nghiệm thu giao diện Quý 4 (Phòng họp B)",
+        "16:30 – 17:00 · Đối soát chỉ số vận hành cuối ngày"
+      ],
+      "resourceLabels": {
+        "team-product@group.calendar.google.com": "Lịch Sản phẩm",
+        "C998877": "#bao-cao-sang"
       }
     },
     {
-      "id": "step_3",
-      "tool": "slack.send_message",
-      "description": "Tự gửi bản tin sáng vào #bao-cao-sang",
-      "dependsOn": ["step_2"],
-      "args": {}
+      "id": "digest-sheets-telegram",
+      "tabLabel": "Biến động bảng tính",
+      "scheduleText": "08:30 · Hàng ngày",
+      "services": ["sheets", "telegram"],
+      "sourceLabel": "Bảng Kế hoạch Quý 4 · Tab Tiến độ (chỉ đọc)",
+      "destinationLabel": "1 nhóm duy nhất: Telegram Ban điều hành",
+      "prompt": "Mỗi 08:30 sáng hàng ngày, đọc các thay đổi mới nhất trên tab Tiến độ của bảng Kế hoạch Quý 4 và gửi bản tin tổng hợp vào nhóm Ban điều hành trên Telegram.",
+      "previewTitle": "Cập nhật bảng Kế hoạch Quý 4 · 3 thay đổi mới",
+      "previewBullets": [
+        "Thêm 2 hạng mục hoàn thành nghiệm thu trong 24 giờ qua",
+        "1 đầu việc chuyển trạng thái sang Chờ kiểm thử",
+        "Không phát sinh hạng mục trễ hạn mới"
+      ],
+      "resourceLabels": {
+        "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms": "Bảng Kế hoạch Quý 4",
+        "-100198273645": "Ban điều hành"
+      }
     },
     {
-      "id": "step_4",
-      "tool": "telegram.send_message",
-      "description": "Tự gửi bản tin sáng vào Nhóm Vận hành",
-      "dependsOn": ["step_2"],
-      "args": {}
+      "id": "digest-github-slack",
+      "tabLabel": "Mã nguồn & đầu việc",
+      "scheduleText": "09:00 · Thứ 2 – Thứ 6",
+      "services": ["github", "slack"],
+      "sourceLabel": "Kho mã acme/web-store (chỉ đọc Issue & PR)",
+      "destinationLabel": "1 kênh duy nhất: Slack #ky-thuat",
+      "prompt": "Mỗi 09:00 sáng ngày làm việc, tổng hợp các issue mới và PR chờ duyệt quá 2 ngày trên repo acme/web-store rồi gửi báo cáo vào kênh #ky-thuat trên Slack.",
+      "previewTitle": "Bản tin kỹ thuật acme/web-store",
+      "previewBullets": [
+        "2 issue mới mở cần phân công người phụ trách",
+        "1 yêu cầu ghép mã (PR #104) đang chờ xem xét trên 48 giờ",
+        "Tất cả hạng mục ưu tiên cao đã có người nhận"
+      ],
+      "resourceLabels": {
+        "acme/web-store": "acme/web-store",
+        "C04KYTHUAT": "#ky-thuat"
+      }
     }
   ],
-  "digestPrompt": "Mỗi sáng 08:00 từ Thứ 2 đến Thứ 6, tự động đọc lịch họp nhóm trên Google Calendar và bảng Sprint Q4 trên Google Sheets, tổng hợp báo cáo gửi vào kênh #bao-cao-sang trên Slack và nhóm Telegram."
+  "stage1Tools": [
+    { "id": "trello", "name": "Trello" },
+    { "id": "slack", "name": "Slack" },
+    { "id": "github", "name": "GitHub" },
+    { "id": "sheets", "name": "Google Sheets" },
+    { "id": "calendar", "name": "Google Calendar" },
+    { "id": "telegram", "name": "Telegram" }
+  ],
+  "coreIntegrations": [
+    { "id": "trello", "name": "Trello", "role": "Bảng & thẻ việc", "scopeUnit": "Theo từng bảng & cột" },
+    { "id": "slack", "name": "Slack", "role": "Kênh nhóm vận hành", "scopeUnit": "Theo từng kênh chỉ định" },
+    { "id": "github", "name": "GitHub", "role": "Kho mã & issue", "scopeUnit": "Theo từng kho mã" },
+    { "id": "sheets", "name": "Google Sheets", "role": "Bảng tính theo dõi", "scopeUnit": "Theo từng tệp bảng tính" },
+    { "id": "calendar", "name": "Google Calendar", "role": "Lịch họp đội ngũ", "scopeUnit": "Theo từng lịch biểu" },
+    { "id": "notion", "name": "Notion", "role": "Tài liệu & quy trình", "scopeUnit": "Theo từng trang & CSDL" },
+    { "id": "telegram", "name": "Telegram", "role": "Nhóm tin nhanh", "scopeUnit": "Theo từng nhóm chat" },
+    { "id": "jira", "name": "Jira", "role": "Đầu việc kỹ thuật", "scopeUnit": "Theo từng dự án" }
+  ]
 }

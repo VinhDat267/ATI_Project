@@ -27,7 +27,7 @@ describe('LoginView Component', () => {
     );
 
     // Brand and platform title
-    expect(screen.getByText(/AI Workflow Automation Platform/i)).toBeDefined();
+    expect(screen.getByText(/Nền tảng điều phối công việc tự động bằng AI/i)).toBeDefined();
     expect(screen.getAllByText(/GitHub/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Trello/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Slack/i).length).toBeGreaterThan(0);
