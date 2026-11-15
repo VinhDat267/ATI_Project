@@ -156,6 +156,19 @@ test('FE-08: closing auth from the mobile drawer returns focus to the menu', asy
   }
 });
 
+test('FE-08: closing login after widening the viewport focuses the visible header login', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Mở menu điều hướng' }).press('Enter');
+  await page.getByTestId('landing-mobile-drawer').getByRole('button', { name: 'Đăng nhập', exact: true }).press('Enter');
+  await expect(page.getByRole('dialog')).toBeVisible();
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('[data-od-id="btn-header-login"]')).toBeFocused();
+});
+
 test('FE-08: AUTH-04: root Google transfer is visible and a real late start cannot navigate after close', async ({ page }) => {
   test.skip(!process.env.GOOGLE_OAUTH_CLIENT_ID, 'Runs in the canonical local signed OIDC fixture scenario');
   let release!: () => void, received!: () => void;

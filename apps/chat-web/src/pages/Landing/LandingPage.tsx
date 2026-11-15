@@ -65,7 +65,13 @@ function restoreRequestedModalFocus() {
     : [...document.querySelectorAll<HTMLElement>('[data-od-id]')].find(
         (node) => node.dataset.odId === opener.id,
       );
-  element?.focus();
+  const fallbacks = document.querySelectorAll<HTMLElement>(
+    '[data-od-id="btn-header-login"], [data-od-id="btn-mobile-menu"]',
+  );
+  for (const target of [element, ...fallbacks]) {
+    target?.focus();
+    if (document.activeElement === target) return;
+  }
 }
 
 export interface LandingPageProps extends Partial<LoginViewProps> {
