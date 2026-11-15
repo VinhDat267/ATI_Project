@@ -27,6 +27,7 @@
   --border: #E7E7E2;
   --border-strong: #D1D5DB;
   --primary: #FF5701;
+  --planora-mark-dot: #E04800;
   --primary-tint: #FFF1E8;
   --primary-text: #AD3800;
   --success: #16A34A;
@@ -73,6 +74,7 @@ html.dark {
   --border: rgba(148,163,184,.18);
   --border-strong: rgba(148,163,184,.32);
   --primary: #FF5701;
+  --planora-mark-dot: #FF5701;
   --primary-tint: #33231F;
   --primary-text: #FFB58F;
   --success: #16A34A;

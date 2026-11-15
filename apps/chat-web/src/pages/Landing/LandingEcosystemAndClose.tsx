@@ -1,4 +1,5 @@
 import landingPlaybooks from '../../assets/landing-playbooks.json';
+import { PlanoraMark } from '../../components/PlanoraMark';
 import { ServiceLogo } from '../../components/ServiceLogo';
 
 interface CoreIntegrationItem {
@@ -244,7 +245,9 @@ export function LandingEcosystemAndClose({
           <div className="pl-footer-grid">
             <div className="lg:col-span-5 space-y-4">
               <a href="#workflow-showcase" className="inline-flex items-center gap-2.5 no-underline">
-                <span className="pl-brand-mark">P</span>
+                <span className="pl-brand-mark pl-brand-mark--lg" aria-hidden="true">
+                  <PlanoraMark tone="inverse" className="w-full h-full" />
+                </span>
                 <span className="pl-footer-wordmark">PLANORA</span>
               </a>
               <p className="text-sm text-[#B8ABA0] max-w-sm leading-relaxed m-0">

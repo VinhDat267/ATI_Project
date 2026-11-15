@@ -6,6 +6,7 @@
 import type { MouseEvent } from 'react';
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
+import { PlanoraMark } from '../../components/PlanoraMark';
 import css from './page.css?inline';
 
 // Đường dẫn đang mở, như script DOMContentLoaded của 404.html.
@@ -46,9 +47,7 @@ export function NotFoundPage({ signedIn, navigate }: { signedIn: boolean; naviga
           {/* Cụm Logo & Quay lại */}
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <a href="/" onClick={go('/')} className="flex items-center gap-2.5 group flex-shrink-0" title={home.logo}>
-              <div className="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">
-                P
-              </div>
+              <PlanoraMark className="w-7 h-7 text-[#111827] dark:text-[#F1F5F9] flex-shrink-0 group-hover:scale-105 transition-transform" />
               <span className="font-display font-bold text-lg tracking-tight text-[#111827]">
                 Planora
               </span>

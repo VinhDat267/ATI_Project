@@ -2,6 +2,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { flushSync } from 'react-dom';
 import type { LoginViewProps } from '../../components/LoginView';
+import { PlanoraMark } from '../../components/PlanoraMark';
 import { useGmailEnabled, useMySheetsEnabled } from '../../hooks/use-gmail-enabled';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
@@ -348,7 +349,9 @@ export function LandingPage({
         <header data-od-id="nav-header" className="pl-header">
           <div className="pl-header-inner">
             <a href="#workflow-showcase" className="pl-brand">
-              <span className="pl-brand-mark">P</span>
+                <span className="pl-brand-mark" aria-hidden="true">
+                <PlanoraMark tone="inverse" className="w-full h-full" />
+              </span>
               <span>Planora</span>
             </a>
 

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 're
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import css from './page.css?inline';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
+import { PlanoraMark } from '../../components/PlanoraMark';
 export type AuthActionMode = 'loading' | 'verify-success' | 'verify-expired' | 'verify-used' | 'reset-password' | 'reset-success' | 'google-pending' | 'google-ready' | 'google-error' | 'blocked-pending' | 'blocked-locked' | 'blocked-attempts' | 'email-not-verified';
 const BAR_EMPTY = 'h-full flex-1 rounded-full bg-[#E5E7EB] transition-colors';
 const BAR = (color: string) => `h-full flex-1 rounded-full transition-colors ${color}`;
@@ -80,9 +81,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
           {/* Cụm Logo & Điều hướng quay lại */}
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <a onClick={followLink} href="/" className="flex items-center gap-2.5 group flex-shrink-0" title="Về trang chủ Planora">
-              <div className="w-8 h-8 rounded-lg bg-[#FF5701] flex items-center justify-center text-white font-display font-bold text-lg shadow-sm group-hover:scale-105 transition-transform">
-                P
-              </div>
+              <PlanoraMark className="w-7 h-7 text-[#111827] dark:text-[#F1F5F9] flex-shrink-0 group-hover:scale-105 transition-transform" />
               <span className="font-display font-bold text-lg tracking-tight text-[#111827]">
                 Planora
               </span>
