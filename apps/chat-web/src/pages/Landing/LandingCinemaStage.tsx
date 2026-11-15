@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 export const DEFAULT_FILM_VOLUME = 0.35;
 
 export interface LandingCinemaStageProps {
   gmailEnabled: boolean;
+  playbackSuspended: boolean;
 }
 
 function applyPreferredAudio(video: HTMLVideoElement): void {
@@ -12,19 +13,22 @@ function applyPreferredAudio(video: HTMLVideoElement): void {
   video.volume = DEFAULT_FILM_VOLUME;
 }
 
-export function LandingCinemaStage({ gmailEnabled }: LandingCinemaStageProps) {
+export function LandingCinemaStage({ gmailEnabled, playbackSuspended }: LandingCinemaStageProps) {
   const sectionRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const inViewRef = useRef(false);
   const userPausedRef = useRef(false);
   const blockedUnmutedRef = useRef(false);
+  const playbackSuspendedRef = useRef(playbackSuspended);
   const [isPlaying, setIsPlaying] = useState(false);
 
   const tryPlayWithAudio = useCallback((video: HTMLVideoElement) => {
+    if (playbackSuspendedRef.current) return;
     applyPreferredAudio(video);
     const playAttempt = video.play();
     if (playAttempt && typeof playAttempt.catch === 'function') {
       playAttempt.catch((err: unknown) => {
+        if (playbackSuspendedRef.current || videoRef.current !== video) return;
         if (
           err &&
           typeof err === 'object' &&
@@ -42,13 +46,24 @@ export function LandingCinemaStage({ gmailEnabled }: LandingCinemaStageProps) {
     }
   }, []);
 
+  useLayoutEffect(() => {
+    playbackSuspendedRef.current = playbackSuspended;
+    const video = videoRef.current;
+    if (!video) return;
+    if (playbackSuspended) {
+      if (!video.paused) video.pause();
+    } else if (inViewRef.current && !userPausedRef.current && video.paused) {
+      tryPlayWithAudio(video);
+    }
+  }, [playbackSuspended, tryPlayWithAudio]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     applyPreferredAudio(video);
 
     const handleUserActivation = () => {
-      if (!blockedUnmutedRef.current) return;
+      if (playbackSuspendedRef.current || !blockedUnmutedRef.current) return;
       blockedUnmutedRef.current = false;
       applyPreferredAudio(video);
       if (inViewRef.current && !userPausedRef.current && video.paused) {
@@ -92,7 +107,7 @@ export function LandingCinemaStage({ gmailEnabled }: LandingCinemaStageProps) {
 
   const handleSurfaceToggle = useCallback(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || playbackSuspendedRef.current) return;
     if (video.paused) {
       userPausedRef.current = false;
       blockedUnmutedRef.current = false;

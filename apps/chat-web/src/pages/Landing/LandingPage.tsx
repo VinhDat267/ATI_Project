@@ -118,6 +118,7 @@ export function LandingPage({
   const signupEmailRef = useRef<HTMLInputElement>(null);
   const forgotEmailRef = useRef<HTMLInputElement>(null);
   const successCloseRef = useRef<HTMLButtonElement>(null);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const manualMomentLockUntil = useRef(0);
   const generation = useRef(0);
   const pending = useRef(false);
@@ -400,7 +401,9 @@ export function LandingPage({
               )}
 
               <button
+                ref={mobileMenuButtonRef}
                 type="button"
+                data-od-id="btn-mobile-menu"
                 data-testid="landing-mobile-menu-btn"
                 aria-expanded={mobileMenuOpen}
                 aria-controls="landing-mobile-drawer"
@@ -457,7 +460,7 @@ export function LandingPage({
               <div className="pt-2.5 border-t border-white/15 flex flex-wrap gap-2.5">
                 <button
                   type="button"
-                  onClick={(e) => handleOpenLogin(e.currentTarget)}
+                  onClick={() => handleOpenLogin(mobileMenuButtonRef.current)}
                   className="pl-btn-ghost-dark flex-1 justify-center"
                 >
                   Đăng nhập
@@ -465,7 +468,7 @@ export function LandingPage({
                 {signupEnabled && (
                   <button
                     type="button"
-                    onClick={(e) => handleOpenSignup(e.currentTarget)}
+                    onClick={() => handleOpenSignup(mobileMenuButtonRef.current)}
                     className="pl-btn-light flex-1 justify-center"
                   >
                     Tạo tài khoản
@@ -485,7 +488,7 @@ export function LandingPage({
             googleEnabled={googleEnabled}
           />
 
-          <LandingCinemaStage gmailEnabled={gmailEnabled} />
+          <LandingCinemaStage gmailEnabled={gmailEnabled} playbackSuspended={authOpen} />
 
           <LandingExecutionTheatre
             activeMoment={activeMoment}

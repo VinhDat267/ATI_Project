@@ -9,9 +9,24 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 375, height: 812 
       await page.setViewportSize(viewport);
       await page.addInitScript(value => localStorage.setItem('ati-theme', value), theme);
       await page.goto('/');
-      await expect(page.locator('.moment-trigger')).toHaveCount(5);
+      if (viewport.width === 1440) await expect(page.locator('.pl-chapter-rail')).toBeVisible();
+      else await expect(page.locator('.pl-chapter-rail')).toBeHidden();
+      await expect(page.locator('.stage-fallback-list > div')).toHaveCount(5);
       await expect(page.getByRole('heading', { name: 'Nói một câu. Việc trên nhiều công cụ được làm xong — sau khi bạn duyệt.' })).toBeVisible();
       await expect(page.locator('#email-sim-modal')).toHaveCount(0);
+      const digest = page.getByTestId('landing-schedule-digest-section');
+      expect(await digest.locator('.pl-digest-board').evaluate(board =>
+        board.getBoundingClientRect().right <= window.innerWidth,
+      )).toBe(true);
+      if (viewport.width === 1440) {
+        const hero = page.getByTestId('landing-hero-orbital-preview');
+        for (const section of [hero, digest]) {
+          expect(await section.getByTestId('workflow-upstream-chain').evaluate(chain => {
+            const row = chain.closest('[class~="overflow-x-auto"]')!;
+            return row.scrollWidth <= row.clientWidth;
+          })).toBe(true);
+        }
+      }
       for (let moment = 1; moment <= 5; moment++) {
         if (viewport.width === 1440) await page.locator(`#trigger-moment-${moment}`).scrollIntoViewIfNeeded();
         else await page.locator('.stage-fallback-list > div').nth(moment - 1).scrollIntoViewIfNeeded();
@@ -30,6 +45,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 375, height: 812 
 test('FE-08: reduced motion uses the vertical story and every panel can be read', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'reduce' }); await page.goto('/');
+  await expect(page.locator('.pl-chapter-rail')).toBeHidden();
   await expect(page.locator('.stage-interactive-desktop')).toBeHidden();
   await expect(page.locator('.stage-fallback-list')).toBeVisible();
   expect(await page.locator('.stage-fallback-list').evaluate(element => getComputedStyle(element).position)).not.toBe('sticky');
@@ -124,6 +140,22 @@ test('FE-08: closing routed auth modals restores each real opener and the active
   }
 });
 
+test('FE-08: closing auth from the mobile drawer returns focus to the menu', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route('**/api/auth/config', route => route.fulfill({ json: { signupEnabled: true, googleEnabled: false } }));
+  await page.goto('/');
+  const menu = page.getByRole('button', { name: 'Mở menu điều hướng' });
+
+  for (const action of ['Đăng nhập', 'Tạo tài khoản']) {
+    await menu.press('Enter');
+    await page.getByTestId('landing-mobile-drawer').getByRole('button', { name: action, exact: true }).press('Enter');
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(menu).toBeFocused();
+  }
+});
+
 test('FE-08: AUTH-04: root Google transfer is visible and a real late start cannot navigate after close', async ({ page }) => {
   test.skip(!process.env.GOOGLE_OAUTH_CLIENT_ID, 'Runs in the canonical local signed OIDC fixture scenario');
   let release!: () => void, received!: () => void;
@@ -147,6 +179,24 @@ test('FE-08: AUTH-04: root Google transfer is visible and a real late start cann
   await expect(page).toHaveURL(/\/$/); await page.waitForTimeout(150);
   expect(starts).toBe(1); expect(providerNavigations).toBe(0);
   expect(await page.evaluate(() => localStorage.getItem('wap_access_token'))).toBeNull();
+});
+
+test('FE-08: opening login while the film is visible pauses playback', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.locator('.pl-hero-film-link').click();
+  const video = page.getByTestId('landing-product-video');
+  await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime)).toBeGreaterThan(0);
+
+  await page.getByRole('link', { name: 'Đăng nhập', exact: true }).first().click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(video).toBeInViewport();
+  await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.readyState)).toBeGreaterThanOrEqual(2);
+  await expect(video).toHaveJSProperty('paused', true);
+
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByTestId('landing-film-surface')).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('FE-08: product film plays chromeless without native controls bar, unmuted at 35% volume, loops, and toggles via surface button', async ({ page }) => {

@@ -531,6 +531,19 @@ test('real browser and PostgreSQL: approved nine-service workflow resolves prior
     await expect(page.getByTestId('gmail-receipt-metrics')).toBeVisible();
     await expect(page.getByTestId('telegram-receipt-metrics')).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('nine-service-approved.png'), fullPage: true });
+
+    await page.setViewportSize({ width: 768, height: 900 });
+    const nodes = page.locator('[data-flow-mode="receipt"]').getByRole('button', { name: /^Nút dịch vụ/ });
+    await expect(nodes).toHaveCount(9);
+    const overlaps = await nodes.evaluateAll(buttons => buttons.flatMap((button, index) => {
+      const bounds = button.getBoundingClientRect();
+      return buttons.slice(index + 1).filter(other => {
+        const next = other.getBoundingClientRect();
+        return bounds.left < next.right && next.left < bounds.right &&
+          bounds.top < next.bottom && next.top < bounds.bottom;
+      }).map(other => [button.getAttribute('aria-label'), other.getAttribute('aria-label')]);
+    }));
+    expect(overlaps).toEqual([]);
   } finally {
     await pool.end();
   }

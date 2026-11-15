@@ -1040,12 +1040,6 @@ html.dark .pl-hero {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .pl-rail-foot {
-    display: none !important;
-  }
-}
-
 .pl-rail-foot-label {
   font-family: var(--pl-font-sans);
   font-size: 0.78125rem;
@@ -1297,25 +1291,18 @@ html.dark .pl-stage-counter-pill {
   margin-top: 1.25rem;
 }
 
-@media (max-width: 1023px) {
+@media (max-width: 1023px), (prefers-reduced-motion: reduce) {
+  .pl-theatre-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pl-chapter-rail,
   .stage-interactive-desktop {
-    display: none !important;
+    display: none;
   }
 
   .stage-fallback-list {
-    display: grid !important;
-    position: static !important;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .stage-interactive-desktop {
-    display: none !important;
-  }
-
-  .stage-fallback-list {
-    display: grid !important;
-    position: static !important;
+    display: grid;
   }
 }
 
@@ -1416,6 +1403,7 @@ html.dark .pl-stage-counter-pill {
 }
 
 .pl-digest-board {
+  min-width: 0;
   background-color: var(--pl-ground-alt);
   border: 1px solid var(--pl-rule-strong);
   border-radius: var(--pl-radius-stage);

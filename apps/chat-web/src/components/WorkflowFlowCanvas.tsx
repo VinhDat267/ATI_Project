@@ -176,7 +176,7 @@ function DottedConnector({
         <div className="relative flex items-center w-full h-3.5">
           <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
           <svg
-            width="100%"
+            width="0"
             height="14"
             fill="none"
             className={`flex-1 min-w-[10px] h-3.5 overflow-visible ${isExecuting ? 'animate-pulse' : ''}`}
@@ -703,7 +703,7 @@ export function WorkflowFlowCanvas({
                 className={
                   compact
                     ? index < serviceNodes.length - 1
-                      ? 'flex items-center flex-1 min-w-0'
+                      ? 'flex items-center flex-1 min-w-max'
                       : 'flex items-center flex-shrink-0'
                     : 'flex items-center'
                 }
@@ -791,12 +791,12 @@ export function WorkflowFlowCanvas({
             data-testid="workflow-upstream-chain"
             className={
               compact
-                ? 'flex flex-wrap sm:flex-nowrap items-center flex-1 min-w-0 gap-y-2'
+                ? 'flex flex-wrap sm:flex-nowrap items-center flex-1 min-w-min gap-y-2'
                 : 'flex flex-wrap items-center justify-center gap-y-2.5'
             }
           >
             {upstreamNodes.map((uNode, uIdx) => (
-              <div key={uNode.service} className={compact ? 'flex items-center flex-1 min-w-0' : 'flex items-center'}>
+              <div key={uNode.service} className={compact ? 'flex items-center flex-1 min-w-max' : 'flex items-center'}>
                 <OrbitalNodeButton
                   node={uNode}
                   index={uIdx}
