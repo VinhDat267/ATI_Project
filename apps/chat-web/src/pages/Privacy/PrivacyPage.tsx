@@ -490,6 +490,12 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
             <p>Planora chỉ tạo issue hoặc thêm bình luận sau khi bạn xem trước đích ghi và bấm phê duyệt kế hoạch. Các bảng hội thoại, kế hoạch và bước thực thi vẫn giữ lại nội dung và tham số đã chạy kể cả sau khi bạn ngắt kết nối Jira.</p>
             <p>Ngắt kết nối trên Planora chỉ xoá token cục bộ và phạm vi project đã lưu, không tự xoá lịch sử hội thoại đã lưu và không tự thu hồi grant phía Atlassian nếu bạn chưa thu hồi quyền trực tiếp trong trang cài đặt tài khoản Atlassian.</p>
           </section>
+          <section aria-label="Tài khoản GitHub bạn kết nối" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3 mt-4">
+            <h3 className="font-semibold text-[#111827]">Tài khoản GitHub bạn kết nối</h3>
+            <p>Khi kết nối GitHub qua OAuth 2.0 1-Click, Planora chỉ đọc và thao tác trong phạm vi tối đa 10 repository được chọn cho Workspace đang kích hoạt (ở Workspace cá nhân bạn tự chọn repository của mình; ở Workspace tổ chức, quản trị viên cấu hình danh sách repository dùng chung và từng thành viên tự liên kết tài khoản GitHub cá nhân). Dữ liệu đọc từ repository (tiêu đề, mô tả, bình luận và siêu dữ liệu issue/Pull Request) được gửi tới nhà cung cấp mô hình AI bên thứ ba đã cấu hình để lập kế hoạch, trả lời hoặc tóm tắt.</p>
+            <p>Mọi thao tác ghi (tạo hoặc cập nhật issue, gắn nhãn, thêm bình luận, tạo Pull Request kể cả PR nháp và mời người review) luôn hiển thị bản xem trước và chỉ thực thi sau khi bạn bấm phê duyệt kế hoạch; lịch bản tin GitHub định kỳ chỉ sử dụng quyền đọc và kiểm tra lại quyền truy cập repository ở mỗi lượt chạy.</p>
+            <p>Bạn có thể đổi danh sách repository hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#github" onClick={appLink(navigate, '/settings#github')} className="text-[#FF5701] underline font-medium">Kết nối dịch vụ</a>. Ngắt kết nối trên Planora sẽ xoá ngay token mã hoá lưu cục bộ, vẫn giữ lại hội thoại, kế hoạch và kết quả bước đã lưu trong cơ sở dữ liệu, và không tự thu hồi grant phía GitHub nếu bạn chưa thu hồi quyền trực tiếp trong phần cài đặt ứng dụng của tài khoản GitHub.</p>
+          </section>
             {/* Quy định duyệt tài khoản Google mới */}
           <div className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm text-[#4B5563]">
             <div className="font-semibold text-[#111827] mb-1 flex items-center gap-2">

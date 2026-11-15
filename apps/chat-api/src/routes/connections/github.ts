@@ -321,7 +321,11 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
     try {
       const cred = await options.credentialRepo!.getPersonalConnectionStatus('github', user.id);
       if (!cred || cred.status !== 'active') {
-        res.status(400).json({ error: 'Quản trị viên cần kết nối tài khoản GitHub trước.' });
+        res.status(400).json({
+          error: scopeId.startsWith('personal:')
+            ? 'Bạn cần kết nối tài khoản GitHub trước.'
+            : 'Quản trị viên cần kết nối tài khoản GitHub trước.',
+        });
         return;
       }
 
@@ -386,7 +390,11 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
     try {
       const cred = await options.credentialRepo!.getPersonalConnectionStatus('github', user.id);
       if (!cred || cred.status !== 'active') {
-        res.status(400).json({ error: 'Quản trị viên cần kết nối tài khoản GitHub trước.' });
+        res.status(400).json({
+          error: scopeId.startsWith('personal:')
+            ? 'Bạn cần kết nối tài khoản GitHub trước.'
+            : 'Quản trị viên cần kết nối tài khoản GitHub trước.',
+        });
         return;
       }
 
@@ -489,7 +497,10 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
           const accessToken = await resolveAccessToken(user.id, cred.id, dec);
           callerRepos = await client.repos(accessToken, AbortSignal.timeout(githubTimeoutMs));
         } catch (err) {
-          if (err instanceof GitHubOAuthError && err.kind === 'invalid_grant') {
+          if (
+            (err instanceof GitHubOAuthError && err.kind === 'invalid_grant') ||
+            (err as any)?.category === 'AUTH_ERROR'
+          ) {
             await options.credentialRepo!.markReconnectRequired('github', user.id, cred.id);
             res.json({ status: 'reconnect_required', ...(login ? { login } : {}), repos: [] });
             return;
@@ -499,6 +510,11 @@ export function createGitHubConnectionRoutes(options: GitHubConnectionsOptions):
             res.json({ status: 'reconnect_required', ...(login ? { login } : {}), repos: [] });
             return;
           }
+          res.status(502).json({
+            error: 'Không kiểm tra được quyền truy cập GitHub lúc này. Vui lòng thử lại.',
+            code: 'GITHUB_UPSTREAM_UNAVAILABLE',
+          });
+          return;
         }
       }
 

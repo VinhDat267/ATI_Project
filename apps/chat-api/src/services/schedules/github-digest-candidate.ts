@@ -47,7 +47,7 @@ export function computeDigestConfigHash(input: {
 }
 
 const WRITE_INTENT_REGEX =
-  /\b(tạo\s+issue|mở\s+issue|đóng\s+issue|sửa\s+issue|cập\s+nhật\s+issue|gắn\s+nhãn|thêm\s+nhãn|add\s+label|create\s+issue|close\s+issue|update\s+issue|tạo\s+thẻ|create\s+card)\b/i;
+  /\b(tạo\s+(?:issue|pr|pull\s+request)|mở\s+(?:issue|pr|pull\s+request)|đóng\s+issue|sửa\s+issue|cập\s+nhật\s+issue|gắn\s+nhãn|thêm\s+nhãn|gán\s+reviewer|yêu\s+cầu\s+review|add\s+label|create\s+(?:issue|pr|pull\s+request)|close\s+issue|update\s+issue|request\s+review(?:ers?)?|tạo\s+thẻ|create\s+card)\b/i;
 
 export interface EvaluateGithubDigestInput {
   userId: string;

@@ -414,6 +414,35 @@
       "titlePrefix": "Issue #",
       "previewStyle": "issue"
     },
+    "github.list_comments": {
+      "action": "Đọc bình luận issue / PR",
+      "done": "Đã đọc bình luận",
+      "receipt": "Đã đọc bình luận",
+      "kind": "Bình luận",
+      "link": "Mở trên GitHub",
+      "titleField": "issueNumber",
+      "titlePrefix": "Issue #"
+    },
+    "github.create_pull_request": {
+      "action": "Tạo Pull Request",
+      "done": "Đã tạo PR",
+      "receipt": "Đã tạo Pull Request",
+      "kind": "Pull Request",
+      "link": "Mở PR",
+      "titleField": "number",
+      "titlePrefix": "PR #",
+      "previewStyle": "issue"
+    },
+    "github.request_reviewers": {
+      "action": "Gán người review PR",
+      "done": "Đã gửi yêu cầu review",
+      "receipt": "Đã gán người review PR",
+      "kind": "Pull Request",
+      "link": "Mở PR",
+      "titleField": "number",
+      "titlePrefix": "PR #",
+      "previewStyle": "issue"
+    },
     "github.get_issue": {
       "action": "Đọc issue",
       "done": "Đã đọc",

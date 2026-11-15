@@ -59,15 +59,30 @@ function toUtcIsoSeconds(date: Date): string {
 function formatSectionItems(
   items: Array<{ repo: string; number: number; title: string }>,
   kind: 'issues' | 'pull',
+  format: 'slack' | 'telegram',
+  hitRepoCap: boolean,
 ): string[] {
   if (items.length === 0) {
-    return ['  - _(Không có mục nào)_'];
+    return [format === 'telegram' ? '  - (Không có mục nào)' : '  - _(Không có mục nào)_'];
   }
-  return items.map((item) => {
-    const safeTitle = escapeSlackMrkdwn(String(item.title ?? '').slice(0, 120));
+  const displayed = items.slice(0, 10);
+  const lines = displayed.map((item) => {
+    const rawTitle = String(item.title ?? '').slice(0, 120);
     const url = `https://github.com/${item.repo}/${kind}/${Number(item.number)}`;
+    if (format === 'telegram') {
+      return `  - ${item.repo}#${Number(item.number)}: ${rawTitle} — ${url}`;
+    }
+    const safeTitle = escapeSlackMrkdwn(rawTitle);
     return `  - <${url}|${item.repo}#${Number(item.number)}>: ${safeTitle}`;
   });
+  if (items.length > displayed.length || hitRepoCap) {
+    lines.push(
+      hitRepoCap
+        ? '  - ... còn thêm mục khác (giới hạn 20/repo)'
+        : `  - ... còn ${items.length - displayed.length} mục khác (hiển thị ${displayed.length}/${items.length})`,
+    );
+  }
+  return lines;
 }
 
 function isDefiniteWriteRejection(err: any): boolean {
@@ -387,10 +402,13 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
     const staleBeforeDate = new Date(run.dueAt.getTime() - staleDays * 24 * 3600_000);
     const staleIso = toUtcIsoSeconds(staleBeforeDate);
 
-    // 3. Read 3 sections from GitHub
+    // 3. Read 3 sections from GitHub (up to 20 per repo to disclose '+' / truncation truthfully)
     const newIssues: Array<{ repo: string; number: number; title: string }> = [];
     const stalePrs: Array<{ repo: string; number: number; title: string }> = [];
     const unassignedIssues: Array<{ repo: string; number: number; title: string }> = [];
+    let newHitCap = false;
+    let staleHitCap = false;
+    let unassignedHitCap = false;
 
     try {
       for (const repo of config.repos) {
@@ -398,33 +416,36 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
         const [newRes, prRes, unassignedRes] = await Promise.all([
           githubAdapter.execute(
             'github.search_issues',
-            { repo, query: `is:issue created:>=${sinceIso}`, limit: 10 },
+            { repo, query: `is:issue created:>=${sinceIso}`, limit: 20 },
             { signal, repo },
           ),
           githubAdapter.execute(
             'github.search_issues',
-            { repo, query: `is:pr is:open draft:false review:none created:<=${staleIso}`, limit: 10 },
+            { repo, query: `is:pr is:open draft:false review:none created:<=${staleIso}`, limit: 20 },
             { signal, repo },
           ),
           githubAdapter.execute(
             'github.search_issues',
-            { repo, query: 'is:issue is:open no:assignee', limit: 10 },
+            { repo, query: 'is:issue is:open no:assignee', limit: 20 },
             { signal, repo },
           ),
         ]);
 
         if (Array.isArray(newRes)) {
-          for (const item of newRes.slice(0, 10)) {
+          if (newRes.length >= 20) newHitCap = true;
+          for (const item of newRes.slice(0, 20)) {
             newIssues.push({ repo, number: Number(item.number), title: String(item.title ?? '') });
           }
         }
         if (Array.isArray(prRes)) {
-          for (const item of prRes.slice(0, 10)) {
+          if (prRes.length >= 20) staleHitCap = true;
+          for (const item of prRes.slice(0, 20)) {
             stalePrs.push({ repo, number: Number(item.number), title: String(item.title ?? '') });
           }
         }
         if (Array.isArray(unassignedRes)) {
-          for (const item of unassignedRes.slice(0, 10)) {
+          if (unassignedRes.length >= 20) unassignedHitCap = true;
+          for (const item of unassignedRes.slice(0, 20)) {
             unassignedIssues.push({ repo, number: Number(item.number), title: String(item.title ?? '') });
           }
         }
@@ -459,7 +480,8 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
           abortPromise,
         ]);
         if (typeof raw === 'string' && raw.trim()) {
-          aiSummary = escapeSlackMrkdwn(raw.trim().slice(0, 400));
+          const rawSummary = raw.trim().slice(0, 400);
+          aiSummary = isTelegramDest ? rawSummary : escapeSlackMrkdwn(rawSummary);
         }
       } catch {
         aiSummary = null;
@@ -469,21 +491,29 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
       }
     }
 
-    // 5. Build escaped Slack message (<= 3,500 chars)
-    const lines: string[] = [
-      `*Bản tin GitHub tự động của Planora* · thiết lập bởi @${escapeSlackMrkdwn(config.login)}`,
-    ];
-    if (aiSummary) {
-      lines.push(`> 💡 *Nhận xét AI:* ${aiSummary}`);
-    }
-    lines.push(
-      `• *Issue mới (${newIssues.length}):*`,
-      ...formatSectionItems(newIssues, 'issues'),
-      `• *PR chờ review quá ${staleDays} ngày (${stalePrs.length}):*`,
-      ...formatSectionItems(stalePrs, 'pull'),
-      `• *Issue mở chưa ai nhận (${unassignedIssues.length}):*`,
-      ...formatSectionItems(unassignedIssues, 'issues'),
-    );
+    // 5. Build destination-appropriate digest message (<= 3,500 chars)
+    const countLabel = (count: number, hitCap: boolean) => (hitCap ? `${count}+` : String(count));
+    const lines: string[] = isTelegramDest
+      ? [
+          `Bản tin GitHub tự động của Planora · thiết lập bởi @${config.login}`,
+          ...(aiSummary ? [`💡 Nhận xét AI: ${aiSummary}`] : []),
+          `• Issue mới (${countLabel(newIssues.length, newHitCap)}):`,
+          ...formatSectionItems(newIssues, 'issues', 'telegram', newHitCap),
+          `• PR chờ review quá ${staleDays} ngày (${countLabel(stalePrs.length, staleHitCap)}):`,
+          ...formatSectionItems(stalePrs, 'pull', 'telegram', staleHitCap),
+          `• Issue mở chưa ai nhận (${countLabel(unassignedIssues.length, unassignedHitCap)}):`,
+          ...formatSectionItems(unassignedIssues, 'issues', 'telegram', unassignedHitCap),
+        ]
+      : [
+          `*Bản tin GitHub tự động của Planora* · thiết lập bởi @${escapeSlackMrkdwn(config.login)}`,
+          ...(aiSummary ? [`> 💡 *Nhận xét AI:* ${aiSummary}`] : []),
+          `• *Issue mới (${countLabel(newIssues.length, newHitCap)}):*`,
+          ...formatSectionItems(newIssues, 'issues', 'slack', newHitCap),
+          `• *PR chờ review quá ${staleDays} ngày (${countLabel(stalePrs.length, staleHitCap)}):*`,
+          ...formatSectionItems(stalePrs, 'pull', 'slack', staleHitCap),
+          `• *Issue mở chưa ai nhận (${countLabel(unassignedIssues.length, unassignedHitCap)}):*`,
+          ...formatSectionItems(unassignedIssues, 'issues', 'slack', unassignedHitCap),
+        ];
 
     const messageText = lines.join('\n').slice(0, 3500);
 
@@ -520,13 +550,25 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
           { chatId: config.telegramChatId, text: messageText },
           { signal, chatId: config.telegramChatId },
         );
+        const messageId =
+          typeof sendRes?.messageId === 'number' &&
+          Number.isInteger(sendRes.messageId) &&
+          sendRes.messageId > 0
+            ? sendRes.messageId
+            : null;
+        if (messageId === null) {
+          return {
+            state: 'delivery_unknown',
+            error: GITHUB_DELIVERY_UNKNOWN,
+          };
+        }
         const delivery: GithubDigestDelivery = {
           channelId: '',
           channelName: '',
           ts: null,
           telegramChatId: config.telegramChatId,
           telegramChatTitle: config.telegramChatTitle ?? '',
-          messageId: typeof sendRes?.messageId === 'number' ? sendRes.messageId : null,
+          messageId,
           counts: {
             newIssues: newIssues.length,
             stalePrs: stalePrs.length,
@@ -560,10 +602,17 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
         { channel: config.channelId, text: messageText },
         { signal },
       );
+      const ts = typeof sendRes?.ts === 'string' && sendRes.ts.trim().length > 0 ? sendRes.ts.trim() : null;
+      if (ts === null) {
+        return {
+          state: 'delivery_unknown',
+          error: GITHUB_DELIVERY_UNKNOWN,
+        };
+      }
       const delivery: GithubDigestDelivery = {
         channelId: config.channelId,
         channelName: config.channelName,
-        ts: typeof sendRes?.ts === 'string' ? sendRes.ts : null,
+        ts,
         counts: {
           newIssues: newIssues.length,
           stalePrs: stalePrs.length,

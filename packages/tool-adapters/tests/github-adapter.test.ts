@@ -224,10 +224,17 @@ describe('GitHub adapter', () => {
     await adapter.execute('github.search_issues', { repo, query: 'pr' });
     expect(new URL(fetchFn.mock.calls[4]![0]).searchParams.get('q')).toBe('repo:team/project is:pr is:open');
 
-    // 4. Plain keyword search still wraps in quotes and filters out pull_request
+    // 4. Plain keywords use AND search (unquoted) while quoted phrases remain exact
     const kwRes = await adapter.execute('github.search_issues', { repo, query: 'login crash' });
     expect(kwRes).toEqual([{ id: '12', number: 7, title: 'Fix login', url: issue.html_url, repo }]);
-    expect(new URL(fetchFn.mock.calls[5]![0]).searchParams.get('q')).toBe('repo:team/project is:issue "login crash"');
+    expect(new URL(fetchFn.mock.calls[5]![0]).searchParams.get('q')).toBe('repo:team/project is:issue login crash');
+
+    await adapter.execute('github.search_issues', { repo, query: '"login crash" is:open' });
+    expect(new URL(fetchFn.mock.calls[6]![0]).searchParams.get('q')).toBe('repo:team/project is:issue is:open "login crash"');
+
+    // 5. Unwhitelisted qualifiers (e.g. repo:, org:) are neutralized to plain text
+    await adapter.execute('github.search_issues', { repo, query: 'repo:other/secret author:vinhdat bug' });
+    expect(new URL(fetchFn.mock.calls[7]![0]).searchParams.get('q')).toBe('repo:team/project is:issue author:vinhdat repo other/secret bug');
   });
 
   it('supports custom baseUrl and rejects out-of-scope context.repo before HTTP dispatch', async () => {
@@ -473,5 +480,151 @@ describe('GitHub adapter', () => {
         draft: false,
       },
     ]);
+  });
+
+  it('matches repo allowlist case-insensitively, marks pre-dispatch aborts requestSent:false, and allows issue/PR limits up to 50', async () => {
+    const fetchFn = vi.fn(async (url: string) => {
+      if (url.endsWith('/repos/team/project')) {
+        return json({ id: 2, name: 'project', full_name: 'Team/Project', html_url: 'https://github.com/Team/Project' });
+      }
+      if (url.includes('/search/issues')) {
+        return json({
+          items: [{ ...issue, repository_url: 'https://api.github.com/repos/Team/Project' }],
+        });
+      }
+      if (url.includes('/repos/team/project/pulls')) {
+        return json([]);
+      }
+      return json({ message: 'Not Found' }, 404);
+    });
+    const adapter = new GitHubAdapter({ credentials: { token: 'test' }, allowedScope, fetchFn: fetchFn as typeof fetch });
+
+    await expect(adapter.execute('github.search_repos', { query: 'project' })).resolves.toEqual([
+      { id: '2', name: 'project', fullName: 'Team/Project', url: 'https://github.com/Team/Project' },
+    ]);
+    await expect(adapter.execute('github.search_issues', { repo: 'TEAM/project', query: 'open', limit: 35 })).resolves.toEqual([
+      { id: '12', number: 7, title: 'Fix login', url: issue.html_url, repo },
+    ]);
+    await expect(adapter.execute('github.list_pull_requests', { repo: 'Team/Project', limit: 50 })).resolves.toEqual([]);
+    await expect(adapter.execute('github.search_issues', { repo, query: 'open', limit: 51 })).rejects.toMatchObject({ category: 'VALIDATION' });
+
+    const preAborted = new AbortController();
+    preAborted.abort();
+    await expect(adapter.execute('github.create_issue', { repo, title: 'aborted' }, { signal: preAborted.signal })).rejects.toMatchObject({
+      category: 'NETWORK',
+      details: { requestSent: false },
+    });
+    await expect(adapter.execute('github.create_issue', { repo: 'other/private', title: 'denied' })).rejects.toMatchObject({
+      category: 'AUTH_ERROR',
+      details: { requestSent: false },
+    });
+  });
+
+  it('supports list_comments, create_pull_request, and request_reviewers with fail-closed validation and acknowledgment checks', async () => {
+    const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes('/issues/7/comments') && init?.method === 'GET') {
+        return json([
+          {
+            id: 3001,
+            body: 'Đã reproduce trên staging.',
+            html_url: 'https://github.com/team/project/issues/7#issuecomment-3001',
+            user: { login: 'qa-bot' },
+            created_at: '2026-10-05T10:00:00Z',
+          },
+        ]);
+      }
+      if (url.endsWith('/repos/team/project/pulls') && init?.method === 'POST') {
+        const parsed = JSON.parse(String(init.body));
+        return json(
+          {
+            id: 601,
+            number: 99,
+            title: parsed.title,
+            html_url: 'https://github.com/team/project/pull/99',
+            state: 'open',
+            draft: Boolean(parsed.draft),
+            head: { ref: parsed.head },
+            base: { ref: parsed.base },
+          },
+          201,
+        );
+      }
+      if (url.endsWith('/pulls/99/requested_reviewers') && init?.method === 'POST') {
+        const parsed = JSON.parse(String(init.body));
+        if (parsed.reviewers.includes('missing')) {
+          return json({ html_url: 'https://github.com/team/project/pull/99', requested_reviewers: [] }, 201);
+        }
+        return json(
+          {
+            html_url: 'https://github.com/team/project/pull/99',
+            requested_reviewers: parsed.reviewers.map((login: string) => ({ login })),
+          },
+          201,
+        );
+      }
+      return json({ message: 'Not Found' }, 404);
+    });
+    const adapter = new GitHubAdapter({ credentials: { token: 'test' }, allowedScope, fetchFn: fetchFn as typeof fetch });
+
+    const comments = await adapter.execute('github.list_comments', { repo, issueNumber: 7, limit: 20 });
+    expect(comments).toEqual([
+      {
+        id: '3001',
+        issueNumber: 7,
+        author: 'qa-bot',
+        body: 'Đã reproduce trên staging.',
+        url: 'https://github.com/team/project/issues/7#issuecomment-3001',
+        repo,
+        createdAt: '2026-10-05T10:00:00Z',
+      },
+    ]);
+
+    const pr = await adapter.execute('github.create_pull_request', {
+      repo,
+      title: 'Fix login race',
+      head: 'fix/login-race',
+      base: 'main',
+      body: 'Closes #7',
+      draft: true,
+    });
+    expect(pr).toEqual({
+      id: '601',
+      number: 99,
+      title: 'Fix login race',
+      url: 'https://github.com/team/project/pull/99',
+      repo,
+      state: 'open',
+      draft: true,
+      headRef: 'fix/login-race',
+      baseRef: 'main',
+    });
+
+    await expect(
+      adapter.execute('github.create_pull_request', { repo, title: 'Bad PR', head: 'main', base: 'main' }),
+    ).rejects.toMatchObject({ category: 'VALIDATION' });
+
+    const reviewed = await adapter.execute('github.request_reviewers', {
+      repo,
+      issueNumber: 99,
+      reviewers: ['@alice', 'bob'],
+    });
+    expect(reviewed).toEqual({
+      number: 99,
+      reviewers: ['alice', 'bob'],
+      repo,
+      url: 'https://github.com/team/project/pull/99',
+    });
+
+    await expect(
+      adapter.execute('github.request_reviewers', { repo, issueNumber: 99, reviewers: ['missing'] }),
+    ).rejects.toMatchObject({ category: 'UNKNOWN', retryable: false });
+
+    await expect(
+      adapter.execute('github.request_reviewers', {
+        repo,
+        issueNumber: 99,
+        reviewers: Array.from({ length: 11 }, (_, i) => `u${i}`),
+      }),
+    ).rejects.toMatchObject({ category: 'VALIDATION' });
   });
 });

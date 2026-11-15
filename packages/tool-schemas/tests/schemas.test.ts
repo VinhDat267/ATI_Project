@@ -55,15 +55,23 @@ describe('packages/tool-schemas (Task 2)', () => {
 
     expect(GITHUB_OAUTH_TOOLS.map((tool) => tool.name)).toEqual([
       'github.get_pull_request',
+      'github.list_comments',
       'github.update_issue',
       'github.add_comment',
+      'github.create_pull_request',
+      'github.request_reviewers',
       'github.list_issues',
       'github.list_pull_requests',
     ]);
     expect(getToolDefinition('github.update_issue')?.inputSchema.required).toEqual(['repo', 'issueNumber']);
     expect(getToolDefinition('github.update_issue')?.inputSchema.properties.state.enum).toEqual(['open', 'closed']);
     expect(getToolDefinition('github.add_comment')?.inputSchema.required).toEqual(['repo', 'issueNumber', 'body']);
+    expect(getToolDefinition('github.create_pull_request')?.inputSchema.required).toEqual(['repo', 'title', 'head', 'base']);
+    expect(getToolDefinition('github.request_reviewers')?.inputSchema.required).toEqual(['repo', 'issueNumber', 'reviewers']);
     expect(getToolDefinition('github.get_pull_request')?.sideEffect).toBe('read');
+    expect(getToolDefinition('github.list_comments')?.sideEffect).toBe('read');
+    expect(getToolDefinition('github.create_pull_request')?.sideEffect).toBe('write');
+    expect(getToolDefinition('github.request_reviewers')?.sideEffect).toBe('write');
     expect(getToolDefinition('github.list_issues')?.sideEffect).toBe('read');
     expect(getToolDefinition('github.list_pull_requests')?.sideEffect).toBe('read');
     expect(getToolDefinition('slack.read_messages')?.sideEffect).toBe('read');

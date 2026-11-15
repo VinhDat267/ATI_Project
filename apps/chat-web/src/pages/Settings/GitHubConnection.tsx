@@ -3,6 +3,11 @@ import { createPortal } from 'react-dom';
 import type { User } from '../../types';
 import { apiClient } from '../../services/api-client';
 import { githubSessionOwner, redirectToGitHub } from '../../services/github-connection';
+import {
+  getActiveWorkspaceId,
+  getActiveWorkspaceSummary,
+  subscribeWorkspace,
+} from '../../services/workspace-storage';
 import { CockpitDialog } from '../../components/CockpitDialog';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import {
@@ -50,28 +55,45 @@ export function GitHubConnection({
     Array<{ repoId: string; fullName: string; name: string; private?: boolean }>
   >([]);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
+  const [candidateError, setCandidateError] = useState('');
   const [repoFilter, setRepoFilter] = useState('');
   const [selectedRepos, setSelectedRepos] = useState<string[]>([]);
   const [editingScope, setEditingScope] = useState(false);
+
+  const [workspace, setWorkspace] = useState(() => getActiveWorkspaceSummary());
+  const [workspaceScopeId, setWorkspaceScopeId] = useState(() => getActiveWorkspaceId());
 
   const mounted = useRef(false);
   const pending = useRef(false);
   const row = useRef<HTMLDivElement>(null);
 
-  const isAdmin = user?.role === 'admin';
+  const isOrgWorkspace = workspaceScopeId !== 'personal';
+  const canManageScope = isOrgWorkspace
+    ? workspace.id !== 'personal'
+      ? workspace.role === 'admin'
+      : user?.role === 'admin'
+    : true;
+  const canManageScopeRef = useRef(canManageScope);
+  canManageScopeRef.current = canManageScope;
 
   const fetchStatus = async () => {
     try {
       const res = await apiClient.getGitHubConnection();
       if (mounted.current) {
-        if (isAdmin && res.status === 'needs_scope') {
+        if (canManageScopeRef.current && res.status === 'needs_scope') {
           setLoadingCandidates(true);
         }
+        setError('');
         setData(res);
       }
-    } catch {
+    } catch (err) {
       if (mounted.current) {
-        setData({ status: 'not_connected', repos: [] });
+        setError(
+          err instanceof Error && err.message
+            ? err.message
+            : 'Không kiểm tra được trạng thái kết nối GitHub lúc này. Vui lòng thử lại.',
+        );
+        setData((prev) => prev ?? { status: 'not_connected', repos: [] });
       }
     }
   };
@@ -82,6 +104,23 @@ export function GitHubConnection({
     return () => {
       mounted.current = false;
     };
+  }, []);
+
+  useEffect(() => {
+    return subscribeWorkspace(() => {
+      if (!mounted.current) return;
+      const nextSummary = getActiveWorkspaceSummary();
+      const nextWsId = getActiveWorkspaceId();
+      setWorkspace(nextSummary);
+      setWorkspaceScopeId(nextWsId);
+      setEditingScope(false);
+      setSelectedRepos([]);
+      setRepoFilter('');
+      setCandidateRepos([]);
+      setCandidateError('');
+      setError('');
+      void fetchStatus();
+    });
   }, []);
 
   useEffect(() => {
@@ -101,8 +140,9 @@ export function GitHubConnection({
   }, [selected]);
 
   useEffect(() => {
-    if (isAdmin && (data?.status === 'needs_scope' || editingScope)) {
+    if (canManageScope && (data?.status === 'needs_scope' || editingScope)) {
       setLoadingCandidates(true);
+      setCandidateError('');
       apiClient
         .getGitHubCandidateRepos()
         .then((res) => {
@@ -110,14 +150,21 @@ export function GitHubConnection({
             setCandidateRepos(res.repos);
           }
         })
-        .catch(() => {
-          if (mounted.current) setCandidateRepos([]);
+        .catch((err) => {
+          if (mounted.current) {
+            setCandidateRepos([]);
+            setCandidateError(
+              err instanceof Error && err.message
+                ? err.message
+                : 'Không tải được danh sách repository từ GitHub.',
+            );
+          }
         })
         .finally(() => {
           if (mounted.current) setLoadingCandidates(false);
         });
     }
-  }, [isAdmin, data?.status, editingScope]);
+  }, [canManageScope, data?.status, editingScope, workspaceScopeId]);
 
   const connect = async () => {
     if (pending.current) return;
@@ -221,7 +268,7 @@ export function GitHubConnection({
         Chỉ bạn dùng được tài khoản GitHub này để thao tác trên các repository đã được chọn.
       </p>
 
-      <div className="text-sm text-[#111827] dark:text-neutral-200 break-words">
+      <div className="text-sm text-[#111827] dark:text-[#E2E8F0] break-words">
         {status === 'connected' ? (
           <span>
             Đã kết nối {data?.login && <>· @{data.login}</>}
@@ -244,18 +291,18 @@ export function GitHubConnection({
       </div>
 
       {status === 'needs_membership' && data?.repos && data.repos.length > 0 && (
-        <div className="v3-space-y-2 border-t border-[#F3F4F6] pt-3">
-          <p className="text-xs font-semibold text-[#DC2626]">
+        <div className="v3-space-y-2 border-t border-[#F3F4F6] dark:border-[#293653] pt-3">
+          <p className="text-xs font-semibold text-[#DC2626] dark:text-red-300">
             Bạn cần được cấp quyền truy cập repository:
           </p>
           <div className="v3-space-y-1.5">
             {data.repos.map((r) => (
               <div
                 key={r.fullName}
-                className="flex items-center justify-between p-2.5 bg-neutral-50 rounded-lg text-xs"
+                className="flex items-center justify-between p-2.5 bg-neutral-50 dark:bg-[#0E1528] rounded-lg text-xs"
               >
-                <span className="font-medium text-[#111827]">{r.fullName}</span>
-                <span className="text-[#DC2626] font-medium">
+                <span className="font-medium text-[#111827] dark:text-[#F1F5F9]">{r.fullName}</span>
+                <span className="text-[#DC2626] dark:text-red-300 font-medium">
                   Bạn cần được cấp quyền truy cập repository
                 </span>
               </div>
@@ -265,19 +312,19 @@ export function GitHubConnection({
       )}
 
       {status === 'connected' && data?.repos && (
-        <div className="v3-space-y-2 border-t border-[#F3F4F6] pt-3">
+        <div className="v3-space-y-2 border-t border-[#F3F4F6] dark:border-[#293653] pt-3">
           <div className="v3-space-y-1.5">
             {data.repos.map((r) => (
               <div
                 key={r.fullName}
-                className="flex items-center justify-between p-2.5 bg-neutral-50 rounded-lg text-xs"
+                className="flex items-center justify-between p-2.5 bg-neutral-50 dark:bg-[#0E1528] rounded-lg text-xs"
               >
-                <span className="font-medium text-[#111827]">{r.fullName}</span>
+                <span className="font-medium text-[#111827] dark:text-[#F1F5F9]">{r.fullName}</span>
                 <span
                   className={
                     r.accessible
-                      ? 'text-emerald-700 font-medium'
-                      : 'text-[#DC2626] font-medium'
+                      ? 'text-emerald-700 dark:text-emerald-300 font-medium'
+                      : 'text-[#DC2626] dark:text-red-300 font-medium'
                   }
                 >
                   {r.accessible ? 'Dùng được' : 'Bạn cần được cấp quyền truy cập repository'}
@@ -288,7 +335,7 @@ export function GitHubConnection({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#2E2E2E]">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#293653]">
         {status === 'not_connected' || status === 'reconnect_required' || status === 'unconfigured' ? (
           <button
             id="github-connect"
@@ -302,7 +349,7 @@ export function GitHubConnection({
         ) : (
           <>
             <div>
-              {isAdmin && !editingScope && (status === 'connected' || status === 'needs_membership') && (
+              {canManageScope && !editingScope && (status === 'connected' || status === 'needs_membership') && (
                 <button
                   id="github-edit-scope"
                   type="button"
@@ -329,24 +376,30 @@ export function GitHubConnection({
         )}
       </div>
 
-      {isAdmin && (status === 'needs_scope' || editingScope) && (
+      {!canManageScope && status === 'needs_scope' && (
+        <p className="mt-3 text-xs text-[#92400E] dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+          Quản trị viên không gian làm việc chưa chọn repository GitHub cho nhóm.
+        </p>
+      )}
+
+      {canManageScope && (status === 'needs_scope' || editingScope) && (
         <div
           id="github-scope"
           data-testid="github-scope"
           className="mt-4 p-4 border border-[#E7E7E2] dark:border-[#374151] rounded-xl bg-[#F8F8F6] dark:bg-[#1F2937]/50 v3-space-y-3"
         >
           <h4 className="text-xs font-semibold text-[#374151] dark:text-[#D1D5DB]">
-            Chọn repository GitHub cho nhóm
+            {isOrgWorkspace ? 'Chọn repository GitHub cho nhóm' : 'Chọn repository GitHub của bạn'}
           </h4>
 
           <div className="v3-space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <label className="text-xs font-semibold text-[#111827]">
+              <label className="text-xs font-semibold text-[#111827] dark:text-[#F1F5F9]">
                 Các repository được phép dùng (tối đa 10 repository)
               </label>
               <span
                 data-testid="github-scope-counter"
-                className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#E7E7E2] text-[#4B5563]"
+                className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white dark:bg-[#0E1528] border border-[#E7E7E2] dark:border-[#293653] text-[#4B5563] dark:text-[#CBD5E1]"
               >
                 Đã chọn {selectedRepos.length}/10
               </span>
@@ -358,7 +411,7 @@ export function GitHubConnection({
                 onChange={(e) => setRepoFilter(e.target.value)}
                 placeholder="Tìm nhanh theo tên repository..."
                 aria-label="Tìm nhanh repository"
-                className="w-full px-3 py-1.5 text-xs bg-white border border-[#E7E7E2] rounded-lg text-[#111827] focus:ring-2 focus:ring-[#FF5701] focus:v3-outline-none"
+                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-[#0E1528] border border-[#E7E7E2] dark:border-[#293653] rounded-lg text-[#111827] dark:text-[#F1F5F9] placeholder:text-[#9CA3AF] focus:ring-2 focus:ring-[#FF5701] focus:v3-outline-none"
               />
             )}
             <div className="v3-space-y-1.5 max-h-48 overflow-y-auto">
@@ -374,7 +427,9 @@ export function GitHubConnection({
                     <div
                       key={r.fullName}
                       className={`flex items-center justify-between gap-2 p-2 rounded-lg text-xs ${
-                        checked ? 'bg-[#F8F8F6] border border-[#111827]/30' : 'bg-white border border-[#E7E7E2]'
+                        checked
+                          ? 'bg-[#F8F8F6] dark:bg-[#1E293B] border border-[#111827]/30 dark:border-[#FF5701]/60'
+                          : 'bg-white dark:bg-[#0E1528] border border-[#E7E7E2] dark:border-[#293653]'
                       }`}
                     >
                       <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
@@ -383,16 +438,16 @@ export function GitHubConnection({
                           checked={checked}
                           disabled={disabled}
                           onChange={() => toggleRepo(r.fullName)}
-                          className="rounded text-[#111827] focus:ring-[#111827]"
+                          className="rounded text-[#111827] dark:text-[#FF5701] focus:ring-[#111827] dark:focus:ring-[#FF5701]"
                         />
-                        <span className="font-medium text-[#111827] truncate">{r.fullName}</span>
+                        <span className="font-medium text-[#111827] dark:text-[#F1F5F9] truncate">{r.fullName}</span>
                       </label>
                       {typeof r.private === 'boolean' && (
                         <span
                           className={`text-xs font-semibold px-1.5 py-0.5 rounded border shrink-0 ${
                             r.private
                               ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
-                              : 'bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:border-neutral-700'
+                              : 'bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-[#1A2540] dark:text-[#CBD5E1] dark:border-[#293653]'
                           }`}
                         >
                           {r.private ? 'Private' : 'Public'}
@@ -402,10 +457,13 @@ export function GitHubConnection({
                   );
                 })}
               {loadingCandidates && candidateRepos.length === 0 && (
-                <p className="text-xs text-[#6B7280]">Đang tải danh sách repository từ GitHub…</p>
+                <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Đang tải danh sách repository từ GitHub…</p>
               )}
-              {!loadingCandidates && candidateRepos.length === 0 && (
-                <p className="text-xs text-[#6B7280]">Không có repository nào trong tài khoản này.</p>
+              {!loadingCandidates && candidateError && candidateRepos.length === 0 && (
+                <p role="alert" className="text-xs text-[#DC2626] dark:text-red-400">{candidateError}</p>
+              )}
+              {!loadingCandidates && !candidateError && candidateRepos.length === 0 && (
+                <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Không có repository nào trong tài khoản này.</p>
               )}
             </div>
           </div>

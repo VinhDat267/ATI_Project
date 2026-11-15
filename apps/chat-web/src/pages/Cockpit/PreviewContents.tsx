@@ -878,9 +878,20 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
   const ghAssignees = Array.isArray(step.args.assignees)
     ? step.args.assignees.filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
     : [];
-  const ghState = step.tool.startsWith('github.') && (step.args.state === 'open' || step.args.state === 'closed')
+  const isGitHub = step.tool.startsWith('github.');
+  const ghState = isGitHub && (step.args.state === 'open' || step.args.state === 'closed')
     ? step.args.state
     : null;
+  const ghHead = isGitHub && typeof step.args.head === 'string' && step.args.head.trim()
+    ? step.args.head.trim()
+    : null;
+  const ghBase = isGitHub && typeof step.args.base === 'string' && step.args.base.trim()
+    ? step.args.base.trim()
+    : null;
+  const ghDraft = isGitHub && typeof step.args.draft === 'boolean' ? step.args.draft : null;
+  const ghReviewers = isGitHub && Array.isArray(step.args.reviewers)
+    ? step.args.reviewers.filter((r): r is string => typeof r === 'string' && r.trim().length > 0)
+    : [];
   const isMyJira = step.tool.startsWith('myjira.');
   const jiraTargetStatus = isMyJira && typeof step.args.targetStatus === 'string' && step.args.targetStatus.trim()
     ? step.args.targetStatus.trim()
@@ -901,6 +912,10 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
     ...(ghLabels.length > 0 ? ['labels', 'label'] : []),
     ...(ghAssignees.length > 0 ? ['assignees'] : []),
     ...(ghState ? ['state'] : []),
+    ...(ghHead ? ['head'] : []),
+    ...(ghBase ? ['base'] : []),
+    ...(ghDraft !== null ? ['draft'] : []),
+    ...(ghReviewers.length > 0 ? ['reviewers'] : []),
     ...(jiraTargetStatus ? ['targetStatus'] : []),
     ...(jiraPriority ? ['priority'] : []),
     ...(jiraDueDate ? ['dueDate'] : []),
@@ -945,8 +960,18 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
         )}
       </div>
     )}
-    {(ghState || ghLabels.length > 0 || ghAssignees.length > 0) && (
+    {(ghState || ghLabels.length > 0 || ghAssignees.length > 0 || ghHead || ghBase || ghDraft !== null || ghReviewers.length > 0) && (
       <div className="flex flex-wrap items-center gap-1.5" data-testid="github-preview-badges">
+        {(ghHead || ghBase) && (
+          <span className="px-2 py-0.5 rounded-full text-[11px] font-mono bg-sky-50 text-sky-800 border border-sky-200">
+            🔀 {ghHead ?? '?'} → {ghBase ?? '?'}
+          </span>
+        )}
+        {ghDraft !== null && (
+          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-100 text-neutral-700 border border-neutral-200">
+            {ghDraft ? '📝 PR nháp (Draft)' : '✅ PR sẵn sàng review'}
+          </span>
+        )}
         {ghState && (
           <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${ghState === 'open' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-purple-50 text-purple-700 border-purple-200'}`}>
             {ghState === 'open' ? 'Đang mở (open)' : 'Đã đóng (closed)'}
@@ -960,6 +985,11 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
         {ghAssignees.map((assignee) => (
           <span key={`asg-${assignee}`} className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
             @{assignee.replace(/^@/, '')}
+          </span>
+        ))}
+        {ghReviewers.map((reviewer) => (
+          <span key={`rev-${reviewer}`} className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-indigo-50 text-indigo-800 border border-indigo-200">
+            👁️ Review: @{reviewer.replace(/^@/, '')}
           </span>
         ))}
       </div>

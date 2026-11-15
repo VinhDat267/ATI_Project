@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { GitHubConnection } from '../src/pages/Settings/GitHubConnection';
 import { apiClient } from '../src/services/api-client';
 import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
@@ -13,6 +13,7 @@ import { operation } from '../src/pages/Cockpit/presentation';
 import { SettingsPage } from '../src/pages/Settings/SettingsPage';
 import { githubConnectionNotice } from '../src/services/github-connection';
 import { authStorage } from '../src/services/auth-storage';
+import { setActiveWorkspaceId, setCachedOrganizations } from '../src/services/workspace-storage';
 import type { ActivePlan, User } from '../src/types';
 
 describe('Task 9: GitHub OAuth connection UI and chat moments', () => {
@@ -472,6 +473,105 @@ describe('Task 9: GitHub OAuth connection UI and chat moments', () => {
       const scopeBtn = screen.getByRole('link', { name: /Chọn repository GitHub/i });
       fireEvent.click(scopeBtn);
       expect(navSpy).toHaveBeenCalledWith('/settings#github-scope');
+    });
+
+    it('supports personal workspace repo selection, blocks non-admin org member edits, reloads on workspace switch, and renders upstream 502 error + PR preview/receipt', async () => {
+      try {
+        // 1. Personal workspace: regular member can configure their own repo scope
+        act(() => {
+          setCachedOrganizations([{ id: 'ws-org-1', name: 'Team Org', role: 'member', status: 'active' }]);
+          setActiveWorkspaceId('personal');
+        });
+        const getStatusSpy = vi.spyOn(apiClient, 'getGitHubConnection').mockResolvedValue({
+          status: 'needs_scope',
+          login: 'member_octo',
+          repos: [],
+        });
+        vi.spyOn(apiClient, 'getGitHubCandidateRepos').mockResolvedValue({
+          repos: [{ repoId: '1', fullName: 'member/personal-repo', name: 'personal-repo', private: true }],
+        });
+
+        render(<GitHubConnection user={memberUser} refresh={vi.fn()} />);
+        expect(await screen.findByTestId('github-scope')).toBeInTheDocument();
+        expect(screen.getByText('Chọn repository GitHub của bạn')).toBeInTheDocument();
+        expect(await screen.findByText('member/personal-repo')).toBeInTheDocument();
+
+        // 2. Switching to Organization workspace where user is a non-admin member hides #github-scope, shows notice, and reloads status
+        act(() => {
+          setActiveWorkspaceId('ws-org-1');
+        });
+        await waitFor(() => {
+          expect(getStatusSpy).toHaveBeenCalledTimes(2);
+          expect(screen.queryByTestId('github-scope')).toBeNull();
+          expect(
+            screen.getByText('Quản trị viên không gian làm việc chưa chọn repository GitHub cho nhóm.'),
+          ).toBeInTheDocument();
+        });
+
+        // 3. Transient 502 error displays an explicit alert banner instead of false not_connected silence
+        getStatusSpy.mockRejectedValueOnce(new Error('Không kiểm tra được quyền truy cập GitHub lúc này. Vui lòng thử lại.'));
+        act(() => {
+          setActiveWorkspaceId('personal');
+        });
+        expect(await screen.findByRole('alert')).toHaveTextContent(
+          'Không kiểm tra được quyền truy cập GitHub lúc này. Vui lòng thử lại.',
+        );
+      } finally {
+        act(() => {
+          setCachedOrganizations([]);
+          setActiveWorkspaceId('personal');
+        });
+      }
+    });
+
+    it('renders Cockpit preview and receipt metrics for create_pull_request and request_reviewers', () => {
+      const { unmount } = render(
+        <PreviewContents
+          step={{
+            id: 's-pr',
+            tool: 'github.create_pull_request',
+            description: 'Tạo Pull Request',
+            args: {
+              repo: 'acme/ati',
+              title: 'Feat: GitHub PR workflow',
+              head: 'feat/pr-tools',
+              base: 'main',
+              draft: true,
+            },
+          }}
+          destination="acme/ati"
+        />,
+      );
+      expect(screen.getByText('🔀 feat/pr-tools → main')).toBeInTheDocument();
+      expect(screen.getByText('📝 PR nháp (Draft)')).toBeInTheDocument();
+      unmount();
+
+      render(
+        <ReceiptMoment
+          request="Gán reviewer cho PR"
+          steps={[
+            {
+              id: 's-rev',
+              tool: 'github.request_reviewers',
+              description: 'Gán reviewer',
+              status: 'succeeded',
+              output: {
+                number: 99,
+                reviewers: ['alice', 'bob'],
+                repo: 'acme/ati',
+                url: 'https://github.com/acme/ati/pull/99',
+              },
+            },
+          ]}
+          planSteps={[{ id: 's-rev', tool: 'github.request_reviewers', description: 'Gán reviewer', args: {} }]}
+          services={[{ id: 'github', name: 'GitHub', configured: true, connected: true, tools: [] } as any]}
+          destination={resourceDestination}
+          onNewConversation={() => {}}
+          onFollowup={() => {}}
+        />,
+      );
+      expect(screen.getByTestId('github-receipt-metrics')).toHaveTextContent('🔀 PR #99');
+      expect(screen.getByTestId('github-receipt-metrics')).toHaveTextContent('👁️ Reviewer: alice, bob');
     });
   });
 });

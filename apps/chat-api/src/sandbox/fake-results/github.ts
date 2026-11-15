@@ -168,5 +168,47 @@ export const GITHUB_FAKE: FakeService = {
         url: `https://github.com/${repo}/issues/${num}`,
       };
     },
+    'github.list_comments': (args) => {
+      const repo = args.repo || 'owner/repo';
+      const num = args.issueNumber ?? 42;
+      return [
+        {
+          id: 'comment_8001',
+          issueNumber: num,
+          author: 'octocat',
+          body: 'Đã kiểm tra log và tái hiện được nguyên nhân gốc.',
+          url: `https://github.com/${repo}/issues/${num}#issuecomment-8001`,
+          repo,
+          createdAt: '2026-10-25T09:00:00Z',
+        },
+      ];
+    },
+    'github.create_pull_request': (args) => {
+      const repo = args.repo || 'owner/repo';
+      return {
+        id: 'pr_' + Date.now(),
+        number: 101,
+        title: args.title,
+        state: 'open',
+        draft: Boolean(args.draft),
+        headRef: args.head ?? 'feat/update',
+        baseRef: args.base ?? 'main',
+        url: `https://github.com/${repo}/pull/101`,
+        repo,
+      };
+    },
+    'github.request_reviewers': (args) => {
+      const repo = args.repo || 'owner/repo';
+      const num = args.issueNumber ?? 12;
+      const reviewers = Array.isArray(args.reviewers)
+        ? args.reviewers.map((r: unknown) => String(r).trim().replace(/^@+/, '')).filter(Boolean)
+        : [];
+      return {
+        number: num,
+        reviewers,
+        repo,
+        url: `https://github.com/${repo}/pull/${num}`,
+      };
+    },
   },
 };

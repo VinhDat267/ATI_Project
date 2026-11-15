@@ -1575,4 +1575,163 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
       { serviceName: 'slack', workspaceId: orgWorkspaceId, workspaceMode: 'organization' },
     ]);
   });
+
+  it('15. rejects missing Slack ts / Telegram messageId receipts as delivery_unknown -> needs_attention, renders clean Telegram plain text, discloses >10/20 caps, and blocks PR write intents', async () => {
+    // 15a. Write intents for PR creation and reviewer requests are rejected for auto_digest
+    const writeCandidate = await evaluateGithubDigestCandidate({
+      userId: owner.id,
+      request: 'Mỗi sáng tạo PR tổng hợp hoặc gán reviewer rồi báo Slack #team',
+      services: ['github', 'slack'],
+      recurrence: dailyRecurrence,
+      githubConnection: async () => ({
+        status: 'connected',
+        connection: { credentialId: GH_CRED_ID, githubUserId: '1001', login: 'octocat', repos: ['nhom/ati'] },
+      }),
+      getAdapter: async () => ({ execute: async () => [{ id: 'C0123456789', name: 'team' }] }),
+    });
+    expect(writeCandidate.canAutoDigest).toBe(false);
+
+    // 15b. Slack missing ts -> delivery_unknown -> needs_attention
+    const slackMissingTsSchedule = await insertDigestSchedule({ config: baseConfig });
+    const runSlackNoTs = createGithubDigestRunner({
+      pool: db.pool,
+      githubConnection: async () => ({
+        status: 'connected',
+        connection: { credentialId: GH_CRED_ID, githubUserId: '1001', login: 'octocat', repos: ['nhom/ati'] },
+      }),
+      getAdapter: async (serviceName) => ({
+        execute: async (tool: string) => {
+          if (serviceName === 'slack' && tool === 'slack.search_channels') {
+            return [{ id: 'C0123456789', name: 'team' }];
+          }
+          if (serviceName === 'slack' && tool === 'slack.send_message') {
+            return { ok: true }; // missing ts!
+          }
+          return [];
+        },
+      }),
+    });
+    const schedulerNoTs = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: VN,
+      now: () => now,
+      planRun: async () => ({ persist: async () => ({ state: 'needs_attention' }), afterCommit() {} }),
+      runGithubDigest: runSlackNoTs,
+      recordState: (client, row, at) => service.recordState(client, row, at),
+    });
+    await schedulerNoTs.tick();
+    await schedulerNoTs.stop();
+    const noTsRun = (
+      await db.pool.query('SELECT status FROM schedule_runs WHERE schedule_id = $1', [slackMissingTsSchedule.id])
+    ).rows[0];
+    expect(noTsRun.status).toBe('needs_attention');
+
+    // 15c. Telegram missing messageId -> delivery_unknown -> needs_attention
+    const tgConfig: GithubDigestConfig = {
+      ...baseConfig,
+      channelId: '',
+      channelName: '',
+      telegramChatId: '-100999888',
+      telegramChatTitle: 'Dev Alerts',
+      telegramCredentialId: TG_CRED_ID,
+      telegramUserId: '777',
+      telegramUsername: 'octo_tg',
+    };
+    const tgMissingIdSchedule = await insertDigestSchedule({ config: tgConfig });
+    const runTgNoId = createGithubDigestRunner({
+      pool: db.pool,
+      githubConnection: async () => ({
+        status: 'connected',
+        connection: { credentialId: GH_CRED_ID, githubUserId: '1001', login: 'octocat', repos: ['nhom/ati'] },
+      }),
+      telegramConnection: async () => ({
+        status: 'connected',
+        connection: { credentialId: TG_CRED_ID, telegramUserId: '777', username: 'octo_tg', chatIds: ['-100999888'] },
+      }),
+      getAdapter: async (serviceName) => ({
+        execute: async (tool: string) => {
+          if (serviceName === 'telegram' && tool === 'telegram.send_message') {
+            return { ok: true }; // missing valid positive integer messageId
+          }
+          return [];
+        },
+      }),
+    });
+    const schedulerTgNoId = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: VN,
+      now: () => now,
+      planRun: async () => ({ persist: async () => ({ state: 'needs_attention' }), afterCommit() {} }),
+      runGithubDigest: runTgNoId,
+      recordState: (client, row, at) => service.recordState(client, row, at),
+    });
+    await schedulerTgNoId.tick();
+    await schedulerTgNoId.stop();
+    const tgNoIdRun = (
+      await db.pool.query('SELECT status FROM schedule_runs WHERE schedule_id = $1', [tgMissingIdSchedule.id])
+    ).rows[0];
+    expect(tgNoIdRun.status).toBe('needs_attention');
+
+    // 15d. Telegram clean plain text (no &amp; or <url|...>) + >10 and 20-cap disclosure
+    const sentTgTexts: string[] = [];
+    const tgSchedule = await insertDigestSchedule({ config: tgConfig });
+    const runTgOk = createGithubDigestRunner({
+      pool: db.pool,
+      githubConnection: async () => ({
+        status: 'connected',
+        connection: { credentialId: GH_CRED_ID, githubUserId: '1001', login: 'octocat', repos: ['nhom/ati'] },
+      }),
+      telegramConnection: async () => ({
+        status: 'connected',
+        connection: { credentialId: TG_CRED_ID, telegramUserId: '777', username: 'octo_tg', chatIds: ['-100999888'] },
+      }),
+      getAdapter: async (serviceName) => ({
+        execute: async (tool: string, args: any) => {
+          if (serviceName === 'github' && tool === 'github.search_issues') {
+            if (args.query.includes('created:>=')) {
+              return Array.from({ length: 12 }, (_, idx) => ({
+                id: String(idx + 1),
+                number: idx + 1,
+                title: idx === 0 ? 'Login crash & retry' : `Issue ${idx + 1}`,
+                state: 'open',
+              }));
+            }
+            if (args.query.includes('no:assignee')) {
+              return Array.from({ length: 20 }, (_, idx) => ({
+                id: String(100 + idx),
+                number: 100 + idx,
+                title: `Unassigned ${idx + 1}`,
+                state: 'open',
+              }));
+            }
+            return [];
+          }
+          if (serviceName === 'telegram' && tool === 'telegram.send_message') {
+            sentTgTexts.push(args.text);
+            return { messageId: 9001, chatId: args.chatId };
+          }
+          return [];
+        },
+      }),
+    });
+    const schedulerTgOk = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: VN,
+      now: () => now,
+      planRun: async () => ({ persist: async () => ({ state: 'needs_attention' }), afterCommit() {} }),
+      runGithubDigest: runTgOk,
+      recordState: (client, row, at) => service.recordState(client, row, at),
+    });
+    await schedulerTgOk.tick();
+    await schedulerTgOk.stop();
+
+    expect(sentTgTexts).toHaveLength(1);
+    const tgText = sentTgTexts[0]!;
+    expect(tgText).toContain('nhom/ati#1: Login crash & retry — https://github.com/nhom/ati/issues/1');
+    expect(tgText).not.toContain('&amp;');
+    expect(tgText).not.toContain('<https://github.com/nhom/ati/issues/1|');
+    expect(tgText).toContain('... còn 2 mục khác (hiển thị 10/12)');
+    expect(tgText).toContain('(20+)');
+    expect(tgText).toContain('giới hạn 20/repo');
+  });
 });
