@@ -148,3 +148,48 @@ test('FE-08: AUTH-04: root Google transfer is visible and a real late start cann
   expect(starts).toBe(1); expect(providerNavigations).toBe(0);
   expect(await page.evaluate(() => localStorage.getItem('wap_access_token'))).toBeNull();
 });
+
+test('FE-08: product film plays chromeless without native controls bar, unmuted at 35% volume, loops, and toggles via surface button', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.locator('.pl-hero-film-link').click();
+
+  const surface = page.getByTestId('landing-film-surface');
+  const video = page.getByTestId('landing-product-video');
+  await expect(surface).toHaveAttribute('aria-pressed', 'true');
+
+  const initial = await video.evaluate((el: HTMLVideoElement) => ({
+    hasControlsAttr: el.hasAttribute('controls'),
+    controls: el.controls,
+    paused: el.paused,
+    muted: el.muted,
+    defaultMuted: el.defaultMuted,
+    volume: el.volume,
+    loop: el.loop,
+    currentTime: el.currentTime,
+  }));
+  expect(initial.hasControlsAttr).toBe(false);
+  expect(initial.controls).toBe(false);
+  expect(initial.paused).toBe(false);
+  expect(initial.muted).toBe(false);
+  expect(initial.defaultMuted).toBe(false);
+  expect(initial.volume).toBeCloseTo(0.35, 2);
+  expect(initial.loop).toBe(true);
+
+  await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime)).toBeGreaterThan(initial.currentTime);
+
+  await surface.click();
+  await expect(surface).toHaveAttribute('aria-pressed', 'false');
+  expect(await video.evaluate((el: HTMLVideoElement) => el.paused)).toBe(true);
+
+  await surface.click();
+  await expect(surface).toHaveAttribute('aria-pressed', 'true');
+  const resumed = await video.evaluate((el: HTMLVideoElement) => ({
+    paused: el.paused,
+    muted: el.muted,
+    volume: el.volume,
+  }));
+  expect(resumed.paused).toBe(false);
+  expect(resumed.muted).toBe(false);
+  expect(resumed.volume).toBeCloseTo(0.35, 2);
+});

@@ -297,11 +297,11 @@
       "suggestion": {
         "icon": "bg-red-50 border-red-100",
         "decoration": "bg-red-500/5 group-hover:bg-red-500/10",
-        "name": "text-red-600",
-        "badge": "bg-red-50 text-red-700",
-        "receiptHover": "hover:border-red-300",
-        "previewBadge": "bg-red-100 text-red-800"
+        "name": "text-red-600"
       },
+      "badge": "bg-red-50 text-red-700",
+      "receiptHover": "hover:border-red-300",
+      "previewBadge": "bg-red-100 text-red-800",
       "orbital": {
         "label": "Gmail",
         "ringClass": "ring-[#EA4335]/25 border-[#EA4335]",
@@ -322,7 +322,7 @@
       "receiptHover": "hover:border-blue-300",
       "previewBadge": "bg-blue-100 text-blue-800",
       "orbital": {
-        "label": "MyCalendar",
+        "label": "Google Calendar",
         "ringClass": "ring-[#1A73E8]/25 border-[#1A73E8]",
         "strokeHex": "#1A73E8",
         "badgeClass": "bg-blue-50 text-blue-700 border-blue-200"
@@ -341,7 +341,7 @@
       "receiptHover": "hover:border-green-300",
       "previewBadge": "bg-green-100 text-green-800",
       "orbital": {
-        "label": "MySheets",
+        "label": "Google Sheets",
         "ringClass": "ring-[#188038]/25 border-[#188038]",
         "strokeHex": "#188038",
         "badgeClass": "bg-emerald-50 text-emerald-700 border-emerald-200"
@@ -1117,5 +1117,20 @@
       "titleField": "key",
       "previewStyle": "issue"
     }
+  },
+  "serviceNames": {
+    "gmail": "Gmail",
+    "mycalendar": "Google Calendar",
+    "calendar": "Google Calendar",
+    "mysheets": "Google Sheets",
+    "sheets": "Google Sheets",
+    "myslack": "Slack của bạn",
+    "slack": "Slack",
+    "myjira": "Atlassian Jira",
+    "jira": "Atlassian Jira",
+    "trello": "Trello",
+    "github": "GitHub",
+    "notion": "Notion",
+    "telegram": "Telegram"
   }
 }
