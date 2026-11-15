@@ -371,8 +371,14 @@ export async function fixtureSearch({ tool, args }: { tool: string; args: Record
       requireParent('myjira_project', args.projectKey, 'key');
       return { issues: bounded(MYJIRA_ISSUES.filter(item => item.siteId === args.siteId && item.projectKey === args.projectKey && (matches(item.title, args.query) || matches(item.key, args.query)))
         .map(({ projectKey: _parent, ...issue }) => issue), 20) };
-    case 'gmail.search_threads':
-      return bounded(GMAIL_THREADS.filter(thread => gmailQueryMatches(thread, String(args.query))).map(({ messages: _messages, ...summary }) => summary), 10);
+    case 'gmail.search_threads': {
+      const matching = GMAIL_THREADS.filter(thread => gmailQueryMatches(thread, String(args.query)));
+      const offset = typeof args.pageToken === 'string' && /^fixture-page-\d+$/.test(args.pageToken)
+        ? Number(args.pageToken.slice(13)) : 0;
+      const threads = bounded(matching.slice(offset).map(({ messages: _messages, ...summary }) => summary), 10);
+      const end = offset + threads.length;
+      return { threads, ...(end < matching.length ? { nextPageToken: `fixture-page-${end}` } : {}) };
+    }
     case 'gmail.get_thread': {
       const found = GMAIL_THREADS.find(thread => thread.id === args.threadId);
       if (!found) throw new Error(`Unknown fixture thread=${String(args.threadId)}`);

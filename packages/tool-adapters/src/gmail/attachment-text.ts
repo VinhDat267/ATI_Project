@@ -17,13 +17,16 @@ function cutCodepoints(text: string, maxChars: number): { text: string; truncate
   return { text: chars.slice(0, maxChars).join(''), truncated: true };
 }
 
-function normalizeText(raw: string): string {
+function normalizeWhitespace(raw: string): string {
   return raw
     .replace(/\r\n?/g, '\n')
     .replace(/\u0000/g, '')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+    .replace(/(?<![ \t])[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n');
+}
+
+function normalizeText(raw: string): string {
+  return normalizeWhitespace(raw).trim();
 }
 
 function decodeXmlEntities(text: string): string {
@@ -138,15 +141,69 @@ function extractDocxText(buf: Buffer): string {
   );
 }
 
-function extractXlsxText(buf: Buffer): string {
-  const entries = extractZipEntries(buf);
-  const sharedStrings: string[] = [];
+function xlsxRichText(xml: string): string {
+  const runs: string[] = [];
+  for (const match of xml.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/gi)) {
+    runs.push(decodeXmlEntities(match[1] ?? ''));
+  }
+  return runs.join('');
+}
+
+function describeXlsxText(text: string) {
+  let horizontalStart = text.length;
+  while (text[horizontalStart - 1] === ' ' || text[horizontalStart - 1] === '\t') horizontalStart--;
+  let newlineStart = horizontalStart;
+  while (text[newlineStart - 1] === '\n') newlineStart--;
+  return {
+    text,
+    contentStart: text.length - text.trimStart().length,
+    contentEnd: text.trimEnd().length,
+    leadingNewlines: text.match(/^\n{1,2}/)?.[0].length ?? 0,
+    trailingNewlines: horizontalStart - newlineStart,
+    horizontalTail: text.length - horizontalStart,
+  };
+}
+
+function xlsxChunk(raw: string) {
+  return {
+    normal: describeXlsxText(normalizeWhitespace(raw)),
+    // CRLF can span a cell and its row separator.
+    afterCarriageReturn: raw.startsWith('\n') ? describeXlsxText(normalizeWhitespace(raw.slice(1))) : undefined,
+    endsWithCarriageReturn: raw.endsWith('\r'),
+  };
+}
+
+type XlsxChunk = ReturnType<typeof xlsxChunk>;
+type XlsxSharedString = string | XlsxChunk | null;
+
+function xlsxCellText(attrs: string, xml: string, sharedStrings: XlsxSharedString[]): XlsxChunk | null {
+  const type = /\bt="([^"]+)"/i.exec(attrs)?.[1];
+  if (type === 'inlineStr') {
+    const text = xlsxRichText(xml);
+    return text ? xlsxChunk(text) : null;
+  }
+  const value = /<v\b[^>]*>([\s\S]*?)<\/v>/i.exec(xml)?.[1] ?? '';
+  if (type === 's') {
+    const index = Number(value);
+    const shared = sharedStrings[index];
+    if (typeof shared === 'string') {
+      const chunk = shared ? xlsxChunk(shared) : null;
+      sharedStrings[index] = chunk;
+      return chunk;
+    }
+    if (shared !== undefined) return shared;
+  }
+  const text = type === 's' ? value : decodeXmlEntities(value);
+  return text ? xlsxChunk(text) : null;
+}
+
+function* xlsxTextChunks(entries: Map<string, Buffer>): Iterable<XlsxChunk> {
+  // Normalize shared text once, even if many cells reference it.
+  const sharedStrings: XlsxSharedString[] = [];
   const sharedXml = entries.get('xl/sharedStrings.xml')?.toString('utf8');
   if (sharedXml) {
-    const siMatches = sharedXml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/gi);
-    for (const match of siMatches) {
-      const runs = [...match[1]!.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/gi)].map((m) => decodeXmlEntities(m[1] ?? ''));
-      sharedStrings.push(runs.join(''));
+    for (const match of sharedXml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/gi)) {
+      sharedStrings.push(xlsxRichText(match[1]!));
     }
   }
 
@@ -154,38 +211,89 @@ function extractXlsxText(buf: Buffer): string {
     .filter((name) => /^xl\/worksheets\/sheet\d+\.xml$/i.test(name))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-  const sections: string[] = [];
+  const tab = xlsxChunk('\t');
+  const rowBreak = xlsxChunk('\n');
+  const sheetBreak = xlsxChunk('\n\n');
+  let hasPreviousSheet = false;
   for (const sheetPath of sheetNames) {
     const xml = entries.get(sheetPath)?.toString('utf8');
     if (!xml) continue;
-    const rows: string[] = [];
+    let hasPreviousRow = false;
     for (const rowMatch of xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/gi)) {
-      const cells: string[] = [];
+      let hasCellText = false;
+      let emptyCells = 0;
       for (const cellMatch of rowMatch[1]!.matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/gi)) {
-        const attrs = cellMatch[1] ?? '';
-        const body = cellMatch[2] ?? '';
-        const typeMatch = /\bt="([^"]+)"/i.exec(attrs)?.[1];
-        if (typeMatch === 'inlineStr') {
-          const text = [...body.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/gi)].map((m) => decodeXmlEntities(m[1] ?? '')).join('');
-          cells.push(text);
+        const value = xlsxCellText(cellMatch[1]!, cellMatch[2]!, sharedStrings);
+        if (hasCellText) {
+          yield tab;
+        } else if (!value) {
+          emptyCells++;
+          continue;
         } else {
-          const val = /<v\b[^>]*>([\s\S]*?)<\/v>/i.exec(body)?.[1] ?? '';
-          if (typeMatch === 's') {
-            const idx = Number(val);
-            cells.push(Number.isInteger(idx) && sharedStrings[idx] !== undefined ? sharedStrings[idx]! : val);
+          if (hasPreviousRow) {
+            yield rowBreak;
           } else {
-            cells.push(decodeXmlEntities(val));
+            if (hasPreviousSheet) yield sheetBreak;
+            if (sheetNames.length > 1) {
+              const label = sheetPath.replace(/^xl\/worksheets\//i, '').replace(/\.xml$/i, '');
+              yield xlsxChunk(`[${label}]\n`);
+            }
+            hasPreviousSheet = true;
+            hasPreviousRow = true;
           }
+          if (emptyCells > 0) yield xlsxChunk('\t'.repeat(emptyCells));
+          hasCellText = true;
         }
+        if (value) yield value;
       }
-      if (cells.some((c) => c.length > 0)) rows.push(cells.join('\t'));
-    }
-    if (rows.length > 0) {
-      const label = sheetPath.replace(/^xl\/worksheets\//i, '').replace(/\.xml$/i, '');
-      sections.push(sheetNames.length > 1 ? `[${label}]\n${rows.join('\n')}` : rows.join('\n'));
     }
   }
-  return normalizeText(sections.join('\n\n'));
+}
+
+function extractXlsxText(buf: Buffer): string {
+  // Bound the rendered prefix before joining expanded cells. Two UTF-16 code
+  // units per code point leave room for the truncation check on Unicode text.
+  const prefixLimit = 2 * (MAX_EXTRACTED_CHARS + 1);
+  let prefix = '';
+  let length = 0;
+  let lastVisibleEnd = 0;
+  let horizontalSpace = 0;
+  let newlines = 0;
+  let previousCarriageReturn = false;
+
+  for (const chunk of xlsxTextChunks(extractZipEntries(buf))) {
+    const part = (previousCarriageReturn ? chunk.afterCarriageReturn : undefined) ?? chunk.normal;
+    previousCarriageReturn = chunk.endsWithCarriageReturn;
+
+    let start = 0;
+    if (length === 0) {
+      start = part.contentStart;
+    } else if (part.leadingNewlines > 0) {
+      // Spaces disappear before a newline. Adjacent line breaks collapse to two.
+      length -= horizontalSpace;
+      prefix = prefix.slice(0, length);
+      horizontalSpace = 0;
+      start = Math.max(0, newlines + part.leadingNewlines - 2);
+    }
+    const span = part.text.length - start;
+    if (span === 0) continue;
+    prefix += part.text.slice(start, start + prefixLimit - prefix.length);
+    if (part.contentEnd > start) {
+      lastVisibleEnd = length + part.contentEnd - start;
+      if (lastVisibleEnd >= prefixLimit) return prefix;
+    }
+    length += span;
+
+    if (part.horizontalTail === part.text.length) {
+      horizontalSpace += span;
+    } else {
+      horizontalSpace = part.horizontalTail;
+      newlines = part.leadingNewlines + horizontalSpace === part.text.length
+        ? Math.min(2, newlines + part.leadingNewlines)
+        : part.trailingNewlines;
+    }
+  }
+  return prefix.slice(0, lastVisibleEnd);
 }
 
 function decodePdfLiteralString(raw: string): string {

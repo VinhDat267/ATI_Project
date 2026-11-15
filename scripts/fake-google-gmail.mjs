@@ -91,6 +91,13 @@ const json = (response, status, body) => {
   response.end(JSON.stringify(body));
 };
 const random = () => randomBytes(24).toString('base64url');
+function fixturePage(list, params, field) {
+  const limit = Number(params.get('maxResults') ?? 10);
+  const token = params.get('pageToken');
+  const offset = token && /^fixture-page-\d+$/.test(token) ? Number(token.slice(13)) : 0;
+  const next = offset + limit;
+  return { [field]: list.slice(offset, next), ...(next < list.length ? { nextPageToken: `fixture-page-${next}` } : {}) };
+}
 function defaultThreads() {
   const message = { id: 'message-1', labelIds: ['INBOX', 'UNREAD'], snippet: 'Chào nhóm, họp lúc 9 giờ.', payload: {
     mimeType: 'text/plain', headers: [
@@ -326,7 +333,9 @@ export async function startFakeGoogleGmail(options = {}) {
             threadId: fallbackThreadId ?? 'draft-thread',
           };
         };
-        if (path === 'threads' && request.method === 'GET') return json(response, 200, { threads: settings.threads.slice(0, Number(url.searchParams.get('maxResults') ?? 10)).map(t => ({ id: t.id })) });
+        if (path === 'threads' && request.method === 'GET') {
+          return json(response, 200, fixturePage(settings.threads.map(thread => ({ id: thread.id })), url.searchParams, 'threads'));
+        }
         if (path === 'labels' && request.method === 'GET') return json(response, 200, { labels: ['INBOX', 'UNREAD', 'STARRED'].map(id => ({ id, name: id, type: 'system' })) });
         if (path === 'labels' && request.method === 'POST') return json(response, 200, { id: `label-${stats.writes}`, name: body.name, type: 'user' });
         if (path === 'messages/send') return json(response, 200, { id: `sent-${stats.writes}`, threadId: body.threadId ?? `new-thread-${stats.writes}` });
@@ -350,6 +359,7 @@ export async function startFakeGoogleGmail(options = {}) {
               threadId: parsed.threadId,
               labelIds: ['DRAFT'],
               snippet: '',
+              raw: body?.message?.raw,
               payload: { mimeType: 'text/plain', headers: parsed.headers, body: { data: '' } },
             },
           };
@@ -361,19 +371,29 @@ export async function startFakeGoogleGmail(options = {}) {
           const existing = idx >= 0 ? settings.drafts[idx] : null;
           if (!existing) return json(response, 404, { error: { code: 404, errors: [{ reason: 'notFound' }] } });
           settings.drafts.splice(idx, 1);
-          return json(response, 200, { id: `sent-${stats.writes}`, threadId: existing.message?.threadId ?? `new-thread-${stats.writes}` });
+          return json(response, 200, { id: `sent-${stats.writes}`, threadId: body?.message?.threadId ?? existing.message?.threadId ?? `new-thread-${stats.writes}` });
         }
         const draftMatch = /^drafts\/([^/]+)$/.exec(path);
         if (draftMatch) {
           const draftId = decodeURIComponent(draftMatch[1]);
           const existing = (settings.drafts ?? []).find((d) => d.id === draftId);
           if (!existing) return json(response, 404, { error: { code: 404, errors: [{ reason: 'notFound' }] } });
-          if (request.method === 'GET') return json(response, 200, existing);
+          if (request.method === 'GET') {
+            if (url.searchParams.get('format') !== 'raw') return json(response, 200, existing);
+            const message = existing.message;
+            const payload = message.payload;
+            const headers = (payload?.headers ?? []).map(({ name, value }) => `${name}: ${value}`).join('\r\n');
+            const text = Buffer.from(payload?.body?.data ?? '', 'base64url').toString('utf8');
+            const raw = message.raw ?? Buffer.from(`${headers}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${text}`).toString('base64url');
+            return json(response, 200, { id: existing.id, message: { id: message.id, threadId: message.threadId, raw } });
+          }
           if (request.method === 'PUT') {
             const parsed = parseRawMimeDraft(body?.message?.raw, body?.message?.threadId ?? existing.message?.threadId);
             existing.message = {
               ...existing.message,
+              id: `draft-message-${stats.writes}`,
               threadId: parsed.threadId,
+              raw: body?.message?.raw,
               payload: { mimeType: 'text/plain', headers: parsed.headers, body: { data: '' } },
             };
             return json(response, 200, { id: existing.id, message: { id: existing.message.id, threadId: parsed.threadId } });

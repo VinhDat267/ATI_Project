@@ -451,7 +451,7 @@ it('shows uncertain Telegram delivery recovery controls on TELEGRAM_DELIVERY_UNK
   expect(screen.getByTestId('btn-resolve-retry-new-run')).toBeInTheDocument();
 });
 
-it('supports telegram_digest reauthorize CTA, locked Gmail query display, and includeAiSummary opt-out toggle', async () => {
+it.each(['manual', 'auto_digest'] as const)('offers Telegram reauthorization and confirms an ordinary update in %s mode', async (mode) => {
   const pausedTgSchedule: ScheduleView = {
     id: 'sched-tg-reauth',
     convId: 'conv-tg-reauth',
@@ -507,10 +507,15 @@ it('supports telegram_digest reauthorize CTA, locked Gmail query display, and in
           type: 'schedule_proposal',
           services: ['gmail', 'telegram'],
           nextRuns: ['2026-11-15T01:00:00.000Z'],
-          previous: null,
+          previous: {
+            name: pausedTgSchedule.name,
+            request: pausedTgSchedule.request,
+            recurrence: pausedTgSchedule.recurrence,
+            status: pausedTgSchedule.status,
+          },
           proposal: {
             kind: 'schedule',
-            action: 'create',
+            action: 'update',
             name: 'Bản tin Gmail sáng',
             request: 'Mỗi sáng 8h tóm tắt email hóa đơn gửi Telegram của tôi',
             recurrence: { type: 'daily', time: '08:00' },
@@ -543,6 +548,15 @@ it('supports telegram_digest reauthorize CTA, locked Gmail query display, and in
     />,
   );
 
+  if (mode === 'manual') {
+    expect(screen.getByRole('radio', { name: /Chờ tôi duyệt mỗi lượt/ })).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: 'Xác nhận' }));
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledWith('conv-tg-1', 'msg-tg-prop-1', 'manual');
+    });
+    return;
+  }
+
   fireEvent.click(document.getElementById('schedule-mode-auto-digest')!);
   expect(screen.getByTestId('gmail-digest-locked-query')).toHaveTextContent(
     'in:inbox is:unread (hóa đơn OR invoice)',
@@ -567,9 +581,16 @@ it('renders previews and account chips for gmail.update_draft, gmail.send_draft,
     to: ['director@example.com'],
     note: 'Gửi kèm báo giá gốc',
     includeAttachments: true,
+    approvedSource: {
+      messageId: 'approved-message', subject: 'Báo giá', body: 'Nội dung thư nguồn',
+      bodyTruncated: false, attachments: [{ filename: 'bao-gia.pdf', size: 1000 }],
+    },
   });
   render(<PreviewContents step={forwardWithAtt} destination="Họp nhóm ATI" labels={labels} />);
   expect(screen.getByTestId('gmail-forward-attachment-included')).toBeInTheDocument();
+  expect(screen.getByTestId('gmail-approved-source')).toHaveTextContent('Nội dung thư nguồn');
+  expect(screen.getByRole('list', { name: 'Tệp đính kèm' })).toHaveTextContent('bao-gia.pdf');
+  expect(screen.queryByTestId('gmail-source-drift-notice')).toBeNull();
   expect(screen.queryByTestId('gmail-forward-attachment-warning')).toBeNull();
   cleanup();
 

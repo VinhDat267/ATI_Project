@@ -1534,7 +1534,9 @@ describe('Gmail native HTTP adapter', () => {
         }],
       }];
 
-      await adapter.execute('gmail.forward', { threadId: 'thread-fwd-att', to: ['minh@example.com'], includeAttachments: true });
+      const args = { threadId: 'thread-fwd-att', to: ['minh@example.com'], includeAttachments: true };
+      const approvedSource = await adapter.execute('gmail.prepare_write', { tool: 'gmail.forward', args });
+      await adapter.execute('gmail.forward', { ...args, approvedSource });
       const req = server.stats.apiRequests.find((r) => r.method === 'POST' && r.path === 'messages/send')!;
       const mime = Buffer.from(req.body.raw, 'base64url').toString('utf8');
       expect(mime).toContain('Content-Type: multipart/mixed; boundary=');
@@ -1548,32 +1550,32 @@ describe('Gmail native HTTP adapter', () => {
       expect(drafts).toHaveLength(1);
       expect(drafts[0]).toMatchObject({ id: 'draft-seed-1', threadId: 'thread-1', subject: 'Re: Họp nhóm ATI', to: ['lan@example.com'] });
 
-      const updated = await adapter.execute('gmail.update_draft', {
+      const updateArgs = {
         draftId: 'draft-seed-1',
         threadId: 'thread-1',
         to: ['lan@example.com'],
         cc: ['minh@example.com'],
         subject: 'Re: Họp nhóm ATI',
         body: 'Nội dung bản nháp đã cập nhật.',
-      });
+      };
+      const updateSource = await adapter.execute('gmail.prepare_write', { tool: 'gmail.update_draft', args: updateArgs });
+      const updated = await adapter.execute('gmail.update_draft', { ...updateArgs, approvedSource: updateSource });
       expect(updated).toMatchObject({ draftId: 'draft-seed-1', threadId: 'thread-1' });
       expect(server.stats.apiRequests.some((r) => r.method === 'PUT' && r.path === 'drafts/draft-seed-1')).toBe(true);
 
-      // Simulate out-of-band hidden Bcc added in Gmail directly after preview/update -> send_draft MUST block with 0 writes
-      server.settings.drafts[0]!.message.payload.headers.push({ name: 'Bcc', value: 'hidden-evil@example.com' });
+      const sendArgs = { draftId: 'draft-seed-1', to: ['lan@example.com'], cc: ['minh@example.com'] };
+      const approvedSource = await adapter.execute('gmail.prepare_write', { tool: 'gmail.send_draft', args: sendArgs });
+      const draft = server.settings.drafts[0]!.message;
+      const originalRaw = draft.raw;
+      draft.raw = Buffer.from('Bcc: hidden@example.com\r\n' + Buffer.from(originalRaw, 'base64url').toString('utf8')).toString('base64url');
       const writesBeforeBlockedSend = server.stats.writes;
       await expect(
-        adapter.execute('gmail.send_draft', { draftId: 'draft-seed-1', to: ['lan@example.com'], cc: ['minh@example.com'] }),
+        adapter.execute('gmail.send_draft', { ...sendArgs, approvedSource }),
       ).rejects.toMatchObject({ category: 'VALIDATION', details: { requestSent: false } });
       expect(server.stats.writes).toBe(writesBeforeBlockedSend);
 
-      // Remove hidden Bcc -> send_draft succeeds
-      server.settings.drafts[0]!.message.payload.headers = server.settings.drafts[0]!.message.payload.headers.filter((h: any) => h.name !== 'Bcc');
-      const sentDraft = await adapter.execute('gmail.send_draft', {
-        draftId: 'draft-seed-1',
-        to: ['lan@example.com'],
-        cc: ['minh@example.com'],
-      });
+      draft.raw = originalRaw;
+      const sentDraft = await adapter.execute('gmail.send_draft', { ...sendArgs, approvedSource });
       expect(sentDraft).toMatchObject({ id: expect.stringMatching(/^sent-/), threadId: 'thread-1' });
     });
 
@@ -1586,9 +1588,9 @@ describe('Gmail native HTTP adapter', () => {
       ];
       const writesBefore = server.stats.writes;
       await expect(
-        adapter.execute('gmail.send_draft', {
-          draftId: 'draft-seed-1',
-          to: ['lan@example.com', 'minh@example.com'],
+        adapter.execute('gmail.prepare_write', {
+          tool: 'gmail.send_draft',
+          args: { draftId: 'draft-seed-1', to: ['lan@example.com', 'minh@example.com'] },
         }),
       ).rejects.toMatchObject({ category: 'VALIDATION', details: { requestSent: false } });
       expect(server.stats.writes).toBe(writesBefore);

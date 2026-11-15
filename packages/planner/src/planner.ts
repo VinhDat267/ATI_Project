@@ -707,7 +707,8 @@ export class AIPlanner {
     onGatherEvent?.({ tool: tool.name, status: 'started' });
     try {
       const raw = await this.gatherSearch({ tool: tool.name, args, signal, actor: input.actor });
-      const list = searchEntities(raw, tool.outputSchema);
+      const outputSchema = tool.searchOutputSchema ?? tool.outputSchema;
+      const list = searchEntities(raw, outputSchema);
       if (signal?.aborted) throw signal.reason ?? new Error('Lookup was aborted');
       const sanitized = (sanitizeEntities(list) as unknown[]) ?? [];
       const result = sanitized.slice(0, MAX_RESULTS_PER_CALL);
@@ -748,7 +749,13 @@ export class AIPlanner {
         memory.setEntity('__observed', recordObserved(memory.getEntity('__observed'), 'recipient', workspaceRecipients, ['id', 'service']));
       }
       onGatherEvent?.({ tool: tool.name, status: 'completed', output: result });
-      return { tool: tool.name, args, result };
+      const cursorSchema = outputSchema.properties?.nextPageToken;
+      const cursor = raw && typeof raw === 'object' && !Array.isArray(raw)
+        ? (raw as Record<string, unknown>).nextPageToken : undefined;
+      const nextPageToken = typeof cursor === 'string' && cursorSchema?.type === 'string' &&
+          cursor.length >= (cursorSchema.minLength ?? 1) && cursor.length <= (cursorSchema.maxLength ?? 2048) && !/[\r\n\x00]/.test(cursor)
+        ? cursor : undefined;
+      return { tool: tool.name, args, result, ...(nextPageToken ? { nextPageToken } : {}) };
     } catch (err: any) {
       onGatherEvent?.({ tool: tool.name, status: 'completed', output: [] });
       return { tool: tool.name, args, error: String(err?.message ?? err).slice(0, 300) };

@@ -590,12 +590,15 @@ export class ScheduleService {
       };
       let telegramDigestConfig: TelegramDigestConfig | null = null;
       let telegramDigestHash: string | null = null;
+      const previousTelegramConfig = existing?.kind === 'telegram_digest'
+        ? existing.digest_config as TelegramDigestConfig | null
+        : null;
 
       if (wantAutoDigest && (proposal.action === 'create' || proposal.action === 'update') && !isGithubSchedule && !isTrelloSchedule && !isNotionSchedule && !isReadOnlyJiraDigestConfirm) {
         if (isTelegramSchedule) {
           const candidate = metadata.digestCandidate as TelegramDigestCandidate | undefined;
           if (!candidate || candidate.canAutoDigest !== true || !candidate.config || !candidate.configHash) {
-            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED', candidate?.disabledReason);
           }
           let candidateHash: string;
           try {
@@ -606,10 +609,10 @@ export class ScheduleService {
           if (candidateHash !== candidate.configHash) {
             throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
           }
+          const confirmedAiSetting = includeAiSummary ??
+            (metadata.reauthorize ? undefined : previousTelegramConfig?.includeAiSummary);
           const effectiveConfig: TelegramDigestConfig =
-            typeof includeAiSummary === 'boolean'
-              ? { ...candidate.config, includeAiSummary }
-              : candidate.config;
+            confirmedAiSetting === undefined ? candidate.config : { ...candidate.config, includeAiSummary: confirmedAiSetting };
           await this.verifyTelegramDigestGmailConfigInTx(client, userId, effectiveConfig, metadata.services);
           let computedHash: string;
           try {
@@ -953,10 +956,14 @@ export class ScheduleService {
             if ((previouslyNotion && proposal.request !== existing.request) || (previewNotion && !previouslyNotion)) {
               throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', NOTION_DIGEST_REAPPROVAL);
             }
-            const updatedConfig: TelegramDigestConfig =
+            const proposedConfig: TelegramDigestConfig =
               !previouslyNotion && tgCandidate?.canAutoDigest && tgCandidate.config
                 ? tgCandidate.config
                 : { ...previousConfig, recurrence: fields.recurrence };
+            const updatedConfig: TelegramDigestConfig =
+              previousConfig.includeAiSummary === undefined
+                ? proposedConfig
+                : { ...proposedConfig, includeAiSummary: previousConfig.includeAiSummary };
             if (previouslyNotion) {
               const binding = approvedTelegramNotionBinding(updatedConfig);
               if (!binding || wsMode === 'organization' || !(await lockApprovedNotionSource(client, userId, binding))) {
@@ -1418,6 +1425,14 @@ export class ScheduleService {
           : typeof prevTgConfig?.includeAiSummary === 'boolean'
             ? prevTgConfig.includeAiSummary
             : undefined;
+      const prevGmailSource = prevTgConfig?.sources?.find((s) => s.service === 'gmail');
+      const prevGmailQuery = prevGmailSource?.args?.query;
+      const reauthorizeGmailQuery = prevGmailSource && isValidGmailDigestQuery(prevGmailQuery)
+        ? {
+            query: prevGmailQuery.trim(),
+            label: prevGmailSource.label.replace(/\s*\([^()]+\)\s*$/, '').trim() || 'Email chưa đọc',
+          }
+        : undefined;
       tgCandidate = evaluateTelegramDigestCandidate({
         proposal: {
           kind: 'schedule',
@@ -1433,6 +1448,7 @@ export class ScheduleService {
         githubLookup,
         gmailBinding,
         existingDigest: prevTgConfig,
+        reauthorizeGmailQuery,
         includeAiSummary: effectiveIncludeAi,
       });
       if (!tgCandidate.canAutoDigest || !tgCandidate.config || !tgCandidate.configHash) {
@@ -1446,23 +1462,6 @@ export class ScheduleService {
           'REAUTHORIZATION_NOT_READY',
           `Cuộc trò chuyện Telegram "${prevTgConfig.chatTitle || prevTgConfig.chatId}" không còn trong phạm vi cấp quyền hiện tại.`,
         );
-      }
-      const prevGmailSource = prevTgConfig?.sources?.find((s) => s.service === 'gmail');
-      const prevGmailQuery = (prevGmailSource?.args as Record<string, unknown> | undefined)?.query;
-      if (prevGmailSource && isValidGmailDigestQuery(prevGmailQuery)) {
-        const idx = tgCandidate.config.sources.findIndex((s) => s.service === 'gmail');
-        if (idx >= 0) {
-          const updatedSource = tgCandidate.config.sources[idx]!;
-          const liveEmail = updatedSource.binding?.email ?? gmailBinding?.email;
-          const baseLabel =
-            prevGmailSource.label.replace(/\s*\([^()]+\)\s*$/, '').trim() || 'Email chưa đọc';
-          tgCandidate.config.sources[idx] = {
-            ...updatedSource,
-            args: { query: prevGmailQuery.trim() },
-            label: liveEmail ? `${baseLabel} (${liveEmail})` : baseLabel,
-          };
-          tgCandidate.configHash = computeTelegramDigestConfigHash(tgCandidate.config);
-        }
       }
     } else {
       const prevConfig =

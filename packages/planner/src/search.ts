@@ -19,6 +19,7 @@ export interface SearchOutcome {
   tool: string;
   args: Record<string, unknown>;
   result?: unknown;
+  nextPageToken?: string;
   error?: string;
 }
 
@@ -341,8 +342,9 @@ export function groundingMemory(
  * becomes in the prompt: whole leading array items that fit, otherwise a
  * marked text prefix. Results within budget are returned unchanged.
  */
-function boundedOutcome(tool: string, args: unknown, result: unknown, error?: string): Record<string, unknown> {
-  const plain = error ? { tool, args, error } : { tool, args, result };
+function boundedOutcome(tool: string, args: unknown, result: unknown, error?: string, nextPageToken?: string): Record<string, unknown> {
+  const pagination = nextPageToken ? { nextPageToken } : {};
+  const plain = error ? { tool, args, error } : { tool, args, result, ...pagination };
   const cost = (outcome: Record<string, unknown>) => JSON.stringify([outcome], null, 2).length;
   if (cost(plain) <= MAX_SEARCH_RESULT_CHARS) return plain;
   // Even tool names, arguments and errors can exceed the budget. In that case
@@ -361,7 +363,7 @@ function boundedOutcome(tool: string, args: unknown, result: unknown, error?: st
   };
   if (error) return envelopePreview();
   if (Array.isArray(result)) {
-    const outcome = (kept: unknown[]) => ({ tool, args, result: kept, truncated: {
+    const outcome = (kept: unknown[]) => ({ tool, args, result: kept, ...pagination, truncated: {
       omittedItems: result.length - kept.length,
       note: 'Result exceeded the search budget; ask the user to narrow the request if an omitted item is needed.',
     } });
@@ -386,9 +388,9 @@ function boundedOutcome(tool: string, args: unknown, result: unknown, error?: st
 }
 
 export function formatSearchResults(outcomes: SearchOutcome[], options: { readAnswers?: boolean } = {}): string {
-  const sanitizedOutcomes = outcomes.map(({ tool, args, result, error }) => {
+  const sanitizedOutcomes = outcomes.map(({ tool, args, result, error, nextPageToken }) => {
     const cleanResult = result !== undefined ? sanitizeEntities(result) : undefined;
-    return boundedOutcome(tool, args, cleanResult, error);
+    return boundedOutcome(tool, args, cleanResult, error, nextPageToken);
   });
   const body = JSON.stringify(sanitizedOutcomes, null, 2)
     .replace(/</g, '\\u003c')

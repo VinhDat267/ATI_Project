@@ -21,9 +21,14 @@ const unfoldHeader = (value: string): string => value.replace(/\r\n[ \t]+/g, ' '
 export const header = (message: GmailMessage, name: string): string =>
   unfoldHeader(message.payload?.headers?.find(h => h.name.toLowerCase() === name.toLowerCase())?.value ?? '');
 /** Header addresses only. Display names, comments and quoted commas never become participants. */
-export function headerAddresses(value: string): string[] {
+export function headerAddresses(value: string, strict = false): string[] {
+  const invalid = () => {
+    if (strict) throw new StepError({ category: 'VALIDATION', message: 'Không thể xác minh địa chỉ trong thư nháp Gmail.' });
+    return [];
+  };
   const normalized = unfoldHeader(value);
-  if (/[\r\n\x00]/.test(normalized)) return [];
+  if (!normalized) return [];
+  if (/[\r\n\x00]/.test(normalized)) return invalid();
   const found: string[] = [];
   const mailboxes: { text: string; quoted: boolean }[] = [];
   let text = '', quoted = false, inQuote = false, escaped = false, commentDepth = 0;
@@ -41,13 +46,21 @@ export function headerAddresses(value: string): string[] {
     if (char === ',') { mailboxes.push({ text, quoted }); text = ''; quoted = false; continue; }
     text += char;
   }
-  if (inQuote || commentDepth > 0 || escaped) return [];
+  if (inQuote || commentDepth > 0 || escaped) return invalid();
   mailboxes.push({ text, quoted });
   for (const mailbox of mailboxes) {
     const angle = /^[^<>]*<([^<>]+)>\s*$/.exec(mailbox.text);
     const candidate = angle?.[1] ?? (!mailbox.quoted && !/[<>]/.test(mailbox.text) ? mailbox.text : undefined);
-    if (candidate === undefined) continue;
-    try { const address = bareAddress(candidate); if (!found.includes(address)) found.push(address); } catch { /* untrusted/invalid header */ }
+    if (candidate === undefined) {
+      if (strict) return invalid();
+      continue;
+    }
+    try {
+      const address = bareAddress(candidate);
+      if (!found.includes(address)) found.push(address);
+    } catch {
+      if (strict) return invalid();
+    }
   }
   return found;
 }
@@ -111,7 +124,7 @@ export function attachmentSources(part?: GmailPart): GmailAttachmentSource[] {
     : [];
   return [...current, ...(part.parts?.flatMap(attachmentSources) ?? [])];
 }
-function encodeSubject(subject: string): string {
+export function encodeSubject(subject: string): string {
   safeHeader(subject);
   if (/^[\x20-\x7e]*$/.test(subject)) return subject;
   const words: string[] = []; let chunk = '';

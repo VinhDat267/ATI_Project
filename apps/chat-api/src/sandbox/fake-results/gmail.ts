@@ -1,4 +1,4 @@
-import { StepError } from '@wap/tool-adapters';
+import { GMAIL_DIGEST_READ_TOOL, GMAIL_SEARCH_PAGE_TOOL, StepError } from '@wap/tool-adapters';
 
 /** Fixed synthetic mail, never obtained from a member's real mailbox. */
 export const GMAIL_THREADS = [
@@ -24,6 +24,7 @@ const thread = (id: string) => {
   return found;
 };
 const sent = (kind: string, args: Record<string, any>) => ({ id: `gmail-sandbox-${kind}`, threadId: args.threadId ? thread(args.threadId).id : 'gmail-sandbox-new-thread' });
+const draftRevisionHash = 'a'.repeat(64);
 export const GMAIL_DRAFTS = [
   {
     id: 'gmail-draft-1',
@@ -32,15 +33,59 @@ export const GMAIL_DRAFTS = [
     subject: 'Re: Họp nhóm ATI',
     to: ['lan@example.com'],
     cc: [],
+    bcc: [],
     snippet: 'Bản nháp xác nhận họp lúc 9h.',
     date: '2026-10-14T10:00:00+07:00',
     participants: ['lan@example.com'],
   },
 ];
+function searchThreadPage(args: Record<string, any>) {
+  const matching = GMAIL_THREADS.filter(t => !args.query || t.subject.toLowerCase().includes(args.query.toLowerCase()) || t.snippet.toLowerCase().includes(args.query.toLowerCase()));
+  const offset = typeof args.pageToken === 'string' && /^sandbox-page-\d+$/.test(args.pageToken)
+    ? Number(args.pageToken.slice(13)) : 0;
+  const end = offset + Math.min(args.limit ?? 10, 10);
+  return {
+    threads: matching.slice(offset, end).map(({ messages: _messages, ...summary }) => structuredClone(summary)),
+    ...(end < matching.length ? { nextPageToken: `sandbox-page-${end}` } : {}),
+  };
+}
 export const GMAIL_FAKE: { id: string; tools: Record<string, (args: Record<string, any>, scenario?: string) => any> } = {
   id: 'gmail', tools: {
-    'gmail.search_threads': (args: Record<string, any>) => GMAIL_THREADS.filter(t => !args.query || t.subject.toLowerCase().includes(args.query.toLowerCase()) || t.snippet.toLowerCase().includes(args.query.toLowerCase()))
-      .slice(0, Math.min(args.limit ?? 10, 10)).map(({ messages: _messages, ...summary }) => structuredClone(summary)),
+    'gmail.prepare_write': ({ tool, args }) => {
+      if (tool === 'gmail.forward') {
+        const message = thread(args.threadId).messages.at(-1)!;
+        return { messageId: message.messageId, subject: message.subject, body: message.body, bodyTruncated: false, attachments: message.attachments };
+      }
+      const draft = GMAIL_DRAFTS.find(entry => entry.id === args.draftId);
+      if (!draft || !['gmail.send_draft', 'gmail.update_draft'].includes(tool)) {
+        throw new StepError({ category: 'NOT_FOUND', message: 'Không tìm thấy thư nháp sandbox.', details: { requestSent: false } });
+      }
+      return {
+        messageId: draft.messageId, subject: draft.subject, body: draft.snippet,
+        bodyTruncated: false, attachments: [], rawSha256: draftRevisionHash,
+      };
+    },
+    'gmail.search_threads': args => searchThreadPage(args).threads,
+    [GMAIL_SEARCH_PAGE_TOOL]: searchThreadPage,
+    [GMAIL_DIGEST_READ_TOOL]: (args) => {
+      // These fixtures each contain one unread Inbox message. Unknown filters
+      // cannot broaden the result in the in-memory sandbox.
+      const terms = String(args.query).toLowerCase().match(/\([^)]*\)|\S+/g) ?? [];
+      return GMAIL_THREADS.filter(t => terms.every(term => {
+        if (term === 'in:inbox' || term === 'is:unread') return true;
+        if (term === 'has:attachment') return t.hasAttachment;
+        if (term === '-has:attachment') return !t.hasAttachment;
+        if (term.startsWith('from:')) return t.from.toLowerCase().includes(term.slice(5));
+        if (term.startsWith('-from:')) return !t.from.toLowerCase().includes(term.slice(6));
+        if (term.startsWith('label:')) return t.labels.includes(term.slice(6).toUpperCase());
+        if (term.startsWith('-label:')) return !t.labels.includes(term.slice(7).toUpperCase());
+        const searchable = `${t.subject} ${t.snippet}`.toLowerCase();
+        return term.startsWith('(') && term.endsWith(')') && term.slice(1, -1).split(' or ').some(part => searchable.includes(part));
+      })).map(t => ({
+        id: t.messages[0]!.messageId, subject: t.subject, from: t.from, snippet: t.snippet,
+        hasAttachment: t.hasAttachment, attachmentNames: [...t.attachmentNames],
+      }));
+    },
     'gmail.get_thread': (args: Record<string, any>) => { const t = thread(args.threadId); return structuredClone({ id: t.id, subject: t.subject, participants: t.participants, totalMessages: t.messages.length, omittedMessages: 0, messages: t.messages }); },
     'gmail.read_attachment': (args: Record<string, any>) => {
       const t = thread(args.threadId);

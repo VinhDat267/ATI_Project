@@ -70,12 +70,12 @@ describe('preregistered answer labels', () => {
     };
     for (const query of ['unread', '-is:unread', 'is:unread in:trash', 'is:unread subject:Họp']) {
       const missed = await run(query);
-      expect((missed.searches[0]!.result as unknown[]).length, query).toBeLessThan(8);
+      expect((missed.searches[0]!.result as { threads: unknown[] }).threads.length, query).toBeLessThan(8);
       expect(missed.score.passed, query).toBe(false);
     }
     for (const query of ['is:unread', 'in:inbox is:unread', 'label:UNREAD']) {
       const filtered = await run(query);
-      expect(filtered.searches[0]!.result, query).toHaveLength(8);
+      expect((filtered.searches[0]!.result as { threads: unknown[] }).threads, query).toHaveLength(8);
       expect(filtered.score.passed, query).toBe(true);
     }
   });

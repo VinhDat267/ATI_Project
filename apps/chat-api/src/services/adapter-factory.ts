@@ -304,8 +304,8 @@ export class AdapterFactory {
     const userId = context?.userId;
     if (!userId) throw gmailError('AUTH_ERROR', 'Gmail chỉ dùng được với kết nối của chính người dùng.');
     const record = await this.credentialRepo.getPersonalCredentials('gmail', userId);
-    if (context?.phase === 'execution') {
-      const previewed = context.connections?.gmail?.credentialId;
+    const previewed = context?.connections?.gmail?.credentialId;
+    if (context?.phase === 'execution' || previewed) {
       if (!record || !previewed || record.id !== previewed) {
         throw gmailError('AUTH_ERROR', 'Kết nối Gmail đã thay đổi, hãy lập lại kế hoạch.');
       }

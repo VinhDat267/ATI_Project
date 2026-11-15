@@ -181,7 +181,9 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                   includeAiSummary,
                 })
               : await apiClient.confirmSchedule(convId, message.id, 'auto_digest')
-            : await apiClient.confirmSchedule(convId, message.id);
+            : isTelegramCandidate
+              ? await apiClient.confirmSchedule(convId, message.id, 'manual')
+              : await apiClient.confirmSchedule(convId, message.id);
       if (currentMessage.current === message.id) setConfirmed(result.schedule); schedulesChanged();
     } catch (reason: any) {
       setError(reason.message || 'Không thể xác nhận lịch.');

@@ -919,11 +919,11 @@ describe('Telegram auto_digest schedule proposal & confirmation on PostgreSQL (T
       expect(isValidGmailDigestQuery('in:inbox is:unread (hóa đơn OR invoice)')).toBe(true);
 
       expect(
-        resolveGmailDigestQueryAndLabel('Tóm tắt thư from:ceo@acme.com)OR(in:anywhere label:spam label:ProjectAlpha)').query,
-      ).toBe('in:inbox is:unread from:ceo@acme.com label:ProjectAlpha');
-      expect(
-        isValidGmailDigestQuery(resolveGmailDigestQueryAndLabel('Tóm tắt thư VIP label:VIP').query),
-      ).toBe(true);
+        resolveGmailDigestQueryAndLabel('Tóm tắt thư from:ceo@acme.com)OR(in:anywhere label:spam label:ProjectAlpha)'),
+      ).toMatchObject({ disabledReason: expect.any(String) });
+      expect(resolveGmailDigestQueryAndLabel('Tóm tắt thư VIP label:VIP')).toMatchObject({
+        query: 'in:inbox is:unread label:VIP (VIP OR khẩn OR urgent)',
+      });
 
       const existingCandidate = evaluateTelegramDigestCandidate({
         proposal: {
@@ -969,6 +969,40 @@ describe('Telegram auto_digest schedule proposal & confirmation on PostgreSQL (T
       });
       expect(existingCandidate.canAutoDigest).toBe(true);
       expect(existingCandidate.config?.includeAiSummary).toBe(false);
+    });
+
+    it.each([
+      'Tóm tắt Gmail -has:attachment',
+      'Tóm tắt thư không có tệp đính kèm',
+      'Tóm tắt Gmail bỏ qua email có tệp đính kèm',
+    ])('preserves an attachment exclusion in %s', requestText => {
+      expect(resolveGmailDigestQueryAndLabel(requestText)).toMatchObject({
+        query: 'in:inbox is:unread -has:attachment',
+      });
+    });
+
+    it.each([
+      'Tóm tắt Gmail subject:Planora',
+      'Tóm tắt Gmail label:"Planora work"',
+      'Tóm tắt Gmail from:someone@example.test OR from:other@example.test',
+      'Tóm tắt Gmail in:sent',
+      'Tóm tắt Gmail from:someone@example.test,other@example.test',
+      'Mỗi sáng tóm tắt thư không phải from:alice@example.com vào Telegram',
+      'Mỗi sáng tóm tắt thư không phải: from:alice@example.com vào Telegram',
+      'Mỗi sáng tóm tắt thư không phải - from:alice@example.com vào Telegram',
+      'Mỗi sáng tóm tắt thư không phải  has:attachment vào Telegram',
+      'Tóm tắt Gmail không phải hóa đơn',
+      'Mỗi sáng tóm tắt thư có tiêu đề chứa Planora vào Telegram',
+      'Tóm tắt thư Gmail newer_than:8h gửi vào Telegram',
+      `Tóm tắt Gmail label:${'a'.repeat(290)}`,
+    ])('disables automatic delivery for an unsupported or ambiguous filter in %s', requestText => {
+      expect(resolveGmailDigestQueryAndLabel(requestText)).toMatchObject({ disabledReason: expect.any(String) });
+    });
+
+    it('keeps the Gmail relative date units supported by the provider', () => {
+      expect(resolveGmailDigestQueryAndLabel('Tóm tắt thư Gmail newer_than:2y gửi vào Telegram')).toMatchObject({
+        query: 'in:inbox is:unread newer_than:2y',
+      });
     });
   });
 });

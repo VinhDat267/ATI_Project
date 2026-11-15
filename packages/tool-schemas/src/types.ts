@@ -23,6 +23,8 @@ export interface ToolDefinition {
   observedFields?: string[];
   inputSchema: JSONSchema;
   outputSchema: JSONSchema;
+  /** An optional paginated projection used for planner lookups while plan steps keep outputSchema. */
+  searchOutputSchema?: JSONSchema;
   examples?: Array<{
     description?: string;
     input: Record<string, any>;

@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { decryptCredentials, detectCalendarConflicts, StepError } from '@wap/tool-adapters';
+import { decryptCredentials, detectCalendarConflicts, GMAIL_DIGEST_READ_TOOL, StepError } from '@wap/tool-adapters';
 import {
   normalizeTelegramChatId,
   TELEGRAM_CHAT_ID_PATTERN,
@@ -28,7 +28,6 @@ import {
 } from './digest-scope-guard.js';
 import {
   assertGmailDigestBinding,
-  DEFAULT_GMAIL_DIGEST_QUERY,
   isValidGmailDigestQuery,
   validateTelegramDigestGmailConfig,
 } from './gmail-digest-binding.js';
@@ -1262,10 +1261,12 @@ export class TelegramDigestRunner {
           rawResult = await this.options.notionSources.read(userId, notionBinding, signal);
         } else if (source.service === 'gmail') {
           const rawQuery = (source.args as Record<string, unknown> | undefined)?.query;
-          const effectiveQuery = isValidGmailDigestQuery(rawQuery) ? rawQuery.trim() : DEFAULT_GMAIL_DIGEST_QUERY;
+          if (!isValidGmailDigestQuery(rawQuery)) {
+            return { status: 'blocked', error: 'Bộ lọc Gmail đã duyệt không hợp lệ.', pauseSchedule: true };
+          }
           rawResult = await adapter.execute(
-            'gmail.search_threads',
-            { query: effectiveQuery },
+            GMAIL_DIGEST_READ_TOOL,
+            { query: rawQuery.trim() },
             { signal },
           );
         } else if (source.service === 'mycalendar' && source.tool === 'mycalendar.list_events') {
