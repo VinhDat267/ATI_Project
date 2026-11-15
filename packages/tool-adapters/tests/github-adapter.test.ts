@@ -265,22 +265,76 @@ describe('GitHub adapter', () => {
     expect(fetchFn.mock.calls[0]![0]).toMatch(/^http:\/\/127\.0\.0\.1:9999\/search\/issues\?/);
   });
 
-  it('supports assignees on create_issue, get_pull_request, update_issue (close/reopen/edit), add_comment, and list_issues across allowed repos', async () => {
+  it('returns pull request metadata from the pull detail endpoint', async () => {
+    const issueView = {
+      id: 301,
+      number: 42,
+      title: 'Feat: OAuth',
+      body: 'PR description',
+      state: 'open',
+      html_url: 'https://github.com/team/project/pull/42',
+      labels: [{ name: 'enhancement' }],
+      user: { login: 'octocat' },
+      assignees: [{ login: 'vinhdat' }],
+      comments: 2,
+    };
+    const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'GET' && url.endsWith('/pulls/42')) {
+        return json({
+          ...issueView,
+          id: 201,
+          draft: false,
+          merged: false,
+          head: { ref: 'feature/oauth' },
+          base: { ref: 'main' },
+          requested_reviewers: [{ login: 'reviewer' }],
+        });
+      }
+      if (init?.method === 'GET' && url.endsWith('/issues/42')) {
+        return json({ ...issueView, pull_request: { url: 'https://api.github.com/repos/team/project/pulls/42' } });
+      }
+      return json({ message: 'Not Found' }, 404);
+    });
+    const adapter = new GitHubAdapter({ credentials: { token: 'test' }, allowedScope, fetchFn: fetchFn as typeof fetch });
+
+    await expect(adapter.execute('github.get_pull_request', { repo, issueNumber: 42 })).resolves.toEqual({
+      id: '201',
+      number: 42,
+      title: 'Feat: OAuth',
+      body: 'PR description',
+      url: 'https://github.com/team/project/pull/42',
+      repo,
+      labels: ['enhancement'],
+      state: 'open',
+      isPullRequest: true,
+      author: 'octocat',
+      assignees: ['vinhdat'],
+      commentsCount: 2,
+      draft: false,
+      merged: false,
+      headRef: 'feature/oauth',
+      baseRef: 'main',
+      requestedReviewers: ['reviewer'],
+    });
+  });
+
+  it('returns not found for an issue number with no matching pull request', async () => {
+    const fetchFn = vi.fn(async (url: string) => url.endsWith('/issues/7')
+      ? json(issue)
+      : json({ message: 'Not Found' }, 404));
+    const adapter = new GitHubAdapter({ credentials: { token: 'test' }, allowedScope, fetchFn: fetchFn as typeof fetch });
+
+    await expect(adapter.execute('github.get_pull_request', { repo, issueNumber: 7 })).rejects.toMatchObject({
+      category: 'NOT_FOUND',
+      statusCode: 404,
+      retryable: false,
+    });
+  });
+
+  it('supports assignees on create_issue, update_issue (close/reopen/edit), add_comment, and list_issues across allowed repos', async () => {
     const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
       if (url.endsWith('/issues') && init?.method === 'POST') {
         return json({ ...issue, assignees: [{ login: 'octocat' }, { login: 'vinhdat' }] }, 201);
-      }
-      if (url.endsWith('/issues/42') && init?.method === 'GET') {
-        return json({
-          id: 201,
-          number: 42,
-          title: 'Feat: OAuth',
-          body: 'PR description',
-          state: 'open',
-          html_url: 'https://github.com/team/project/pull/42',
-          labels: [{ name: 'enhancement' }],
-          pull_request: { url: 'https://api.github.com/repos/team/project/pulls/42' },
-        });
       }
       if (url.endsWith('/issues/7') && init?.method === 'PATCH') {
         return json({
@@ -321,35 +375,7 @@ describe('GitHub adapter', () => {
       assignees: ['octocat', 'vinhdat'],
     });
 
-    // 2. get_pull_request returns PR details without rejecting pull_request field
-    const pr = await adapter.execute('github.get_pull_request', { repo, issueNumber: 42 });
-    expect(pr).toEqual({
-      id: '201',
-      number: 42,
-      title: 'Feat: OAuth',
-      body: 'PR description',
-      url: 'https://github.com/team/project/pull/42',
-      repo,
-      labels: ['enhancement'],
-      state: 'open',
-      isPullRequest: true,
-    });
-
-    // 2b. get_pull_request rejects an ordinary issue (no pull_request field)
-    const ordinaryIssueFetch = vi.fn(async () => json(issue));
-    const ordinaryAdapter = new GitHubAdapter({
-      credentials: { token: 'test' },
-      allowedScope,
-      fetchFn: ordinaryIssueFetch as typeof fetch,
-    });
-    await expect(
-      ordinaryAdapter.execute('github.get_pull_request', { repo, issueNumber: 7 }),
-    ).rejects.toMatchObject({
-      category: 'VALIDATION',
-      message: 'GitHub item is an issue, not a pull request',
-    });
-
-    // 3. update_issue sends PATCH to close/update issue
+    // 2. update_issue sends PATCH to close/update issue
     const updated = await adapter.execute('github.update_issue', {
       repo,
       issueNumber: 7,
@@ -368,15 +394,15 @@ describe('GitHub adapter', () => {
       labels: ['bug', 'resolved'],
       assignees: ['vinhdat'],
     });
-    expect(fetchFn.mock.calls[2]![1]?.method).toBe('PATCH');
-    expect(JSON.parse(String(fetchFn.mock.calls[2]![1]?.body))).toEqual({
+    expect(fetchFn.mock.calls[1]![1]?.method).toBe('PATCH');
+    expect(JSON.parse(String(fetchFn.mock.calls[1]![1]?.body))).toEqual({
       title: 'Fixed login',
       state: 'closed',
       labels: ['bug', 'resolved'],
       assignees: ['vinhdat'],
     });
 
-    // 4. add_comment posts comment to issue
+    // 3. add_comment posts comment to issue
     const comment = await adapter.execute('github.add_comment', {
       repo,
       issueNumber: 7,
@@ -390,13 +416,13 @@ describe('GitHub adapter', () => {
       url: 'https://github.com/team/project/issues/7#issuecomment-9001',
     });
 
-    // 5. list_issues works without repo (iterating allowedRepositories for TelegramDigestRunner)
+    // 4. list_issues works without repo (iterating allowedRepositories for TelegramDigestRunner)
     const listed = await adapter.execute('github.list_issues', { state: 'open' });
     expect(listed).toEqual([
       { id: '12', number: 7, title: 'Fix login', url: issue.html_url, repo },
     ]);
 
-    // 6. list_issues preserves created_at and updated_at as createdAt and updatedAt for aging reports
+    // 5. list_issues preserves created_at and updated_at as createdAt and updatedAt for aging reports
     const timestampedFetch = vi.fn(async () =>
       json({
         items: [

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import type { User } from '../../types';
 import { apiClient } from '../../services/api-client';
@@ -40,31 +40,36 @@ interface GitHubStatusData {
   repos: Array<{ repoId: string; fullName: string; name: string; accessible: boolean }>;
 }
 
-export function GitHubConnection({
+export function GitHubConnection(props: GitHubConnectionProps) {
+  const workspaceScopeId = useSyncExternalStore(subscribeWorkspace, getActiveWorkspaceId);
+  return <GitHubWorkspaceConnection key={workspaceScopeId} {...props} workspaceScopeId={workspaceScopeId} />;
+}
+
+function GitHubWorkspaceConnection({
   user,
   refresh,
   selected,
   standalone = true,
-}: GitHubConnectionProps) {
+  workspaceScopeId,
+}: GitHubConnectionProps & { workspaceScopeId: string }) {
   const [data, setData] = useState<GitHubStatusData | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState(false);
 
   const [candidateRepos, setCandidateRepos] = useState<
-    Array<{ repoId: string; fullName: string; name: string; private?: boolean }>
-  >([]);
-  const [loadingCandidates, setLoadingCandidates] = useState(false);
+    Array<{ repoId: string; fullName: string; name: string; private?: boolean }> | null
+  >(null);
   const [candidateError, setCandidateError] = useState('');
   const [repoFilter, setRepoFilter] = useState('');
   const [selectedRepos, setSelectedRepos] = useState<string[]>([]);
   const [editingScope, setEditingScope] = useState(false);
 
-  const [workspace, setWorkspace] = useState(() => getActiveWorkspaceSummary());
-  const [workspaceScopeId, setWorkspaceScopeId] = useState(() => getActiveWorkspaceId());
+  const [workspace, setWorkspace] = useState(getActiveWorkspaceSummary);
 
   const mounted = useRef(false);
   const pending = useRef(false);
+  const statusRequest = useRef(0);
   const row = useRef<HTMLDivElement>(null);
 
   const isOrgWorkspace = workspaceScopeId !== 'personal';
@@ -73,21 +78,19 @@ export function GitHubConnection({
       ? workspace.role === 'admin'
       : user?.role === 'admin'
     : true;
-  const canManageScopeRef = useRef(canManageScope);
-  canManageScopeRef.current = canManageScope;
+  const ownsWorkspace = () => mounted.current && getActiveWorkspaceId() === workspaceScopeId;
 
   const fetchStatus = async () => {
+    const request = ++statusRequest.current;
+    const isCurrent = () => ownsWorkspace() && request === statusRequest.current;
     try {
-      const res = await apiClient.getGitHubConnection();
-      if (mounted.current) {
-        if (canManageScopeRef.current && res.status === 'needs_scope') {
-          setLoadingCandidates(true);
-        }
+      const res = await apiClient.getGitHubConnection(workspaceScopeId);
+      if (isCurrent()) {
         setError('');
         setData(res);
       }
     } catch (err) {
-      if (mounted.current) {
+      if (isCurrent()) {
         setError(
           err instanceof Error && err.message
             ? err.message
@@ -107,21 +110,12 @@ export function GitHubConnection({
   }, []);
 
   useEffect(() => {
-    return subscribeWorkspace(() => {
-      if (!mounted.current) return;
-      const nextSummary = getActiveWorkspaceSummary();
-      const nextWsId = getActiveWorkspaceId();
-      setWorkspace(nextSummary);
-      setWorkspaceScopeId(nextWsId);
-      setEditingScope(false);
-      setSelectedRepos([]);
-      setRepoFilter('');
-      setCandidateRepos([]);
-      setCandidateError('');
-      setError('');
-      void fetchStatus();
-    });
-  }, []);
+    const updateRole = () => {
+      if (ownsWorkspace()) setWorkspace(getActiveWorkspaceSummary());
+    };
+    updateRole();
+    return subscribeWorkspace(updateRole);
+  }, [workspaceScopeId]);
 
   useEffect(() => {
     const focus = () => {
@@ -139,44 +133,42 @@ export function GitHubConnection({
     };
   }, [selected]);
 
+  const scopeOpen = canManageScope && (data?.status === 'needs_scope' || editingScope);
   useEffect(() => {
-    if (canManageScope && (data?.status === 'needs_scope' || editingScope)) {
-      setLoadingCandidates(true);
+    if (!scopeOpen) {
+      setCandidateRepos(null);
       setCandidateError('');
-      apiClient
-        .getGitHubCandidateRepos()
-        .then((res) => {
-          if (mounted.current && res?.repos) {
-            setCandidateRepos(res.repos);
-          }
-        })
-        .catch((err) => {
-          if (mounted.current) {
-            setCandidateRepos([]);
-            setCandidateError(
-              err instanceof Error && err.message
-                ? err.message
-                : 'Không tải được danh sách repository từ GitHub.',
-            );
-          }
-        })
-        .finally(() => {
-          if (mounted.current) setLoadingCandidates(false);
-        });
+      return;
     }
-  }, [canManageScope, data?.status, editingScope, workspaceScopeId]);
+    let cancelled = false;
+    apiClient.getGitHubCandidateRepos(workspaceScopeId).then(
+      ({ repos }) => {
+        if (!cancelled && ownsWorkspace()) setCandidateRepos(repos);
+      },
+      (err) => {
+        if (!cancelled && ownsWorkspace()) {
+          setCandidateError(
+            err instanceof Error && err.message
+              ? err.message
+              : 'Không tải được danh sách repository từ GitHub.',
+          );
+        }
+      },
+    );
+    return () => { cancelled = true; };
+  }, [scopeOpen, workspaceScopeId]);
 
   const connect = async () => {
-    if (pending.current) return;
+    if (!data || !ownsWorkspace() || pending.current) return;
     const owns = githubSessionOwner();
     pending.current = true;
     setBusy(true);
     setError('');
     try {
       const result = await apiClient.startGitHubConnection();
-      if (mounted.current && owns()) redirectToGitHub(result.url);
+      if (ownsWorkspace() && owns()) redirectToGitHub(result.url);
     } catch {
-      if (mounted.current && owns())
+      if (ownsWorkspace() && owns())
         setError('Không thể cập nhật kết nối GitHub. Hãy kiểm tra mạng và thử lại.');
     } finally {
       pending.current = false;
@@ -185,20 +177,20 @@ export function GitHubConnection({
   };
 
   const disconnect = async () => {
-    if (pending.current) return;
+    if (!ownsWorkspace() || pending.current) return;
     const owns = githubSessionOwner();
     pending.current = true;
     setBusy(true);
     setError('');
     try {
       await apiClient.disconnectGitHub();
-      if (mounted.current && owns()) {
+      if (ownsWorkspace() && owns()) {
         setConfirm(false);
         await fetchStatus();
-        await refresh?.();
+        if (ownsWorkspace()) await refresh?.();
       }
     } catch {
-      if (mounted.current && owns())
+      if (ownsWorkspace() && owns())
         setError('Không thể ngắt kết nối GitHub. Hãy kiểm tra mạng và thử lại.');
     } finally {
       pending.current = false;
@@ -215,19 +207,25 @@ export function GitHubConnection({
     }
   };
 
+  const canSaveScope = scopeOpen && Boolean(candidateRepos?.length) &&
+    selectedRepos.length > 0 && selectedRepos.length <= 10 && !busy;
+
   const saveScope = async () => {
-    if (selectedRepos.length === 0 || selectedRepos.length > 10) return;
+    if (!canSaveScope || !ownsWorkspace() || pending.current) return;
+    pending.current = true;
     setBusy(true);
     setError('');
     try {
-      await apiClient.saveGitHubScope(selectedRepos);
+      await apiClient.saveGitHubScope(selectedRepos, workspaceScopeId);
+      if (!ownsWorkspace()) return;
       setEditingScope(false);
       await fetchStatus();
-      await refresh?.();
+      if (ownsWorkspace()) await refresh?.();
     } catch {
-      setError('Không thể lưu phạm vi repository GitHub. Hãy thử lại.');
+      if (ownsWorkspace()) setError('Không thể lưu phạm vi repository GitHub. Hãy thử lại.');
     } finally {
-      setBusy(false);
+      pending.current = false;
+      if (mounted.current) setBusy(false);
     }
   };
 
@@ -259,7 +257,7 @@ export function GitHubConnection({
           </span>
         ) : (
           <span className={connectionBadgeClass('neutral')}>
-            Chưa kết nối
+            {data ? 'Chưa kết nối' : 'Đang kiểm tra kết nối…'}
           </span>
         )}
       </div>
@@ -341,7 +339,7 @@ export function GitHubConnection({
             id="github-connect"
             type="button"
             className={button}
-            disabled={busy || status === 'unconfigured'}
+            disabled={!data || busy || status === 'unconfigured'}
             onClick={() => void connect()}
           >
             Kết nối GitHub
@@ -382,7 +380,7 @@ export function GitHubConnection({
         </p>
       )}
 
-      {canManageScope && (status === 'needs_scope' || editingScope) && (
+      {scopeOpen && (
         <div
           id="github-scope"
           data-testid="github-scope"
@@ -404,7 +402,7 @@ export function GitHubConnection({
                 Đã chọn {selectedRepos.length}/10
               </span>
             </div>
-            {candidateRepos.length >= 5 && (
+            {candidateRepos && candidateRepos.length >= 5 && (
               <input
                 type="search"
                 value={repoFilter}
@@ -416,7 +414,7 @@ export function GitHubConnection({
             )}
             <div className="v3-space-y-1.5 max-h-48 overflow-y-auto">
               {candidateRepos
-                .filter((r) =>
+                ?.filter((r) =>
                   !repoFilter.trim() ||
                   r.fullName.toLowerCase().includes(repoFilter.trim().toLowerCase())
                 )
@@ -456,13 +454,13 @@ export function GitHubConnection({
                     </div>
                   );
                 })}
-              {loadingCandidates && candidateRepos.length === 0 && (
+              {!candidateRepos && !candidateError && (
                 <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Đang tải danh sách repository từ GitHub…</p>
               )}
-              {!loadingCandidates && candidateError && candidateRepos.length === 0 && (
+              {candidateError && (
                 <p role="alert" className="text-xs text-[#DC2626] dark:text-red-400">{candidateError}</p>
               )}
-              {!loadingCandidates && !candidateError && candidateRepos.length === 0 && (
+              {candidateRepos?.length === 0 && (
                 <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Không có repository nào trong tài khoản này.</p>
               )}
             </div>
@@ -473,7 +471,7 @@ export function GitHubConnection({
               id="github-save-scope"
               type="button"
               className={button}
-              disabled={selectedRepos.length === 0 || selectedRepos.length > 10 || busy}
+              disabled={!canSaveScope}
               onClick={() => void saveScope()}
             >
               Lưu repository được dùng

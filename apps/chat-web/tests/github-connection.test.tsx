@@ -30,6 +30,70 @@ describe('Task 9: GitHub OAuth connection UI and chat moments', () => {
   });
 
   describe('1. GitHubConnection component', () => {
+    it('hides the previous workspace scope until the current workspace status loads', async () => {
+      const personalRepo = { repoId: '1', fullName: 'octo/personal', name: 'personal', accessible: true };
+      const orgRepo = { repoId: '2', fullName: 'octo/team', name: 'team', accessible: true };
+      type Status = Awaited<ReturnType<typeof apiClient.getGitHubConnection>>;
+      let resolveOrg!: (value: Status) => void;
+      const orgStatus = new Promise<Status>((resolve) => { resolveOrg = resolve; });
+
+      setActiveWorkspaceId('personal');
+      const status = vi.spyOn(apiClient, 'getGitHubConnection')
+        .mockResolvedValueOnce({ status: 'connected', repos: [personalRepo] })
+        .mockReturnValueOnce(orgStatus)
+        .mockResolvedValue({ status: 'connected', repos: [orgRepo] });
+      vi.spyOn(apiClient, 'getGitHubCandidateRepos').mockResolvedValue({ repos: [orgRepo] });
+      const save = vi.spyOn(apiClient, 'saveGitHubScope').mockResolvedValue({
+        chosenBy: adminUser.id, updatedAt: '2026-11-01T00:00:00Z', repos: [orgRepo],
+      });
+      const view = render(<GitHubConnection user={adminUser} />);
+      try {
+        expect(await screen.findByText(personalRepo.fullName)).toBeVisible();
+        act(() => setActiveWorkspaceId('team-workspace'));
+        expect(screen.queryByText(personalRepo.fullName)).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Đổi repository' })).not.toBeInTheDocument();
+
+        await act(async () => resolveOrg({ status: 'connected', repos: [orgRepo] }));
+        fireEvent.click(screen.getByRole('button', { name: 'Đổi repository' }));
+        expect(await screen.findByRole('checkbox', { name: orgRepo.fullName })).toBeChecked();
+        const saveButton = screen.getByRole('button', { name: 'Lưu repository được dùng' });
+        await waitFor(() => expect(saveButton).toBeEnabled());
+        fireEvent.click(saveButton);
+        await waitFor(() => expect(save).toHaveBeenCalledWith([orgRepo.fullName], 'team-workspace'));
+        expect(status).toHaveBeenCalledTimes(3);
+      } finally {
+        view.unmount();
+        setActiveWorkspaceId('personal');
+      }
+    });
+
+    it('ignores a candidate response that arrives after switching workspaces', async () => {
+      const personalRepo = { repoId: '1', fullName: 'octo/personal', name: 'personal' };
+      const orgRepo = { repoId: '2', fullName: 'octo/team', name: 'team' };
+      type Candidates = Awaited<ReturnType<typeof apiClient.getGitHubCandidateRepos>>;
+      let resolvePersonal!: (value: Candidates) => void;
+      const personalCandidates = new Promise<Candidates>((resolve) => { resolvePersonal = resolve; });
+
+      setActiveWorkspaceId('personal');
+      vi.spyOn(apiClient, 'getGitHubConnection').mockResolvedValue({ status: 'needs_scope', repos: [] });
+      const candidates = vi.spyOn(apiClient, 'getGitHubCandidateRepos')
+        .mockReturnValueOnce(personalCandidates)
+        .mockResolvedValue({ repos: [orgRepo] });
+      const view = render(<GitHubConnection user={adminUser} />);
+      try {
+        await waitFor(() => expect(candidates).toHaveBeenCalledTimes(1));
+        act(() => setActiveWorkspaceId('team-workspace'));
+        expect(await screen.findByRole('checkbox', { name: orgRepo.fullName })).toBeVisible();
+
+        await act(async () => resolvePersonal({ repos: [personalRepo] }));
+        expect(screen.queryByRole('checkbox', { name: personalRepo.fullName })).not.toBeInTheDocument();
+        expect(screen.getByRole('checkbox', { name: orgRepo.fullName })).toBeVisible();
+      } finally {
+        view.unmount();
+        setActiveWorkspaceId('personal');
+      }
+    });
+
     it('renders not_connected with button #github-connect labeled "Kết nối GitHub" and no PAT or token inputs', async () => {
       vi.spyOn(apiClient, 'getGitHubConnection').mockResolvedValue({
         status: 'not_connected',
@@ -98,7 +162,7 @@ describe('Task 9: GitHub OAuth connection UI and chat moments', () => {
 
       fireEvent.click(saveBtn);
       await waitFor(() => {
-        expect(saveScopeSpy).toHaveBeenCalledWith(['acme/repo-1']);
+        expect(saveScopeSpy).toHaveBeenCalledWith(['acme/repo-1'], 'personal');
       });
     });
 
@@ -167,7 +231,7 @@ describe('Task 9: GitHub OAuth connection UI and chat moments', () => {
       fireEvent.click(saveBtn);
 
       await waitFor(() => {
-        expect(saveScopeSpy).toHaveBeenCalledWith(['acme/new-repo']);
+        expect(saveScopeSpy).toHaveBeenCalledWith(['acme/new-repo'], 'personal');
       });
     });
 

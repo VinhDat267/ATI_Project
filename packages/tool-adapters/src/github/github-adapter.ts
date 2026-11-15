@@ -358,16 +358,24 @@ export class GitHubAdapter extends BaseAdapter {
 
   async getIssue(
     args: { repo: string; issueNumber: number; includePullRequest?: boolean },
-    options?: { signal?: AbortSignal; repo?: string; allowPullRequests?: boolean; requirePullRequest?: boolean },
+    options?: { signal?: AbortSignal; repo?: string; allowPullRequests?: boolean },
   ) {
     const repo = this.checkedRepo(args.repo, options?.repo);
     const number = issueNumber(args.issueNumber);
     const value = await this.request<any>(`/repos/${repo}/issues/${number}`, options?.signal);
     const allowPr = Boolean(args.includePullRequest || options?.allowPullRequests);
+    return this.normalizeIssueDetails(value, repo, allowPr, Boolean(value?.pull_request));
+  }
+
+  async getPullRequest(args: { repo: string; issueNumber: number }, options?: { signal?: AbortSignal; repo?: string }) {
+    const repo = this.checkedRepo(args.repo, options?.repo);
+    const number = issueNumber(args.issueNumber);
+    const value = await this.request<any>(`/repos/${repo}/pulls/${number}`, options?.signal);
+    return this.normalizeIssueDetails(value, repo, true, true);
+  }
+
+  private normalizeIssueDetails(value: any, repo: string, allowPr: boolean, isPullRequest: boolean) {
     const normalized = githubIssue(value, repo, false, allowPr);
-    if (options?.requirePullRequest && !value?.pull_request) {
-      validation('GitHub item is an issue, not a pull request');
-    }
     const author = typeof value.user?.login === 'string' && value.user.login.trim() ? value.user.login.trim() : undefined;
     const assignees = Array.isArray(value.assignees)
       ? value.assignees.filter((entry: any) => typeof entry?.login === 'string').map((entry: any) => entry.login as string)
@@ -386,7 +394,7 @@ export class GitHubAdapter extends BaseAdapter {
       ...(allowPr
         ? {
             state: typeof value.state === 'string' ? value.state : 'open',
-            isPullRequest: Boolean(value.pull_request),
+            isPullRequest,
             ...(typeof value.draft === 'boolean' ? { draft: value.draft } : {}),
             ...(typeof value.merged === 'boolean' ? { merged: value.merged } : {}),
             ...(headRef ? { headRef } : {}),
@@ -400,10 +408,6 @@ export class GitHubAdapter extends BaseAdapter {
       ...(assignees ? { assignees } : {}),
       ...(commentsCount !== undefined ? { commentsCount } : {}),
     };
-  }
-
-  async getPullRequest(args: { repo: string; issueNumber: number }, options?: { signal?: AbortSignal; repo?: string }) {
-    return this.getIssue({ ...args, includePullRequest: true }, { ...options, allowPullRequests: true, requirePullRequest: true });
   }
 
   async createIssue(args: { repo: string; title: string; body?: string; labels?: string[]; assignees?: string[] }, options?: { signal?: AbortSignal; repo?: string }) {

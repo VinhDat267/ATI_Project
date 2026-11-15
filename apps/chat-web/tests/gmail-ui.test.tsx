@@ -14,7 +14,10 @@ const gmail = (personalStatus = 'not_connected') => ({ id: 'gmail', name: 'Gmail
 beforeEach(() => { window.history.replaceState({}, '', '/settings'); localStorage.clear(); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); authStorage.clearStoredTokens(); });
 function catalogue(services: ServiceInfo[]) { vi.spyOn(apiClient, 'getServices').mockResolvedValue({ services, canConfigure: false }); }
-function settings() { return render(<SettingsPage user={member} navigate={() => {}} onLogout={() => {}} />); }
+function settings() {
+  vi.spyOn(apiClient, 'getGitHubConnection').mockResolvedValue({ status: 'not_connected', repos: [] });
+  return render(<SettingsPage user={member} navigate={() => {}} onLogout={() => {}} />);
+}
 
 it.each(['not_connected', 'connected', 'reconnect_required'])('shows the personal %s row to an ordinary member without shared credential controls', async status => {
   catalogue([gmail(status)]); settings();
@@ -46,7 +49,8 @@ it('disables duplicate starts, shows redirect pending and handles a connection e
   expect(button).toBeDisabled(); expect(apiClient.startGmailConnection).toHaveBeenCalledTimes(1);
   expect(screen.getByRole('status')).toHaveTextContent('Đang chuyển hướng');
   await act(async () => reject(new Error('private upstream error')));
-  expect(await screen.findByRole('alert')).toHaveTextContent('Không thể cập nhật');
+  const gmailRow = button.closest<HTMLElement>('#service-row-gmail')!;
+  expect(await within(gmailRow).findByRole('alert')).toHaveTextContent('Không thể cập nhật');
   expect(button).not.toBeDisabled(); expect(document.body.textContent).not.toContain('private upstream error');
 });
 it('ignores a late start after the owning session changes', async () => {

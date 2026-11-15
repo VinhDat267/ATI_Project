@@ -56,33 +56,79 @@ function toUtcIsoSeconds(date: Date): string {
   return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
-function formatSectionItems(
-  items: Array<{ repo: string; number: number; title: string }>,
+const DIGEST_TEXT_LIMIT = 3500;
+const DIGEST_SECTION_ITEM_LIMIT = 10;
+
+type DigestItem = { repo: string; number: number; title: string };
+
+function formatItemLine(
+  item: DigestItem,
   kind: 'issues' | 'pull',
   format: 'slack' | 'telegram',
-  hitRepoCap: boolean,
-): string[] {
-  if (items.length === 0) {
-    return [format === 'telegram' ? '  - (Không có mục nào)' : '  - _(Không có mục nào)_'];
+): string {
+  const rawTitle = String(item.title ?? '').slice(0, 120);
+  const url = `https://github.com/${item.repo}/${kind}/${Number(item.number)}`;
+  const label = `${item.repo}#${Number(item.number)}`;
+  if (format === 'telegram') {
+    return `  - ${label}: ${rawTitle} — ${url}`;
   }
-  const displayed = items.slice(0, 10);
-  const lines = displayed.map((item) => {
-    const rawTitle = String(item.title ?? '').slice(0, 120);
-    const url = `https://github.com/${item.repo}/${kind}/${Number(item.number)}`;
-    if (format === 'telegram') {
-      return `  - ${item.repo}#${Number(item.number)}: ${rawTitle} — ${url}`;
-    }
-    const safeTitle = escapeSlackMrkdwn(rawTitle);
-    return `  - <${url}|${item.repo}#${Number(item.number)}>: ${safeTitle}`;
+  return `  - <${url}|${label}>: ${escapeSlackMrkdwn(rawTitle)}`;
+}
+
+function formatGithubDigest(
+  header: string,
+  summary: string | null,
+  sections: Array<{ label: string; items: DigestItem[]; kind: 'issues' | 'pull'; hitRepoCap: boolean }>,
+  format: 'slack' | 'telegram',
+): string {
+  const rendered = sections.map(({ label, items, kind, hitRepoCap }) => {
+    const heading = `${label} (${items.length}${hitRepoCap ? '+' : ''}):`;
+    const footer = (shown: number): string | null => {
+      if (items.length === 0) {
+        return format === 'telegram' ? '  - (Không có mục nào)' : '  - _(Không có mục nào)_';
+      }
+      if (hitRepoCap) {
+        return `  - ... còn thêm mục khác (giới hạn 20/repo, hiển thị ${shown}/${items.length}+)`;
+      }
+      return shown === items.length
+        ? null
+        : `  - ... còn ${items.length - shown} mục khác (hiển thị ${shown}/${items.length})`;
+    };
+    return {
+      heading: format === 'telegram' ? `• ${heading}` : `• *${heading}*`,
+      entries: items.slice(0, DIGEST_SECTION_ITEM_LIMIT).map((item) => formatItemLine(item, kind, format)),
+      shown: [] as string[],
+      footer,
+    };
   });
-  if (items.length > displayed.length || hitRepoCap) {
-    lines.push(
-      hitRepoCap
-        ? '  - ... còn thêm mục khác (giới hạn 20/repo)'
-        : `  - ... còn ${items.length - displayed.length} mục khác (hiển thị ${displayed.length}/${items.length})`,
-    );
+  let summaryLine: string | null = null;
+  const render = () => [
+    header,
+    summaryLine,
+    ...rendered.flatMap(({ heading, shown, footer }) => [heading, ...shown, footer(shown.length)]),
+  ].filter((line) => line !== null).join('\n');
+
+  // Reserve every heading and overflow line. Offer one whole item per
+  // section before the optional summary, then fill the remaining space evenly.
+  let message = render();
+  for (let index = 0; index < DIGEST_SECTION_ITEM_LIMIT; index += 1) {
+    if (index === 1 && summary && message.length + 1 + summary.length <= DIGEST_TEXT_LIMIT) {
+      summaryLine = summary;
+      message = render();
+    }
+    for (const section of rendered) {
+      const entry = section.entries[index];
+      if (entry === undefined || section.shown.length !== index) continue;
+      section.shown.push(entry);
+      const candidate = render();
+      if (candidate.length <= DIGEST_TEXT_LIMIT) {
+        message = candidate;
+      } else {
+        section.shown.pop();
+      }
+    }
   }
-  return lines;
+  return message;
 }
 
 function isDefiniteWriteRejection(err: any): boolean {
@@ -492,30 +538,18 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
     }
 
     // 5. Build destination-appropriate digest message (<= 3,500 chars)
-    const countLabel = (count: number, hitCap: boolean) => (hitCap ? `${count}+` : String(count));
-    const lines: string[] = isTelegramDest
-      ? [
-          `Bản tin GitHub tự động của Planora · thiết lập bởi @${config.login}`,
-          ...(aiSummary ? [`💡 Nhận xét AI: ${aiSummary}`] : []),
-          `• Issue mới (${countLabel(newIssues.length, newHitCap)}):`,
-          ...formatSectionItems(newIssues, 'issues', 'telegram', newHitCap),
-          `• PR chờ review quá ${staleDays} ngày (${countLabel(stalePrs.length, staleHitCap)}):`,
-          ...formatSectionItems(stalePrs, 'pull', 'telegram', staleHitCap),
-          `• Issue mở chưa ai nhận (${countLabel(unassignedIssues.length, unassignedHitCap)}):`,
-          ...formatSectionItems(unassignedIssues, 'issues', 'telegram', unassignedHitCap),
-        ]
-      : [
-          `*Bản tin GitHub tự động của Planora* · thiết lập bởi @${escapeSlackMrkdwn(config.login)}`,
-          ...(aiSummary ? [`> 💡 *Nhận xét AI:* ${aiSummary}`] : []),
-          `• *Issue mới (${countLabel(newIssues.length, newHitCap)}):*`,
-          ...formatSectionItems(newIssues, 'issues', 'slack', newHitCap),
-          `• *PR chờ review quá ${staleDays} ngày (${countLabel(stalePrs.length, staleHitCap)}):*`,
-          ...formatSectionItems(stalePrs, 'pull', 'slack', staleHitCap),
-          `• *Issue mở chưa ai nhận (${countLabel(unassignedIssues.length, unassignedHitCap)}):*`,
-          ...formatSectionItems(unassignedIssues, 'issues', 'slack', unassignedHitCap),
-        ];
-
-    const messageText = lines.join('\n').slice(0, 3500);
+    const login = config.login.slice(0, 128);
+    const header = isTelegramDest
+      ? `Bản tin GitHub tự động của Planora · thiết lập bởi @${login}`
+      : `*Bản tin GitHub tự động của Planora* · thiết lập bởi @${escapeSlackMrkdwn(login)}`;
+    const summary = aiSummary && (isTelegramDest
+      ? `💡 Nhận xét AI: ${aiSummary}`
+      : `> 💡 *Nhận xét AI:* ${aiSummary}`);
+    const messageText = formatGithubDigest(header, summary, [
+      { label: 'Issue mới', items: newIssues, kind: 'issues', hitRepoCap: newHitCap },
+      { label: `PR chờ review quá ${staleDays} ngày`, items: stalePrs, kind: 'pull', hitRepoCap: staleHitCap },
+      { label: 'Issue mở chưa ai nhận', items: unassignedIssues, kind: 'issues', hitRepoCap: unassignedHitCap },
+    ], isTelegramDest ? 'telegram' : 'slack');
 
     // 6. Pre-send schedule version and status check + mark delivery_started_at
     signal.throwIfAborted();

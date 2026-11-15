@@ -46,8 +46,24 @@ export function computeDigestConfigHash(input: {
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
 
-const WRITE_INTENT_REGEX =
-  /\b(tạo\s+(?:issue|pr|pull\s+request)|mở\s+(?:issue|pr|pull\s+request)|đóng\s+issue|sửa\s+issue|cập\s+nhật\s+issue|gắn\s+nhãn|thêm\s+nhãn|gán\s+reviewer|yêu\s+cầu\s+review|add\s+label|create\s+(?:issue|pr|pull\s+request)|close\s+issue|update\s+issue|request\s+review(?:ers?)?|tạo\s+thẻ|create\s+card)\b/i;
+// A schedule proposal carries the request and service set, but no tool steps.
+// Match action + object phrases so status descriptions such as "open issues"
+// and "PR chờ review" remain eligible for the built-in read-only digest.
+const WRITE_INTENT_PATTERNS = [
+  /\b(?:create|close|reopen|update|edit|assign|unassign|merge)\s+(?:(?:a|an|the|new|draft|old|open|stale|existing|all)\s+){0,4}(?:issues?|prs?|pull[\s-]+requests?)\b/i,
+  /\bopen\s+(?:(?:a|an|the)(?:\s+(?:new|draft))?|new|draft)\s+(?:issues?|prs?|pull[\s-]+requests?)\b/i,
+  /\bopen\s+(?:issue|pr|pull[\s-]+request)\s+#[1-9]\d*\b/i,
+  /\bdraft\s+(?:a|the)\s+(?:pr|pull[\s-]+request)\b/i,
+  /\b(?:request|ask\s+for)\s+(?:(?:a|an|the|code|pull[\s-]+request|pr)\s+){0,4}review(?:s|ers?)?\b/i,
+  /\bassign\s+@?[a-z0-9][a-z0-9-]*\s+to\s+(?:the\s+)?issues?\b/i,
+  /\bask\s+@?[a-z0-9][a-z0-9-]*\s+to\s+review\s+(?:the\s+)?(?:prs?|pull[\s-]+requests?)\b/i,
+  /\b(?:add|remove|apply|set|change)\s+(?:(?:a|an|the|new|bug|existing)\s+){0,4}labels?\b/i,
+  /\b(?:add|leave|post|write|submit|send)\s+(?:(?:a|an|the|new)\s+){0,4}comments?\b/i,
+  /(?:^|[,;:.!?]|\b(?:and|then|also|please|và|rồi))\s*comment\s+on\b/i,
+  /(?:^|[^\p{L}\p{N}_])(?:tạo|mở|đóng|mở\s+lại|sửa|cập\s+nhật|gán|giao|hợp\s+nhất|merge)\s+(?:(?:một|các|những|mấy|tất\s+cả|lại)\s+){0,4}(?:issues?|prs?|pull[\s-]+requests?|thẻ)(?![\p{L}\p{N}_])/iu,
+  /(?:^|[^\p{L}\p{N}_])(?:(?:gắn|thêm|gỡ|đổi)\s+(?:một\s+)?nhãn|(?:gán|thêm)\s+(?:một\s+)?reviewers?|(?:yêu\s+cầu|nhờ|xin)\s+(?:một\s+)?(?:review|đánh\s+giá)|(?:thêm|đăng|gửi|viết|để\s+lại)\s+(?:một\s+)?(?:bình\s+luận|comments?)|bình\s+luận\s+(?:vào|trên|cho))(?![\p{L}\p{N}_])/iu,
+  /\bcreate\s+(?:a\s+)?card\b/i,
+];
 
 export interface EvaluateGithubDigestInput {
   userId: string;
@@ -83,11 +99,12 @@ export async function evaluateGithubDigestCandidate(
     };
   }
 
-  if (WRITE_INTENT_REGEX.test(request)) {
+  const normalizedRequest = request.normalize('NFC');
+  if (WRITE_INTENT_PATTERNS.some((pattern) => pattern.test(normalizedRequest))) {
     return {
       canAutoDigest: false,
       disabledReason:
-        'Chỉ bật được khi lịch chỉ đọc GitHub và gửi báo cáo vào 1 kênh Slack đã chọn (không tự động tạo hoặc sửa dữ liệu).',
+        'Chỉ bật tự động cho lịch đọc GitHub và gửi bản tin. Lịch có thao tác ghi cần duyệt từng lượt.',
     };
   }
 
