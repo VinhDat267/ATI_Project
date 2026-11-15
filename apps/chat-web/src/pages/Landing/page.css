@@ -1800,3 +1800,268 @@ html.dark .pl-stage-counter-pill {
     animation: plFadeUp 640ms var(--pl-ease-enter) 90ms both;
   }
 }
+
+/* ==========================================================================
+ * AUTH MODAL — ASYMMETRIC SPLIT DIALOG (Harmonized with --pl-* Taste Tokens)
+ * ========================================================================== */
+.auth-modal-backdrop {
+  background-color: rgba(12, 8, 5, 0.64);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  overscroll-behavior: contain;
+}
+html.dark .auth-modal-backdrop {
+  background-color: rgba(4, 8, 18, 0.78);
+}
+
+.auth-modal-shell {
+  overscroll-behavior: contain;
+  background-color: var(--pl-ground-elevated);
+  color: var(--pl-ink);
+  border: 1px solid var(--pl-rule-strong);
+  box-shadow: var(--pl-shadow-stage);
+  font-family: var(--pl-font-sans);
+}
+
+.auth-display {
+  font-family: var(--pl-font-display);
+  letter-spacing: -0.025em;
+}
+
+.auth-showcase-panel {
+  background-color: var(--pl-ground-alt);
+  background-image: radial-gradient(120% 85% at 0% 0%, rgba(255, 87, 1, 0.1) 0%, transparent 62%);
+  border-right: 1px solid var(--pl-rule-strong);
+}
+html.dark .auth-showcase-panel {
+  background-color: var(--pl-ground-pure);
+  background-image: radial-gradient(120% 85% at 0% 0%, rgba(255, 87, 1, 0.16) 0%, transparent 64%);
+}
+
+.auth-showcase-card {
+  background-color: rgba(255, 255, 255, 0.84);
+  border: 1px solid var(--pl-rule-strong);
+}
+html.dark .auth-showcase-card {
+  background-color: rgba(22, 31, 52, 0.86);
+}
+
+.auth-service-chip {
+  background-color: #FFFFFF;
+  border: 1px solid var(--pl-rule-strong);
+  color: var(--pl-ink);
+}
+html.dark .auth-service-chip {
+  background-color: rgba(22, 31, 52, 0.94);
+  color: #E2E8F0;
+}
+
+.auth-step-badge {
+  background-color: rgba(255, 87, 1, 0.12);
+  border: 1px solid rgba(255, 87, 1, 0.24);
+  color: #C2410C;
+}
+html.dark .auth-step-badge {
+  background-color: rgba(255, 87, 1, 0.18);
+  border-color: rgba(255, 87, 1, 0.34);
+  color: #FDBA74;
+}
+
+.auth-mobile-notice {
+  background-color: var(--pl-ground);
+  border: 1px solid var(--pl-rule-strong);
+  color: var(--pl-ink-muted);
+}
+html.dark .auth-mobile-notice {
+  background-color: var(--pl-ground-pure);
+}
+
+.auth-tablist {
+  background-color: var(--pl-ground-alt);
+  border: 1px solid var(--pl-rule-strong);
+}
+
+.auth-tab-on {
+  background-color: var(--pl-ground-elevated);
+  color: var(--pl-ink);
+  box-shadow: 0 1px 3px rgba(20, 10, 5, 0.1);
+}
+html.dark .auth-tab-on {
+  background-color: #1E293B;
+  color: #F8FAFC;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.auth-tab-off {
+  color: var(--pl-ink-subtle);
+}
+.auth-tab-off:hover {
+  color: var(--pl-ink);
+}
+
+.auth-google-btn {
+  min-height: 44px;
+  background-color: var(--pl-ground-elevated);
+  border: 1px solid var(--pl-rule-strong);
+  color: var(--pl-ink);
+}
+.auth-google-btn:hover:not(:disabled) {
+  background-color: var(--pl-surface-hover);
+  border-color: var(--pl-ink);
+}
+
+.auth-divider-line {
+  border-color: var(--pl-rule-strong);
+}
+
+.auth-divider-label {
+  background-color: var(--pl-ground-elevated);
+  color: var(--pl-ink-subtle);
+}
+
+.auth-input {
+  min-height: 44px;
+  background-color: #FFFFFF;
+  border: 1px solid rgba(20, 10, 5, 0.18);
+  color: var(--pl-ink);
+}
+.auth-input::placeholder {
+  color: var(--pl-ink-subtle);
+}
+.auth-input:hover:not(:focus) {
+  border-color: rgba(20, 10, 5, 0.34);
+}
+.auth-input:focus {
+  border-color: #FF5701;
+  box-shadow: 0 0 0 3px rgba(255, 87, 1, 0.16);
+  outline: none;
+}
+.auth-input:not(:focus):user-invalid {
+  border-color: #DC2626;
+}
+.auth-input:-webkit-autofill,
+.auth-input:autofill {
+  box-shadow: 0 0 0 1000px #FFFFFF inset;
+  -webkit-text-fill-color: var(--pl-ink);
+  caret-color: var(--pl-ink);
+}
+
+html.dark .auth-input {
+  background-color: #0E1422;
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #F8FAFC;
+}
+html.dark .auth-input::placeholder {
+  color: #64748B;
+}
+html.dark .auth-input:hover:not(:focus) {
+  border-color: rgba(148, 163, 184, 0.46);
+}
+html.dark .auth-input:focus {
+  border-color: #FF5701;
+  box-shadow: 0 0 0 3px rgba(255, 87, 1, 0.24);
+}
+html.dark .auth-input:not(:focus):user-invalid {
+  border-color: #F87171;
+}
+html.dark .auth-input:-webkit-autofill,
+html.dark .auth-input:autofill {
+  box-shadow: 0 0 0 1000px #0E1422 inset;
+  -webkit-text-fill-color: #F8FAFC;
+  caret-color: #F8FAFC;
+}
+
+.auth-close-btn {
+  color: var(--pl-ink-subtle);
+  background-color: transparent;
+}
+.auth-close-btn:hover {
+  color: var(--pl-ink);
+  background-color: var(--pl-ground-alt);
+}
+
+.auth-pwd-toggle {
+  color: var(--pl-ink-subtle);
+}
+.auth-pwd-toggle:hover {
+  color: var(--pl-ink);
+}
+
+.auth-link {
+  color: #C2410C;
+}
+.auth-link:hover {
+  color: #9A3412;
+  text-decoration: underline;
+}
+html.dark .auth-link {
+  color: #FB923C;
+}
+html.dark .auth-link:hover {
+  color: #FDBA74;
+}
+
+.auth-eyebrow {
+  color: #C2410C;
+}
+html.dark .auth-eyebrow {
+  color: #FB923C;
+}
+
+.auth-secondary-btn {
+  min-height: 44px;
+  background-color: var(--pl-ground-elevated);
+  border: 1px solid var(--pl-rule-strong);
+  color: var(--pl-ink);
+}
+.auth-secondary-btn:hover {
+  background-color: var(--pl-surface-hover);
+  border-color: var(--pl-ink);
+}
+
+.auth-strength-empty {
+  background-color: rgba(20, 10, 5, 0.12);
+}
+html.dark .auth-strength-empty {
+  background-color: rgba(148, 163, 184, 0.22);
+}
+.auth-strength-danger {
+  background-color: #DC2626;
+}
+html.dark .auth-strength-danger {
+  background-color: #F87171;
+}
+.auth-strength-warning {
+  background-color: #D97706;
+}
+html.dark .auth-strength-warning {
+  background-color: #FBBF24;
+}
+.auth-strength-success {
+  background-color: #16A34A;
+}
+html.dark .auth-strength-success {
+  background-color: #34D399;
+}
+
+.auth-tone-muted {
+  color: var(--pl-ink-muted);
+}
+.auth-tone-warning {
+  color: #9A3412;
+}
+html.dark .auth-tone-warning {
+  color: #FCD34D;
+}
+.auth-tone-danger {
+  color: #B91C1C;
+}
+html.dark .auth-tone-danger {
+  color: #FCA5A5;
+}
+.auth-tone-success {
+  color: #047857;
+}
+html.dark .auth-tone-success {
+  color: #6EE7B7;
+}
