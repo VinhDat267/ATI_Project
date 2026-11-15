@@ -107,6 +107,10 @@ describe('Auth modal redesign', () => {
 
     fireEvent.focus(pwdInput);
     expect(announcement).toBeEmptyDOMElement();
+    fireEvent.change(pwdInput, { target: { value: '123456789012' } });
+    expect(meter).toHaveTextContent('Đạt 1/4 gợi ý về ký tự');
+    expect(meter.querySelectorAll('[data-strength-bar="filled"]')).toHaveLength(1);
+
     fireEvent.change(pwdInput, { target: { value: 'Password123!' } });
     expect(meter).toHaveTextContent('Đạt 4/4 gợi ý về ký tự');
     expect(meter).toHaveTextContent('Ưu tiên mật khẩu dài, riêng cho Planora.');

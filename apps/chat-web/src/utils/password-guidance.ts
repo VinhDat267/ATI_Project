@@ -32,8 +32,9 @@ export function evaluatePasswordGuidance(password: string, blurred: boolean): Pa
     };
   }
 
-  let filledBars = 1;
-  if (/\p{Lu}/u.test(password) && /\p{Ll}/u.test(password)) filledBars++;
+  let filledBars = 0;
+  if (/\p{Lu}/u.test(password)) filledBars++;
+  if (/\p{Ll}/u.test(password)) filledBars++;
   if (/\p{Nd}/u.test(password)) filledBars++;
   if (/[\p{P}\p{S}]/u.test(password)) filledBars++;
   return {
