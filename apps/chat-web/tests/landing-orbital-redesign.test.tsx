@@ -414,4 +414,17 @@ describe('LandingPage — Make.com Orbital & OAuth 1-Click Redesign', () => {
     expect(bodyText).not.toMatch(/Gmail/i);
     expect(container.innerHTML).not.toMatch(/purple-|violet-|#4A154B/i);
   });
+
+  it('FE-06B regression: /login LandingPage copy never matches session-expiry draft retention regex /bản nháp.*(?:lưu|giữ)/i', () => {
+    render(
+      <LandingPage
+        navigate={vi.fn()}
+        initialMode="login"
+        authConfig={{ signupEnabled: true, googleEnabled: true }}
+      />,
+    );
+
+    const normalizedText = (document.body.textContent ?? '').replace(/\s+/g, ' ');
+    expect(normalizedText).not.toMatch(/bản nháp.*(?:lưu|giữ)/i);
+  });
 });

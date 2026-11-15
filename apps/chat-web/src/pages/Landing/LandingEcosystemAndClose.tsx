@@ -1,20 +1,14 @@
+import landingPlaybooks from '../../assets/landing-playbooks.json';
 import { ServiceLogo } from '../../components/ServiceLogo';
 
-const CORE_INTEGRATIONS: Array<{
-  id: 'trello' | 'slack' | 'github' | 'sheets' | 'calendar' | 'notion' | 'telegram' | 'jira';
+interface CoreIntegrationItem {
+  id: string;
   name: string;
   role: string;
   scopeUnit: string;
-}> = [
-  { id: 'trello', name: 'Trello', role: 'Bảng & thẻ việc', scopeUnit: 'Theo từng bảng & cột' },
-  { id: 'slack', name: 'Slack', role: 'Kênh nhóm vận hành', scopeUnit: 'Theo từng kênh chỉ định' },
-  { id: 'github', name: 'GitHub', role: 'Kho mã & issue', scopeUnit: 'Theo từng kho mã' },
-  { id: 'sheets', name: 'Google Sheets', role: 'Bảng tính theo dõi', scopeUnit: 'Theo từng tệp bảng tính' },
-  { id: 'calendar', name: 'Google Calendar', role: 'Lịch họp đội ngũ', scopeUnit: 'Theo từng lịch biểu' },
-  { id: 'notion', name: 'Notion', role: 'Tài liệu & quy trình', scopeUnit: 'Theo từng trang & CSDL' },
-  { id: 'telegram', name: 'Telegram', role: 'Nhóm tin nhanh', scopeUnit: 'Theo từng nhóm chat' },
-  { id: 'jira', name: 'Jira', role: 'Đầu việc kỹ thuật', scopeUnit: 'Theo từng dự án' },
-];
+}
+
+const CORE_INTEGRATIONS = (landingPlaybooks.coreIntegrations as unknown) as CoreIntegrationItem[];
 
 export interface LandingEcosystemAndCloseProps {
   gmailEnabled: boolean;
@@ -105,7 +99,7 @@ export function LandingEcosystemAndClose({
                 <div className="pl-capability-card space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2.5">
-                      <ServiceLogo service="sheets" className="w-6 h-6" />
+                      <ServiceLogo service="mysheets" className="w-6 h-6" />
                       <h3 className="text-base font-semibold text-[var(--pl-ink)] m-0">
                         Google Sheets · Của riêng bạn
                       </h3>

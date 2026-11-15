@@ -8,14 +8,12 @@ type CanvasProps = ComponentProps<typeof WorkflowFlowCanvas>;
 const SAMPLE_SENTENCE =
   'Tạo thẻ Trello cho sự cố thanh toán QR đơn #408, mở issue GitHub theo dõi, ghi vào bảng Google Sheets và báo ngay sang Slack #van-hanh.';
 
-const STAGE1_TOOLS: Array<{ id: 'trello' | 'slack' | 'github' | 'sheets' | 'calendar' | 'telegram'; name: string }> = [
-  { id: 'trello', name: 'Trello' },
-  { id: 'slack', name: 'Slack' },
-  { id: 'github', name: 'GitHub' },
-  { id: 'sheets', name: 'Google Sheets' },
-  { id: 'calendar', name: 'Google Calendar' },
-  { id: 'telegram', name: 'Telegram' },
-];
+interface Stage1ToolItem {
+  id: string;
+  name: string;
+}
+
+const STAGE1_TOOLS = (landingPlaybooks.stage1Tools as unknown) as Stage1ToolItem[];
 
 const STAGE2_TARGETS = [
   { service: 'Trello', scope: 'Bảng Vận hành · Cột Cần làm' },
@@ -279,7 +277,7 @@ export function LandingExecutionTheatre({
                     <div data-testid="landing-stage3-sheets-grid" className="pl-sheets-grid">
                       <div className="pl-sheets-header">
                         <span>Xem trước dòng thêm vào Google Sheets · Tab Sự cố</span>
-                        <span className="pl-mono text-xs text-[var(--pl-ink-subtle)]">Bản nháp</span>
+                        <span className="pl-mono text-xs text-[var(--pl-ink-subtle)]">Chưa ghi</span>
                       </div>
                       <table className="pl-sheets-table">
                         <thead>
