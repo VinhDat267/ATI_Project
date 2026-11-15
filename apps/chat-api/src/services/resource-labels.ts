@@ -1,5 +1,5 @@
 import { getToolDefinition, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYJIRA_TOOLS, MYSHEETS_TOOLS, type PlanResponse } from '@wap/tool-schemas';
-import { groundingMemory, normalizedRecipient, observedThreads, observedWorkspaceRecipients, userEmailAddresses, type WorkingMemory } from '@wap/planner';
+import { groundingMemory, normalizedRecipient, observedDrafts, observedThreads, observedWorkspaceRecipients, userEmailAddresses, type WorkingMemory } from '@wap/planner';
 
 /** Display-only projection of actual lookups; never part of the approved payload. */
 export function resourceLabels(
@@ -28,8 +28,10 @@ export function resourceLabels(
   const labels: Record<string, string> = Object.create(null);
   const ambiguous = new Set<string>();
   const subjects = memory.getEntity('__labels')?.thread ?? {};
+  const draftSubjects = memory.getEntity('__labels')?.draft ?? {};
   const typed = userEmailAddresses(userTexts);
   const threads = observedThreads(memory.getAll());
+  const drafts = observedDrafts(memory.getAll());
   const workspaceRecipients = observedWorkspaceRecipients(memory.getAll());
   for (const step of plan.steps) {
     const properties = (getToolDefinition(step.tool) ?? GMAIL_TOOLS.find(t => t.name === step.tool) ?? MYCALENDAR_TOOLS.find(t => t.name === step.tool) ?? MYSHEETS_TOOLS.find(t => t.name === step.tool) ?? MYJIRA_TOOLS.find(t => t.name === step.tool))?.inputSchema.properties ?? {};
@@ -42,7 +44,11 @@ export function resourceLabels(
         else {
           const source = threads.find(t => t.participants.some(p => normalizedRecipient(p) === address));
           if (source && typeof subjects[source.id] === 'string') labels[`recipient:${address}`] = `thread:${subjects[source.id]}`;
-          else if (workspaceRecipients.has(address)) labels[`recipient:${address}`] = `service:${workspaceRecipients.get(address)}`;
+          else {
+            const draftSource = drafts.find(d => d.participants.some(p => normalizedRecipient(p) === address));
+            if (draftSource && typeof draftSubjects[draftSource.id] === 'string') labels[`recipient:${address}`] = `thread:${draftSubjects[draftSource.id]}`;
+            else if (workspaceRecipients.has(address)) labels[`recipient:${address}`] = `service:${workspaceRecipients.get(address)}`;
+          }
         }
       }
       const key = annotation['x-resource'];
@@ -57,6 +63,7 @@ export function resourceLabels(
       for (const value of values) {
         if (typeof value !== 'string' && typeof value !== 'number') continue;
         if (key === 'thread' && typeof subjects[String(value)] === 'string') { labels[String(value)] = subjects[String(value)]; continue; }
+        if (key === 'draft' && typeof draftSubjects[String(value)] === 'string') { labels[String(value)] = draftSubjects[String(value)]; continue; }
         const candidates = entries(key).filter(item =>
           String(item[annotation['x-resource-field'] ?? 'id'] ?? item.id) === String(value) &&
           parents.every(([parent]) => {

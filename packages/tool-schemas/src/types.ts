@@ -604,6 +604,7 @@ export interface TelegramDigestConfig {
   chatId: string;
   chatTitle: string;
   sourceBindingVersion?: 1;
+  includeAiSummary?: boolean;
   sources: TelegramDigestSource[];
   recurrence: ScheduleRecurrence;
   timeZone: string;
@@ -744,7 +745,8 @@ export interface ScheduleView {
     | {
         chatId: string;
         chatTitle: string;
-        sources: Array<{ service: string; label: string }>;
+        sources: Array<{ service: string; label: string; query?: string }>;
+        includeAiSummary?: boolean;
         approvedAt: string | null;
       }
     | null;

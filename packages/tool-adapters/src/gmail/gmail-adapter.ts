@@ -2,7 +2,27 @@ import { GMAIL_TOOLS } from '@wap/tool-schemas';
 import { StepError } from '../base-adapter.js';
 import { GlobalRateLimiter, retryAfterMs, waitWithSignal } from '../rate-limiter.js';
 import type { GmailAccessTokenProvider } from './token-provider.js';
-import { attachments, bareAddress, cut, header, headerAddresses, messageText, participants, rawMessage, safeHeader, type GmailMessage, type GmailThread } from './mail-format.js';
+import {
+  MAX_ATTACHMENT_READ_BYTES,
+  MAX_FORWARD_ATTACHMENTS_TOTAL_BYTES,
+  extractAttachmentText,
+} from './attachment-text.js';
+import {
+  attachments,
+  attachmentSources,
+  bareAddress,
+  cut,
+  header,
+  headerAddresses,
+  messageText,
+  participants,
+  rawMessage,
+  safeHeader,
+  type GmailAttachmentSource,
+  type GmailMessage,
+  type GmailThread,
+  type OutgoingAttachment,
+} from './mail-format.js';
 
 export interface GmailToolAdapterOptions {
   tokens: GmailAccessTokenProvider;
@@ -18,6 +38,8 @@ function check(value: any, schema: any, path: string): void {
     if (schema.minLength != null && Array.from(value).length < schema.minLength || schema.maxLength != null && Array.from(value).length > schema.maxLength) invalid(`${path} length exceeds Gmail limits`);
   } else if (schema.type === 'integer') {
     if (!Number.isInteger(value) || value < schema.minimum || value > schema.maximum) invalid(`${path} is out of range`);
+  } else if (schema.type === 'boolean') {
+    if (typeof value !== 'boolean') invalid(`${path} must be a boolean`);
   } else if (schema.type === 'array') {
     if (!Array.isArray(value) || value.length < (schema.minItems ?? 0) || value.length > (schema.maxItems ?? Infinity)) invalid(`${path} must be a bounded literal array`);
     value.forEach((v: any, i: number) => check(v, schema.items, `${path}[${i}]`));
@@ -44,14 +66,16 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
       if (!tool) invalid('Unknown Gmail tool');
       check(input, tool.inputSchema, 'args');
       const args = { ...input };
-      for (const key of ['threadId', 'name', 'query', 'subject']) if (args[key] != null) safeHeader(args[key]);
+      for (const key of ['threadId', 'draftId', 'messageId', 'filename', 'pageToken', 'name', 'query', 'subject']) if (args[key] != null) safeHeader(args[key]);
       if (args.threadId && !/^[A-Za-z0-9_-]+$/.test(args.threadId)) invalid('Invalid Gmail threadId');
+      if (args.draftId && !/^[A-Za-z0-9_.:-]+$/.test(args.draftId)) invalid('Invalid Gmail draftId');
+      if (args.messageId && !/^[A-Za-z0-9_.:-]+$/.test(args.messageId)) invalid('Invalid Gmail messageId');
       if (args.threadIds?.some((id: string) => !/^[A-Za-z0-9_-]+$/.test(id))) invalid('Invalid Gmail threadId');
       for (const key of ['addLabelIds', 'removeLabelIds']) if (args[key]?.some((id: string) => !/^[A-Za-z0-9_-]+$/.test(id))) invalid('Invalid Gmail label id');
       for (const key of ['to', 'cc', 'bcc']) if (args[key]) args[key] = args[key].map(bareAddress);
       if (['to', 'cc', 'bcc'].reduce((n, key) => n + (args[key]?.length ?? 0), 0) > 20) invalid('Gmail allows at most 20 recipients total');
-      async function request(path: string, body?: any): Promise<any> {
-        const write = body !== undefined;
+      async function request(path: string, body?: any, method: 'GET' | 'POST' | 'PUT' = body !== undefined ? 'POST' : 'GET'): Promise<any> {
+        const write = method !== 'GET';
         if (write) currentWriteDispatched = false;
         let refreshed = false, forceRefresh = false, retries = 0;
         for (;;) {
@@ -63,7 +87,7 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
           let response: Response;
           try {
             if (write) currentWriteDispatched = true;
-            response = await fetchFn(`${baseUrl}/gmail/v1/users/me/${path}`, { method: write ? 'POST' : 'GET',
+            response = await fetchFn(`${baseUrl}/gmail/v1/users/me/${path}`, { method,
               redirect: 'manual', signal, headers: { Authorization: `Bearer ${token}`, ...(write ? { 'Content-Type': 'application/json' } : {}) },
               ...(write ? { body: JSON.stringify(body) } : {}) });
           } catch {
@@ -91,8 +115,8 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
           if (response.ok) {
             const id = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
             const invalidWrite = write && (!id(data?.id) ||
-              path === 'messages/send' && !id(data?.threadId) ||
-              path === 'drafts' && (!id(data?.message?.id) || !id(data?.message?.threadId)) ||
+              (path === 'messages/send' || path === 'drafts/send') && !id(data?.threadId) ||
+              (path === 'drafts' || (method === 'PUT' && path.startsWith('drafts/'))) && (!id(data?.message?.id) || !id(data?.message?.threadId)) ||
               path === 'labels' && typeof data?.name !== 'string' ||
               path.endsWith('/modify') && (!Array.isArray(data?.messages) || data.messages.some((message: any) => !message || typeof message !== 'object' || message.labelIds !== undefined && (!Array.isArray(message.labelIds) || message.labelIds.some((label: unknown) => !id(label))))));
             if (!data || typeof data !== 'object' || invalidWrite) {
@@ -131,9 +155,19 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
           snippet: cut(latest.snippet ?? '', 200), date: header(latest, 'Date'), labels: [...new Set(messages.flatMap(m => m.labelIds ?? []))], messageCount: messages.length,
           unread: messages.some(m => m.labelIds?.includes('UNREAD')), hasAttachment: files.length > 0, attachmentNames: files, hasDraft: messages.some(isDraft), participants: participants(messages) };
       };
+      const loadAttachmentBuffer = async (msgId: string, source: GmailAttachmentSource): Promise<Buffer> => {
+        if (source.inlineData) return Buffer.from(source.inlineData, 'base64url');
+        if (!source.attachmentId) invalid('Tệp đính kèm không có dữ liệu hoặc attachmentId để tải.');
+        const data = await request(`messages/${encodeURIComponent(msgId)}/attachments/${encodeURIComponent(source.attachmentId)}`);
+        if (typeof data?.data !== 'string') {
+          throw new StepError({ category: 'SERVER_ERROR', message: 'Gmail attachment response is missing base64 data' });
+        }
+        return Buffer.from(data.data, 'base64url');
+      };
       switch (toolName) {
         case 'gmail.search_threads': {
           const params = new URLSearchParams({ q: args.query, maxResults: String(args.limit ?? 10) });
+          if (typeof args.pageToken === 'string' && args.pageToken.trim()) params.set('pageToken', args.pageToken.trim());
           const result = await request(`threads?${params}`);
           const threads = (result.threads ?? []).slice(0, args.limit ?? 10);
           return await Promise.all(threads.map(async (t: any) => summary(await readThread(t.id, 'metadata'))));
@@ -155,8 +189,119 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
             }),
           };
         }
+        case 'gmail.read_attachment': {
+          const thread = await readThread(args.threadId);
+          const messages = thread.messages ?? [];
+          let targetMessage: GmailMessage | undefined;
+          let candidateSources: GmailAttachmentSource[] = [];
+          if (args.messageId) {
+            targetMessage = messages.find((m) => m.id === args.messageId);
+            if (!targetMessage) invalid('Không tìm thấy messageId trong luồng thư Gmail này.');
+            candidateSources = attachmentSources(targetMessage.payload);
+          } else {
+            for (const msg of [...messages].reverse()) {
+              const found = attachmentSources(msg.payload);
+              if (found.length > 0) {
+                if (typeof args.filename === 'string' && args.filename.trim()) {
+                  const want = args.filename.trim().toLowerCase();
+                  if (found.some((a) => a.filename.toLowerCase() === want || a.filename.toLowerCase().includes(want))) {
+                    targetMessage = msg;
+                    candidateSources = found;
+                    break;
+                  }
+                } else {
+                  targetMessage = msg;
+                  candidateSources = found;
+                  break;
+                }
+              }
+            }
+          }
+          if (!targetMessage || candidateSources.length === 0) {
+            invalid('Luồng thư này không có tệp đính kèm phù hợp để đọc.');
+          }
+          let picked = candidateSources[0]!;
+          if (typeof args.filename === 'string' && args.filename.trim()) {
+            const want = args.filename.trim().toLowerCase();
+            const exact = candidateSources.find((a) => a.filename.toLowerCase() === want);
+            const partial = exact ?? candidateSources.find((a) => a.filename.toLowerCase().includes(want));
+            if (!partial) invalid(`Không tìm thấy tệp đính kèm "${args.filename}" trong thư.`);
+            picked = partial;
+          }
+          if (picked.size > MAX_ATTACHMENT_READ_BYTES) {
+            invalid('Tệp đính kèm vượt quá giới hạn đọc an toàn 5 MB.');
+          }
+          const bytes = await loadAttachmentBuffer(targetMessage.id, picked);
+          if (bytes.length > MAX_ATTACHMENT_READ_BYTES) {
+            invalid('Tệp đính kèm vượt quá giới hạn đọc an toàn 5 MB.');
+          }
+          const extracted = extractAttachmentText({
+            filename: picked.filename,
+            mimeType: picked.mimeType,
+            bytes,
+          });
+          return {
+            threadId: thread.id,
+            messageId: targetMessage.id,
+            filename: picked.filename,
+            mimeType: picked.mimeType,
+            size: bytes.length,
+            extracted: extracted.extracted,
+            truncated: extracted.truncated,
+            text: extracted.text,
+          };
+        }
         case 'gmail.list_labels': {
           const data = await request('labels'); return (data.labels ?? []).filter((l: any) => l.name.toLowerCase().includes(args.query.toLowerCase())).slice(0, args.limit ?? 10).map((l: any) => ({ id: l.id, name: l.name, type: l.type }));
+        }
+        case 'gmail.list_drafts': {
+          const params = new URLSearchParams({ maxResults: String(args.limit ?? 10) });
+          if (typeof args.query === 'string' && args.query.trim()) params.set('q', args.query.trim());
+          const result = await request(`drafts?${params}`);
+          const drafts = (result.drafts ?? []).slice(0, args.limit ?? 10);
+          return await Promise.all(drafts.map(async (d: any) => {
+            const detail = await request(`drafts/${encodeURIComponent(d.id)}?format=full`);
+            const msg: GmailMessage = detail?.message ?? { id: '' };
+            const draftThreadId = typeof detail?.message?.threadId === 'string' && detail.message.threadId.trim() ? detail.message.threadId : undefined;
+            const msgParticipants = [...new Set([...participants([msg]), ...headerAddresses(header(msg, 'Bcc'))])].slice(0, 20);
+            return {
+              id: detail?.id ?? d.id,
+              messageId: msg.id ?? '',
+              ...(draftThreadId ? { threadId: draftThreadId } : {}),
+              subject: cut(header(msg, 'Subject'), 500),
+              to: headerAddresses(header(msg, 'To')),
+              cc: headerAddresses(header(msg, 'Cc')),
+              snippet: cut(msg.snippet ?? '', 200),
+              date: header(msg, 'Date'),
+              participants: msgParticipants,
+            };
+          }));
+        }
+        case 'gmail.send_draft': {
+          const draftRes = await request(`drafts/${encodeURIComponent(args.draftId)}?format=full`);
+          const draftMsg: GmailMessage = draftRes?.message ?? { id: '' };
+          const normalizeAddressSet = (list: string[]) =>
+            new Set(list.map((r) => r.trim().toLowerCase()).filter(Boolean));
+          const setsEqual = (actual: string[], approvedList: string[]) => {
+            const a = normalizeAddressSet(actual);
+            const b = normalizeAddressSet(approvedList);
+            return a.size === b.size && [...a].every((r) => b.has(r));
+          };
+          const draftTo = headerAddresses(header(draftMsg, 'To'));
+          const draftCc = headerAddresses(header(draftMsg, 'Cc'));
+          const draftBcc = headerAddresses(header(draftMsg, 'Bcc'));
+          if (draftTo.length + draftCc.length + draftBcc.length === 0) {
+            invalid('Thư nháp hiện chưa có người nhận nào trong Gmail; hãy cập nhật thư nháp trước khi gửi.');
+          }
+          const mismatch =
+            !setsEqual(draftTo, args.to ?? []) ||
+            !setsEqual(draftCc, args.cc ?? []) ||
+            !setsEqual(draftBcc, args.bcc ?? []);
+          if (mismatch) {
+            invalid('Danh sách người nhận thực tế trong thư nháp không khớp bản xem trước đã duyệt; hãy cập nhật thư nháp trước khi gửi.');
+          }
+          const sent = await request('drafts/send', { id: args.draftId });
+          return { id: sent.id, threadId: sent.threadId };
         }
         case 'gmail.modify_thread_labels': {
           const thread = await request(`threads/${args.threadId}/modify`, { ...(args.addLabelIds ? { addLabelIds: args.addLabelIds } : {}), ...(args.removeLabelIds ? { removeLabelIds: args.removeLabelIds } : {}) });
@@ -197,6 +342,7 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
         }
         default: {
           let subject = args.subject ?? '', body = args.body ?? '', inReplyTo: string | undefined, references: string | undefined;
+          let outgoingAttachments: OutgoingAttachment[] | undefined;
           if (args.threadId) {
             const thread = await readThread(args.threadId);
             const latest: GmailMessage | undefined = (thread.messages ?? []).filter(m => !m.labelIds?.includes('DRAFT')).at(-1);
@@ -205,9 +351,27 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
             if (toolName === 'gmail.forward') {
               subject = /^Fwd:/i.test(originalSubject) ? originalSubject : 'Fwd: ' + originalSubject;
               body = `${args.note ?? ''}\n\n---------- Forwarded message ----------\nFrom: ${safeHeader(header(latest, 'From'))}\nSubject: ${originalSubject}\n\n${cut(messageText(latest), 12000)}`;
+              if (args.includeAttachments === true) {
+                const sources = attachmentSources(latest.payload);
+                const declaredTotal = sources.reduce((sum, item) => sum + item.size, 0);
+                if (declaredTotal > MAX_FORWARD_ATTACHMENTS_TOTAL_BYTES) {
+                  invalid('Tổng dung lượng tệp đính kèm vượt quá giới hạn 10 MB khi chuyển tiếp.');
+                }
+                const loaded: OutgoingAttachment[] = [];
+                let totalBytes = 0;
+                for (const src of sources) {
+                  const buf = await loadAttachmentBuffer(latest.id, src);
+                  totalBytes += buf.length;
+                  if (totalBytes > MAX_FORWARD_ATTACHMENTS_TOTAL_BYTES) {
+                    invalid('Tổng dung lượng tệp đính kèm vượt quá giới hạn 10 MB khi chuyển tiếp.');
+                  }
+                  loaded.push({ filename: src.filename, mimeType: src.mimeType, content: buf });
+                }
+                outgoingAttachments = loaded;
+              }
             } else {
               const derivedSubject = cut(/^Re:/i.test(originalSubject) ? originalSubject : 'Re: ' + originalSubject, 250);
-              if (toolName === 'gmail.create_draft' && typeof args.subject === 'string' && args.subject.trim().length > 0 && args.subject !== derivedSubject) {
+              if ((toolName === 'gmail.create_draft' || toolName === 'gmail.update_draft') && typeof args.subject === 'string' && args.subject.trim().length > 0 && args.subject !== derivedSubject) {
                 invalid('Không thể đổi tiêu đề khi tạo bản nháp trả lời trong luồng thư sẵn có. Tạo bản nháp thư mới nếu muốn đổi tiêu đề.');
               }
               subject = derivedSubject;
@@ -218,9 +382,29 @@ export function createGmailToolAdapter(options: GmailToolAdapterOptions) {
               references = [...new Set([...(previous.match(/<[^<>\s]+>/g) ?? []), inReplyTo])].join(' ');
             }
           }
-          const raw = rawMessage({ to: args.to, cc: args.cc, bcc: args.bcc, subject: cut(subject, 250), body: cut(body, 20000), inReplyTo, references });
+          const raw = rawMessage({
+            to: args.to,
+            cc: args.cc,
+            bcc: args.bcc,
+            subject: cut(subject, 250),
+            body: cut(body, 20000),
+            inReplyTo,
+            references,
+            ...(outgoingAttachments?.length ? { attachments: outgoingAttachments } : {}),
+          });
           const message = { raw, ...(args.threadId && toolName !== 'gmail.forward' ? { threadId: args.threadId } : {}) };
-          if (toolName === 'gmail.create_draft') { const data = await request('drafts', { message }); return { id: data.id, messageId: data.message?.id, threadId: data.message?.threadId }; }
+          if (toolName === 'gmail.create_draft') {
+            const data = await request('drafts', { message });
+            return { id: data.id, messageId: data.message?.id, threadId: data.message?.threadId };
+          }
+          if (toolName === 'gmail.update_draft') {
+            const data = await request(`drafts/${encodeURIComponent(args.draftId)}`, { id: args.draftId, message }, 'PUT');
+            return {
+              draftId: data.id,
+              messageId: data.message?.id,
+              ...(data.message?.threadId ? { threadId: data.message.threadId } : {}),
+            };
+          }
           const sent = await request('messages/send', message);
           return { id: sent.id, threadId: sent.threadId };
         }

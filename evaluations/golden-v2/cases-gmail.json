@@ -627,6 +627,58 @@
           }
         ]
       }
+    },
+    {
+      "id": "gm19",
+      "category": "single_step",
+      "language": "vi",
+      "primaryService": "gmail",
+      "services": [
+        "gmail"
+      ],
+      "prompt": "Cập nhật thư nháp trả lời \"Re: Họp nhóm ATI\" gửi cho lan@example.com với nội dung: Mình xác nhận họp lúc 9h30.",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "gmail.update_draft",
+            "args": {
+              "draftId": {
+                "equals": "gmail-draft-1"
+              },
+              "to": {
+                "contains": "lan@example.com"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "gm20",
+      "category": "single_step",
+      "language": "en",
+      "primaryService": "gmail",
+      "services": [
+        "gmail"
+      ],
+      "prompt": "Send the Gmail draft \"Re: Họp nhóm ATI\" to lan@example.com.",
+      "expect": {
+        "kind": "plan",
+        "steps": [
+          {
+            "tool": "gmail.send_draft",
+            "args": {
+              "draftId": {
+                "equals": "gmail-draft-1"
+              },
+              "to": {
+                "contains": "lan@example.com"
+              }
+            }
+          }
+        ]
+      }
     }
   ]
 }

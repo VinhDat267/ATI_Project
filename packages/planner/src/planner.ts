@@ -737,9 +737,10 @@ export class AIPlanner {
         // `stamp` records the parent a result was found under, e.g. the board of a member.
         const stamped = result.map((entity) => (entity && typeof entity === 'object' ? { ...enrichedStamp, ...entity } : entity));
         memory.setEntity('__observed', recordObserved(memory.getEntity('__observed'), tool.discovers, stamped, tool.observedFields));
-        if (tool.service === 'gmail' && tool.discovers === 'thread') {
+        if (tool.service === 'gmail' && (tool.discovers === 'thread' || tool.discovers === 'draft')) {
           const labels = memory.getEntity('__labels') ?? {};
-          memory.setEntity('__labels', { ...labels, thread: recordThreadLabels(labels.thread, stamped) });
+          const labelKey = tool.discovers === 'draft' ? 'draft' : 'thread';
+          memory.setEntity('__labels', { ...labels, [labelKey]: recordThreadLabels(labels[labelKey], stamped) });
         }
       }
       const workspaceRecipients = extractWorkspaceRecipients(tool.service, raw);

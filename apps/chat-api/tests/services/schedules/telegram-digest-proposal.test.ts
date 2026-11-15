@@ -13,7 +13,9 @@ import { GMAIL_MODIFY_SCOPE, type TelegramDigestConfig } from '@wap/tool-schemas
 import {
   computeTelegramDigestConfigHash,
   evaluateTelegramDigestCandidate,
+  resolveGmailDigestQueryAndLabel,
 } from '../../../src/services/schedules/telegram-digest-candidate.js';
+import { isValidGmailDigestQuery } from '../../../src/services/schedules/gmail-digest-binding.js';
 
 const directory = fileURLToPath(new URL('../../../../../db/v3/', import.meta.url));
 
@@ -899,6 +901,74 @@ describe('Telegram auto_digest schedule proposal & confirmation on PostgreSQL (T
       expect(computeTelegramDigestConfigHash(nonGmailConfig)).toBe(
         '3d42466d8ce4fe8fd249c83b55c3f9bfb0fd432cd825b8598bdeb110a521cccd',
       );
+    });
+
+    it('hardens Gmail digest query validation, filter parsing, and preserves existingDigest.includeAiSummary on update', () => {
+      expect(isValidGmailDigestQuery('in:inbox OR from:ceo@acme.com')).toBe(false);
+      expect(isValidGmailDigestQuery('in:inbox | from:ceo@acme.com')).toBe(false);
+      expect(isValidGmailDigestQuery('in:inbox is:unread OR is:starred')).toBe(false);
+      expect(isValidGmailDigestQuery('in:inbox is:unread | is:starred')).toBe(false);
+      expect(isValidGmailDigestQuery('in:inbox {from:a from:b}')).toBe(false);
+      expect(isValidGmailDigestQuery('in:inbox label:spam')).toBe(false);
+      expect(isValidGmailDigestQuery('in:inbox label:trash')).toBe(false);
+      expect(isValidGmailDigestQuery('in:inbox label:sent')).toBe(false);
+      expect(isValidGmailDigestQuery('in:inbox label:anywhere')).toBe(false);
+      expect(isValidGmailDigestQuery('in:inbox (from:ceo@acme.com')).toBe(false);
+      expect(isValidGmailDigestQuery('in:inbox from:ceo@acme.com)')).toBe(false);
+      expect(isValidGmailDigestQuery('in:inbox "unclosed quote')).toBe(false);
+      expect(isValidGmailDigestQuery('in:inbox is:unread (hóa đơn OR invoice)')).toBe(true);
+
+      expect(
+        resolveGmailDigestQueryAndLabel('Tóm tắt thư from:ceo@acme.com)OR(in:anywhere label:spam label:ProjectAlpha)').query,
+      ).toBe('in:inbox is:unread from:ceo@acme.com label:ProjectAlpha');
+      expect(
+        isValidGmailDigestQuery(resolveGmailDigestQueryAndLabel('Tóm tắt thư VIP label:VIP').query),
+      ).toBe(true);
+
+      const existingCandidate = evaluateTelegramDigestCandidate({
+        proposal: {
+          kind: 'schedule',
+          action: 'update',
+          name: 'Cập nhật bản tin sáng',
+          request: 'Tóm tắt thư chưa đọc gửi vào Telegram của tôi',
+          recurrence: { type: 'daily', time: '08:00' },
+          summary: 'Mỗi sáng 8h gửi bản tin',
+        },
+        services: ['gmail', 'telegram'],
+        timeZone: 'Asia/Ho_Chi_Minh',
+        telegramLookup: {
+          status: 'connected',
+          selectedChats: [
+            { chatId: '777888999', title: 'Telegram của tôi (Digest User)', type: 'private' },
+          ],
+          connection: {
+            credentialId: '00000000-0000-4000-8000-000000000888',
+            telegramUserId: '777888999',
+            username: 'digestuser',
+            chatIds: ['777888999'],
+          },
+        },
+        gmailBinding: {
+          kind: 'gmail',
+          credentialId: '00000000-0000-4000-8000-000000000777',
+          email: 'alice.trusted@example.test',
+          oauthClientId: GMAIL_CLIENT_ID,
+        },
+        existingDigest: {
+          credentialId: '00000000-0000-4000-8000-000000000888',
+          telegramUserId: '777888999',
+          username: 'digestuser',
+          chatId: '777888999',
+          chatTitle: 'Telegram của tôi (Digest User)',
+          sourceBindingVersion: 1,
+          includeAiSummary: false,
+          sources: [],
+          recurrence: { type: 'daily', time: '08:00' },
+          timeZone: 'Asia/Ho_Chi_Minh',
+        },
+      });
+      expect(existingCandidate.canAutoDigest).toBe(true);
+      expect(existingCandidate.config?.includeAiSummary).toBe(false);
     });
   });
 });

@@ -14,7 +14,7 @@
     "jira": { "siteId": "Site Jira", "projectKey": "Mã dự án Jira", "issueKey": "Mã công việc Jira", "summary": "Tiêu đề công việc", "description": "Mô tả chi tiết", "issueType": "Loại công việc", "body": "Nội dung bình luận", "targetStatus": "Trạng thái chuyển tới", "priority": "Độ ưu tiên", "dueDate": "Hạn hoàn thành", "assigneeAccountId": "Người phụ trách (Account ID)", "parentKey": "Mã Epic / Issue cha", "labels": "Các nhãn", "status": "Lọc theo trạng thái" },
     "myjira": { "siteId": "Site Jira", "projectKey": "Mã dự án Jira", "issueKey": "Mã công việc Jira", "summary": "Tiêu đề công việc", "description": "Mô tả chi tiết", "issueType": "Loại công việc", "body": "Nội dung bình luận", "targetStatus": "Trạng thái chuyển tới", "priority": "Độ ưu tiên", "dueDate": "Hạn hoàn thành", "assigneeAccountId": "Người phụ trách (Account ID)", "parentKey": "Mã Epic / Issue cha", "labels": "Các nhãn", "status": "Lọc theo trạng thái" },
     "github": { "repo": "Kho mã nguồn GitHub", "issueNumber": "Số công việc GitHub", "body": "Nội dung công việc", "labels": "Các nhãn", "label": "Nhãn", "assignees": "Người phụ trách", "state": "Trạng thái", "query": "Từ khóa tìm kiếm" },
-    "gmail": { "threadId": "Luồng thư", "threadIds": "Các luồng thư", "to": "Người nhận (Tới)", "cc": "Người nhận bản sao (Cc)", "bcc": "Người nhận ẩn danh (Bcc)", "subject": "Tiêu đề thư", "body": "Nội dung thư", "note": "Lời nhắn chuyển tiếp", "addLabelIds": "Thêm nhãn", "removeLabelIds": "Bỏ nhãn", "name": "Tên nhãn" }
+    "gmail": { "threadId": "Luồng thư", "threadIds": "Các luồng thư", "draftId": "Thư nháp", "messageId": "Tin nhắn", "attachmentId": "Tệp đính kèm", "includeAttachments": "Đính kèm tệp gốc", "pageToken": "Trang tiếp theo", "to": "Người nhận (Tới)", "cc": "Người nhận bản sao (Cc)", "bcc": "Người nhận ẩn danh (Bcc)", "subject": "Tiêu đề thư", "body": "Nội dung thư", "note": "Lời nhắn chuyển tiếp", "addLabelIds": "Thêm nhãn", "removeLabelIds": "Bỏ nhãn", "name": "Tên nhãn" }
   },
   "outputs": {
     "html_url": "liên kết", "webUrl": "liên kết", "key": "mã công việc",
@@ -24,7 +24,7 @@
     "updatedCells": "số ô đã cập nhật", "skippedDuplicates": "số dòng trùng đã bỏ qua", "unmatchedKeys": "các khóa chưa tìm thấy",
     "totalMatched": "số dòng khớp", "totalDataRows": "tổng số dòng dữ liệu", "matches": "các dòng khớp điều kiện", "sheet": "tên trang tính", "headers": "tiêu đề cột",
     "pageId": "ID trang Notion", "blockIds": "các ID khối nội dung", "blocks": "các khối nội dung trang", "updatedProperties": "các thuộc tính đã cập nhật", "archived": "trạng thái lưu trữ", "lastEditedTime": "thời gian cập nhật cuối", "schema": "cấu trúc cột database", "messageId": "ID tin nhắn",
-    "threadId": "ID luồng thư", "labelIds": "các nhãn đã cập nhật", "ids": "các luồng thư đã cập nhật",
+    "threadId": "ID luồng thư", "draftId": "ID thư nháp", "filename": "tên tệp đính kèm", "labelIds": "các nhãn đã cập nhật", "ids": "các luồng thư đã cập nhật",
     "chatId": "ID cuộc trò chuyện", "date": "thời gian gửi", "issueKey": "mã công việc Jira",
     "boardId": "ID bảng Trello", "listId": "ID danh sách Trello", "cardId": "ID thẻ Trello",
     "memberId": "ID thành viên", "username": "tên người dùng", "email": "địa chỉ email",

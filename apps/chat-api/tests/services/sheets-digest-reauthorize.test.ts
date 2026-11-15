@@ -679,7 +679,7 @@ describe('Task 5A (PR-5A): Strict Resume Separation & Two-Phase Server-Side Reau
       });
       expect(inTxDuringFetch).toBe(false);
       expect(fetchOrgSheetsMetadata).toHaveBeenCalledTimes(1);
-      expect(orgPreview.candidate.config?.version).toBe(2);
+      expect(orgPreview.candidate.config).toMatchObject({ version: 2 });
 
       // Now simulate concurrent modification during Phase A -> Phase B must reject with 409 STALE_VERSION
       mutateVersionDuringFetch = true;

@@ -182,6 +182,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
     requestText?: string;
     workspaceMode?: 'personal' | 'organization';
     workspaceId?: string | null;
+    includeAiSummary?: boolean;
   }) {
     const targetPool = input.pool ?? db.pool;
     const convRepo = new ConversationRepo(targetPool);
@@ -275,6 +276,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
       messageId: proposalEvent!.payload.messageId,
       approvalMode: 'auto_digest',
       now: PROPOSAL_NOW,
+      ...(typeof input.includeAiSummary === 'boolean' ? { includeAiSummary: input.includeAiSummary } : {}),
       scope:
         input.workspaceMode === 'organization'
           ? { workspaceMode: 'organization', workspaceId: input.workspaceId ?? null }
@@ -303,6 +305,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
     }>;
     aiTimeoutMs?: number;
     sendTimeoutMs?: number;
+    now?: () => Date;
     botClient?: {
       getChatMember: (chatId: string, userId: string, signal?: AbortSignal) => Promise<boolean>;
     };
@@ -462,7 +465,7 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
       timeZone: TZ,
       encryptionKey: ENC_KEY,
       gmailOAuthClientId: GMAIL_CLIENT_ID,
-      now: () => TICK_NOW,
+      now: () => opts.now?.() ?? TICK_NOW,
       planRun: async () => {
         throw new Error('Should not invoke manual planRun for telegram_digest');
       },
@@ -4254,5 +4257,165 @@ describe('GMAIL-G2 A1 — Bounded Gmail Source Binding & PostgreSQL Egress Autho
         await proxy.close();
       }
     }, 30_000);
+  });
+
+  describe('GMAIL-COMPLETE: Filtered Digest Queries, includeAiSummary Opt-Out & telegram_digest Reauthorize', () => {
+    it('derives bounded filtered Gmail query from natural Vietnamese request and executes it on tick', async () => {
+      const owner = await db.person('Filtered Digest Owner');
+      const credRepo = new CredentialRepo(db.pool, ENC_KEY);
+      const tg = await seedTelegramPersonal(credRepo, owner.id);
+      await seedGmailPersonal(credRepo, owner.id, {
+        email: 'alice@example.test',
+        refreshToken: '1//rt-alice-filtered',
+      });
+
+      const { confirmed, scheduleService } = await proposeAndConfirmGmailDigest({
+        userId: owner.id,
+        tg,
+        requestText:
+          'Mỗi sáng 8h tóm tắt email hóa đơn chưa đọc từ billing@vendor.test có tệp đính kèm gửi vào Telegram của tôi',
+      });
+
+      const cfg = confirmed.schedule.digestConfig as TelegramDigestConfig;
+      expect(cfg.sources[0]?.args?.query).toBe(
+        'in:inbox is:unread from:billing@vendor.test has:attachment (hóa đơn OR invoice)',
+      );
+      expect(cfg.sources[0]?.label).toContain('alice@example.test');
+      expect((confirmed.schedule.digest as any)?.sources?.[0]?.query).toBe(
+        'in:inbox is:unread from:billing@vendor.test has:attachment (hóa đơn OR invoice)',
+      );
+
+      const h = createHarness({ credRepo });
+      await h.scheduleRunner.tick();
+
+      expect(h.gmailCalls).toHaveLength(1);
+      expect(h.gmailCalls[0]!.args).toEqual({
+        query: 'in:inbox is:unread from:billing@vendor.test has:attachment (hóa đơn OR invoice)',
+      });
+      expect(h.telegramWrites).toHaveLength(1);
+
+      const listed = await scheduleService.list(owner.id, TICK_NOW);
+      const found = listed.find((s) => s.id === confirmed.schedule.id);
+      expect((found?.digest as any)?.sources?.[0]?.query).toBe(
+        'in:inbox is:unread from:billing@vendor.test has:attachment (hóa đơn OR invoice)',
+      );
+    });
+
+    it('skips AI model summary call (0 aiCalls) when confirmProposal sets includeAiSummary: false', async () => {
+      const owner = await db.person('No AI Digest Owner');
+      const credRepo = new CredentialRepo(db.pool, ENC_KEY);
+      const tg = await seedTelegramPersonal(credRepo, owner.id);
+      await seedGmailPersonal(credRepo, owner.id, {
+        email: 'noai@example.test',
+        refreshToken: '1//rt-noai',
+      });
+
+      const { confirmed } = await proposeAndConfirmGmailDigest({
+        userId: owner.id,
+        tg,
+        includeAiSummary: false,
+      });
+
+      const cfg = confirmed.schedule.digestConfig as TelegramDigestConfig;
+      expect(cfg.includeAiSummary).toBe(false);
+      expect((confirmed.schedule.digest as any)?.includeAiSummary).toBe(false);
+
+      const h = createHarness({ credRepo });
+      await h.scheduleRunner.tick();
+
+      expect(h.gmailCalls).toHaveLength(1);
+      expect(h.aiCalls).toHaveLength(0);
+      expect(h.telegramWrites).toHaveLength(1);
+      expect(h.telegramWrites[0]!.text).toContain('Báo cáo tài chính Q4');
+
+      const runRow = (
+        await db.pool.query('SELECT status, error FROM schedule_runs WHERE schedule_id = $1', [
+          confirmed.schedule.id,
+        ])
+      ).rows[0];
+      expect(runRow).toEqual({ status: 'digest_sent', error: null });
+    });
+
+    it('supports full transactional reauthorize preview and confirm for paused Gmail telegram_digest after credential replacement', async () => {
+      const owner = await db.person('Reauth TG Digest Owner');
+      const credRepo = new CredentialRepo(db.pool, ENC_KEY);
+      const tg = await seedTelegramPersonal(credRepo, owner.id);
+      const gmailA = await seedGmailPersonal(credRepo, owner.id, {
+        email: 'alice@example.test',
+        refreshToken: '1//rt-alice-reauth',
+      });
+
+      const { confirmed, conv, scheduleService } = await proposeAndConfirmGmailDigest({
+        userId: owner.id,
+        tg,
+      });
+
+      // Replace personal Gmail with Account B -> tick blocks & pauses schedule
+      const gmailB = await seedGmailPersonal(credRepo, owner.id, {
+        email: 'bob@example.test',
+        refreshToken: '1//rt-bob-reauth',
+      });
+      expect(gmailB.row.id).not.toBe(gmailA.row.id);
+
+      const h1 = createHarness({ credRepo });
+      await h1.scheduleRunner.tick();
+      expect(h1.gmailCalls).toHaveLength(0);
+
+      const pausedRow = (
+        await db.pool.query('SELECT status, version, digest_config FROM schedules WHERE id = $1', [
+          confirmed.schedule.id,
+        ])
+      ).rows[0];
+      expect(pausedRow.status).toBe('paused');
+
+      // Phase 1: createReauthorizePreview creates sealed reauthorize proposal without mutating schedules row
+      const preview = await scheduleService.createReauthorizePreview({
+        userId: owner.id,
+        scheduleId: confirmed.schedule.id,
+        now: TICK_NOW,
+      });
+      expect(preview.metadata.reauthorize).toBe(true);
+      expect(preview.baseVersion).toBe(pausedRow.version);
+      expect((preview.candidate.config as TelegramDigestConfig).sources[0]?.binding).toEqual({
+        kind: 'gmail',
+        credentialId: gmailB.row.id,
+        email: 'bob@example.test',
+        oauthClientId: GMAIL_CLIENT_ID,
+      });
+
+      const unchangedBeforeConfirm = (
+        await db.pool.query('SELECT status, digest_config FROM schedules WHERE id = $1', [
+          confirmed.schedule.id,
+        ])
+      ).rows[0];
+      expect(unchangedBeforeConfirm.status).toBe('paused');
+      expect(unchangedBeforeConfirm.digest_config.sources[0].binding.credentialId).toBe(gmailA.row.id);
+
+      // Phase 2: confirmProposal reactivates schedule and rebinds to Account B
+      const reauthorized = await scheduleService.confirmProposal({
+        userId: owner.id,
+        convId: conv.id,
+        messageId: preview.proposalMessageId,
+        approvalMode: 'auto_digest',
+        now: TICK_NOW,
+      });
+      expect(reauthorized.schedule.status).toBe('active');
+      expect(reauthorized.schedule.pauseReason).toBeNull();
+      expect((reauthorized.schedule.digestConfig as TelegramDigestConfig).sources[0]?.binding?.credentialId).toBe(
+        gmailB.row.id,
+      );
+
+      const NEXT_DAY_TICK = new Date('2026-11-03T01:00:30.000Z');
+      const h2 = createHarness({ credRepo, now: () => NEXT_DAY_TICK });
+      await h2.scheduleRunner.tick();
+
+      expect(h2.gmailCalls).toHaveLength(1);
+      expect(h2.gmailCalls[0]!.accessToken).toBe('ya29.tok-for-1//rt-bob-reauth');
+      expect(h2.gmailCalls[0]!.context?.connections?.gmail).toEqual({
+        credentialId: gmailB.row.id,
+        email: 'bob@example.test',
+      });
+      expect(h2.telegramWrites).toHaveLength(1);
+    });
   });
 });

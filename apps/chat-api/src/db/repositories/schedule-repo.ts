@@ -102,10 +102,15 @@ export class ScheduleRepo {
       base.digest = {
         chatId: cfg.chatId,
         chatTitle: cfg.chatTitle,
-        sources: (cfg.sources ?? []).map((s) => ({
-          service: s.service,
-          label: s.label,
-        })),
+        sources: (cfg.sources ?? []).map((s) => {
+          const q = (s.args as Record<string, unknown> | undefined)?.query;
+          return {
+            service: s.service,
+            label: s.label,
+            ...(typeof q === 'string' && q.trim() ? { query: q.trim() } : {}),
+          };
+        }),
+        ...(typeof cfg.includeAiSummary === 'boolean' ? { includeAiSummary: cfg.includeAiSummary } : {}),
         approvedAt: row.digest_approved_at ? new Date(row.digest_approved_at).toISOString() : null,
       };
     }

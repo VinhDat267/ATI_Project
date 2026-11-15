@@ -168,6 +168,19 @@ export const GMAIL_THREADS = [
     subject, date: '2026-10-14T09:00:00+07:00', body, attachments: index === 1 ? [{ filename: 'báo cáo.pdf', size: 1200 }] : [], isDraft: false }],
 }));
 export const GMAIL_LABELS = ['INBOX', 'UNREAD', 'STARRED'].map(id => ({ id, name: id, type: 'system' }));
+export const GMAIL_DRAFTS = [
+  {
+    id: 'gmail-draft-1',
+    messageId: 'gmail-draft-msg-1',
+    threadId: 'gmail-thread-1',
+    subject: 'Re: Họp nhóm ATI',
+    to: ['lan@example.com'],
+    cc: [],
+    snippet: 'Bản nháp xác nhận họp lúc 9h.',
+    date: '2026-10-14T10:00:00+07:00',
+    participants: ['lan@example.com'],
+  },
+];
 type GmailThread = (typeof GMAIL_THREADS)[number];
 /**
  * Approximates Gmail search over the fixture: every term must match and a leading "-" negates one; quoted phrases,
@@ -203,7 +216,7 @@ const ENTITIES: Record<string, Array<{ id: string | number }>> = {
   board: BOARDS, list: LISTS, member: MEMBERS, card: CARDS, channel: CHANNELS, repository: REPOS, issue: ISSUES,
   spreadsheet: SPREADSHEETS, myspreadsheet: MYSPREADSHEETS, drive_folder: DRIVE_FOLDERS, google_doc: GOOGLE_DOCS,
   sheet: SHEETS, mysheet: MYSHEETS_TABS, calendar: CALENDARS, mycalendar: MYCALENDARS, database: DATABASES, page: PAGES,
-  chat: CHATS, project: PROJECTS, jira_site: MYJIRA_SITES, jira_project: PROJECTS, jira_issue: JIRA_ISSUES, myjira_project: MYJIRA_PROJECTS, myjira_issue: MYJIRA_ISSUES, thread: GMAIL_THREADS, label: GMAIL_LABELS,
+  chat: CHATS, project: PROJECTS, jira_site: MYJIRA_SITES, jira_project: PROJECTS, jira_issue: JIRA_ISSUES, myjira_project: MYJIRA_PROJECTS, myjira_issue: MYJIRA_ISSUES, thread: GMAIL_THREADS, label: GMAIL_LABELS, draft: GMAIL_DRAFTS,
 };
 
 /** Every value a resource argument may legitimately take, by x-resource name. */
@@ -365,7 +378,16 @@ export async function fixtureSearch({ tool, args }: { tool: string; args: Record
       if (!found) throw new Error(`Unknown fixture thread=${String(args.threadId)}`);
       return structuredClone({ id: found.id, subject: found.subject, participants: found.participants, totalMessages: found.messages.length, omittedMessages: 0, messages: found.messages });
     }
+    case 'gmail.read_attachment': {
+      const found = GMAIL_THREADS.find(thread => thread.id === args.threadId);
+      if (!found) throw new Error(`Unknown fixture thread=${String(args.threadId)}`);
+      const msg = found.messages.find(m => !args.messageId || m.messageId === args.messageId) ?? found.messages[0]!;
+      const att = msg.attachments.find(a => !args.filename || a.filename.toLowerCase().includes(String(args.filename).toLowerCase())) ?? msg.attachments[0];
+      if (!att) throw new Error(`Unknown fixture attachment on thread=${String(args.threadId)}`);
+      return { threadId: found.id, messageId: msg.messageId, filename: att.filename, mimeType: 'application/pdf', size: att.size, extracted: true, truncated: false, text: 'Báo cáo tuần ATI: Hoàn thành sprint đúng tiến độ.' };
+    }
     case 'gmail.list_labels': return bounded(GMAIL_LABELS.filter(label => matches(label.name, args.query)), 10);
+    case 'gmail.list_drafts': return bounded(GMAIL_DRAFTS.filter(d => matches(d.subject, args.query)), 10);
     case 'trello.search_boards': return BOARDS.filter((b) => matches(b.name, args.query));
     case 'trello.search_lists': return LISTS.filter((l) => l.boardId === args.boardId && matches(l.name, args.query));
     case 'trello.search_members':

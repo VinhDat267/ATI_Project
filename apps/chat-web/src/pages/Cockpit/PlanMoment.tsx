@@ -140,9 +140,11 @@ export function PlanMoment({
   const gmailSteps = plan.steps.filter((step) => step.tool.startsWith('gmail.'));
   if (gmailSteps.length > 0 && plan.connections?.gmail) {
     const hasGmailSend = gmailSteps.some((step) =>
-      ['gmail.send_message', 'gmail.reply', 'gmail.forward'].includes(step.tool),
+      ['gmail.send_message', 'gmail.reply', 'gmail.forward', 'gmail.send_draft'].includes(step.tool),
     );
-    const hasGmailDraft = gmailSteps.some((step) => step.tool === 'gmail.create_draft');
+    const hasGmailDraft = gmailSteps.some((step) =>
+      ['gmail.create_draft', 'gmail.update_draft'].includes(step.tool),
+    );
     accountChips.push({
       key: 'gmail',
       service: 'gmail',

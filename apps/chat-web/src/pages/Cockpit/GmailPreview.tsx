@@ -2,13 +2,20 @@ import type { PlanStep } from '../../types';
 import { formatArgValue } from '../../components/PlanStepItem';
 
 const fieldNames: Record<string, string> = {
-  threadId: 'Luồng thư', threadIds: 'Các luồng thư', addLabelIds: 'Thêm nhãn', removeLabelIds: 'Bỏ nhãn', name: 'Tên nhãn',
+  threadId: 'Luồng thư', threadIds: 'Các luồng thư', draftId: 'Thư nháp',
+  messageId: 'Tin nhắn', attachmentId: 'Tệp đính kèm', includeAttachments: 'Đính kèm tệp gốc', pageToken: 'Trang tiếp theo',
+  addLabelIds: 'Thêm nhãn', removeLabelIds: 'Bỏ nhãn', name: 'Tên nhãn',
   subject: 'Tiêu đề', body: 'Nội dung', note: 'Lời nhắn',
 };
 
 /** Threads and labels show the names from resourceLabels; a bare ID is marked as having none. */
 function argumentValue(key: string, value: unknown, labels?: Record<string, string>) {
-  const missing = key === 'threadId' || key === 'threadIds' ? 'tiêu đề' : key === 'addLabelIds' || key === 'removeLabelIds' ? 'tên' : null;
+  const missing =
+    key === 'threadId' || key === 'threadIds' || key === 'draftId'
+      ? 'tiêu đề'
+      : key === 'addLabelIds' || key === 'removeLabelIds'
+        ? 'tên'
+        : null;
   if (!missing) return formatArgValue(value).text;
   const items = Array.isArray(value) ? value : [value];
   return <div className="flex flex-wrap gap-1.5 mt-1 min-w-0">{items.map((item, index) => <div key={index} className="px-2.5 py-1 rounded-lg bg-white border border-[#E7E7E2] text-[#111827] font-medium max-w-full min-w-0 break-words [overflow-wrap:anywhere]">{typeof item === 'string'
@@ -27,7 +34,17 @@ function Arguments({ step, labels, except = [] }: { step: PlanStep; labels?: Rec
 }
 
 export function GmailPreview({ step, labels }: { step: PlanStep; labels?: Record<string, string> }) {
-  const isMail = ['gmail.send_message', 'gmail.reply', 'gmail.forward', 'gmail.create_draft'].includes(step.tool);
+  const isMail = [
+    'gmail.send_message',
+    'gmail.reply',
+    'gmail.forward',
+    'gmail.create_draft',
+    'gmail.update_draft',
+    'gmail.send_draft',
+  ].includes(step.tool);
+  const hasDraftRecipients =
+    step.tool !== 'gmail.send_draft' ||
+    Boolean(step.args.to || step.args.cc || step.args.bcc);
   if (!isMail) return <div data-testid="gmail-preview-card" className="p-4 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-4 min-w-0">
     {step.tool === 'gmail.trash_thread' && <p className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">Luồng thư này sẽ được chuyển vào Thùng rác của Gmail.</p>}
     <Arguments step={step} labels={labels} />
@@ -52,13 +69,24 @@ export function GmailPreview({ step, labels }: { step: PlanStep; labels?: Record
     <p data-testid="gmail-delivery-mode" className="text-xs text-[#4B5563] font-medium break-words">
       {step.tool === 'gmail.create_draft'
         ? 'Chế độ thực thi: Chỉ tạo thư nháp trong Gmail; chưa gửi thư tới người nhận.'
-        : 'Chế độ thực thi: Gửi thư thật tới người nhận ngay sau khi bạn duyệt kế hoạch.'}
+        : step.tool === 'gmail.update_draft'
+          ? 'Chế độ thực thi: Chỉ cập nhật nội dung thư nháp trong Gmail; chưa gửi thư tới người nhận.'
+          : step.tool === 'gmail.send_draft'
+            ? 'Chế độ thực thi: Gửi thư nháp này thật tới người nhận trong thư nháp ngay sau khi bạn duyệt kế hoạch.'
+            : 'Chế độ thực thi: Gửi thư thật tới người nhận ngay sau khi bạn duyệt kế hoạch.'}
     </p>
-    <dl className="v3-space-y-3 min-w-0">{recipients}</dl>
-    {fromThread && ['gmail.send_message', 'gmail.forward'].includes(step.tool) && <p role="alert" className="p-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-900">Người nhận lấy từ tiêu đề luồng thư có thể bị giả mạo. Hãy kiểm tra từng địa chỉ trước khi duyệt gửi.</p>}
-    {step.tool === 'gmail.forward' && <p data-testid="gmail-forward-attachment-warning" className="p-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 font-medium">Chỉ chuyển tiếp văn bản; tệp đính kèm gốc không được gửi.</p>}
+    {hasDraftRecipients && <dl className="v3-space-y-3 min-w-0">{recipients}</dl>}
+    {step.tool === 'gmail.send_draft' && !hasDraftRecipients && (
+      <p data-testid="gmail-draft-send-recipient-note" className="p-2.5 rounded-lg bg-white border border-[#E7E7E2] text-xs text-[#4B5563] leading-relaxed">
+        Người nhận thực tế sẽ lấy theo tiêu đề To/Cc/Bcc đã lưu trong thư nháp và được kiểm tra lại trước khi gửi.
+      </p>
+    )}
+    {fromThread && ['gmail.send_message', 'gmail.forward', 'gmail.send_draft'].includes(step.tool) && <p role="alert" className="p-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-900">Người nhận lấy từ tiêu đề luồng thư có thể bị giả mạo. Hãy kiểm tra từng địa chỉ trước khi duyệt gửi.</p>}
+    {step.tool === 'gmail.forward' && (step.args.includeAttachments === true
+      ? <p data-testid="gmail-forward-attachment-included" className="p-3 rounded-xl border border-blue-200 bg-blue-50 text-blue-900 font-medium">Chuyển tiếp kèm tệp đính kèm gốc từ thư (tối đa 10 MB tổng dung lượng đính kèm).</p>
+      : <p data-testid="gmail-forward-attachment-warning" className="p-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 font-medium">Chỉ chuyển tiếp văn bản; tệp đính kèm gốc không được gửi.</p>)}
     {(step.tool === 'gmail.reply' || step.tool === 'gmail.forward') && <p data-testid="gmail-source-drift-notice" className="p-2.5 rounded-lg bg-white border border-[#E7E7E2] text-xs text-[#4B5563] leading-relaxed">Khi thực thi, hệ thống đối chiếu tin nhắn đã gửi mới nhất trong luồng thư trên Gmail (nội dung gốc trong luồng không cố định theo bản xem trước nếu luồng có thư mới trước lúc chạy).</p>}
-    {step.tool === 'gmail.create_draft' && hasThreadId && <p data-testid="gmail-source-drift-notice" className="p-2.5 rounded-lg bg-white border border-[#E7E7E2] text-xs text-[#4B5563] leading-relaxed">Thư nháp trả lời trong luồng dùng tin nhắn đã gửi mới nhất khi thực thi (không cố định nội dung luồng tại thời điểm xem trước) và giữ tiêu đề Re: của luồng; máy chủ từ chối tiêu đề tùy chỉnh không khớp — hãy tạo thư nháp độc lập mới nếu muốn đổi tiêu đề.</p>}
+    {(step.tool === 'gmail.create_draft' || step.tool === 'gmail.update_draft') && hasThreadId && <p data-testid="gmail-source-drift-notice" className="p-2.5 rounded-lg bg-white border border-[#E7E7E2] text-xs text-[#4B5563] leading-relaxed">Thư nháp trả lời trong luồng dùng tin nhắn đã gửi mới nhất khi thực thi (không cố định nội dung luồng tại thời điểm xem trước) và giữ tiêu đề Re: của luồng; máy chủ từ chối tiêu đề tùy chỉnh không khớp — hãy tạo thư nháp độc lập mới nếu muốn đổi tiêu đề.</p>}
     <Arguments step={step} labels={labels} except={['to', 'cc', 'bcc']} />
   </div>;
 }

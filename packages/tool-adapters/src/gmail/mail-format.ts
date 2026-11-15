@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { GMAIL_ADDRESS_PATTERN } from '@wap/tool-schemas';
 import { StepError } from '../base-adapter.js';
 
@@ -90,6 +91,26 @@ export function attachments(part?: GmailPart): { filename: string; size: number 
   if (!part) return [];
   return [...(part.filename ? [{ filename: part.filename, size: part.body?.size ?? 0 }] : []), ...(part.parts?.flatMap(attachments) ?? [])];
 }
+export interface GmailAttachmentSource {
+  filename: string;
+  mimeType: string;
+  size: number;
+  attachmentId?: string;
+  inlineData?: string;
+}
+export function attachmentSources(part?: GmailPart): GmailAttachmentSource[] {
+  if (!part) return [];
+  const current: GmailAttachmentSource[] = part.filename
+    ? [{
+        filename: part.filename,
+        mimeType: part.mimeType?.split(';')[0]?.trim() || 'application/octet-stream',
+        size: part.body?.size ?? 0,
+        ...(part.body?.attachmentId ? { attachmentId: part.body.attachmentId } : {}),
+        ...(part.body?.data ? { inlineData: part.body.data } : {}),
+      }]
+    : [];
+  return [...current, ...(part.parts?.flatMap(attachmentSources) ?? [])];
+}
 function encodeSubject(subject: string): string {
   safeHeader(subject);
   if (/^[\x20-\x7e]*$/.test(subject)) return subject;
@@ -101,14 +122,55 @@ function encodeSubject(subject: string): string {
   if (chunk) words.push(`=?UTF-8?B?${Buffer.from(chunk).toString('base64')}?=`);
   return words.join('\r\n ');
 }
-export function rawMessage(args: { to?: string[]; cc?: string[]; bcc?: string[]; subject: string; body: string; inReplyTo?: string; references?: string }): string {
-  const headers = ['MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64'];
+function sanitizeAttachmentFilename(filename: string): string {
+  return safeHeader(filename).replace(/["\\]/g, '_').trim() || 'attachment';
+}
+export interface OutgoingAttachment {
+  filename: string;
+  mimeType: string;
+  content: Buffer;
+}
+export function rawMessage(args: {
+  to?: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  body: string;
+  inReplyTo?: string;
+  references?: string;
+  attachments?: OutgoingAttachment[];
+}): string {
+  const baseHeaders = ['MIME-Version: 1.0'];
   for (const [name, list] of [['To', args.to], ['Cc', args.cc], ['Bcc', args.bcc]] as const) {
-    if (list?.length) headers.push(`${name}: ${list.join(', ')}`);
+    if (list?.length) baseHeaders.push(`${name}: ${list.join(', ')}`);
   }
-  headers.push(`Subject: ${encodeSubject(args.subject)}`);
-  if (args.inReplyTo) headers.push(`In-Reply-To: ${safeHeader(args.inReplyTo)}`);
-  if (args.references) headers.push(`References: ${safeHeader(args.references)}`);
+  baseHeaders.push(`Subject: ${encodeSubject(args.subject)}`);
+  if (args.inReplyTo) baseHeaders.push(`In-Reply-To: ${safeHeader(args.inReplyTo)}`);
+  if (args.references) baseHeaders.push(`References: ${safeHeader(args.references)}`);
   const body = Buffer.from(args.body.replace(/\r?\n/g, '\r\n'), 'utf8').toString('base64').match(/.{1,76}/g)?.join('\r\n') ?? '';
-  return Buffer.from(headers.join('\r\n') + '\r\n\r\n' + body, 'utf8').toString('base64url');
+
+  if (!args.attachments || args.attachments.length === 0) {
+    const headers = [baseHeaders[0]!, 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', ...baseHeaders.slice(1)];
+    return Buffer.from(headers.join('\r\n') + '\r\n\r\n' + body, 'utf8').toString('base64url');
+  }
+
+  const boundary = `====ati_gmail_${randomUUID().replace(/-/g, '')}====`;
+  const headers = [...baseHeaders, `Content-Type: multipart/mixed; boundary="${boundary}"`];
+  const parts: string[] = [
+    `--${boundary}\r\nContent-Type: text/plain; charset="UTF-8"\r\nContent-Transfer-Encoding: base64\r\n\r\n${body}`,
+  ];
+  for (const att of args.attachments) {
+    const cleanName = sanitizeAttachmentFilename(att.filename);
+    const encodedName = encodeSubject(cleanName);
+    const safeMime = safeHeader(att.mimeType || 'application/octet-stream').replace(/[;\r\n]/g, '').trim() || 'application/octet-stream';
+    const b64 = att.content.toString('base64').match(/.{1,76}/g)?.join('\r\n') ?? '';
+    parts.push(
+      `--${boundary}\r\n` +
+      `Content-Type: ${safeMime}; name="${encodedName}"\r\n` +
+      `Content-Disposition: attachment; filename="${encodedName}"; filename*=UTF-8''${encodeURIComponent(cleanName)}\r\n` +
+      `Content-Transfer-Encoding: base64\r\n\r\n${b64}`,
+    );
+  }
+  parts.push(`--${boundary}--`);
+  return Buffer.from(headers.join('\r\n') + '\r\n\r\n' + parts.join('\r\n'), 'utf8').toString('base64url');
 }

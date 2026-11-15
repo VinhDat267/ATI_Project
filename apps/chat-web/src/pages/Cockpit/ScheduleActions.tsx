@@ -16,7 +16,7 @@ function CancelDialog({ name, busy, onClose, onConfirm }: { name: string; busy: 
     <div className="flex flex-wrap justify-end gap-2 mt-5"><button type="button" className={scheduleButton} onClick={onClose}>Giữ lịch</button><button type="button" disabled={busy} className={primaryScheduleButton} onClick={onConfirm}>Xác nhận hủy lịch</button></div>
   </div></div>, document.body);
 }
-const REAUTH_PAUSE_REASON_RE = /REAUTH_REQUIRED|cấp quyền lại|xác nhận lại lịch|phiên bản cũ\s*\(v1\)/iu;
+const REAUTH_PAUSE_REASON_RE = /REAUTH_REQUIRED|cấp quyền lại|xác nhận lại lịch|phiên bản cũ\s*\(v1\)|kết nối lại|hộp thư đã xác nhận|bị ngắt hoặc thay đổi/iu;
 
 export function ScheduleActions({ schedule, navigate, onChanged, onConflict }: { schedule: ScheduleView; navigate: (path: string) => void; onChanged: (schedule: ScheduleView) => void; onConflict: () => Promise<void> }) {
   const [busy, setBusy] = useState(false), [cancel, setCancel] = useState(false), [error, setError] = useState(''), [needsReauth, setNeedsReauth] = useState(false);
@@ -36,7 +36,7 @@ export function ScheduleActions({ schedule, navigate, onChanged, onConflict }: {
       setCancel(false);
       if (
         kind === 'resume' &&
-        schedule.kind === 'sheets_digest' &&
+        (schedule.kind === 'sheets_digest' || schedule.kind === 'telegram_digest') &&
         reason?.status === 409 &&
         (reason?.code === 'REAUTHORIZATION_REQUIRED' ||
           /cấp quyền lại|REAUTHORIZATION_REQUIRED|xác nhận lại/iu.test(reason?.message ?? ''))
@@ -65,7 +65,7 @@ export function ScheduleActions({ schedule, navigate, onChanged, onConflict }: {
   };
   const closed = schedule.status === 'cancelled' || schedule.status === 'completed';
   const requiresReauth =
-    schedule.kind === 'sheets_digest' &&
+    (schedule.kind === 'sheets_digest' || schedule.kind === 'telegram_digest') &&
     schedule.status === 'paused' &&
     (needsReauth || REAUTH_PAUSE_REASON_RE.test(schedule.pauseReason ?? ''));
   return <><div className="flex flex-wrap gap-2">

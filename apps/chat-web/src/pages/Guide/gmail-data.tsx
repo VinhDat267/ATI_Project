@@ -3,7 +3,7 @@ import type { Capability, SamplePrompt, ServiceGuide } from './data';
 export const GMAIL_GUIDE: ServiceGuide = {
   id: 'gmail', name: 'Gmail', category: 'Của riêng bạn', keys: [], scopeLabel: 'Hộp thư của bạn', sampleScope: 'Tài khoản bạn tự kết nối', timeEstimate: '2 phút',
   summary: 'Tự kết nối hộp thư Gmail của bạn bằng Google, không cần nhập khoá.',
-  importantNotice: 'Planora được đọc, soạn, gửi và quản lý thư, không xoá vĩnh viễn. Nội dung thư có thể đi qua 9router tới tài khoản model bên thứ ba. Chỉ bạn dùng được kết nối này.',
+  importantNotice: 'Planora được đọc, trích xuất nội dung tệp đính kèm theo yêu cầu, soạn/sửa, gửi và quản lý thư, không xoá vĩnh viễn. Nội dung thư cần xử lý được gửi tới nhà cung cấp mô hình AI bên thứ ba đã cấu hình. Chỉ bạn dùng được kết nối này.',
   steps: [
     { num: 1, title: 'Mở Kết nối dịch vụ', desc: 'Đăng nhập Planora, mở nhóm Của riêng bạn và chọn Kết nối Gmail.' },
     { num: 2, title: 'Chọn hộp thư và cấp quyền', desc: 'Chọn đúng tài khoản Google, cấp quyền Gmail rồi trở lại Planora. Hộp thư có thể khác email đăng nhập Planora.' },
@@ -29,15 +29,20 @@ export const GMAIL_PROMPTS: SamplePrompt[] = [
     workflow: ['Google Sheets: Đọc tên và email khách hàng từ bảng tính đã chọn', 'Gmail: Tự động xác thực địa chỉ người nhận từ Google Sheets', 'Gmail: Tạo thư nháp báo giá để bạn kiểm tra trước khi gửi'],
     badge: 'Liên dịch vụ',
   },
+  {
+    id: 'gmail-attachment-digest', category: 'email', categoryLabel: 'Email & Tệp đính kèm', title: 'Đọc hợp đồng / báo giá đính kèm trong email',
+    prompt: 'Tìm email có tệp đính kèm hợp đồng hoặc hóa đơn chưa đọc gần đây, đọc nội dung tệp đính kèm và tóm tắt các điểm chính.', services: ['gmail'], tools: ['gmail.search_threads', 'gmail.get_thread', 'gmail.read_attachment'],
+    workflow: ['Tìm luồng thư có tệp đính kèm', 'Đọc chi tiết thư để nhận diện tệp đính kèm', 'Trích xuất văn bản PDF/DOCX/XLSX/CSV và tóm tắt cho bạn'],
+  },
 ];
 export const GMAIL_CAPABILITY: Capability = { id: 'gmail', name: 'Gmail', role: 'Hộp thư riêng',
   canDo: [
-    'Tìm, đọc và tóm tắt thư (kèm nhận diện tệp đính kèm)',
-    'Gửi, trả lời, chuyển tiếp, soạn nháp',
+    'Tìm (phân trang), đọc và tóm tắt thư cùng nội dung tệp đính kèm (PDF/DOCX/XLSX/CSV/TXT, tối đa 5 MB)',
+    'Gửi, trả lời, chuyển tiếp (tuỳ chọn kèm tệp đính kèm gốc <= 10 MB), tạo/sửa và gửi thư nháp',
     'Gắn nhãn, lưu trữ, chuyển vào thùng rác',
     'Đánh dấu đã đọc, gắn nhãn hàng loạt (Inbox Zero)',
-    'Gửi thư cho người nhận lấy từ Google Sheets, Notion, Trello, Jira',
-    'Nhận bản tin tóm tắt thư chưa đọc tự động qua Telegram',
+    'Gửi thư cho người nhận lấy từ Google Sheets, Google Calendar, Notion, Trello, Jira',
+    'Nhận bản tin thư chưa đọc theo bộ lọc từ khoá/người gửi qua Telegram (tuỳ chọn tắt tóm tắt AI)',
   ],
-  cannotDo: ['Xoá vĩnh viễn', 'Gửi kèm tệp', 'Dùng hộp thư của người khác'],
+  cannotDo: ['Xoá vĩnh viễn', 'Gửi tệp tải lên mới từ máy tính ngoài tệp đính kèm chuyển tiếp', 'Dùng hộp thư của người khác'],
 };

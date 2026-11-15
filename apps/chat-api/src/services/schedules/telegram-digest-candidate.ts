@@ -11,9 +11,13 @@ import type {
 import type { TelegramConnectionLookupResult } from '../telegram/connection-reference.js';
 import type { GitHubConnectionLookupResult } from '../github/connection-reference.js';
 import {
+  DEFAULT_GMAIL_DIGEST_QUERY,
   isValidGmailDigestBinding,
+  isValidGmailDigestQuery,
   validateTelegramDigestGmailConfig,
 } from './gmail-digest-binding.js';
+
+export type { TelegramConnectionLookupResult };
 
 import { isNotionDigestSourceBinding, NOTION_DIGEST_REAPPROVAL } from '../notion/digest-source-authority.js';
 
@@ -142,6 +146,7 @@ export function computeTelegramDigestConfigHash(config: TelegramDigestConfig): s
     chatId: config.chatId,
     chatTitle: config.chatTitle,
     ...(gmailValidation.kind === 'gmail_bound' ? { sourceBindingVersion: 1 as const } : {}),
+    ...(typeof config.includeAiSummary === 'boolean' ? { includeAiSummary: config.includeAiSummary } : {}),
     sources: config.sources.map((s) => ({
       service: s.service,
       tool: s.tool,
@@ -206,6 +211,63 @@ export function buildTelegramDigestSourceArgs(
   return { callArgs: base };
 }
 
+export function resolveGmailDigestQueryAndLabel(requestText: string): { query: string; label: string } {
+  const filters: string[] = [];
+  const pushFilter = (value: string) => {
+    const clean = value.replace(/[\u0000-\u001f\u007f]/g, '').trim();
+    if (clean && !filters.includes(clean)) {
+      filters.push(clean);
+    }
+  };
+
+  for (const m of requestText.matchAll(/(?:^|[\s(])from:([A-Za-z0-9._%+-]+(?:@[A-Za-z0-9.-]+)?)/gi)) {
+    const sender = m[1]?.trim().toLowerCase();
+    if (sender) pushFilter(`from:${sender}`);
+  }
+  for (const m of requestText.matchAll(/(?:^|[\s,(:;])(?:từ|của)\s+([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/gi)) {
+    const email = m[1]?.trim().toLowerCase();
+    if (email) pushFilter(`from:${email}`);
+  }
+  for (const m of requestText.matchAll(/(?:^|[\s(])label:([\p{L}\p{N}_/-]+)/giu)) {
+    const label = m[1]?.trim();
+    if (label && !/^(?:anywhere|trash|spam|sent|drafts|chats|all|inbox)$/i.test(label)) {
+      pushFilter(`label:${label}`);
+    }
+  }
+  if (/\bhas:attachment\b/i.test(requestText) || /đính kèm|file đính kèm|tệp đính kèm/iu.test(requestText)) {
+    pushFilter('has:attachment');
+  }
+  const newerMatch = requestText.match(/\bnewer_than:(\d+[dhm])\b/i);
+  if (newerMatch?.[1]) {
+    pushFilter(`newer_than:${newerMatch[1].toLowerCase()}`);
+  }
+  if (/hóa đơn|hoá đơn|\binvoice\b/iu.test(requestText)) {
+    pushFilter('(hóa đơn OR invoice)');
+  }
+  if (/báo giá|\bquote\b|\bquotation\b/iu.test(requestText)) {
+    pushFilter('(báo giá OR quote)');
+  }
+  if (/hợp đồng|\bcontract\b/iu.test(requestText)) {
+    pushFilter('(hợp đồng OR contract)');
+  }
+  if (/\bvip\b|khẩn cấp|\burgent\b/iu.test(requestText)) {
+    pushFilter('(VIP OR khẩn OR urgent)');
+  }
+
+  if (filters.length === 0) {
+    return { query: DEFAULT_GMAIL_DIGEST_QUERY, label: 'Email chưa đọc' };
+  }
+
+  const candidateQuery = [DEFAULT_GMAIL_DIGEST_QUERY, ...filters].join(' ').slice(0, 300).trim();
+  if (!isValidGmailDigestQuery(candidateQuery)) {
+    return { query: DEFAULT_GMAIL_DIGEST_QUERY, label: 'Email chưa đọc' };
+  }
+  return {
+    query: candidateQuery,
+    label: `Email chưa đọc (${filters.join(', ')})`,
+  };
+}
+
 export interface EvaluateTelegramDigestInput {
   proposal: ScheduleResponse;
   services: string[];
@@ -215,6 +277,7 @@ export interface EvaluateTelegramDigestInput {
   gmailBinding?: GmailDigestBinding | null;
   existingDigest?: TelegramDigestConfig | null;
   notionBinding?: NotionDigestSourceBinding;
+  includeAiSummary?: boolean;
 }
 
 export function evaluateTelegramDigestCandidate(
@@ -367,10 +430,11 @@ export function evaluateTelegramDigestCandidate(
           disabledReason: 'Hãy kết nối Gmail cá nhân hợp lệ trước khi bật Tự gửi.',
         };
       }
+      const resolvedGmail = resolveGmailDigestQueryAndLabel(proposal.request ?? '');
       sources.push({
         ...source,
-        args: { query: 'in:inbox is:unread' },
-        label: `${source.label} (${input.gmailBinding.email})`,
+        args: { query: resolvedGmail.query },
+        label: `${resolvedGmail.label} (${input.gmailBinding.email})`,
         binding: {
           kind: 'gmail',
           credentialId: input.gmailBinding.credentialId,
@@ -389,6 +453,12 @@ export function evaluateTelegramDigestCandidate(
   }
 
   const hasGmailSource = sources.some((s) => s.service === 'gmail');
+  const resolvedIncludeAiSummary =
+    typeof input.includeAiSummary === 'boolean'
+      ? input.includeAiSummary
+      : typeof input.existingDigest?.includeAiSummary === 'boolean'
+        ? input.existingDigest.includeAiSummary
+        : undefined;
   const config: TelegramDigestConfig = {
     credentialId: connection.credentialId,
     telegramUserId: connection.telegramUserId,
@@ -396,6 +466,7 @@ export function evaluateTelegramDigestCandidate(
     chatId: targetChat.chatId,
     chatTitle: targetChat.title,
     ...(hasGmailSource ? { sourceBindingVersion: 1 as const } : {}),
+    ...(typeof resolvedIncludeAiSummary === 'boolean' ? { includeAiSummary: resolvedIncludeAiSummary } : {}),
     sources,
     recurrence: proposal.recurrence!,
     timeZone,

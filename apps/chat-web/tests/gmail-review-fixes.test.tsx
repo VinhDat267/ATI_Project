@@ -1,12 +1,18 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { GMAIL_TOOLS } from '@wap/tool-schemas';
+import { GMAIL_TOOLS, type ScheduleRunView, type ScheduleView } from '@wap/tool-schemas';
 import { resourceDestination } from '../src/components/Cockpit';
 import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
 import { ReceiptMoment } from '../src/pages/Cockpit/ReceiptMoment';
 import { PreviewContents } from '../src/pages/Cockpit/PreviewContents';
 import { PreviewModal } from '../src/pages/Cockpit/PreviewModal';
 import { RecoveryMoment } from '../src/pages/Cockpit/RecoveryMoment';
+import { ScheduleActions } from '../src/pages/Cockpit/ScheduleActions';
+import { ScheduleMoment } from '../src/pages/Cockpit/ScheduleMoment';
+import {
+  isUncertainSheetsDeliveryRun,
+  SheetsDeliveryRecoveryControl,
+} from '../src/pages/Cockpit/ScheduleRunRecovery';
 import { operation, servicePalette } from '../src/pages/Cockpit/presentation';
 import { WorkflowFlowCanvas } from '../src/components/WorkflowFlowCanvas';
 import { LandingPage } from '../src/pages/Landing/LandingPage';
@@ -413,4 +419,207 @@ it('B2: displays confirmed completedThreadIds, failedThreadId, causeCategory, an
     }
     cleanup();
   }
+});
+
+it('shows uncertain Telegram delivery recovery controls on TELEGRAM_DELIVERY_UNKNOWN runs', () => {
+  const unknownRun: ScheduleRunView = {
+    id: 'run-tg-unknown',
+    scheduleId: 'sched-tg-1',
+    trigger: 'scheduled',
+    dueAt: '2026-11-10T01:00:00.000Z',
+    createdAt: '2026-11-10T01:00:00.000Z',
+    state: 'needs_attention',
+    missedCount: 1,
+    convId: 'conv-tg-1',
+    planId: null,
+    planStatus: null,
+    error: 'TELEGRAM_DELIVERY_UNKNOWN: Network reset after Telegram send',
+    deliveryStartedAt: '2026-11-10T01:00:05.000Z',
+    deliveryResolution: null,
+  };
+
+  expect(isUncertainSheetsDeliveryRun(unknownRun)).toBe(true);
+  render(
+    <SheetsDeliveryRecoveryControl
+      run={unknownRun}
+      scheduleStatus="active"
+      onResolved={() => {}}
+    />,
+  );
+  expect(screen.getByTestId('sheets-delivery-recovery-panel')).toBeInTheDocument();
+  expect(screen.getByTestId('btn-resolve-mark-sent')).toBeInTheDocument();
+  expect(screen.getByTestId('btn-resolve-retry-new-run')).toBeInTheDocument();
+});
+
+it('supports telegram_digest reauthorize CTA, locked Gmail query display, and includeAiSummary opt-out toggle', async () => {
+  const pausedTgSchedule: ScheduleView = {
+    id: 'sched-tg-reauth',
+    convId: 'conv-tg-reauth',
+    version: 3,
+    name: 'Bản tin Gmail sáng',
+    request: 'Mỗi sáng 8h tóm tắt email hóa đơn chưa đọc gửi Telegram',
+    recurrence: { type: 'daily', time: '08:00' },
+    services: ['gmail', 'telegram'],
+    status: 'paused',
+    pauseReason: 'Kết nối Gmail của chủ lịch không còn hoạt động hoặc cần kết nối lại.',
+    nextRuns: [],
+    lastRun: null,
+    kind: 'telegram_digest',
+    approvalMode: 'auto_digest',
+  };
+  const navigate = vi.fn();
+  vi.spyOn(apiClient, 'reauthorizeSchedulePreview').mockResolvedValue({
+    proposalMessageId: 'msg-reauth-1',
+    convId: 'conv-tg-reauth',
+    scheduleId: pausedTgSchedule.id,
+    baseVersion: 3,
+    expiresAt: '2026-11-15T01:00:00.000Z',
+  } as any);
+
+  render(
+    <ScheduleActions
+      schedule={pausedTgSchedule}
+      navigate={navigate}
+      onChanged={() => {}}
+      onConflict={async () => {}}
+    />,
+  );
+  const reauthBtn = screen.getByTestId('btn-reauthorize-schedule-preview');
+  fireEvent.click(reauthBtn);
+  await waitFor(() =>
+    expect(apiClient.reauthorizeSchedulePreview).toHaveBeenCalledWith('sched-tg-reauth'),
+  );
+  expect(navigate).toHaveBeenCalledWith('/c/conv-tg-reauth');
+  cleanup();
+
+  const confirmSpy = vi.spyOn(apiClient, 'confirmSchedule').mockResolvedValue({
+    schedule: { ...pausedTgSchedule, status: 'active', pauseReason: null, version: 4 },
+  } as any);
+
+  render(
+    <ScheduleMoment
+      convId="conv-tg-1"
+      message={{
+        id: 'msg-tg-prop-1',
+        role: 'assistant',
+        content: '',
+        metadata: {
+          type: 'schedule_proposal',
+          services: ['gmail', 'telegram'],
+          nextRuns: ['2026-11-15T01:00:00.000Z'],
+          previous: null,
+          proposal: {
+            kind: 'schedule',
+            action: 'create',
+            name: 'Bản tin Gmail sáng',
+            request: 'Mỗi sáng 8h tóm tắt email hóa đơn gửi Telegram của tôi',
+            recurrence: { type: 'daily', time: '08:00' },
+            summary: 'Bản tin Gmail sáng',
+          },
+          digestCandidate: {
+            canAutoDigest: true,
+            configHash: 'hash-1',
+            config: {
+              credentialId: 'tg-cred-1',
+              telegramUserId: '777',
+              username: 'owner',
+              chatId: '777',
+              chatTitle: 'Telegram của tôi',
+              sourceBindingVersion: 1,
+              sources: [
+                {
+                  service: 'gmail',
+                  tool: 'gmail.search_threads',
+                  args: { query: 'in:inbox is:unread (hóa đơn OR invoice)' },
+                  label: 'Email chưa đọc (owner@example.test)',
+                },
+              ],
+              recurrence: { type: 'daily', time: '08:00' },
+              timeZone: 'Asia/Ho_Chi_Minh',
+            },
+          },
+        } as any,
+      }}
+    />,
+  );
+
+  fireEvent.click(document.getElementById('schedule-mode-auto-digest')!);
+  expect(screen.getByTestId('gmail-digest-locked-query')).toHaveTextContent(
+    'in:inbox is:unread (hóa đơn OR invoice)',
+  );
+  const aiCheckbox = screen.getByTestId('checkbox-telegram-include-ai-summary') as HTMLInputElement;
+  expect(aiCheckbox.checked).toBe(true);
+  fireEvent.click(aiCheckbox);
+  expect(aiCheckbox.checked).toBe(false);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Xác nhận' }));
+  await waitFor(() =>
+    expect(confirmSpy).toHaveBeenCalledWith('conv-tg-1', 'msg-tg-prop-1', {
+      approvalMode: 'auto_digest',
+      includeAiSummary: false,
+    }),
+  );
+});
+
+it('renders previews and account chips for gmail.update_draft, gmail.send_draft, and gmail.forward with includeAttachments: true', () => {
+  const forwardWithAtt = step('gmail.forward', {
+    threadId: thread,
+    to: ['director@example.com'],
+    note: 'Gửi kèm báo giá gốc',
+    includeAttachments: true,
+  });
+  render(<PreviewContents step={forwardWithAtt} destination="Họp nhóm ATI" labels={labels} />);
+  expect(screen.getByTestId('gmail-forward-attachment-included')).toBeInTheDocument();
+  expect(screen.queryByTestId('gmail-forward-attachment-warning')).toBeNull();
+  cleanup();
+
+  const updateDraft = step('gmail.update_draft', {
+    draftId: 'draft-1',
+    to: ['lan@example.com'],
+    subject: 'Báo giá mới',
+    body: 'Nội dung sửa đổi',
+  });
+  const draftPlan = {
+    id: 'plan-draft-up',
+    convId: 'conv-draft-up',
+    summary: 'Sửa nháp',
+    status: 'pending' as const,
+    resourceLabels: { 'draft-1': 'Báo giá Q4', 'recipient:lan@example.com': 'user' },
+    connections: { gmail: { credentialId: 'c1', email: 'own@gmail.test' } },
+    steps: [updateDraft],
+  };
+  render(
+    <PlanMoment
+      runtimeMode="live"
+      plan={draftPlan}
+      services={[]}
+      destination={resourceDestination}
+      onPreview={() => {}}
+      onApprove={() => {}}
+      onCancel={() => {}}
+      onEdit={() => {}}
+      inlineComposer={null}
+    />,
+  );
+  expect(screen.getByText('Tạo thư nháp tại: own@gmail.test')).toBeInTheDocument();
+  expect(screen.getByTestId('gmail-delivery-mode')).toHaveTextContent(/chỉ cập nhật nội dung thư nháp/i);
+  expect(screen.getByText('Báo giá Q4')).toBeInTheDocument();
+  cleanup();
+
+  const sendDraft = step('gmail.send_draft', { draftId: 'draft-1' });
+  render(
+    <PlanMoment
+      runtimeMode="live"
+      plan={{ ...draftPlan, id: 'plan-draft-send', steps: [sendDraft] }}
+      services={[]}
+      destination={resourceDestination}
+      onPreview={() => {}}
+      onApprove={() => {}}
+      onCancel={() => {}}
+      onEdit={() => {}}
+      inlineComposer={null}
+    />,
+  );
+  expect(screen.getByText('Gửi từ: own@gmail.test')).toBeInTheDocument();
+  expect(screen.getByTestId('gmail-draft-send-recipient-note')).toBeInTheDocument();
 });

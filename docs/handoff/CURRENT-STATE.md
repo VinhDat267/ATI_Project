@@ -21,7 +21,7 @@
 | Notion | OAuth bền vững (#317), ràng buộc nguồn digest (#319), hiển thị đúng trạng thái OAuth cá nhân trên `/api/services` | #324 | Khoảng 10 lỗi audit còn mở (độ phủ dữ liệu, bộ lọc ngày/trạng thái, biên nhận Slack, phân trang tìm database, Privacy); nghiệm thu thật |
 | Telegram | Bot cá nhân; chặn digest sai binding (#303); chuẩn hóa `requestSent: false` pre-dispatch | #325 | Nghiệm thu thật |
 | Jira / MyJira | G2A read containment (#318), `requestSent: false` pre-dispatch (#325); thu hồi lease `syncSites`, ẩn `cloudId` ở Personal Mode, sửa `jira-digest-runner` | #324 | Chỉ dùng trong "Không gian Chung" (site `ati-workflow-test`) |
-| Gmail | Gửi/nháp/đọc/nhãn qua OAuth cá nhân; ràng buộc nguồn Telegram digest + kiểm soát origin OAuth | #327 (G2 + đóng `GMAIL-AUDIT-08`..`12`) + `GMAIL-04` nghiệm thu Google Cloud OAuth thật & mặc định `PLANNER_READ_ANSWERS=on` (14/11/2026) | Kết nối lại OAuth trong vòng 7 ngày trước buổi bảo vệ (project Testing hết hạn refresh token sau 7 ngày) |
+| Gmail | 15 tool qua OAuth cá nhân (đọc tệp đính kèm PDF/DOCX/XLSX/CSV/TXT ≤ 5 MB, phân trang `pageToken`, chuyển tiếp kèm tệp gốc ≤ 10 MB, danh sách/sửa/gửi thư nháp); grounding người nhận từ sự kiện Calendar; lịch `telegram_digest` hỗ trợ bộ lọc `in:inbox` có điều kiện, tắt/bật tóm tắt AI và cấp quyền lại 2 pha | Nâng cấp Gmail v3 (`feat/gmail-v3-upgrade`, kế tiếp #327 & `GMAIL-04`) | Kết nối lại OAuth trong vòng 7 ngày trước buổi bảo vệ (project Testing hết hạn refresh token sau 7 ngày) |
 
 ## Chạy và kiểm tra
 
