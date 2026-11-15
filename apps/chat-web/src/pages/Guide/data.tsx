@@ -489,7 +489,7 @@ export const SAMPLE_PROMPTS: SamplePrompt[] = [
         id: 'p15',
         category: 'sprint-bug',
         categoryLabel: 'Lỗi Sprint & Kỹ thuật',
-        title: 'Điều phối War-Room toàn diện qua 8 công cụ (Calendar, Jira, GitHub, Trello, Notion, Sheets, Telegram, Slack)',
+        title: 'Điều phối xử lý sự cố liên hoàn trên nhiều công cụ (Calendar, Jira, GitHub, Trello, Notion, Sheets, Telegram, Slack)',
         prompt: 'Tạo lịch họp khẩn trên Google Calendar, tạo ticket sự cố trên Jira kèm link lịch họp, mở issue trên GitHub tham chiếu mã Jira, tạo thẻ theo dõi trên Trello, lập trang biên bản sự cố trên Notion tổng hợp các liên kết, ghi dòng nhật ký vào bảng tính Google Sheets, gửi cảnh báo trực ca qua Telegram và đăng tổng hợp toàn bộ vào kênh Slack #general',
         services: ['calendar', 'jira', 'github', 'trello', 'notion', 'sheets', 'telegram', 'slack'],
         tools: [
@@ -670,8 +670,8 @@ export const CAPABILITIES_DATA: Capability[] = [
         canDo: [
           'Kết nối OAuth 2.0 1-Click và chuyển đổi linh hoạt giữa nhiều Workspace Notion',
           'Tìm và truy vấn database theo từ khoá hoặc lọc theo cột trạng thái (Status / Select)',
-          'Đọc chi tiết toàn văn nội dung trang (notion.get_page) cùng đầy đủ thuộc tính (status, multi_select, checkbox, date, number)',
-          'Tạo trang mới, nối thêm đoạn văn bản và cập nhật trạng thái/thuộc tính trang (notion.update_page)',
+          'Đọc chi tiết toàn văn nội dung trang cùng đầy đủ thuộc tính (trạng thái, nhãn chọn, ô đánh dấu, ngày tháng, số liệu)',
+          'Tạo trang mới, nối thêm đoạn văn bản và cập nhật trạng thái hoặc thuộc tính trang',
           'Lên lịch Bản tin Notion tự động (Auto-Digest) phân loại mục Quá hạn/Bị chặn gửi qua Telegram hoặc Slack'
         ],
         cannotDo: [
@@ -697,12 +697,12 @@ export const CAPABILITIES_DATA: Capability[] = [
       {
         id: 'jira',
         name: 'Jira',
-        role: 'Quản lý dự án, Điều phối Sprint & Vòng đời Issue (OAuth 3LO)',
+        role: 'Quản lý dự án, Điều phối Sprint & Vòng đời Issue',
         canDo: [
-          'Kết nối OAuth 2.0 (3LO) 1-Click và tự khởi tạo Jira Workspace ngay trên giao diện',
-          'Tìm project, lọc issue theo trạng thái/độ ưu tiên/loại và đọc chi tiết toàn văn issue (myjira.get_issue)',
-          'Tạo issue mới (Task, Bug, Story) kèm Priority, Labels, Due Date, Assignee và Epic/Parent',
-          'Chuyển trạng thái workflow (myjira.transition_issue: To Do → In Progress → Done) và cập nhật trường issue (myjira.update_issue)',
+          'Kết nối nhanh tài khoản Jira và tự khởi tạo không gian Jira ngay trên giao diện',
+          'Tìm dự án, lọc issue theo trạng thái, độ ưu tiên, loại công việc và đọc chi tiết toàn văn issue',
+          'Tạo issue mới (Task, Bug, Story) kèm mức ưu tiên, nhãn, hạn hoàn thành, người phụ trách và Epic/Parent',
+          'Chuyển trạng thái quy trình (To Do → In Progress → Done) và cập nhật thông tin issue',
           'Thêm bình luận tiến độ và đặt lịch Bản tin Standup/Blocker chỉ đọc gửi sang Slack/Telegram'
         ],
         cannotDo: [

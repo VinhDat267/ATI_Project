@@ -64,15 +64,12 @@ export function NotFoundPage({ signedIn, navigate }: { signedIn: boolean; naviga
                 Quay lại
               </span>
             </a>
-            <span className="hidden md:inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-200/70 text-[#4B5563]">
-              Mã sự cố: 404
-            </span>
           </div>
-          {/* Mã sự cố */}
+          {/* Trạng thái trang */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <ThemeToggle />
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-neutral-200/70 text-[#4B5563]">
-              Mã lỗi: 404
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-neutral-200/70 dark:bg-[#19233B] text-[#4B5563] dark:text-[#CBD5E1]">
+              Không tìm thấy (404)
             </span>
           </div>
         </div>
@@ -80,10 +77,10 @@ export function NotFoundPage({ signedIn, navigate }: { signedIn: boolean; naviga
       {/* 2. Nội dung chính 404 */}
       <main className="flex-1 flex flex-col items-center justify-center max-w-xl w-full mx-auto px-4 sm:px-6 py-12 sm:py-16">
         {/* Hero 404 Section */}
-        <section className="text-center v3-space-y-5 max-w-xl mx-auto">
+        <section className="text-center flex flex-col items-center gap-5 max-w-xl mx-auto">
           <div className="relative inline-block select-none">
             {' '}
-            <span className="font-display font-bold text-8xl sm:text-9xl text-neutral-200 tracking-tight block">
+            <span aria-hidden="true" className="font-display font-bold text-8xl sm:text-9xl text-neutral-200 tracking-tight block">
               404
             </span>
             <div className="absolute inset-0 flex items-center justify-center">

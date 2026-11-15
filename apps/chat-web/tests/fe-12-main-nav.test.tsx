@@ -94,7 +94,7 @@ it('FE-12: the bar keeps the logo outside the tabs, the theme toggle, the avatar
 it('FE-12: the avatar menu still lists every page, so phones can reach all of them', () => {
   render(<MainNav user={admin} current={null} navigate={vi.fn()} onLogout={vi.fn()} />);
   fireEvent.click(screen.getByRole('button', { name: /Menu người dùng/ }));
-  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Nhật ký điều phối', 'Kết nối dịch vụ', 'Cẩm nang', 'Tài khoản', 'Quản lý người dùng', 'Chính sách an toàn', 'Đăng xuất']);
+  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Nhật ký điều phối', 'Không gian làm việc', 'Hộp thư đề xuất', 'Kết nối dịch vụ', 'Cẩm nang', 'Tài khoản', 'Quản lý người dùng', 'Chính sách an toàn', 'Đăng xuất']);
 });
 
 it('FE-12: signed-in guide and privacy use the shared bar; signed out they keep the old header', () => {

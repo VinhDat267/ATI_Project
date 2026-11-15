@@ -88,7 +88,7 @@ export function PersonalGmail({ service, refresh, selected, standalone = true }:
           ))}
         </div>
         {status === 'connected' && service.email && (
-          <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#F8F8F6] dark:bg-[#161616] border border-[#E7E7E2] dark:border-[#2E2E2E]">
+          <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#F8F8F6] dark:bg-[#0E1528] border border-[#E7E7E2] dark:border-[#293653]">
             <span className="text-xs font-medium text-[#4B5563] dark:text-[#9CA3AF]">Hộp thư được dùng:</span>
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/60">
               <span>{service.email}</span>
@@ -97,7 +97,7 @@ export function PersonalGmail({ service, refresh, selected, standalone = true }:
         )}
         {status === 'reconnect_required' && <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Quyền có thể đã bị thu hồi hoặc hết hạn sau 7 ngày ở chế độ thử nghiệm của Google. Hãy kết nối lại.</p>}
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#2E2E2E]">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#293653]">
         <button id="gmail-action" type="button" className={status === 'connected' ? `${DANGER_GHOST_BTN} ml-auto` : button} disabled={busy} onClick={() => status === 'connected' ? setConfirm(true) : void act(false)}>{status === 'connected' ? 'Ngắt kết nối' : status === 'reconnect_required' ? 'Kết nối lại' : 'Kết nối Gmail'}</button>
         {busy && <p role="status" className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">{status === 'connected' ? 'Đang ngắt kết nối…' : 'Đang chuyển hướng tới Google…'}</p>}
         {error && <p role="alert" className="text-xs text-[#DC2626] w-full">{error}</p>}

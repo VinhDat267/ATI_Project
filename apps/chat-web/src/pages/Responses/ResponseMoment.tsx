@@ -11,6 +11,7 @@ import { jiraApi } from '../../services/jira-api';
 import { jiraSessionOwner, redirectToJira } from '../../services/jira-connection';
 import type { ChatMessage, ClarificationState, ServiceInfo } from '../../types';
 import { RequestEcho, useScheduledOrigin } from '../Cockpit/RequestEcho';
+import { serviceName as formatCockpitServiceName } from '../Cockpit/presentation';
 
 const JIRA_SETTINGS_PATH = '/settings#ji' + 'ra';
 
@@ -39,7 +40,7 @@ export function AnswerMoment({ message, request, services }: { message: ChatMess
   const [expanded, setExpanded] = useState(false);
   const lookups = message.metadata?.lookups ?? [];
   const directory = message.metadata?.usedDirectory ?? [];
-  const serviceName = (id: string) => services.find(service => service.id === id)?.name ?? id;
+  const serviceName = (id: string) => formatCockpitServiceName(id, services);
   const names = [...new Set([...lookups.map(lookup => lookup.tool.split('.')[0]), ...directory])].map(serviceName);
   const source = [lookups.length ? `${lookups.length} lần tra cứu` : '', directory.length ? `Danh mục ${directory.map(serviceName).join(', ')}` : ''].filter(Boolean).join(' · ');
   const safeLink = (link: string) => { try { return new URL(link).protocol === 'https:'; } catch { return false; } };
@@ -63,10 +64,10 @@ function ResponseCard({ request, title, children, moment }: { request: string; t
   const badgeLabel = moment === 'answer' ? 'Phản hồi tra cứu' : moment === 'refusal' ? 'Cần bổ sung kết nối / quyền' : 'Cần xác nhận thêm';
   return <section id={`moment-${moment}`} data-moment={moment} aria-label="Cockpit" className="w-full max-w-3xl mx-auto">
     <div className="rounded-2xl border border-[#E5E5E0] bg-white shadow-sm overflow-hidden">
-      <div className="px-5 sm:px-6 py-3 bg-[#F8F8F6] border-b border-[#EAEAE4] flex items-center justify-between text-xs text-[#4B5563] gap-2 flex-wrap">
+      <div className="px-4 sm:px-6 py-2.5 bg-[#F8F8F6] border-b border-[#EAEAE4] flex items-center justify-between text-xs text-[#4B5563] gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-[#111827]">Planora</span>
-          <span className="text-[#9CA3AF]">·</span>
+          <span className="text-[#9CA3AF]" aria-hidden="true">·</span>
           <span>{badgeLabel}</span>
         </div>
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-white border border-[#E5E5E0] text-[#4B5563]">
@@ -74,12 +75,12 @@ function ResponseCard({ request, title, children, moment }: { request: string; t
           Chưa lập kế hoạch
         </span>
       </div>
-      <div className="p-5 sm:p-6 v3-space-y-5 min-w-0">
+      <div className="p-3.5 sm:p-6 v3-space-y-2.5 sm:v3-space-y-4 min-w-0">
         {origin ? <RequestEcho request={request} /> : <div className="text-xs sm:text-sm text-[#4B5563] flex flex-wrap items-baseline gap-1.5">
           <span className="text-[#6B7280]">Bạn nhờ:</span>
           <span>“<span id="user-request-bubble-text" className="font-medium text-[#111827] leading-relaxed break-words">{request}</span>”</span>
         </div>}
-        <h1 id="response-card-title" tabIndex={-1} className="font-sans font-semibold text-xl sm:text-2xl text-[#111827] tracking-tight focus:v3-outline-none focus:ring-2 focus:ring-[#C84300]/20 rounded-lg break-words">{title}</h1>
+        <h1 id="response-card-title" tabIndex={-1} className="font-sans font-semibold text-base sm:text-2xl text-[#111827] tracking-tight focus:v3-outline-none focus:ring-2 focus:ring-[#C84300]/20 rounded-lg break-words">{title}</h1>
         {children}
         <NoWritesNotice />
       </div>
@@ -115,8 +116,9 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
   const suggestion = metadata?.suggestion || legacy.slice(1).join('\n');
   const unavailable = metadata?.unavailableServices ?? [];
   const ids = new Set(unavailable.map(row => row.id));
-  const relevant = services.filter(service => ids.has(service.id) || new RegExp(`(^|[^\\p{L}\\p{N}])${service.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\p{L}\\p{N}]|$)`, 'iu').test(request));
-  const rows = [...relevant, ...unavailable.filter(row => !relevant.some(service => service.id === row.id)).map(row => ({ ...row, connected: false, configured: false, connectionStatus: 'unconfigured' as const }))];
+  const rawRelevant = services.filter(service => ids.has(service.id) || new RegExp(`(^|[^\\p{L}\\p{N}])${service.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^\\p{L}\\p{N}]|$)`, 'iu').test(request));
+  const mergedRows = [...rawRelevant, ...unavailable.filter(row => !rawRelevant.some(service => service.id === row.id)).map(row => ({ ...row, connected: false, configured: false, connectionStatus: 'unconfigured' as const }))];
+  const rows = mergedRows.filter((row, idx) => idx === mergedRows.findIndex(other => other.name.trim().toLocaleLowerCase() === row.name.trim().toLocaleLowerCase()));
   // What the refusal named may be usable by now: Gmail/MyCalendar/MySheets once this person connected it, a shared service once configured.
   const current = (id: string) => services.find(service => service.id === id);
   const usable = (id: string) =>
@@ -229,14 +231,14 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
     finally { pending.current = false; if (mounted.current) setStarting(false); }
   };
   return <ResponseCard request={request} title={unavailable.length ? 'Tôi chưa làm được yêu cầu này' : 'Việc này tôi chưa làm được'} moment="refusal">
-    <div id={`scenario-content-${unavailable.length ? 1 : 2}`} className="scenario-panel v3-space-y-5">
-      <div className="p-3.5 sm:p-4 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-sm text-[#111827] font-medium flex items-start gap-3">
+    <div id={`scenario-content-${unavailable.length ? 1 : 2}`} className="scenario-panel v3-space-y-2.5 sm:v3-space-y-4">
+      <div className="p-2.5 sm:p-4 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-sm text-[#111827] font-medium flex items-start gap-2.5 sm:gap-3">
         <svg aria-hidden="true" className="w-5 h-5 text-[#FF5701] flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-        <div className="v3-space-y-1 min-w-0"><p className="text-sm font-semibold text-[#111827] whitespace-pre-wrap break-words">{reason}</p>{suggestion && <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed whitespace-pre-wrap break-words">{suggestion}</p>}</div>
+        <div className="v3-space-y-1 min-w-0"><p className="text-xs sm:text-sm font-semibold text-[#111827] whitespace-pre-wrap break-words">{reason}</p>{suggestion && <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed whitespace-pre-wrap break-words">{suggestion}</p>}</div>
       </div>
       {unavailable.length > 0 && <div>
-        <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider mb-2">Trạng thái các dịch vụ trong yêu cầu này</p>
-        <div id="s1-services-list" aria-label="Trạng thái các dịch vụ trong yêu cầu này" className="v3-space-y-2">
+        <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider mb-1.5 sm:mb-2">Trạng thái các dịch vụ trong yêu cầu này</p>
+        <div id="s1-services-list" aria-label="Trạng thái các dịch vụ trong yêu cầu này" className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
           {rows.map(service => {
             const status = ids.has(service.id) && !usable(service.id) ? 'unconfigured' : service.connectionStatus ?? (service.configured ? 'unchecked' : 'unconfigured');
             const gmailConnected = service.id === 'gmail' && usable('gmail');
@@ -250,7 +252,7 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
             const telegramConnected = service.id === 'telegram' && usable('telegram');
             const myjiraConnected = service.id === 'myjira' && usable('myjira');
             const good = gmailConnected || mycalConnected || mysheetsConnected || trelloConnected || githubConnected || notionConnected || telegramConnected || myjiraConnected || status === 'healthy';
-            return <div key={service.id} className="flex items-center justify-between p-3 rounded-xl bg-white border border-[#E7E7E2] shadow-sm gap-2 flex-wrap">
+            return <div key={service.id} className="flex items-center justify-between px-2.5 py-1.5 sm:p-3 rounded-xl bg-white border border-[#E7E7E2] shadow-sm gap-2 flex-wrap">
               <div className="flex items-center gap-3 min-w-0"><div className="w-8 h-8 rounded-lg bg-neutral-50 border border-neutral-100 flex items-center justify-center flex-shrink-0"><ServiceLogo service={service.id} className="w-5 h-5 flex-shrink-0" /></div><span className="text-xs sm:text-sm font-semibold text-[#111827] break-words">{service.name}</span></div>
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium min-w-0 break-all ${good ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-neutral-100 text-neutral-600 border border-neutral-200'}`}><span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${good ? 'bg-emerald-500' : 'bg-neutral-400'}`} /><span>
                 {gmailConnected
@@ -315,7 +317,7 @@ export function RefusalMoment({ message, request, services, canConfigure, naviga
       </div>}
       {resend && <p role="status" className="text-sm text-[#111827] break-words">{listOf(unavailable.map(row => row.name))} đã được kết nối. Bạn có thể gửi lại yêu cầu.</p>}
       {startError && <p role="alert" className="text-sm text-danger-text break-words">{startError}</p>}
-      <div className="pt-2 border-t border-[#F3F4F6] flex flex-wrap items-center gap-3" id="s1-action-area">
+      <div className="pt-2 border-t border-[#F3F4F6] dark:border-[#1F2A44] flex flex-wrap items-center gap-2.5 sm:gap-3" id="s1-action-area">
         {resend && <button type="button" onClick={() => onResend(request)} className={primary}>Gửi lại yêu cầu</button>}
         {ids.has('mysheets') && mysheetsStatus === 'connected' && (
           <a href="/settings#mysheets" aria-disabled={starting || undefined} onClick={event => {
@@ -553,7 +555,7 @@ export function ExpandedClarificationMoment({ clarification, variant, request, s
   const mentioned = services.filter(service => `${request} ${clarification.context ?? ''} ${clarification.question}`.toLocaleLowerCase().includes(service.name.toLocaleLowerCase()));
   const path = mentioned.length === 1 ? `/settings#${encodeURIComponent(mentioned[0].id)}` : '/settings';
   return <ResponseCard request={request} title={clarification.question} moment="3">
-    <div id={`scenario-content-${variant === 'read-only' ? 3 : 4}`} className="scenario-panel v3-space-y-5">
+    <div id={`scenario-content-${variant === 'read-only' ? 3 : 4}`} className="scenario-panel v3-space-y-3 sm:v3-space-y-4">
       {clarification.context && <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed whitespace-pre-wrap break-words">{clarification.context}</p>}
       <div className="v3-space-y-2" role="radiogroup" aria-label={clarification.question} onKeyDown={event => {
         if (!['ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
@@ -563,7 +565,7 @@ export function ExpandedClarificationMoment({ clarification, variant, request, s
         const next = event.key === 'Home' ? 0 : event.key === 'End' ? radios.length - 1 : (index + (['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1) + radios.length) % radios.length;
         onSelect(clarification.options[next]); radios[next].focus();
       }}>
-        {clarification.options.map((option, index) => <button key={`${index}:${option}`} type="button" role="radio" aria-checked={selected === option} tabIndex={selected === option || (!selected && index === 0) ? 0 : -1} onClick={() => onSelect(option)} className={variant === 'destination' ? 'inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#C84300] hover:bg-[#A83800] text-white text-xs sm:text-sm font-semibold shadow-sm transition-all' : `w-full text-left p-3.5 rounded-xl border ${selected === option ? 'border-[#C84300] bg-[#FFF6EE]/50' : 'border-[#E5E5E0] bg-white'} hover:border-[#C84300] transition-all flex items-center justify-between group gap-3`}>
+        {clarification.options.map((option, index) => <button key={`${index}:${option}`} type="button" role="radio" aria-checked={selected === option} tabIndex={selected === option || (!selected && index === 0) ? 0 : -1} onClick={() => onSelect(option)} className={variant === 'destination' ? 'inline-flex items-center gap-2.5 px-4 py-2 sm:py-2.5 rounded-xl bg-[#C84300] hover:bg-[#A83800] text-white text-xs sm:text-sm font-semibold shadow-sm transition-all' : `w-full text-left p-2.5 sm:p-3.5 rounded-xl border ${selected === option ? 'border-[#C84300] bg-[#FFF6EE]/50' : 'border-[#E5E5E0] bg-white'} hover:border-[#C84300] transition-all flex items-center justify-between group gap-3`}>
           <div className="flex items-center gap-3 min-w-0"><div aria-hidden="true" className={variant === 'destination' ? 'w-5 h-5 bg-white rounded p-0.5 flex items-center justify-center flex-shrink-0' : 'w-8 h-8 rounded-lg bg-[#F8F8F6] border border-[#E5E5E0] flex items-center justify-center flex-shrink-0'}><svg className="w-4 h-4 text-[#4B5563]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 10h8m-8 4h5M6 3h9l3 3v15H6z" /></svg></div><span className={variant === 'destination' ? 'break-words' : 'text-xs sm:text-sm font-semibold text-[#111827] group-hover:text-[#B43E00] transition-colors break-words'}>{option}</span></div>
           {variant === 'destination' && selected === option && <span aria-hidden="true" className="text-[11px] font-semibold flex-shrink-0">Đã chọn</span>}
           {variant !== 'destination' && <svg aria-hidden="true" className="w-4 h-4 text-[#9CA3AF] group-hover:text-[#B43E00] transition-colors flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>}
@@ -572,7 +574,7 @@ export function ExpandedClarificationMoment({ clarification, variant, request, s
       {variant === 'destination' && <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E5E5E0] text-xs sm:text-sm text-[#4B5563]" id="s4-role-subline">
         {canConfigure ? <p>Nơi bạn cần chưa có trong danh sách? <a href={path} onClick={event => { event.preventDefault(); navigate(path); }} className="font-semibold text-[#B43E00] hover:underline underline-offset-2">Thêm ở Kết nối dịch vụ{mentioned.length === 1 ? ` → ${mentioned[0].name}` : ''} →</a></p> : <p>Nơi bạn cần chưa có trong danh sách? Hãy báo quản trị viên thêm vào.</p>}
       </div>}
-      <div className="pt-2 border-t border-[#F3F4F6] flex flex-wrap items-center gap-3">
+      <div className="pt-2 border-t border-[#F3F4F6] dark:border-[#1F2A44] flex flex-wrap items-center gap-2.5 sm:gap-3">
         {clarification.options.length > 0 && <button type="button" disabled={!selected || planning} onClick={() => selected && onSend(selected)} className={primary}>Xác nhận và tiếp tục</button>}
         <button type="button" onClick={() => onEdit(request)} className={secondary}>Sửa yêu cầu</button>
       </div>

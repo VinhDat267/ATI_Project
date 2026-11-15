@@ -190,7 +190,7 @@ export function PersonalSlack({ standalone = true }: { standalone?: boolean } = 
           {rows.map((row) => (
             <li
               key={row.id}
-              className="border border-[#E7E7E2] dark:border-[#333333] rounded-lg p-3.5 break-words bg-[#FAFAFA] dark:bg-[#252525]"
+              className="border border-[#E7E7E2] dark:border-[#293653] rounded-lg p-3.5 break-words bg-[#FAFAFA] dark:bg-[#1A2540]"
             >
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                 <div className="min-w-0">
@@ -207,7 +207,7 @@ export function PersonalSlack({ standalone = true }: { standalone?: boolean } = 
                       Cần kết nối lại
                     </span>
                   ) : row.status === 'revoked' ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-700 dark:bg-[#1A2540] dark:text-[#CBD5E1]">
                       Đã thu hồi
                     </span>
                   ) : row.processingReady ? (
@@ -234,7 +234,7 @@ export function PersonalSlack({ standalone = true }: { standalone?: boolean } = 
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center gap-3 mt-3 pt-2 border-t border-[#E7E7E2] dark:border-[#333333]">
+              <div className="flex flex-wrap items-center gap-3 mt-3 pt-2 border-t border-[#E7E7E2] dark:border-[#293653]">
                 {row.status === 'reconnect_required' && (
                   <button
                     type="button"
@@ -316,12 +316,12 @@ export function PersonalSlack({ standalone = true }: { standalone?: boolean } = 
               <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
                 Sau khi ngắt, Planora sẽ không thể tương tác với workspace này cho tới khi bạn kết nối lại.
               </p>
-              <div className="flex justify-end gap-3 pt-3 border-t border-[#E7E7E2] dark:border-[#333333]">
+              <div className="flex justify-end gap-3 pt-3 border-t border-[#E7E7E2] dark:border-[#293653]">
                 <button
                   type="button"
                   disabled={!!busy}
                   onClick={() => setDisconnectTarget(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium bg-white dark:bg-[#1E1E1E] text-[#111827] dark:text-white border border-[#E7E7E2] dark:border-[#333333] hover:bg-neutral-50 dark:hover:bg-[#282828] transition-colors"
+                  className="px-4 py-2 rounded-xl text-xs font-medium bg-white dark:bg-[#1A2540] text-[#111827] dark:text-[#F1F5F9] border border-[#E7E7E2] dark:border-[#293653] hover:bg-neutral-50 dark:hover:bg-[#24324D] transition-colors"
                 >
                   Hủy
                 </button>

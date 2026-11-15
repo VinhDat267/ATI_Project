@@ -20,14 +20,15 @@ const names: Record<string,string> = {
   deduplicate:'Chống ghi trùng', onDuplicate:'Xử lý dòng trùng', keyColumnIndex:'Cột khóa đối chiếu', keyColumn:'Cột khóa đối chiếu',
   deduplicateColumn:'Cột khóa đối chiếu', deduplicateColumns:'Các cột khóa đối chiếu', records:'Các dòng theo tên cột',
   groupBy:'Nhóm theo cột', metrics:'Phép tính thống kê', rowNumbers:'Các dòng cần xoá', matchColumn:'Cột đối chiếu', matchValue:'Giá trị đối chiếu',
-  due:'Hạn chót', dueComplete:'Hoàn thành hạn chót', closed:'Lưu trữ (Archive)', pos:'Vị trí',
+  due:'Hạn chót', dueComplete:'Hoàn thành hạn chót', closed:'Lưu trữ', pos:'Vị trí',
   items:'Các mục công việc', itemName:'Mục checklist', idMembers:'Thành viên được gán', memberId:'Thành viên',
   status:'Lọc theo trạng thái', archived:'Lưu trữ trang Notion',
-  targetStatus:'Trạng thái chuyển tới', priority:'Mức độ ưu tiên', assigneeAccountId:'Người phụ trách (Account ID)',
-  dueDate:'Hạn hoàn thành (Due date)', parentKey:'Epic / Issue cha', comment:'Bình luận kèm theo',
+  targetStatus:'Trạng thái chuyển tới', priority:'Mức độ ưu tiên', assigneeAccountId:'Người phụ trách',
+  dueDate:'Hạn hoàn thành', parentKey:'Epic / Công việc cha', comment:'Bình luận kèm theo',
   docId:'Tài liệu Google Docs', documentId:'Tài liệu Google Docs', fileId:'Tệp Google Drive',
   folderId:'Thư mục Google Drive đích', parentFolderId:'Thư mục cha trên Drive', mimeType:'Loại tệp Google Drive',
-  sendInvites:'Gửi email mời họp', timeZone:'Múi giờ', author:'Tác giả', draft:'Bản nháp (Draft)', channel:'Kênh Slack',
+  sendInvites:'Gửi email mời họp', timeZone:'Múi giờ', author:'Tác giả', draft:'Bản nháp PR', channel:'Kênh Slack',
+  head:'Nhánh nguồn (head)', base:'Nhánh đích (base)', reviewers:'Người review',
 };
 const operatorLabels: Record<string,string> = {
   equals:'Bằng (=)',
@@ -307,7 +308,7 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
                   : 'bg-emerald-50 text-emerald-700 border-emerald-200'
               }`}
             >
-              {step.args.closed ? '📦 Lưu trữ (Archive)' : '📂 Mở lại thẻ (Unarchive)'}
+              {step.args.closed ? '📦 Lưu trữ thẻ' : '📂 Mở lại thẻ (Unarchive)'}
             </span>
           )}
           {chkState && (
@@ -402,7 +403,7 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
       {rows.length > 0 && (
         <div data-testid="spreadsheet-grid-preview" className="border border-emerald-200 rounded-xl overflow-x-auto bg-white shadow-2xs">
           <div className="px-3 py-1.5 bg-emerald-50/80 border-b border-emerald-200 text-[11px] font-semibold text-emerald-900 flex items-center justify-between">
-            <span>Xem trước dòng bảng tính (Spreadsheet Grid)</span>
+            <span>Xem trước dòng bảng tính</span>
             <span className="font-mono text-[10px] text-emerald-700">{rows.length} dòng × {maxCols} cột</span>
           </div>
           <div className="min-w-full">
@@ -795,7 +796,7 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
         <div className="flex items-center gap-2 text-xs">
           <span className="text-[11px] text-neutral-400 uppercase font-semibold">Trạng thái lưu trữ:</span>
           <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${isArchived ? 'bg-amber-50 text-amber-800 border-amber-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'}`}>
-            {isArchived ? '📦 Chuyển vào Lưu trữ (Archive)' : '📂 Khôi phục hoạt động'}
+            {isArchived ? '📦 Chuyển vào Lưu trữ' : '📂 Khôi phục hoạt động'}
           </span>
         </div>
       )}
@@ -818,7 +819,7 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
                   <div className="flex flex-wrap items-center gap-1">
                     {isCheckbox ? (
                       <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${valStr === 'true' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-neutral-100 text-neutral-600 border-neutral-200'}`}>
-                        {valStr === 'true' ? '☑ Đã chọn (True)' : '☐ Chưa chọn (False)'}
+                        {valStr === 'true' ? '☑ Đã chọn' : '☐ Chưa chọn'}
                       </span>
                     ) : isDate ? (
                       <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-amber-50 text-amber-900 border border-amber-200">

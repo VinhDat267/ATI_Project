@@ -53,15 +53,15 @@ export function ClarificationMoment({
   return (
     <section
       id="moment-3"
-      className="stage-section is-active max-w-2xl mx-auto w-full pt-2 sm:pt-4"
+      className="stage-section is-active max-w-2xl mx-auto w-full pt-0 sm:pt-2"
       data-moment="3"
       aria-label="Cockpit"
     >
       <div className="bg-white rounded-2xl border border-[#E5E5E0] shadow-2xs overflow-hidden">
         {/* Top Workflow Stepper & Safety Assurance */}
-        <div className="px-5 py-3 bg-[#F8F8F6] border-b border-[#EAEAE4] flex items-center justify-between gap-3 flex-wrap">
+        <div className="px-4 sm:px-5 py-2.5 bg-[#F8F8F6] border-b border-[#EAEAE4] flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
           <div className="flex items-center gap-2 text-xs">
-            <span className="inline-flex items-center gap-1 text-emerald-700 font-medium hidden sm:inline-flex">
+            <span className="hidden sm:inline-flex items-center gap-1 text-emerald-700 font-medium">
               <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
               </svg>
@@ -70,7 +70,7 @@ export function ClarificationMoment({
             <span className="text-[#9CA3AF] hidden sm:inline" aria-hidden="true">
               →
             </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-[#DEDED8] font-semibold text-[#111827] shadow-2xs">
+            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-white border border-[#DEDED8] text-[11px] sm:text-xs font-semibold text-[#111827] shadow-2xs whitespace-nowrap">
               <span className="w-2 h-2 rounded-full bg-[#FF5701]" aria-hidden="true" />
               <span>2. Bổ sung thông tin</span>
             </span>
@@ -87,17 +87,17 @@ export function ClarificationMoment({
         </div>
 
         {/* Question & Context Header */}
-        <div className="px-5 sm:px-6 pt-5 pb-4 border-b border-[#F1F1EC] v3-space-y-2">
+        <div className="px-4 sm:px-6 pt-3.5 sm:pt-5 pb-3 sm:pb-4 border-b border-[#F1F1EC] v3-space-y-1.5 sm:v3-space-y-2">
           <RequestEcho request={request} />
           <h1
             id="heading-moment-3"
-            className="text-lg sm:text-xl font-semibold text-[#111827] leading-relaxed [overflow-wrap:anywhere]"
+            className="text-base sm:text-xl font-semibold text-[#111827] leading-snug sm:leading-relaxed [overflow-wrap:anywhere]"
             tabIndex={-1}
           >
             {question}
           </h1>
           {context && (
-            <p className="text-sm text-[#4B5563] leading-relaxed [overflow-wrap:anywhere]">
+            <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed [overflow-wrap:anywhere]">
               {context}
             </p>
           )}
@@ -110,7 +110,7 @@ export function ClarificationMoment({
             event.preventDefault();
             if (canSubmit) onSend(combinedValue);
           }}
-          className="px-5 sm:px-6 py-5 v3-space-y-4 bg-white"
+          className="px-4 sm:px-6 py-3.5 sm:py-5 v3-space-y-3 sm:v3-space-y-4 bg-white"
         >
           <div
             className="v3-space-y-2.5"

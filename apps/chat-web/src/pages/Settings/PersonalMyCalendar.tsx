@@ -249,7 +249,7 @@ export function PersonalMyCalendar({
         </div>
 
         {status === 'connected' && service.selectedCalendars && service.selectedCalendars.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#F8F8F6] dark:bg-[#161616] border border-[#E7E7E2] dark:border-[#2E2E2E]">
+          <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#F8F8F6] dark:bg-[#0E1528] border border-[#E7E7E2] dark:border-[#293653]">
             <span className="text-xs font-medium text-[#4B5563] dark:text-[#9CA3AF]">Lịch được dùng:</span>
             {service.selectedCalendars.map((cal) => (
               <span
@@ -271,7 +271,7 @@ export function PersonalMyCalendar({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#2E2E2E]">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#293653]">
         {status === 'not_connected' && (
           <button
             id="mycalendar-action"

@@ -47,7 +47,7 @@ export function ExecutionMoment({
       data-moment="5"
       aria-labelledby="heading-moment-5"
     >
-      <div className="rounded-xl border border-[#E5E5E3] bg-white overflow-hidden">
+      <div className="rounded-2xl border border-[#E5E5E3] bg-white overflow-hidden">
         <div className="px-5 sm:px-6 pt-5 pb-4 border-b border-[#ECECE9]">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5 text-xs">
             <div className="flex flex-wrap items-center gap-2 text-[#5F6368] font-medium">

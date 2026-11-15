@@ -31,7 +31,7 @@ const TAB = 'inline-flex items-center h-9 px-2 border-b-2 text-sm whitespace-now
 const TAB_ON = `${TAB} border-[#FF5701] font-semibold text-[#111827]`;
 const TAB_OFF = `${TAB} border-transparent font-medium text-[#4B5563] hover:text-[#111827]`;
 const AVATAR = 'w-8 h-8 rounded-full bg-[#FF5701] text-white text-xs font-bold flex items-center justify-center shadow-sm flex-shrink-0 hover:opacity-90';
-const MENU_ITEM = 'flex w-full text-left items-center gap-2.5 px-4 py-2 text-xs text-[#111827] dark:text-slate-50 hover:bg-neutral-100 dark:hover:bg-slate-700 hover:text-[#FF5701] focus:bg-neutral-100 dark:focus:bg-slate-700 focus:text-[#FF5701] focus:outline-none transition-colors';
+const MENU_ITEM = 'w-full flex text-left items-center gap-2.5 px-4 py-2 text-xs text-[#111827] dark:text-[#F1F5F9] hover:bg-neutral-100 dark:hover:bg-[#1F2A44] hover:text-[#B43E00] dark:hover:text-[#FB923C] focus:bg-neutral-100 dark:focus:bg-[#1F2A44] focus:text-[#B43E00] dark:focus:text-[#FB923C] focus:outline-none transition-colors';
 
 export interface MainNavProps {
   user: User | null;
@@ -73,7 +73,7 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
               Planora
             </span>
           </a>
-          <div className="hidden sm:flex min-w-0 shrink">
+          <div className="flex items-center min-w-0 shrink">
             <WorkspaceSwitcher navigate={navigate} />
           </div>
           {pageName && <span data-nav-page-name className="min-[900px]:hidden text-sm font-medium text-[#4B5563] truncate">{pageName}</span>}
@@ -103,7 +103,7 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
             className={
               current === 'inbox' || (typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0)
                 ? 'inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 rounded-xl bg-[#FF5701]/10 px-2.5 py-1.5 text-xs font-semibold text-[#FF5701] hover:bg-[#FF5701]/20 transition-colors border border-[#FF5701]/30'
-                : `${actions ? 'hidden xl:inline-flex' : 'inline-flex'} items-center gap-1.5 whitespace-nowrap flex-shrink-0 rounded-xl bg-white dark:bg-[#1E1E1E] px-2.5 py-1.5 text-xs font-medium text-[#4B5563] dark:text-[#D1D5DB] hover:text-[#111827] dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-[#E7E7E2] dark:border-[#374151] shadow-sm transition-colors`
+                : `${actions ? 'hidden xl:inline-flex' : 'inline-flex'} items-center gap-1.5 whitespace-nowrap flex-shrink-0 rounded-xl bg-white dark:bg-[#131B2F] px-2.5 py-1.5 text-xs font-medium text-[#4B5563] dark:text-[#CBD5E1] hover:text-[#111827] dark:hover:text-[#F1F5F9] hover:bg-neutral-100 dark:hover:bg-[#1F2A44] border border-[#E7E7E2] dark:border-[#293653] shadow-sm transition-colors`
             }
           >
             <svg className="w-3.5 h-3.5 text-[#FF5701] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -125,7 +125,7 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
           </a>
           {actions}
           <ThemeToggle />
-          <UserNavMenu user={user} pendingScheduleCount={pendingCount} variant="prototype" triggerClassName={AVATAR} menuItemClassName={MENU_ITEM} navigate={navigate} onOpenSettings={onOpenSettings ?? (() => navigate('/settings'))} onOpenAccount={() => navigate('/account')} onManageUsers={() => navigate('/admin/users')} onLogout={onLogout} />
+          <UserNavMenu user={user} pendingScheduleCount={pendingCount} variant="prototype" triggerClassName={AVATAR} menuItemClassName={MENU_ITEM} navigate={navigate} currentPath={current ? TABS.find(t => t.id === current)?.path ?? (current === 'inbox' ? '/inbox' : '/') : undefined} inboxBadgeCount={inboxBadgeCount} onOpenSettings={onOpenSettings ?? (() => navigate('/settings'))} onOpenAccount={() => navigate('/account')} onManageUsers={() => navigate('/admin/users')} onLogout={onLogout} />
         </div>
       </div>
       {children}

@@ -176,7 +176,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
         {/* Tiêu đề trang & Nguyên tắc */}
         <div className="mb-8 sm:mb-10">
           {/* Context Pill */}
-          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E7E7E2] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] text-xs text-[#111827] dark:text-white shadow-sm">
+          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E7E7E2] dark:border-[#293653] bg-white dark:bg-[#131B2F] text-xs text-[#111827] dark:text-[#F1F5F9] shadow-sm">
             {workspace.id === 'personal' ? (
               <svg className="w-3.5 h-3.5 text-[#6B7280] dark:text-[#9CA3AF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -215,7 +215,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
             )}
           </div>
           {/* Khung nguyên tắc an toàn dữ liệu */}
-          <div className="bg-white dark:bg-[#1E1E1E] rounded-xl p-4 sm:p-5 border border-[#E7E7E2] dark:border-[#333333] shadow-sm flex items-start gap-3">
+          <div className="bg-white dark:bg-[#131B2F] rounded-xl p-4 sm:p-5 border border-[#E7E7E2] dark:border-[#293653] shadow-sm flex items-start gap-3">
             <div className="w-6 h-6 rounded-full bg-[#FF5701]/10 text-[#FF5701] flex items-center justify-center flex-shrink-0 mt-0.5">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -233,12 +233,12 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
         {loadError && <div role="alert" className="text-xs text-[#DC2626] mb-4">{loadError} <button type="button" onClick={() => void refresh()} className="underline">Thử lại</button></div>}
         {connectedEmail && <p role="status" className="text-sm text-[#111827] dark:text-white mb-4">Đã kết nối {connectedEmail}</p>}
         <section aria-labelledby="heading-personal-services" className="mb-8 v3-space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-[#E7E7E2] dark:border-[#2E2E2E]">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-[#E7E7E2] dark:border-[#293653]">
             <div>
               <h2 id="heading-personal-services" className="text-sm font-semibold text-[#111827] dark:text-white">Của riêng bạn</h2>
               <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] mt-0.5">Liên kết tài khoản trực tiếp · Chỉ truy cập đúng dữ liệu bạn cho phép</p>
             </div>
-            <div role="tablist" aria-label="Phân nhóm dịch vụ" className="inline-flex flex-wrap items-center gap-1 p-1 rounded-xl bg-[#F3F2EE] dark:bg-[#161616] border border-[#E7E7E2] dark:border-[#2E2E2E]">
+            <div role="tablist" aria-label="Phân nhóm dịch vụ" className="inline-flex flex-wrap items-center gap-1 p-1 rounded-xl bg-[#F3F2EE] dark:bg-[#0E1528] border border-[#E7E7E2] dark:border-[#293653]">
               {([
                 { id: 'all', label: 'Tất cả' },
                 { id: 'google', label: 'Google Workspace' },
@@ -253,7 +253,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                   onClick={() => setCategoryFilter(tab.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     categoryFilter === tab.id
-                      ? 'bg-white dark:bg-[#262626] text-[#111827] dark:text-white shadow-sm'
+                      ? 'bg-white dark:bg-[#1A2540] text-[#111827] dark:text-[#F1F5F9] shadow-sm'
                       : 'text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#111827] dark:hover:text-white'
                   }`}
                 >
@@ -339,7 +339,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
             </div>
             <div id="list-connected-services" className="v3-space-y-3" role="list">
               {configured.length === 0
-                ? <div role="listitem" className="p-6 text-center text-xs text-[#6B7280] bg-white rounded-xl border border-[#E7E7E2]">Chưa có dịch vụ nào được thiết lập.</div>
+                ? <div role="listitem" className="p-6 text-center text-xs text-[#6B7280] dark:text-[#A1AEC0] bg-white dark:bg-[#131B2F] rounded-xl border border-[#E7E7E2] dark:border-[#293653]">Chưa có dịch vụ nào được thiết lập.</div>
                 : configured.map(s => <div key={s.id} role="listitem"><ServiceRow service={s} onOpen={actions.openServiceDrawer} /></div>)}
             </div>
           </section>

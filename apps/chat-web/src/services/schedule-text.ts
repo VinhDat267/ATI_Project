@@ -1,6 +1,6 @@
 import type { ScheduleRecurrence, ScheduleRunView, ScheduleView } from '@wap/tool-schemas';
 const days = ['Chủ nhật', 'thứ Hai', 'thứ Ba', 'thứ Tư', 'thứ Năm', 'thứ Sáu', 'thứ Bảy'];
-const capital = (text: string) => text[0].toUpperCase() + text.slice(1);
+const capital = (text: string) => (text ? text[0].toUpperCase() + text.slice(1) : '');
 export function describeRecurrence(r: ScheduleRecurrence): string {
   let text: string;
   if (r.type === 'daily') text = 'Hằng ngày';
@@ -8,9 +8,20 @@ export function describeRecurrence(r: ScheduleRecurrence): string {
     const date = new Date(`${r.date}T12:00:00Z`);
     text = `Một lần, ${days[date.getUTCDay()]} ${r.date.split('-').reverse().join('/')}`;
   } else {
-    const names = r.days.map(day => days[day % 7]);
-    const consecutive = r.days.length >= 3 && r.days.every((day, index) => !index || day === r.days[index - 1] + 1);
-    text = r.days.length === 7 ? 'Mọi ngày trong tuần' : consecutive ? `${names[0]} đến ${names.at(-1)}` : names.join(', ');
+    const validDays = (Array.isArray(r.days) ? r.days : []).filter(
+      day => typeof day === 'number' && Number.isInteger(day),
+    );
+    const names = validDays
+      .map(day => days[((day % 7) + 7) % 7])
+      .filter((name): name is string => Boolean(name));
+    const consecutive = validDays.length >= 3 && validDays.every((day, index) => !index || day === validDays[index - 1] + 1);
+    text = !names.length
+      ? 'Hằng tuần'
+      : validDays.length === 7
+        ? 'Mọi ngày trong tuần'
+        : consecutive
+          ? `${names[0]} đến ${names.at(-1)}`
+          : names.join(', ');
   }
   return `${capital(text)}, ${r.time}, giờ Việt Nam`;
 }

@@ -230,7 +230,7 @@ export function PersonalMySheets({
         {status === 'connected' &&
           service.selectedSpreadsheets &&
           service.selectedSpreadsheets.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#F8F8F6] dark:bg-[#161616] border border-[#E7E7E2] dark:border-[#2E2E2E]">
+            <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#F8F8F6] dark:bg-[#0E1528] border border-[#E7E7E2] dark:border-[#293653]">
               <span className="text-xs font-medium text-[#4B5563] dark:text-[#9CA3AF]">Bảng tính được dùng:</span>
               {service.selectedSpreadsheets.map((sheet) => (
                 <span
@@ -287,7 +287,7 @@ export function PersonalMySheets({
                   disabled={busy}
                   onChange={(e) => setUrlInput(e.target.value)}
                   placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMd.../edit"
-                  className="flex-1 px-3 py-1.5 rounded-lg border border-[#E7E7E2] dark:border-[#3A3A3A] bg-white dark:bg-[#262626] text-xs text-[#111827] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#FF5701]"
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-[#E7E7E2] dark:border-[#293653] bg-white dark:bg-[#1A2540] text-xs text-[#111827] dark:text-[#F1F5F9] focus:outline-none focus:ring-2 focus:ring-[#FF5701]"
                 />
                 <button
                   type="button"
@@ -303,7 +303,7 @@ export function PersonalMySheets({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2.5 border-t border-[#F3F4F6] dark:border-[#2E2E2E]">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2.5 border-t border-[#F3F4F6] dark:border-[#293653]">
         {status === 'not_connected' && (
           <button
             id="mysheets-action"

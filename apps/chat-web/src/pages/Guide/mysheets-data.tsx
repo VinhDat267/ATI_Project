@@ -9,10 +9,10 @@ export const MYSHEETS_GUIDE: ServiceGuide = {
   sampleScope: 'Bảng tính bạn chọn trong cửa sổ Google',
   timeEstimate: '2 phút',
   summary: 'Tự kết nối Google Sheets của bạn bằng Google, không cần nhập khoá.',
-  importantNotice: 'Planora chỉ đọc và thêm dòng mới vào các bảng tính bạn chọn trong cửa sổ Google Picker. Không xoá, không sửa ô có sẵn. Nội dung ô tính đi qua 9router để lập kế hoạch. Chỉ bạn dùng được kết nối này.',
+  importantNotice: 'Planora chỉ đọc, tra cứu, cập nhật chọn lọc, tạo tab mới hoặc thêm dòng vào các bảng tính bạn chọn trong cửa sổ Google Picker sau khi bạn duyệt. Dữ liệu cần thiết được gửi qua hệ thống AI lập kế hoạch. Chỉ bạn dùng được kết nối này.',
   steps: [
     { num: 1, title: 'Mở Kết nối dịch vụ', desc: 'Đăng nhập Planora, mở nhóm Của riêng bạn và chọn Kết nối Google Sheets.' },
-    { num: 2, title: 'Cấp quyền Google', desc: 'Chọn tài khoản Google của bạn và đồng ý cấp quyền truy cập tệp Drive (drive.file).' },
+    { num: 2, title: 'Cấp quyền Google', desc: 'Chọn tài khoản Google của bạn và đồng ý cấp quyền truy cập các bảng tính bạn chọn.' },
     { num: 3, title: 'Chọn bảng tính trong cửa sổ Google', desc: 'Mở Google Picker, đánh dấu chọn các bảng tính bạn muốn Planora dùng và bấm Chọn.' },
     { num: 4, title: 'Kiểm tra trước khi duyệt', desc: 'Trước khi thêm dòng, kiểm tra kỹ tên bảng tính, tab và dữ liệu từng cột tại màn duyệt.' },
   ],
@@ -89,10 +89,10 @@ export const MYSHEETS_CAPABILITY: Capability = {
   name: 'Google Sheets của bạn',
   role: 'Bảng tính riêng',
   canDo: [
-    'Đọc dữ liệu ô và tra cứu/lọc dòng theo điều kiện cột (search_rows) trong phạm vi các bảng tính bạn đã chọn',
-    'Thêm dòng mới hoặc cập nhật dòng trùng khóa (Upsert) sau khi bạn duyệt',
-    'Cập nhật chọn lọc từng cột theo khóa/số dòng (update_rows) mà vẫn bảo toàn công thức ở các cột khác',
-    'Tạo trang tính (tab) mới kèm dòng tiêu đề cột (create_sheet) trong bảng tính đã cấp quyền',
+    'Đọc dữ liệu ô và tra cứu, lọc dòng theo điều kiện cột trong phạm vi các bảng tính bạn đã chọn',
+    'Thêm dòng mới hoặc cập nhật dòng trùng khoá sau khi bạn duyệt',
+    'Cập nhật chọn lọc từng cột theo khoá hoặc số dòng mà vẫn bảo toàn công thức ở các cột khác',
+    'Tạo trang tính (tab) mới kèm dòng tiêu đề cột trong bảng tính đã cấp quyền',
   ],
   cannotDo: [
     'Xoá bảng tính hoặc tự ý chỉnh sửa khi bạn chưa duyệt kế hoạch',

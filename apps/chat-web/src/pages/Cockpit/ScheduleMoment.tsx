@@ -198,17 +198,17 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
   const isAutoDigestActive = approvalMode === 'auto_digest' || schedule?.kind === 'calendar_digest' || schedule?.kind === 'sheets_digest' || schedule?.kind === 'github_digest' || schedule?.kind === 'trello_digest' || schedule?.kind === 'notion_digest' || (schedule?.kind as string) === 'myjira_digest' || schedule?.kind === 'telegram_digest';
   return <section data-moment="schedule" className="w-full min-w-0 max-w-3xl mx-auto">
     <div className="bg-white border border-[#E5E5E0] rounded-2xl shadow-sm overflow-hidden min-w-0">
-      <div className="px-5 sm:px-6 py-3 bg-[#F8F8F6] border-b border-[#EAEAE4] flex items-center justify-between gap-2 text-xs">
+      <div className="px-3.5 sm:px-6 py-2 sm:py-2.5 bg-[#F8F8F6] border-b border-[#EAEAE4] flex items-center justify-between gap-2 text-xs">
         <span className="inline-flex items-center gap-1.5 font-semibold text-[#111827]">
           <svg aria-hidden="true" className="w-3.5 h-3.5 text-[#B43E00]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           <span>Lịch chạy tự động</span>
         </span>
         <span className="text-[#6B7280] font-medium">{schedule ? 'Đã xác nhận' : 'Đang xem trước đề xuất'}</span>
       </div>
-      <div className="p-5 sm:p-6 v3-space-y-5 min-w-0">
-        <h1 tabIndex={-1} className="font-sans text-xl sm:text-2xl font-semibold tracking-tight text-[#111827] [overflow-wrap:anywhere]">{title}</h1>
+      <div className="p-3.5 sm:p-5 v3-space-y-2.5 sm:v3-space-y-4 min-w-0">
+        <h1 tabIndex={-1} className="font-sans text-base sm:text-2xl font-semibold tracking-tight text-[#111827] [overflow-wrap:anywhere]">{title}</h1>
       {!manage && scheduleServices.length >= 2 && (
-        <WorkflowFlowCanvas services={scheduleServices} isAutoDigest={isAutoDigestActive} mode="schedule" />
+        <WorkflowFlowCanvas services={scheduleServices} isAutoDigest={isAutoDigestActive} mode="schedule" compact />
       )}
       {schedule ? <>
         <div className="flex flex-wrap items-center gap-2">
@@ -258,7 +258,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
           {change('Thời gian', previous ? describeRecurrence(previous.recurrence) : undefined, proposal.recurrence ? describeRecurrence(proposal.recurrence) : undefined)}
           {change('Việc sẽ làm', previous?.request, proposal.request)}
           <div className="flex flex-wrap gap-2">{metadata.services?.map(id => <span key={id} className="inline-flex items-center gap-2 text-xs text-[#4B5563]"><span aria-hidden="true" className="w-6 h-6 rounded-lg border border-[#E5E5E0] bg-[#F8F8F6] flex items-center justify-center"><ServiceLogo service={id} className="w-3.5 h-3.5" /></span>{serviceName(id, [])}</span>)}</div>
-          {!!metadata.nextRuns?.length && <div className="text-xs text-[#4B5563] v3-space-y-1"><p className="font-semibold">Lần chạy tới:</p>{metadata.nextRuns.map(time => <p key={time}>{formatRunTime(time)}</p>)}</div>}
+          {!!metadata.nextRuns?.length && <div className="flex flex-wrap items-center gap-1.5 text-xs text-[#4B5563]"><span className="font-semibold text-[#111827]">Lần chạy tới:</span>{metadata.nextRuns.map(time => <span key={time} className="px-2 py-0.5 rounded-md bg-[#F8F8F6] border border-[#EAEAE4] tabular-nums">{formatRunTime(time)}</span>)}</div>}
           {isTelegramCandidate ? (
             <>
               <fieldset className="border border-[#E7E7E2] rounded-xl p-3.5 bg-[#F8F8F6] v3-space-y-2.5">
@@ -538,7 +538,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                     </p>
                   ) : (
                     <p className="text-xs text-[#6B7280] break-words">
-                      {digestCandidate?.disabledReason || 'Chỉ bật được khi lịch chỉ đọc Jira (myjira.search_issues) và gửi báo cáo vào 1 kênh Slack hoặc nhóm Telegram đã chọn.'}
+                      {digestCandidate?.disabledReason || 'Chỉ bật được khi lịch chỉ đọc công việc Jira và gửi báo cáo vào 1 kênh Slack hoặc nhóm Telegram đã chọn.'}
                     </p>
                   )}
                 </div>
@@ -638,7 +638,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                   data-testid="sheets-digest-v2-preview"
                   className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-[#111827] v3-space-y-1.5"
                 >
-                  <p className="font-semibold text-emerald-950">Chi tiết phạm vi tự gửi Google Sheets (v2):</p>
+                  <p className="font-semibold text-emerald-950">Chi tiết phạm vi tự gửi Google Sheets:</p>
                   <p>
                     <span className="font-semibold">Nguồn dữ liệu:</span> {sheetsPreview.sourceConnectionLabel} · Chủ sở hữu/Tài khoản: {sheetsPreview.sourceOwnerLabel}
                   </p>
@@ -669,7 +669,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                       <span>
                         <span className="font-semibold">Tóm tắt bằng AI bên thứ ba:</span>{' '}
                         {includeAiSummary
-                          ? 'Gửi tiêu đề cột và tối đa 20 dòng cuối mỗi lượt chạy qua 9router / nhà cung cấp mô hình AI đã cấu hình để viết đoạn nhận xét.'
+                          ? 'Gửi tiêu đề cột và tối đa 20 dòng cuối mỗi lượt chạy qua hệ thống AI lập kế hoạch để viết đoạn nhận xét.'
                           : 'Chỉ thống kê số liệu thuần — tính KPI hoàn toàn trên máy chủ Planora, không gửi dữ liệu ô bảng tính tới mô hình AI bên thứ ba.'}
                       </span>
                     </label>
@@ -689,7 +689,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                     <span>
                       <span className="font-semibold">Tóm tắt bằng AI bên thứ ba:</span>{' '}
                       {includeAiSummary
-                        ? 'Gửi tiêu đề cột và tối đa 20 dòng cuối mỗi lượt chạy qua 9router / nhà cung cấp mô hình AI đã cấu hình để viết đoạn nhận xét.'
+                        ? 'Gửi tiêu đề cột và tối đa 20 dòng cuối mỗi lượt chạy qua hệ thống AI lập kế hoạch để viết đoạn nhận xét.'
                         : 'Chỉ thống kê số liệu thuần — tính KPI hoàn toàn trên máy chủ Planora, không gửi dữ liệu ô bảng tính tới mô hình AI bên thứ ba.'}
                     </span>
                   </label>

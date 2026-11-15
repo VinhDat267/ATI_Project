@@ -1,12 +1,11 @@
 // Source: AppStagePage.tsx moments 1–2. Content comes from the registered catalog and gatherState.
 import { useState, useEffect, useRef, type KeyboardEvent, type RefObject, type ReactNode } from 'react';
-import { getServiceDefinition } from '@wap/tool-schemas';
 import { toolDefinition } from '../../services/tool-definitions';
 import { ServiceLogo } from '../../components/ServiceLogo';
 import presentation from '../../assets/cockpit-services.json';
 import type { ServiceInfo, GatherState } from '../../types';
 import { RequestEcho, useScheduledOrigin } from './RequestEcho';
-import { multiServicePlaybooks } from './presentation';
+import { multiServicePlaybooks, serviceName } from './presentation';
 import { getActiveWorkspaceSummary, subscribeWorkspace } from '../../services/workspace-storage';
 import { authStorage } from '../../services/auth-storage';
 import {
@@ -1464,10 +1463,7 @@ export function DiscoveryMoment({
                 const service =
                   toolDefinition(step.tool)?.service ??
                   step.tool.split('.')[0];
-                const serviceLabel =
-                  services.find((row) => row.id === service)?.name ??
-                  getServiceDefinition(service)?.name ??
-                  service;
+                const serviceLabel = serviceName(service, services);
                 const found = step.status === 'completed';
                 return (
                   <li

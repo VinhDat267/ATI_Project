@@ -524,7 +524,7 @@ export function TrelloConnection({
 
       {/* Actions */}
       {!isInitialLoading && !isStatusOutage && (
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#2E2E2E]">
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#293653]">
           {status === 'not_connected' || status === 'reconnect_required' || status === 'unconfigured' ? (
             <button
               id="trello-connect"
