@@ -239,7 +239,17 @@ export class TrelloBaseAdapter extends BaseAdapter {
       });
     }
 
-    return (await res.json()) as T;
+    try {
+      return (await res.json()) as T;
+    } catch (error) {
+      const invalidJson = error instanceof SyntaxError;
+      throw new StepError({
+        message: invalidJson ? 'Trello returned invalid JSON' : 'Could not read the Trello response',
+        category: invalidJson ? 'SERVER_ERROR' : 'NETWORK',
+        retryable: !invalidJson,
+        cause: error,
+      });
+    }
   }
 
   async execute(toolName: string, args: Record<string, any>, context?: any): Promise<any> {

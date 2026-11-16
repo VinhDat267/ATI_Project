@@ -140,6 +140,21 @@ describe('Trello write tools: scope rejection never sends a write', () => {
 });
 
 describe('Trello write tools: requestSent semantics around dispatch', () => {
+  it('classifies a response-body disconnect as network failure without claiming the write was unsent', async () => {
+    const { adapter } = makeAdapter((call) => {
+      if (call.method !== 'POST') return undefined;
+      return new Response(new ReadableStream({
+        start(controller) {
+          controller.error(new TypeError('Connection interrupted while reading response'));
+        },
+      }));
+    });
+
+    const error = await rejection(adapter.execute('trello.add_comment', { cardId: 'C1', text: 'hi' }));
+    expect(error).toMatchObject({ category: 'NETWORK' });
+    expect(error.details?.requestSent).not.toBe(false);
+  });
+
   it('a failing pre-check GET (5xx) carries requestSent:false and sends no write', async () => {
     const { adapter, calls } = makeAdapter((c) => (c.method === 'GET' ? json({ message: 'boom' }, 503) : undefined));
     const err = await rejection(adapter.execute('trello.add_comment', { cardId: 'C1', text: 'hi' }));
