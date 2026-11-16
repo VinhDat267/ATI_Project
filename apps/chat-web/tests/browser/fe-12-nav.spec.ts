@@ -72,6 +72,45 @@ async function barLayout(page: Page) {
 }
 const apart = (a: Box, b: Box) => a.right <= b.left || b.right <= a.left;
 
+for (const theme of ['light', 'dark'] as const) {
+  test(`FE-12: the user menu keeps logout reachable on a short landscape viewport (${theme})`, async ({ page }) => {
+    await page.setViewportSize({ width: 667, height: 375 });
+    await admin(page);
+    await page.goto('/guide');
+    await setTheme(page, theme);
+    await page.getByRole('button', { name: /Menu người dùng/ }).click();
+    const menu = page.getByRole('menu', { name: 'Người dùng', exact: true });
+    await expect(menu).toBeVisible();
+    await expect.poll(async () => {
+      const bounds = await menu.boundingBox();
+      return bounds ? bounds.y + bounds.height : Infinity;
+    }, { message: 'the menu stays inside the viewport' }).toBeLessThanOrEqual(375);
+    await menu.hover();
+    await page.mouse.wheel(0, 600);
+    const logout = menu.getByRole('menuitem', { name: 'Đăng xuất', exact: true });
+    await expect(logout).toBeInViewport({ ratio: 1 });
+    await logout.click();
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('wap_access_token'))).toBeNull();
+  });
+
+  test(`FE-12: the workspace menu fits a 320px viewport (${theme})`, async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    await admin(page);
+    await page.goto('/guide');
+    await setTheme(page, theme);
+    await page.getByRole('button', { name: /^Không gian làm việc:/ }).click();
+    const menu = page.getByRole('menu', { name: 'Danh sách không gian làm việc', exact: true });
+    await expect(menu).toBeVisible();
+    await expect.poll(() => menu.evaluate(element => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.left >= 0 && bounds.right <= window.innerWidth &&
+        document.documentElement.scrollWidth <= window.innerWidth;
+    }), { message: 'opening the workspace menu never widens the page' }).toBe(true);
+    await menu.getByRole('menuitem', { name: /Không gian Cá nhân/ }).click();
+    await expect(menu).toBeHidden();
+  });
+}
+
 test('FE-12: an admin reaches every tab from every page and the current tab is marked', async ({ page }) => {
   test.setTimeout(240_000);
   await page.setViewportSize({ width: 1440, height: 900 });

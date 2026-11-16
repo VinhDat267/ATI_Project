@@ -215,7 +215,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
           id={menuId}
           role="menu"
           aria-label="Danh sách không gian làm việc"
-          className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 bg-white dark:bg-[#131B2F] rounded-xl border border-[#E7E7E2] dark:border-[#293653] shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
+          className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 max-w-[calc(100vw-4rem)] bg-white dark:bg-[#131B2F] rounded-xl border border-[#E7E7E2] dark:border-[#293653] shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
         >
           <div className="px-3 py-1.5 text-xs font-bold text-[#6B7280] dark:text-[#94A3B8]">
             Không gian làm việc

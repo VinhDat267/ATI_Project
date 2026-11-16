@@ -55,7 +55,7 @@ export function UserNavMenu({ user, onOpenSettings, onLogout, onManageUsers, onO
     <button ref={trigger} type="button" aria-label={`Menu người dùng: ${user?.name || user?.email || 'Người dùng'}`} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined}
       className={triggerClassName ?? (variant === 'prototype' ? 'user-avatar-btn shadow-sm' : 'flex h-10 w-10 items-center justify-center rounded-full border border-border-strong bg-primary-tint text-primary-text font-semibold')}
       onClick={() => setOpen(!open)} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setOpen(true); } }}>{avatarInitials(user)}</button>
-    {open && <div id={id} role="menu" aria-label="Người dùng" className={variant === 'prototype' ? 'absolute right-0 top-full mt-2 w-64 sm:w-68 max-w-[calc(100vw-24px)] bg-white dark:bg-[#131B2F] rounded-2xl border border-brand-border dark:border-[#293653] shadow-2xl py-1.5 z-50' : 'absolute right-0 top-full mt-2 z-50 w-72 rounded-2xl border border-border bg-surface p-2 shadow-xl'}
+    {open && <div id={id} role="menu" aria-label="Người dùng" className={`${variant === 'prototype' ? 'absolute right-0 top-full mt-2 w-64 sm:w-68 max-w-[calc(100vw-24px)] bg-white dark:bg-[#131B2F] rounded-2xl border border-brand-border dark:border-[#293653] shadow-2xl py-1.5 z-50' : 'absolute right-0 top-full mt-2 z-50 w-72 rounded-2xl border border-border bg-surface p-2 shadow-xl'} max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain`}
       onKeyDown={event => {
         const all = items(), index = all.indexOf(document.activeElement as HTMLButtonElement);
         if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
