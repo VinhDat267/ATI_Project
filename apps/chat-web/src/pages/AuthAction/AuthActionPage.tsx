@@ -51,6 +51,8 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
  const [newPassword, setNewPassword] = useState(''), [strengthTouched, setStrengthTouched] = useState(false);
  const [retryingGoogle, setRetryingGoogle] = useState(false);
  const [googleRetryError, setGoogleRetryError] = useState<string | null>(null);
+ const googleRetryMounted = useRef(false);
+ useEffect(() => { googleRetryMounted.current = true; return () => { googleRetryMounted.current = false; }; }, []);
  const [matchMessage, setMatchMessage] = useState({ text: '', className: 'text-[11px] text-[#6B7280] mt-1' });
  const [visible, setVisible] = useState({ 'new-password-input': false, 'confirm-password-input': false });
  const resendInputRef = useRef<HTMLInputElement>(null), newPasswordRef = useRef<HTMLInputElement>(null), confirmPasswordRef = useRef<HTMLInputElement>(null);
@@ -732,8 +734,9 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     setGoogleRetryError(null);
                     setRetryingGoogle(true);
                     void apiClient.startGoogleAuth()
-                      .then(({ url }) => { window.location.assign(url); })
+                      .then(({ url }) => { if (googleRetryMounted.current) window.location.assign(url); })
                       .catch((err) => {
+                        if (!googleRetryMounted.current) return;
                         setRetryingGoogle(false);
                         setGoogleRetryError(err instanceof Error && err.message ? err.message : 'Chưa thể kết nối Google lúc này. Bạn có thể đăng nhập bằng Email & Mật khẩu bên dưới.');
                       });
