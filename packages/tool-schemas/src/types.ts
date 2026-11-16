@@ -623,6 +623,7 @@ export interface TelegramDigestDelivery {
     service: string;
     label: string;
     status: 'ok' | 'partial_error' | 'empty';
+    truncated?: boolean;
     itemCount?: number;
     error?: string;
   }>;
@@ -713,10 +714,14 @@ export interface NotionDigestDelivery {
   channelId: string;
   channelName: string;
   ts: string | null;
-  counts: { databasesChecked: number; totalPages: number };
+  counts: { databasesChecked: number; totalPages: number; dueSoon?: number; unassigned?: number };
+  truncated?: boolean;
   telegramChatId?: string;
   telegramChatTitle?: string;
   messageId?: number | null;
+  sentAt?: string;
+  manualConfirmedAt?: string;
+  manualResolution?: SheetsDigestManualResolution;
 }
 
 export interface NotionDigestCandidate {

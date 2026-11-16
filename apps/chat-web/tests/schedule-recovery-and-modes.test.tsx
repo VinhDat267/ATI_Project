@@ -190,4 +190,45 @@ describe('FLOW-06 Web: Schedule approval modes, timezone, next run, and recovery
     expect(screen.getByText('Lượt chạy chờ duyệt:')).toBeInTheDocument();
     expect(screen.getByText(/Kế hoạch đã sẵn sàng, cần bạn xem và xác nhận trước khi gửi/)).toBeInTheDocument();
   });
+
+  it('recognizes NOTION_DELIVERY_UNKNOWN in ScheduleRunRecovery and hides replan button', async () => {
+    vi.spyOn(useSchedulesHook, 'useSchedulesEnabled').mockReturnValue(true);
+    vi.spyOn(apiClient, 'getScheduleRuns').mockResolvedValue({
+      runs: [
+        {
+          id: 'run-notion-unknown-1',
+          scheduleId: 'sched-notion-1',
+          dueAt: '2026-11-04T02:00:00.000Z',
+          createdAt: '2026-11-04T02:00:05.000Z',
+          trigger: 'scheduled',
+          state: 'needs_attention',
+          convId: 'conv-notion-run',
+          planId: null,
+          planStatus: null,
+          missedCount: 0,
+          deliveryStartedAt: '2026-11-04T02:00:08.000Z',
+          error:
+            'NOTION_DELIVERY_UNKNOWN: Chưa xác định bản tin Notion đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.',
+        },
+      ],
+    });
+
+    const runMsg: ChatMessage = {
+      id: 'msg-run-notion-attn',
+      role: 'system',
+      content: 'Lượt chạy cần bạn xem',
+      metadata: {
+        type: 'schedule_run',
+        scheduleId: 'sched-notion-1',
+        runId: 'run-notion-unknown-1',
+      },
+    };
+
+    render(<ScheduleRunRecovery message={runMsg} navigate={vi.fn()} />);
+    expect(await screen.findByRole('status')).toHaveTextContent(/Chưa xác định bản tin Notion đã gửi hay chưa/);
+    expect(screen.queryByRole('button', { name: 'Lập lại kế hoạch' })).toBeNull();
+    expect(screen.getByTestId('sheets-delivery-recovery-panel')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Xác nhận đã nhận báo cáo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tạo lượt gửi bù mới' })).toBeInTheDocument();
+  });
 });

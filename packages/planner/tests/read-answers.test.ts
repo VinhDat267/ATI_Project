@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_TOOLS, NOTION_TOOLS, SLACK_TOOLS } from '@wap/tool-schemas';
 import { AIPlanner, MockLLMProvider, WorkingMemory, buildSystemPrompt, formatSearchResults, validatePlan } from '../src/index.js';
 import * as validator from '../src/validator.js';
 
@@ -21,9 +21,9 @@ describe('ANS-01 read answers', () => {
     const hash = (s: string) => createHash('sha256').update(s).digest('hex');
     const offPrompt = buildSystemPrompt(ALL_TOOLS, date, { search: true, readAnswers: false });
     expect(offPrompt).toBe(buildSystemPrompt(ALL_TOOLS, date, { search: true }));
-    // GitHub v3 changes the GitHub tool schemas and adds provider-specific rules.
+    // GitHub v3 + Notion v3 update tool schemas and add provider-specific rules.
     expect(hash(offPrompt))
-      .toBe('239f1f12bac23337d7bf49af89b31fbc8391d5d2a26697c4846db5ef24775515');
+      .toBe('f2e78729a244883cefc60091592040158df30bcd35f517c0d9abd7da86f57a64');
     expect(hash(formatSearchResults([{ tool: 'slack.search_channels', args: { query: 'frontend' }, result: [] }])))
       .toBe('1edfb5917d31a91aa046dca5ea220a6c131deed29412fa206df107eb32ef9850');
   });
@@ -32,6 +32,18 @@ describe('ANS-01 read answers', () => {
     expect(githubPrompt).toContain('### GitHub Rules:');
     expect(githubPrompt).toContain('github.request_reviewers');
     expect(buildSystemPrompt(SLACK_TOOLS)).not.toContain('### GitHub Rules:');
+  });
+  it('includes Notion rules only for a catalogue with Notion tools and propagates truncated flag in formatSearchResults', () => {
+    const notionPrompt = buildSystemPrompt(NOTION_TOOLS);
+    expect(notionPrompt).toContain('### Notion Rules:');
+    expect(notionPrompt).toContain('notion.query_database');
+    expect(buildSystemPrompt(SLACK_TOOLS)).not.toContain('### Notion Rules:');
+
+    const formatted = formatSearchResults([
+      { tool: 'notion.query_database', args: { databaseId: 'db1' }, result: [{ id: 'p1', title: 'Page 1' }], truncated: true },
+    ]);
+    expect(formatted).toContain('"truncated"');
+    expect(formatted).toContain('reported more items beyond this page');
   });
   it('teaches read lookup then answer only when enabled', () => {
     const prompt = buildSystemPrompt(SLACK_TOOLS, undefined, { search: true, readAnswers: true } as any);

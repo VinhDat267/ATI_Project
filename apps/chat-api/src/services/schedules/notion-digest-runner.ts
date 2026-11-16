@@ -2,11 +2,12 @@ import type pg from 'pg';
 import type { NotionDigestConfig, NotionDigestDelivery, ScheduleRecurrence } from '@wap/tool-schemas';
 import { approvedSlackNotionBinding, computeNotionDigestConfigHash } from './notion-digest-candidate.js';
 import { escapeSlackMrkdwn } from './github-digest-runner.js';
+import { isSlackMessageTimestamp } from './slack-message-timestamp.js';
 import { NOTION_DIGEST_REAPPROVAL, isNotionSourceDenied, type NotionDigestSourceAuthority } from '../notion/digest-source-authority.js';
 import type { RunToPlan } from './schedule-runner.js';
 
 export const NOTION_DELIVERY_UNKNOWN =
-  'Chưa xác định bản tin Notion đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
+  'NOTION_DELIVERY_UNKNOWN: Chưa xác định bản tin Notion đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
 
 export interface NotionDigestRunInput extends RunToPlan {
   recurrence: ScheduleRecurrence;
@@ -42,38 +43,106 @@ export interface NotionDigestStats {
   done: number;
   inProgress: number;
   overdueOrBlocked: number;
+  dueSoon: number;
+  unassigned: number;
   recentlyUpdated: number;
 }
 
-function parseNotionDateMs(raw: string): number | null {
-  const firstPart = raw.split('→')[0]?.trim() ?? '';
-  if (!firstPart) return null;
-  const dmy = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(firstPart);
-  if (dmy) {
-    const dt = Date.UTC(Number(dmy[3]), Number(dmy[2]) - 1, Number(dmy[1]));
-    return Number.isFinite(dt) ? dt : null;
+function resolveTimeZone(tz?: string): string {
+  if (tz) {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: tz }).format(0);
+      return tz;
+    } catch {
+      // fall through
+    }
   }
-  const parsed = Date.parse(firstPart);
-  return Number.isFinite(parsed) ? parsed : null;
+  return 'Asia/Ho_Chi_Minh';
+}
+
+function startOfCalendarDateInTimeZoneMs(year: number, month: number, day: number, timeZone?: string): number {
+  const tz = resolveTimeZone(timeZone);
+  const utcMidnight = Date.UTC(year, month - 1, day, 0, 0, 0);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    timeZoneName: 'shortOffset',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(utcMidnight));
+  const offsetStr = parts.find((p) => p.type === 'timeZoneName')?.value ?? 'GMT';
+  const match = /^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/i.exec(offsetStr);
+  if (!match) {
+    return tz === 'Asia/Ho_Chi_Minh' ? utcMidnight - 7 * 3600_000 : utcMidnight;
+  }
+  const sign = match[1] === '-' ? -1 : 1;
+  const offsetMin = sign * (Number(match[2]) * 60 + Number(match[3] ?? '0'));
+  return utcMidnight - offsetMin * 60_000;
+}
+
+function startOfDayInTimeZoneMs(ms: number, timeZone?: string): number {
+  const tz = resolveTimeZone(timeZone);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date(ms));
+  const y = Number(parts.find((p) => p.type === 'year')?.value);
+  const m = Number(parts.find((p) => p.type === 'month')?.value);
+  const d = Number(parts.find((p) => p.type === 'day')?.value);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
+    return new Date(ms).setUTCHours(0, 0, 0, 0);
+  }
+  return startOfCalendarDateInTimeZoneMs(y, m, d, tz);
+}
+
+function parseNotionDueDate(raw: string, timeZone?: string): { ms: number; dateOnly: boolean } | null {
+  const segments = raw.split('→').map((s) => s.trim()).filter(Boolean);
+  const target = segments.length > 1 ? segments[segments.length - 1]! : (segments[0] ?? '');
+  if (!target) return null;
+  const isoDateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(target);
+  if (isoDateOnly) {
+    return {
+      ms: startOfCalendarDateInTimeZoneMs(Number(isoDateOnly[1]), Number(isoDateOnly[2]), Number(isoDateOnly[3]), timeZone),
+      dateOnly: true,
+    };
+  }
+  const dmy = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(target);
+  if (dmy) {
+    return {
+      ms: startOfCalendarDateInTimeZoneMs(Number(dmy[3]), Number(dmy[2]), Number(dmy[1]), timeZone),
+      dateOnly: true,
+    };
+  }
+  const parsed = Date.parse(target);
+  return Number.isFinite(parsed) ? { ms: parsed, dateOnly: false } : null;
 }
 
 export function analyzeNotionDigestPages(
   pages: NotionPageDigestItem[],
   nowMs: number = Date.now(),
+  timeZone?: string,
 ): {
   stats: NotionDigestStats;
   sortedPages: Array<{
     page: NotionPageDigestItem;
     bucket: 'overdue_blocked' | 'in_progress' | 'todo' | 'done';
     isRecent24h: boolean;
+    isDueSoon: boolean;
+    isUnassigned: boolean;
   }>;
 } {
-  const todayStartMs = new Date(nowMs).setUTCHours(0, 0, 0, 0);
+  const tz = resolveTimeZone(timeZone);
+  const todayStartMs = startOfDayInTimeZoneMs(nowMs, tz);
+  const soonLimitMs = nowMs + 48 * 3600_000;
   const stats: NotionDigestStats = {
     total: pages.length,
     done: 0,
     inProgress: 0,
     overdueOrBlocked: 0,
+    dueSoon: 0,
+    unassigned: 0,
     recentlyUpdated: 0,
   };
 
@@ -81,9 +150,17 @@ export function analyzeNotionDigestPages(
     const props = page.properties ?? {};
     let statusVal = '';
     let dueVal = '';
+    let hasAssigneeField = false;
+    let hasAssigneeValue = false;
     for (const [k, v] of Object.entries(props)) {
-      if (!v || typeof v !== 'string') continue;
       const kl = k.toLowerCase();
+      if (kl.includes('assignee') || kl.includes('assign') || kl.includes('owner') || kl.includes('phụ trách') || kl.includes('thực hiện')) {
+        hasAssigneeField = true;
+        if (typeof v === 'string' && v.trim().length > 0) {
+          hasAssigneeValue = true;
+        }
+      }
+      if (!v || typeof v !== 'string') continue;
       if (!statusVal && (kl.includes('status') || kl.includes('trạng thái') || kl.includes('stage') || kl.includes('tình trạng'))) {
         statusVal = v.trim().toLowerCase();
       }
@@ -95,12 +172,16 @@ export function analyzeNotionDigestPages(
     const isDone = /^(done|completed|complete|hoàn thành|đã xong|closed)$/i.test(statusVal);
     const isBlocked = /(blocked|bị chặn|quá hạn|overdue|stuck|khẩn)/i.test(statusVal);
     const isInProgress = /(in progress|in-progress|doing|đang làm|đang thực hiện|review|active)/i.test(statusVal);
-    const dueMs = dueVal ? parseNotionDateMs(dueVal) : null;
-    const isPastDue = !isDone && dueMs !== null && dueMs < todayStartMs;
+    const due = dueVal ? parseNotionDueDate(dueVal, tz) : null;
+    const isPastDue = !isDone && due !== null && due.ms < (due.dateOnly ? todayStartMs : nowMs);
+    const isDueSoon = !isDone && !isBlocked && !isPastDue && due !== null && due.ms <= soonLimitMs;
+    const isUnassigned = !isDone && hasAssigneeField && !hasAssigneeValue;
 
     const editedMs = page.lastEditedTime ? Date.parse(page.lastEditedTime) : NaN;
     const isRecent24h = Number.isFinite(editedMs) && nowMs - editedMs >= 0 && nowMs - editedMs <= 24 * 3600_000;
     if (isRecent24h) stats.recentlyUpdated++;
+    if (isDueSoon) stats.dueSoon++;
+    if (isUnassigned) stats.unassigned++;
 
     let bucket: 'overdue_blocked' | 'in_progress' | 'todo' | 'done' = 'todo';
     if (isDone) {
@@ -114,7 +195,7 @@ export function analyzeNotionDigestPages(
       stats.inProgress++;
     }
 
-    return { page, bucket, isRecent24h };
+    return { page, bucket, isRecent24h, isDueSoon, isUnassigned };
   });
 
   const priorityOrder: Record<typeof enriched[number]['bucket'], number> = {
@@ -126,6 +207,7 @@ export function analyzeNotionDigestPages(
   enriched.sort((a, b) => {
     const diff = priorityOrder[a.bucket] - priorityOrder[b.bucket];
     if (diff !== 0) return diff;
+    if (a.isDueSoon !== b.isDueSoon) return a.isDueSoon ? -1 : 1;
     if (a.isRecent24h !== b.isRecent24h) return a.isRecent24h ? -1 : 1;
     return 0;
   });
@@ -137,6 +219,7 @@ export interface NotionDigestRunnerOptions {
   pool: pg.Pool;
   notionSources?: Pick<NotionDigestSourceAuthority, 'read' | 'withSource'>;
   getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
+  timeZone?: string;
 }
 
 function formatNotionPropertyBadges(props?: Record<string, string | null>): string {
@@ -163,40 +246,51 @@ function formatNotionDatabaseSection(
   dbTitle: string,
   pages: NotionPageDigestItem[],
   nowMs: number = Date.now(),
-): string[] {
+  sectionOptions?: { timeZone?: string; truncated?: boolean },
+): { lines: string[]; stats: NotionDigestStats } {
   const safeDb = escapeSlackMrkdwn(dbTitle);
-  const { stats, sortedPages } = analyzeNotionDigestPages(pages, nowMs);
+  const { stats, sortedPages } = analyzeNotionDigestPages(pages, nowMs, sectionOptions?.timeZone);
   const kpiParts: string[] = [`${stats.total} trang`];
   if (stats.overdueOrBlocked > 0) kpiParts.push(`🚨 ${stats.overdueOrBlocked} quá hạn/chặn`);
+  if (stats.dueSoon > 0) kpiParts.push(`⏰ ${stats.dueSoon} sắp đến hạn (48h)`);
   if (stats.inProgress > 0) kpiParts.push(`🔄 ${stats.inProgress} đang làm`);
+  if (stats.unassigned > 0) kpiParts.push(`👤 ${stats.unassigned} chưa phân công`);
   if (stats.done > 0) kpiParts.push(`✅ ${stats.done} hoàn thành`);
   if (stats.recentlyUpdated > 0) kpiParts.push(`✨ ${stats.recentlyUpdated} mới sửa 24h`);
 
-  const header = `• *📒 ${safeDb} (${kpiParts.join(' · ')}):*`;
+  const truncBadge = sectionOptions?.truncated ? ' · ⚠️ Chưa tải hết trang (giới hạn 20 trang)' : '';
+  const header = `• *📒 ${safeDb} (${kpiParts.join(' · ')}${truncBadge}):*`;
   if (pages.length === 0) {
-    return [header, '  - _(Chưa có trang nào)_'];
+    return { lines: [header, '  - _(Chưa có trang nào)_'], stats };
   }
-  const itemLines = sortedPages.slice(0, 10).map(({ page: item, bucket, isRecent24h }) => {
+  const itemLines = sortedPages.slice(0, 10).map(({ page: item, bucket, isRecent24h, isDueSoon, isUnassigned }) => {
     const safeTitle = escapeSlackMrkdwn(String(item.title || 'Trang không tiêu đề').slice(0, 120));
     const prefix =
       bucket === 'overdue_blocked'
         ? '🚨 [Cần chú ý] '
-        : bucket === 'in_progress'
-          ? '🔄 '
-          : bucket === 'done'
-            ? '✅ '
-            : '';
+        : isDueSoon
+          ? '⏰ [Sắp đến hạn] '
+          : bucket === 'in_progress'
+            ? '🔄 '
+            : bucket === 'done'
+              ? '✅ '
+              : '';
+    const unassignedBadge = isUnassigned ? ' · [Chưa phân công]' : '';
     const recentBadge = isRecent24h ? ' · ✨ Mới cập nhật 24h' : '';
     const badges = formatNotionPropertyBadges(item.properties);
     if (item.url) {
-      return `  - ${prefix}<${item.url}|${safeTitle}>${badges}${recentBadge}`;
+      return `  - ${prefix}<${item.url}|${safeTitle}>${badges}${unassignedBadge}${recentBadge}`;
     }
-    return `  - ${prefix}${safeTitle}${badges}${recentBadge}`;
+    return `  - ${prefix}${safeTitle}${badges}${unassignedBadge}${recentBadge}`;
   });
-  if (pages.length > 10) {
-    itemLines.push(`  - _... và ${pages.length - 10} trang khác_`);
+  if (pages.length > 10 || sectionOptions?.truncated) {
+    itemLines.push(
+      sectionOptions?.truncated
+        ? `  - _... còn trang khác chưa hiển thị hết (giới hạn tải 20 trang/database)_`
+        : `  - _... và ${pages.length - 10} trang khác_`,
+    );
   }
-  return [header, ...itemLines];
+  return { lines: [header, ...itemLines], stats };
 }
 
 function isDefiniteWriteRejection(err: any): boolean {
@@ -328,9 +422,12 @@ export function createNotionDigestRunner(options: NotionDigestRunnerOptions): Ru
       if (isNotionSourceDenied(error)) return blocked();
       return { state: 'digest_failed', error: 'Không đọc được dữ liệu từ Notion lúc này. Hãy thử lại.' };
     }
+    const effectiveTimeZone = run.timeZone ?? options.timeZone;
     const lines = [
       `*Bản tin Notion tự động của Planora* · Workspace: ${escapeSlackMrkdwn(config.workspaceName)}`,
     ];
+    let totalDueSoon = 0;
+    let totalUnassigned = 0;
     for (const db of config.databases) {
       const pages = (sourceData.pagesByDatabase.get(db.id) ?? []).map((page: any): NotionPageDigestItem => ({
         databaseId: db.id,
@@ -341,9 +438,22 @@ export function createNotionDigestRunner(options: NotionDigestRunnerOptions): Ru
         properties: page.properties,
         lastEditedTime: page.lastEditedTime,
       }));
-      lines.push(...formatNotionDatabaseSection(db.title, pages, run.dueAt.getTime()));
+      const dbTruncated = Boolean(sourceData.truncatedByDatabase?.get(db.id));
+      const section = formatNotionDatabaseSection(db.title, pages, run.dueAt.getTime(), {
+        timeZone: effectiveTimeZone,
+        truncated: dbTruncated,
+      });
+      totalDueSoon += section.stats.dueSoon;
+      totalUnassigned += section.stats.unassigned;
+      lines.push(...section.lines);
     }
-    const text = lines.join('\n').slice(0, 3500);
+    const truncated = Boolean(sourceData.truncated);
+    const truncFooter = truncated
+      ? '\n_⚠️ Lưu ý: Một số database còn trang chưa hiển thị hết (giới hạn tải 20 trang/database mỗi lượt); số liệu chỉ phản ánh phần đã tải._'
+      : '';
+    const joinedBody = lines.join('\n');
+    const maxBodyLen = Math.max(0, 3500 - truncFooter.length);
+    const text = `${joinedBody.length > maxBodyLen ? joinedBody.slice(0, maxBodyLen) : joinedBody}${truncFooter}`;
 
     let deliveryStarted = false;
     try {
@@ -355,12 +465,20 @@ export function createNotionDigestRunner(options: NotionDigestRunnerOptions): Ru
         if (claim === 'discarded') return { state: 'discarded' };
         deliveryStarted = true;
         const receipt = await slackAdapter.execute('slack.send_message', { channel: config.channelId, text }, { signal });
-        if (typeof receipt?.ts !== 'string' || !receipt.ts.trim()) {
+        if (!isSlackMessageTimestamp(receipt?.ts)) {
           return { state: 'delivery_unknown', error: NOTION_DELIVERY_UNKNOWN };
         }
         const delivery: NotionDigestDelivery = {
-          channelId: config.channelId, channelName: config.channelName, ts: receipt.ts,
-          counts: { databasesChecked: config.databases.length, totalPages: sourceData.pages.length },
+          channelId: config.channelId,
+          channelName: config.channelName,
+          ts: receipt.ts.trim(),
+          counts: {
+            databasesChecked: config.databases.length,
+            totalPages: sourceData.pages.length,
+            dueSoon: totalDueSoon,
+            unassigned: totalUnassigned,
+          },
+          ...(truncated ? { truncated: true } : {}),
         };
         return { state: 'digest_sent', delivery, text };
       });

@@ -57,6 +57,28 @@ async function queryProperties(properties: Record<string, any>) {
   const result = await adapter.execute('notion.query_database', { databaseId: DB });
   return { properties: result.pages[0].properties, calls };
 }
+it('resolves Notion Date, formula and rollup wall times with their IANA time zone', async () => {
+  const date = {
+    start: '2026-11-10T08:00:00',
+    end: '2026-11-11T09:30:15.25',
+    time_zone: 'Asia/Ho_Chi_Minh',
+  };
+  const localDate = { type: 'date', date };
+  const { properties } = await queryProperties({
+    Deadline: localDate,
+    Computed: { type: 'formula', formula: localDate },
+    Rollup: { type: 'rollup', rollup: localDate },
+    AllDay: { type: 'date', date: { start: '2026-11-10', end: '2026-11-11', time_zone: null } },
+    WithOffset: { type: 'date', date: { start: '2026-11-10T08:00:00+07:00', end: '2026-11-11T02:30:15Z', time_zone: null } },
+  });
+  const resolved = '2026-11-10T01:00:00.000Z → 2026-11-11T02:30:15.250Z';
+  expect(properties).toMatchObject({
+    Deadline: resolved, Computed: resolved, Rollup: resolved,
+    AllDay: '2026-11-10 → 2026-11-11',
+    WithOffset: '2026-11-10T08:00:00+07:00 → 2026-11-11T02:30:15Z',
+  });
+});
+
 it('preserves formula primitives, false and zero, dates and explicitly unavailable results', async () => {
   const values = {
     Label: { type: 'string', string: 'Ready for release' }, Approved: { type: 'boolean', boolean: true },
@@ -417,6 +439,382 @@ it('updates page title, properties, and archived state via notion.update_page af
       Status: { status: { name: 'Done' } },
       Check: { checkbox: false },
     },
-    archived: false,
+    in_trash: false,
   });
+});
+
+it.each([{ in_trash: true }, { archived: true }])('restores a trashed page after verifying its parent data source (%o)', async trashState => {
+  const { adapter, calls } = setup(call => {
+    if (call.url.endsWith('/data_sources/' + DS)) return ok(source());
+    return ok(call.method === 'PATCH' ? page() : { ...page(), ...trashState });
+  });
+
+  await expect(adapter.execute('notion.update_page', { pageId: PAGE, archived: false })).resolves.toMatchObject({ id: PAGE, archived: false });
+  expect(calls.map(call => [call.method, new URL(call.url).pathname])).toEqual([
+    ['GET', '/v1/pages/' + PAGE], ['GET', '/v1/data_sources/' + DS], ['PATCH', '/v1/pages/' + PAGE],
+  ]);
+  expect(calls[2]!.body).toEqual({ in_trash: false });
+});
+
+it('keeps trash blocked outside restore and refuses restore outside the allowlist', async () => {
+  const trashed = { ...page(), in_trash: true };
+  const { adapter, calls } = setup(call => ok(call.url.endsWith('/data_sources/' + DS)
+    ? { ...source(), parent: { type: 'database_id', database_id: OTHER } }
+    : trashed));
+  await expect(adapter.execute('notion.get_page', { pageId: PAGE })).rejects.toMatchObject({ category: 'AUTH_ERROR' });
+  await expect(adapter.execute('notion.update_page', { pageId: PAGE, title: 'Still in trash' })).rejects.toMatchObject({ category: 'AUTH_ERROR', details: { requestSent: false } });
+  await expect(adapter.execute('notion.update_page', { pageId: PAGE, archived: false })).rejects.toMatchObject({ category: 'AUTH_ERROR', details: { requestSent: false } });
+  expect(calls.map(call => [call.method, new URL(call.url).pathname])).toEqual([
+    ['GET', '/v1/pages/' + PAGE], ['GET', '/v1/pages/' + PAGE], ['GET', '/v1/pages/' + PAGE], ['GET', '/v1/data_sources/' + DS],
+  ]);
+});
+
+it('sets truncated=true when query_database reaches limit with has_more=true or hits read budget', async () => {
+  const { adapter } = setup(call => {
+    if (call.url.includes('/databases/')) return ok(database());
+    if (call.url.endsWith('/data_sources/' + DS)) return ok(source());
+    if (call.url.endsWith('/query')) {
+      return ok({ object: 'list', results: [page()], has_more: true, next_cursor: 'next-1' });
+    }
+    return ok(page());
+  });
+  const res = await adapter.execute('notion.query_database', { databaseId: DB, limit: 1 });
+  expect(res.pages).toHaveLength(1);
+  expect(res.truncated).toBe(true);
+
+  const sparse = setup(call => {
+    if (call.url.includes('/databases/')) return ok(database());
+    if (call.url.endsWith('/data_sources/' + DS)) return ok(source());
+    if (call.url.endsWith('/query')) {
+      return ok({ object: 'list', results: [{ ...page(), in_trash: true }], has_more: true, next_cursor: 'c-' + Math.random() });
+    }
+    return ok(page());
+  });
+  const sparseRes = await sparse.adapter.execute('notion.query_database', { databaseId: DB, limit: 5 });
+  expect(sparseRes.pages).toEqual([]);
+  expect(sparseRes.truncated).toBe(true);
+});
+
+it('validates status/date filters and supports sortDirection on query_database', async () => {
+  const noStatus = setup(call => {
+    if (call.url.includes('/databases/')) return ok(database());
+    if (call.url.endsWith('/data_sources/' + DS)) {
+      return ok({ ...source(), properties: { Name: { type: 'title' }, Notes: { type: 'rich_text' }, Day: { type: 'date' } } });
+    }
+    return ok(page());
+  });
+  await expect(noStatus.adapter.execute('notion.query_database', { databaseId: DB, status: 'Done' }))
+    .rejects.toMatchObject({ category: 'VALIDATION' });
+
+  const multiDateSource = () => ({
+    ...source(),
+    properties: { ...source().properties, Deadline: { type: 'date' } },
+  });
+  const multiDate = setup(call => {
+    if (call.url.includes('/databases/')) return ok(database());
+    if (call.url.endsWith('/data_sources/' + DS)) return ok(multiDateSource());
+    if (call.url.endsWith('/query')) {
+      return ok({
+        object: 'list',
+        results: [
+          { ...page(), id: PAGE, properties: { ...page().properties, Day: { type: 'date', date: { start: '2026-10-03', end: null } }, Deadline: { type: 'date', date: { start: '2026-11-15', end: null } } } },
+          { ...page(), id: OTHER, properties: { ...page().properties, Day: { type: 'date', date: { start: '2026-10-03', end: null } }, Deadline: { type: 'date', date: { start: '2026-12-20', end: null } } } },
+        ],
+        has_more: false,
+      });
+    }
+    return ok(page());
+  });
+  await expect(multiDate.adapter.execute('notion.query_database', { databaseId: DB, dateOnOrAfter: '2026-11-01' }))
+    .rejects.toMatchObject({ category: 'VALIDATION' });
+
+  const filtered = await multiDate.adapter.execute('notion.query_database', {
+    databaseId: DB,
+    dateProperty: 'Deadline',
+    dateOnOrAfter: '2026-11-01',
+    dateOnOrBefore: '2026-11-30',
+    sortDirection: 'descending',
+  });
+  expect(filtered.pages.map((p: any) => p.id)).toEqual([PAGE]);
+  const qCall = multiDate.calls.find(c => c.url.endsWith('/query'))!;
+  expect(qCall.body.sorts).toEqual([{ timestamp: 'last_edited_time', direction: 'descending' }]);
+  expect(qCall.body.filter).toEqual({
+    and: [
+      { property: 'Deadline', date: { on_or_after: '2026-11-01' } },
+      { property: 'Deadline', date: { on_or_before: '2026-11-30' } },
+    ],
+  });
+});
+
+it('uses the Notion date time zone when checking whether a date range overlaps the query bounds', async () => {
+  const { adapter } = setup(call => {
+    if (call.url.endsWith('/databases/' + DB)) return ok(database());
+    if (call.url.endsWith('/data_sources/' + DS)) return ok(source());
+    const row = page();
+    const date = { start: '2026-11-10T08:00:00', end: '2026-11-10T09:00:00' };
+    const results = [
+      { ...row, properties: { ...row.properties, Day: { type: 'date', date: { ...date, time_zone: 'Asia/Ho_Chi_Minh' } } } },
+      { ...row, id: OTHER, properties: { ...row.properties, Day: { type: 'date', date: { ...date, time_zone: 'America/New_York' } } } },
+    ];
+    return ok({ object: 'list', results, has_more: false });
+  });
+  const query = { databaseId: DB, dateOnOrAfter: '2026-11-10T01:30:00Z', dateOnOrBefore: '2026-11-10T01:45:00Z' };
+  const result = await adapter.execute('notion.query_database', query);
+  expect(result.pages.map((row: any) => row.id)).toEqual([PAGE]);
+});
+
+it('extracts rich block types without leaking signed file URLs in notion.get_page', async () => {
+  const { adapter } = setup(call => {
+    const pathname = new URL(call.url).pathname;
+    if (pathname === '/v1/pages/' + PAGE) return ok(page());
+    if (pathname === '/v1/data_sources/' + DS) return ok(source());
+    if (pathname === '/v1/blocks/' + PAGE + '/children') {
+      return ok({
+        object: 'list',
+        results: [
+          { object: 'block', id: BLOCK, type: 'code', code: { language: 'typescript', rich_text: rich('const x = 1;') } },
+          { object: 'block', id: '44444444-5555-6666-7777-888888888888', type: 'callout', callout: { rich_text: rich('Lưu ý quan trọng') } },
+          { object: 'block', id: '55555555-6666-7777-8888-999999999999', type: 'table_row', table_row: { cells: [rich('Task'), rich('Done')] } },
+          { object: 'block', id: '66666666-7777-8888-9999-000000000000', type: 'equation', equation: { expression: 'E=mc^2' } },
+          { object: 'block', id: '77777777-8888-9999-0000-111111111111', type: 'bookmark', bookmark: { caption: rich('Spec'), url: 'https://example.test/spec' } },
+          { object: 'block', id: '88888888-9999-0000-1111-222222222222', type: 'image', image: { caption: [], type: 'file', file: { url: 'https://s3.example.test/signed?secret=1' } } },
+          { object: 'block', id: '99999999-0000-1111-2222-333333333333', type: 'divider', divider: {} },
+        ],
+        has_more: false,
+      });
+    }
+    return ok(page());
+  });
+  const res = await adapter.execute('notion.get_page', { pageId: PAGE });
+  expect(res.content).toContain('```typescript\nconst x = 1;\n```');
+  expect(res.content).toContain('> 💡 Lưu ý quan trọng');
+  expect(res.content).toContain('| Task | Done |');
+  expect(res.content).toContain('E=mc^2');
+  expect(res.content).toContain('Spec - https://example.test/spec');
+  expect(res.content).toContain('[image]');
+  expect(res.content).toContain('---');
+  expect(JSON.stringify(res)).not.toContain('signed?secret');
+});
+
+it('attaches details.requestSent=false on pre-write aborts and pre-flight validation/scope failures', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  const { adapter } = setup();
+  const abortErr = await adapter.execute('notion.create_page', { databaseId: DB, title: 'No' }, { signal: controller.signal }).catch(e => e);
+  expect(abortErr.details?.requestSent).toBe(false);
+
+  const preflightErr = await adapter.execute('notion.update_page', { pageId: OTHER, archived: true }).catch(e => e);
+  expect(preflightErr.details?.requestSent).toBe(false);
+});
+
+it.each([
+  { type: 'heading_1', prefix: '# ', suffix: '' },
+  { type: 'to_do', prefix: '- [x] ', suffix: '' },
+  { type: 'bulleted_list_item', prefix: '- ', suffix: '' },
+  { type: 'numbered_list_item', prefix: '1. ', suffix: '' },
+  { type: 'callout', prefix: '> 💡 ', suffix: '' },
+  { type: 'quote', prefix: '> ', suffix: '' },
+  { type: 'code', prefix: '```ts\n', suffix: '\n```' },
+  { type: 'paragraph', prefix: '', suffix: '' },
+])('appends all long $type text in rich text chunks without splitting an emoji', async ({ type, prefix, suffix }) => {
+  const { adapter, calls } = setup();
+  const contents = 'a'.repeat(1999) + '💡TAIL';
+  await expect(adapter.execute('notion.append_blocks', { pageId: PAGE, content: prefix + contents + suffix }))
+    .resolves.toMatchObject({ blockCount: 1 });
+
+  const children = calls.find(call => call.method === 'PATCH')!.body.children;
+  expect(children.map((item: any) => item.type)).toEqual([type]);
+  expect(children[0][type].rich_text.map((item: any) => item.text.content)).toEqual(['a'.repeat(1999), '💡TAIL']);
+});
+
+it('rejects Markdown with more than 50 blocks before making a Notion request', async () => {
+  const { adapter, calls } = setup(call => {
+    if (call.url.endsWith('/data_sources/' + DS)) return ok(source());
+    if (call.method !== 'PATCH') return ok(page());
+    return ok({ object: 'list', results: call.body.children.map(() => ({ object: 'block', id: BLOCK })), has_more: false });
+  });
+  const content = Array.from({ length: 51 }, (_, i) => `- item ${i + 1}`).join('\n');
+  await expect(adapter.execute('notion.append_blocks', { pageId: PAGE, content }))
+    .rejects.toMatchObject({ category: 'VALIDATION', details: { requestSent: false } });
+  expect(calls).toEqual([]);
+});
+
+it('finds matching rows across allowed databases and all of their data sources under one result limit', async () => {
+  const otherDb = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeef';
+  const secondSource = '11111111-2222-3333-4444-555555555556';
+  const thirdSource = '11111111-2222-3333-4444-555555555557';
+  const { adapter, calls } = setup(call => {
+    const path = new URL(call.url).pathname;
+    if (path === '/v1/search') return ok({ object: 'list', results: [], has_more: false });
+    if (path === '/v1/databases/' + DB) return ok({ ...database(), data_sources: [{ id: DS }, { id: secondSource }] });
+    if (path === '/v1/databases/' + otherDb) return ok({ ...database(), id: otherDb, data_sources: [{ id: thirdSource }] });
+    if (path === '/v1/data_sources/' + DS) return ok(source());
+    if (path === '/v1/data_sources/' + secondSource) return ok({ ...source(), id: secondSource, properties: { Topic: { type: 'title' } } });
+    if (path === '/v1/data_sources/' + thirdSource) return ok({ ...source(), id: thirdSource, parent: { type: 'database_id', database_id: otherDb } });
+    if (path === '/v1/data_sources/' + DS + '/query') return ok({ object: 'list', results: [], has_more: false });
+    if (path === '/v1/data_sources/' + secondSource + '/query') {
+      const row = { ...page(), parent: { ...page().parent, data_source_id: secondSource }, properties: { Topic: { type: 'title', title: rich('ATI Ship') } } };
+      return ok({ object: 'list', results: [row], has_more: false });
+    }
+    if (path === '/v1/data_sources/' + thirdSource + '/query') {
+      const row = { ...page(), id: OTHER, parent: { type: 'data_source_id', data_source_id: thirdSource, database_id: otherDb } };
+      return ok({ object: 'list', results: [row], has_more: false });
+    }
+    return new Response(null, { status: 404 });
+  }, [DB, otherDb]);
+
+  const query = { query: 'ATI', limit: 2 };
+  const result = await adapter.execute('notion.search_pages', query);
+  expect(result.pages).toMatchObject([{ id: PAGE, title: 'ATI Ship', databaseId: DB }, { id: OTHER, title: 'ATI Review', databaseId: otherDb }]);
+  expect(result.truncated).toBeUndefined();
+  expect(calls.filter(call => call.method === 'POST').map(call => call.body)).toEqual([
+    { page_size: 2, result_type: 'page', filter: { property: 'Name', title: { contains: 'ATI' } } },
+    { page_size: 2, result_type: 'page', filter: { property: 'Topic', title: { contains: 'ATI' } } },
+    { page_size: 1, result_type: 'page', filter: { property: 'Name', title: { contains: 'ATI' } } },
+  ]);
+
+  await expect(adapter.execute('notion.search_pages', { ...query, limit: 1 })).resolves.toMatchObject({
+    pages: [{ id: PAGE, databaseId: DB }], truncated: true,
+  });
+
+  const scoped = await adapter.execute('notion.search_pages', { ...query, databaseId: DB });
+  expect(scoped.pages).toMatchObject([{ id: PAGE, title: 'ATI Ship', databaseId: DB }]);
+  expect(scoped.truncated).toBeUndefined();
+});
+
+it('rejects a search result whose page parent differs from the queried data source', async () => {
+  const { adapter } = setup(call => {
+    if (call.url.endsWith('/databases/' + DB)) return ok(database());
+    if (call.url.endsWith('/data_sources/' + DS)) return ok(source());
+    if (call.url.endsWith('/search')) return ok({ object: 'list', results: [], has_more: false });
+    return ok({ object: 'list', results: [{ ...page(), parent: { ...page().parent, data_source_id: OTHER } }], has_more: false });
+  });
+  await expect(adapter.execute('notion.search_pages', { query: 'ATI' })).rejects.toMatchObject({ category: 'SERVER_ERROR' });
+});
+
+it('bounds cross-database pagination and reports unscanned sources as truncated', async () => {
+  const secondSource = '11111111-2222-3333-4444-555555555556';
+  const thirdSource = '11111111-2222-3333-4444-555555555557';
+  const fourthSource = '11111111-2222-3333-4444-555555555558';
+  const { adapter, calls } = setup(call => {
+    const path = new URL(call.url).pathname;
+    if (path === '/v1/search') return ok({ object: 'list', results: [], has_more: false });
+    if (path === '/v1/databases/' + DB) return ok({ ...database(), data_sources: [DS, secondSource, thirdSource, fourthSource].map(id => ({ id })) });
+    if (call.method === 'GET') return ok({ ...source(), id: path.split('/').at(-1) });
+    const previousPage = Number(call.body.start_cursor ?? '0');
+    return ok({ object: 'list', results: [], has_more: true, next_cursor: String(previousPage + 1) });
+  });
+
+  await expect(adapter.execute('notion.search_pages', { query: 'ATI' })).resolves.toEqual({ pages: [], truncated: true });
+  const queries = calls.filter(call => call.method === 'POST');
+  for (const id of [DS, secondSource]) {
+    const requestedCursors = queries.filter(call => call.url.endsWith(id + '/query')).map(call => call.body.start_cursor);
+    expect(requestedCursors).toEqual([undefined, '1', '2', '3', '4', '5', '6', '7', '8', '9']);
+  }
+  expect(queries.filter(call => call.url.endsWith(thirdSource + '/query')).map(call => call.body.start_cursor)).toEqual([undefined, '1', '2', '3', '4', '5']);
+  expect(calls).toHaveLength(30);
+  expect(calls.some(call => call.url.includes(fourthSource))).toBe(false);
+});
+
+it('reports provider-capped search results even if Notion returns has_more=false', async () => {
+  const { adapter } = setup(call => {
+    if (call.url.endsWith('/databases/' + DB)) return ok(database());
+    if (call.url.endsWith('/data_sources/' + DS)) return ok(source());
+    return ok({ object: 'list', results: [page()], has_more: false, request_status: { type: 'incomplete', incomplete_reason: 'query_result_limit_reached' } });
+  });
+  await expect(adapter.execute('notion.search_pages', { query: 'ATI' })).resolves.toMatchObject({ pages: [{ id: PAGE }], truncated: true });
+});
+
+it('supports email/phone_number properties and new v3 tools: get_database, search_pages, append_blocks, list_comments, add_comment', async () => {
+  const v3Source = () => ({
+    ...source(),
+    properties: {
+      ...source().properties,
+      Email: { type: 'email' },
+      Phone: { type: 'phone_number' },
+    },
+  });
+  const commentId = 'cccccccc-1111-2222-3333-444444444444';
+  const { adapter, calls } = setup(call => {
+    const u = new URL(call.url);
+    const p = u.pathname;
+    if (p === '/v1/databases/' + DB) return ok(database());
+    if (p === '/v1/data_sources/' + DS) return ok(v3Source());
+    if (p === '/v1/data_sources/' + DS + '/query') {
+      return ok({
+        object: 'list',
+        results: [page()],
+        has_more: false,
+      });
+    }
+    if (p === '/v1/pages') return ok(page());
+    if (p === '/v1/pages/' + PAGE) return ok(page());
+    if (p === '/v1/blocks/' + PAGE + '/children' && call.method === 'PATCH') {
+      return ok({
+        object: 'list',
+        results: call.body.children.map((_c: any, idx: number) => ({ object: 'block', id: `33333333-4444-5555-6666-77777777770${idx}` })),
+        has_more: false,
+      });
+    }
+    if (p === '/v1/comments' && call.method === 'GET') {
+      return ok({
+        object: 'list',
+        results: [{ object: 'comment', id: commentId, created_time: '2026-11-15T10:00:00Z', created_by: { id: OTHER, name: 'Vinh Dat' }, rich_text: rich('Cần review thêm') }],
+        has_more: false,
+      });
+    }
+    if (p === '/v1/comments' && call.method === 'POST') {
+      return ok({ object: 'comment', id: commentId, created_time: '2026-11-15T10:05:00Z' });
+    }
+    return ok(page());
+  });
+
+  // 1. email & phone_number on create_page
+  await adapter.execute('notion.create_page', {
+    databaseId: DB,
+    title: 'Lead CRM',
+    properties: { Email: 'lead@company.vn', Phone: '+84901234567' },
+  });
+  const createBody = calls.find(c => c.method === 'POST' && new URL(c.url).pathname === '/v1/pages')!.body;
+  expect(createBody.properties.Email).toEqual({ email: 'lead@company.vn' });
+  expect(createBody.properties.Phone).toEqual({ phone_number: '+84901234567' });
+
+  // 2. get_database
+  const dbInfo = await adapter.execute('notion.get_database', { databaseId: DB });
+  expect(dbInfo).toMatchObject({ id: DB, title: 'ATI Notes', url: database().url });
+  expect(dbInfo.schema).toEqual(expect.arrayContaining([{ name: 'Email', type: 'email' }, { name: 'Phone', type: 'phone_number' }]));
+
+  // 3. search_pages
+  const foundPages = await adapter.execute('notion.search_pages', { query: 'ATI' });
+  expect(foundPages.pages).toHaveLength(1);
+  expect(foundPages.pages[0]).toMatchObject({ id: PAGE, databaseId: DB, title: 'ATI Review' });
+
+  // 4. append_blocks with Markdown -> native blocks
+  const appended = await adapter.execute('notion.append_blocks', {
+    pageId: PAGE,
+    content: '## Action Items\n- [ ] Check API\n- [x] Verify DB\n- Bullet item\n1. Step one\n> 💡 Callout note\n```ts\nconst ok = true;\n```\n---',
+  });
+  expect(appended.blockCount).toBe(8);
+  const patchBlocks = calls.find(c => c.method === 'PATCH' && new URL(c.url).pathname.endsWith('/children'))!.body.children;
+  expect(patchBlocks.map((b: any) => b.type)).toEqual([
+    'heading_2', 'to_do', 'to_do', 'bulleted_list_item', 'numbered_list_item', 'callout', 'code', 'divider',
+  ]);
+  expect(patchBlocks[1].to_do.checked).toBe(false);
+  expect(patchBlocks[2].to_do.checked).toBe(true);
+  expect(patchBlocks[6].code.language).toBe('typescript');
+
+  // 5. list_comments & add_comment
+  const commentsRes = await adapter.execute('notion.list_comments', { pageId: PAGE });
+  expect(commentsRes.comments).toEqual([{ id: commentId, pageId: PAGE, author: 'Vinh Dat', text: 'Cần review thêm', createdTime: '2026-11-15T10:00:00Z' }]);
+
+  const addedComment = await adapter.execute('notion.add_comment', { pageId: PAGE, text: 'Đã chốt!' });
+  expect(addedComment).toEqual({ id: commentId, pageId: PAGE, url: page().url, createdTime: '2026-11-15T10:05:00Z' });
+  const postComment = calls.find(c => c.method === 'POST' && new URL(c.url).pathname === '/v1/comments')!;
+  expect(postComment.body).toEqual({ parent: { page_id: PAGE }, rich_text: [{ type: 'text', text: { content: 'Đã chốt!' } }] });
+
+  // Security negative: add_comment on out-of-scope page sets requestSent=false and never calls POST /v1/comments
+  const commentCallsBefore = calls.filter(c => new URL(c.url).pathname === '/v1/comments' && c.method === 'POST').length;
+  const deniedErr = await adapter.execute('notion.add_comment', { pageId: OTHER, text: 'Hack' }).catch(e => e);
+  expect(deniedErr.details?.requestSent).toBe(false);
+  expect(calls.filter(c => new URL(c.url).pathname === '/v1/comments' && c.method === 'POST')).toHaveLength(commentCallsBefore);
 });

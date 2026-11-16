@@ -134,6 +134,71 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
     expect(summarizeWithAi).not.toHaveBeenCalled();
   });
 
+  it.each([20, 0])('sends the Notion source truncation warning with %i returned pages', async (pageCount) => {
+    const chatId = '777888999';
+    const username = 'runneruser';
+    const credential = await credRepo.saveCredentials('telegram', encryptCredentials({
+      telegramUserId: chatId, username,
+      selectedChats: [{ chatId, title: 'Private chat', type: 'private' }],
+    }, ENCRYPTION_KEY), USER_ID);
+    const databaseId = randomUUID();
+    const notionBinding = {
+      version: 1 as const, ownerId: USER_ID, credentialId: randomUUID(), appId: 'notion-app',
+      workspaceId: 'workspace-fixture', workspaceName: 'Notion workspace',
+      actorId: 'actor-fixture', botId: 'bot-fixture', identityVersion: 1,
+      databases: [{ databaseId, dataSourceId: randomUUID(), title: 'Sprint' }],
+    };
+    const config: TelegramDigestConfig = {
+      credentialId: credential.id, telegramUserId: chatId, username, chatId, chatTitle: 'Private chat',
+      sources: [{ service: 'notion', tool: 'notion.query_database', label: 'Notion', notionBinding }],
+      recurrence: { type: 'daily', time: '08:00' }, timeZone: 'Asia/Ho_Chi_Minh',
+    };
+    const schedule = await seedDigestSchedule(config);
+    const runId = (await pool.query(
+      `INSERT INTO schedule_runs(schedule_id,schedule_version,trigger,due_at,status)
+       VALUES($1,$2,'scheduled',$3,'planning') RETURNING id`, [schedule.id, schedule.version, now],
+    )).rows[0].id;
+    const pages = Array.from({ length: pageCount }, (_, i) => ({
+      id: randomUUID(), title: `Sprint task ${i + 1}`, url: 'https://www.notion.so/fixture',
+      properties: { Description: 'a'.repeat(500), Notes: 'b'.repeat(500), Details: '📝'.repeat(500) },
+    }));
+    const send = vi.fn(async (_tool: string, _args: { text: string }) => ({ messageId: 42 }));
+    const runner = new TelegramDigestRunner({
+      pool, credentialRepo: credRepo, encryptionKey: ENCRYPTION_KEY, timeZone: config.timeZone,
+      adapterFactory: { getAdapterForService: async () => ({ execute: send }) },
+      notionSources: {
+        read: async () => ({
+          pages, pagesByDatabase: new Map([[databaseId, pages]]), truncated: true,
+          truncatedByDatabase: new Map([[databaseId, true]]), databases: [{ databaseId, truncated: true }],
+        }),
+        withSource: async (_ownerId, _binding, _signal, dispatch) => {
+          const client = await pool.connect();
+          try { return await dispatch(client); }
+          finally { client.release(); }
+        },
+      },
+    });
+
+    const result = await runner.execute({
+      runId, scheduleId: schedule.id, scheduleVersion: schedule.version,
+      userId: USER_ID, name: schedule.name, request: schedule.request, dueAt: now, trigger: 'scheduled',
+      digestConfig: schedule.digest_config, digestConfigHash: schedule.digest_config_hash,
+    }, AbortSignal.timeout(3000));
+
+    expect(result).toMatchObject({
+      status: 'digest_sent',
+      delivery: { sources: [{
+        service: 'notion', label: 'Notion', itemCount: pageCount,
+        status: pageCount > 0 ? 'ok' : 'empty', truncated: true,
+      }] },
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    const [tool, { text: sentText }] = send.mock.calls[0]!;
+    expect(tool).toBe('telegram.send_message');
+    expect(sentText).toContain('giới hạn 20 trang/database');
+    expect(Array.from(sentText).length).toBeLessThanOrEqual(4000);
+  });
+
   it.each([
     'unchanged', 'source-replaced', 'unshared', 'revoked-before-send', 'revoke-waits-for-send',
     'one-pool-client', 'source-replaced-before-confirm', 'archived-before-send',

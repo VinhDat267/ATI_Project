@@ -621,8 +621,10 @@ export function PlanMoment({
                             const hasContent =
                               (typeof step.args.content === 'string' && step.args.content.trim().length > 0) ||
                               (typeof step.args.text === 'string' && step.args.text.trim().length > 0);
+                            const hasDateFilter = Boolean(step.args.dateOnOrAfter || step.args.dateOnOrBefore);
+                            const isComment = step.tool === 'notion.add_comment';
                             const isArchived = step.args.archived === true;
-                            if (!statusText && propKeys.length === 0 && !hasContent && !isArchived) return null;
+                            if (!statusText && propKeys.length === 0 && !hasContent && !hasDateFilter && !isArchived) return null;
                             return (
                               <div data-testid="notion-step-pills" className="flex flex-wrap items-center gap-1.5 mt-2.5">
                                 {statusText && (
@@ -635,9 +637,14 @@ export function PlanMoment({
                                     📋 {propKeys.length} thuộc tính
                                   </span>
                                 )}
+                                {hasDateFilter && (
+                                  <span className="text-[11px] font-medium px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full">
+                                    📅 Lọc theo ngày
+                                  </span>
+                                )}
                                 {hasContent && (
                                   <span className="text-[11px] font-medium px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full">
-                                    📝 Có nội dung văn bản
+                                    {isComment ? '💬 Có nội dung bình luận' : '📝 Có nội dung văn bản'}
                                   </span>
                                 )}
                                 {isArchived && (

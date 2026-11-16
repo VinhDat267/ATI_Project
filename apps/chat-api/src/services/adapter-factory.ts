@@ -95,6 +95,7 @@ export interface AdapterFactoryOptions {
   }) => AdapterExecutor;
   notionRepo?: NotionConnectionRepo;
   notionTokens?: NotionTokenManager;
+  notionApiBaseUrl?: string;
   createNotionAdapter?: (input: {
     userId: string;
     allowedDatabases: string[];
@@ -213,7 +214,7 @@ export class AdapterFactory {
     if (serviceName === 'trello') return this.trelloAdapter(context);
     if (serviceName === 'github') return this.githubAdapter(context);
     if (serviceName === 'telegram') return this.telegramAdapter(context);
-    if (serviceName === 'notion' && this.options.notionRepo && context?.userId) {
+    if (serviceName === 'notion' && this.options.notionRepo && context?.userId && context.workspaceMode !== 'organization') {
       const hasPreviewed = context.phase === 'execution' && Boolean(context.connections?.notion);
       const active = await this.options.notionRepo.getActive(context.userId);
       if (hasPreviewed || active) {
@@ -819,6 +820,7 @@ export class AdapterFactory {
               const liveAdapter = new NotionAdapter({
                 credentials: { token: accessToken },
                 allowedScope: { databases: allowedDatabases },
+                apiBaseUrl: this.options.notionApiBaseUrl,
                 fetchFn: this.options.serviceFetchFn,
               });
               try {
@@ -840,6 +842,7 @@ export class AdapterFactory {
         const liveAdapter = new NotionAdapter({
           credentials: { token: cfg.accessToken },
           allowedScope: { databases: allowedDatabases },
+          apiBaseUrl: this.options.notionApiBaseUrl,
           fetchFn: this.options.serviceFetchFn,
         });
         return liveAdapter.execute(tool, args, execContext);

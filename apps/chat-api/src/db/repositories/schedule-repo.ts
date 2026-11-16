@@ -72,7 +72,7 @@ export class ScheduleRepo {
       status: row.status,
       pauseReason: row.pause_reason,
       nextRuns: upcoming.map((d) => d.toISOString()),
-      lastRun: lastRun ? runView(lastRun, now) : null,
+      lastRun: lastRun ? runView(lastRun, now, row) : null,
       kind,
       approvalMode: kind === 'plan' ? 'manual' : 'auto_digest',
       digestConfig: row.digest_config ?? null,
@@ -240,12 +240,12 @@ export class ScheduleRepo {
     return res.rows[0] ?? null;
   }
 
-  async listRuns(scheduleId: string, limit: number, now: Date) {
+  async listRuns(schedule: ScheduleRow, limit: number, now: Date) {
     const res = await this.pool.query(
       `${RUN_SELECT} WHERE r.schedule_id = $1 ORDER BY r.created_at DESC, r.id DESC LIMIT $2`,
-      [scheduleId, limit]
+      [schedule.id, limit]
     );
-    return Promise.all(res.rows.map(async (row: RunRow) => runView(await this.safeRun(row), now)));
+    return Promise.all(res.rows.map(async (row: RunRow) => runView(await this.safeRun(row), now, schedule)));
   }
 
   async run(runId: string, db: Queryable = this.pool): Promise<RunRow | null> {

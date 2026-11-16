@@ -472,7 +472,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
           const check =
             savedCheck?.credentialVersion === (record ? versionOf(record.config) : null) ? savedCheck : undefined;
           const isPersonalNotionOAuth =
-            id === 'notion' && !configured && Boolean(options.notionConnectionRepo || options.notionConnection);
+            id === 'notion' && mode !== 'organization' && !configured && Boolean(options.notionConnectionRepo || options.notionConnection);
           const effectiveIsPersonalOAuth = isPersonalOAuth || isPersonalNotionOAuth;
 
           let personalStatus:

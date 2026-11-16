@@ -10,6 +10,10 @@ import type {
   TelegramDigestDelivery,
   TrelloDigestDelivery,
 } from '@wap/tool-schemas';
+import type { ScheduleRow } from '../../db/repositories/schedule-repo.js';
+import { CALENDAR_DELIVERY_UNKNOWN } from './calendar-digest-runner.js';
+import { GITHUB_DELIVERY_UNKNOWN } from './github-digest-runner.js';
+import { NOTION_DELIVERY_UNKNOWN } from './notion-digest-runner.js';
 
 /** A schedule_runs row joined with the latest plan of its conversation (see RUN_SELECT). */
 export interface RunRow {
@@ -71,13 +75,39 @@ export function runState(row: RunRow, now: Date): ScheduleRunState {
 
 const iso = (value: Date | string) => new Date(value).toISOString();
 
-export function runView(row: RunRow, now: Date): ScheduleRunView {
+type DeliverySchedule = Pick<ScheduleRow, 'kind' | 'version' | 'digest_config'>;
+
+export function isNotionDeliveryUnknown(run: RunRow, schedule?: DeliverySchedule): boolean {
+  if (
+    schedule?.kind !== 'notion_digest' ||
+    run.status !== 'needs_attention' ||
+    run.delivery_started_at == null ||
+    run.delivery_resolution != null ||
+    typeof run.error !== 'string'
+  ) {
+    return false;
+  }
+  if (run.error.includes('NOTION_DELIVERY_UNKNOWN') ||
+      run.error.includes('Chưa xác định bản tin Notion đã gửi hay chưa')) {
+    return true;
+  }
+  // Some older workers saved neither a Notion-specific error nor the
+  // dispatched snapshot. The current config only identifies that run if
+  // the schedule still has the exact version that dispatched it.
+  const config = run.dispatched_config ??
+    (run.schedule_version === schedule.version ? schedule.digest_config : null);
+  return (run.error === CALENDAR_DELIVERY_UNKNOWN || run.error === GITHUB_DELIVERY_UNKNOWN) &&
+    config !== null && typeof config === 'object' && 'databases' in config && Array.isArray(config.databases);
+}
+
+export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): ScheduleRunView {
   const view: ScheduleRunView = {
     id: row.id, scheduleId: row.schedule_id, trigger: row.trigger,
     dueAt: iso(row.due_at), createdAt: iso(row.created_at),
     state: runState(row, now), missedCount: row.missed_count,
     convId: row.conv_id, planId: row.latest_plan_id ?? row.plan_id ?? null,
-    planStatus: row.plan_status ?? null, error: row.error,
+    planStatus: row.plan_status ?? null,
+    error: isNotionDeliveryUnknown(row, schedule) ? NOTION_DELIVERY_UNKNOWN : row.error,
     delivery: row.delivery ?? null,
     deliveryStartedAt: row.delivery_started_at ? iso(row.delivery_started_at) : null,
     deliveryResolution: row.delivery_resolution ?? null,
