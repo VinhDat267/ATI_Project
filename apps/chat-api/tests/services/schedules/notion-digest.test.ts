@@ -10,6 +10,8 @@ import {
   NOTION_DELIVERY_UNKNOWN,
 } from '../../../src/services/schedules/notion-digest-runner.js';
 import { summarizeSourceItems } from '../../../src/services/schedules/telegram-digest-runner.js';
+import { CALENDAR_DELIVERY_UNKNOWN } from '../../../src/services/schedules/calendar-digest-runner.js';
+import { GITHUB_DELIVERY_UNKNOWN } from '../../../src/services/schedules/github-digest-runner.js';
 import { ScheduleService } from '../../../src/services/schedules/schedule-service.js';
 import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
 import { createMigratedSchema } from '../../helpers/gmail-test-db.js';
@@ -162,7 +164,27 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       expect(analysis.sortedPages[1]?.isRecent24h).toBe(true);
     });
 
-    it('tracks dueSoon (48h), unassigned active pages, end-of-range dates, timezone boundaries, and Telegram truncated footer', () => {
+    it.each([
+      ['2026-11-10T08:00:00+07:00', 1, 0],
+      ['2026-11-10T18:00:00+07:00', 0, 1],
+      ['2026-11-10', 0, 1],
+      ['10/11/2026', 0, 1],
+      ['2026-11-09T09:00:00+07:00 → 2026-11-10T08:00:00+07:00', 1, 0],
+      ['2026-11-09T09:00:00+07:00 → 2026-11-10', 0, 1],
+    ])('classifies Notion due date %s at 18:00 local time', (due, overdueOrBlocked, dueSoon) => {
+      const { stats } = analyzeNotionDigestPages([{
+        databaseId: dbId1,
+        databaseTitle: 'Sprint',
+        id: 'p-due',
+        title: 'Sprint task',
+        url: 'https://www.notion.so/p-due',
+        properties: { Status: 'Todo', Due: due },
+      }], Date.parse('2026-11-10T18:00:00+07:00'), 'Asia/Ho_Chi_Minh');
+
+      expect(stats).toMatchObject({ overdueOrBlocked, dueSoon });
+    });
+
+    it('tracks dueSoon (48h), unassigned active pages, end-of-range dates, timezone boundaries, and Telegram truncation metadata', () => {
       // 2026-11-10T00:30:00+07:00 = 2026-11-09T17:30:00.000Z
       const nowMs = Date.parse('2026-11-09T17:30:00.000Z');
       const analysis = analyzeNotionDigestPages(
@@ -212,7 +234,6 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
         truncated: true,
       });
       expect(truncatedTg.truncated).toBe(true);
-      expect(truncatedTg.lines.some((line) => line.includes('giới hạn 20 trang/database'))).toBe(true);
     });
   });
 
@@ -590,7 +611,11 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       });
     });
 
-    it('quarantines malformed Slack receipt into NOTION_DELIVERY_UNKNOWN and resolves via mark_sent & retry_new_run', async () => {
+    it.each([
+      { label: 'Notion delivery error', storedError: null },
+      { label: 'legacy Calendar fallback without a snapshot', storedError: CALENDAR_DELIVERY_UNKNOWN, omitSnapshot: true },
+      { label: 'legacy GitHub fallback', storedError: GITHUB_DELIVERY_UNKNOWN },
+    ])('recovers $label via mark_sent and retry_new_run after a malformed Slack receipt', async ({ storedError, omitSnapshot }) => {
       const createBadTsSchedule = async (suffix: string) => {
         const user = await db.person(`NotionRecovery_${suffix}`);
         const convRes = await db.pool.query(
@@ -664,6 +689,17 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
           recordState: (client, row, now) => service.recordState(client, row, now),
         });
         await runner.tick();
+        if (storedError) {
+          const updated = await db.pool.query(
+            `UPDATE schedule_runs
+             SET error = $2,
+                 dispatched_config = CASE WHEN $3 THEN NULL ELSE dispatched_config END,
+                 dispatched_config_hash = CASE WHEN $3 THEN NULL ELSE dispatched_config_hash END
+             WHERE schedule_id = $1 AND status = 'needs_attention' AND delivery_started_at IS NOT NULL`,
+            [confirmed.schedule.id, storedError, omitSnapshot ?? false],
+          );
+          expect(updated.rowCount).toBe(1);
+        }
         return { user, service, schedule: confirmed.schedule };
       };
 
@@ -672,6 +708,17 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       const runsA = await caseA.service.listRuns(caseA.user.id, caseA.schedule.id, 5, new Date('2026-11-03T01:32:00.000Z'));
       expect(runsA[0]?.state).toBe('needs_attention');
       expect(runsA[0]?.error).toBe(NOTION_DELIVERY_UNKNOWN);
+      const scheduleViews = await caseA.service.list(caseA.user.id, new Date('2026-11-03T01:32:00.000Z'));
+      expect(scheduleViews[0]?.lastRun?.error).toBe(NOTION_DELIVERY_UNKNOWN);
+      if (omitSnapshot) {
+        await db.pool.query('UPDATE schedules SET version = version + 1 WHERE id = $1', [caseA.schedule.id]);
+        await expect(caseA.service.resolveRunDelivery({
+          userId: caseA.user.id,
+          runId: runsA[0]!.id,
+          resolution: 'mark_sent',
+        })).rejects.toMatchObject({ code: 'RUN_NOT_AWAITING_DELIVERY_RESOLUTION' });
+        await db.pool.query('UPDATE schedules SET version = $2 WHERE id = $1', [caseA.schedule.id, caseA.schedule.version]);
+      }
       await expect(
         caseA.service.startRun({ runId: runsA[0]!.id, trigger: 'replan', userId: caseA.user.id, now: new Date('2026-11-03T01:33:00.000Z') })
       ).rejects.toThrow();

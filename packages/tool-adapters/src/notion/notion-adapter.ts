@@ -2,6 +2,7 @@ import { NOTION_ID_PATTERN, normalizeNotionId } from '@wap/tool-schemas';
 import { BaseAdapter, StepError, type BaseAdapterConfig } from '../base-adapter.js';
 import { GlobalRateLimiter, waitWithSignal } from '../rate-limiter.js';
 import { NOTION_MAX_PROPERTY_CHARS, clipText } from '../bounds.js';
+import { zonedWallTimeToInstant } from '../calendar/time-utils.js';
 
 export interface NotionAdapterConfig extends BaseAdapterConfig {
   credentials: { token: string };
@@ -12,6 +13,8 @@ export interface NotionAdapterConfig extends BaseAdapterConfig {
 export const NOTION_VERSION = '2026-03-11';
 const defaultApiBaseUrl = 'https://api.notion.com/v1';
 const sharedLimiter = new GlobalRateLimiter({ maxRequests: 3, windowMs: 1000 });
+const MAX_SEARCH_REQUESTS = 30;
+const MAX_SEARCH_QUERIES_PER_SOURCE = 10;
 function invalid(message: string): never { throw new StepError({ message: 'Notion ' + message, category: 'VALIDATION' }); }
 function denied(): never { throw new StepError({ message: 'Notion resource is outside the allowed database scope', category: 'AUTH_ERROR', statusCode: 403 }); }
 function badResponse(writing = false): never { throw new StepError({ message: 'Notion returned an invalid response', category: writing ? 'UNKNOWN' : 'SERVER_ERROR' }); }
@@ -31,7 +34,8 @@ function limit(value: unknown, max: number): number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > max) invalid('limit is outside its allowed range');
   return value;
 }
-const rich = (content: string) => [{ type: 'text', text: { content } }];
+const textItem = (content: string) => ({ type: 'text', text: { content } });
+const rich = (content: string) => [textItem(content)];
 function chunkTextSafe(content: string, maxLen = 2000): string[] {
   const chunks: string[] = [];
   for (let start = 0; start < content.length;) {
@@ -66,11 +70,7 @@ function normalizeCodeLanguage(raw: string): string {
 function markdownToNotionBlocks(content: string): object[] {
   const lines = content.replace(/\r\n/g, '\n').split('\n');
   const blocks: object[] = [];
-  const pushParagraphs = (textStr: string) => {
-    for (const chunk of chunkTextSafe(textStr, 2000)) {
-      blocks.push({ object: 'block', type: 'paragraph', paragraph: { rich_text: rich(chunk) } });
-    }
-  };
+  const blockRichText = (value: string) => chunkTextSafe(value).map(textItem);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
     if (!line.trim()) continue;
@@ -87,11 +87,10 @@ function markdownToNotionBlocks(content: string): object[] {
         codeLines.push(lines[j]!);
       }
       if (!closed) i = lines.length - 1;
-      const codeText = codeLines.join('\n').slice(0, 2000);
       blocks.push({
         object: 'block',
         type: 'code',
-        code: { language: normalizeCodeLanguage(fence[1] ?? ''), rich_text: rich(codeText) },
+        code: { language: normalizeCodeLanguage(fence[1] ?? ''), rich_text: blockRichText(codeLines.join('\n')) },
       });
       continue;
     }
@@ -104,7 +103,7 @@ function markdownToNotionBlocks(content: string): object[] {
     if (heading) {
       const level = heading[1]!.length as 1 | 2 | 3;
       const key = level === 1 ? 'heading_1' : level === 2 ? 'heading_2' : 'heading_3';
-      blocks.push({ object: 'block', type: key, [key]: { rich_text: rich(heading[2]!.slice(0, 2000)) } });
+      blocks.push({ object: 'block', type: key, [key]: { rich_text: blockRichText(heading[2]!) } });
       continue;
     }
     const todo = /^[-*]\s+\[([ xX])\]\s+(.+)$/.exec(trimmed);
@@ -112,7 +111,7 @@ function markdownToNotionBlocks(content: string): object[] {
       blocks.push({
         object: 'block',
         type: 'to_do',
-        to_do: { rich_text: rich(todo[2]!.slice(0, 2000)), checked: todo[1]!.toLowerCase() === 'x' },
+        to_do: { rich_text: blockRichText(todo[2]!), checked: todo[1]!.toLowerCase() === 'x' },
       });
       continue;
     }
@@ -121,7 +120,7 @@ function markdownToNotionBlocks(content: string): object[] {
       blocks.push({
         object: 'block',
         type: 'bulleted_list_item',
-        bulleted_list_item: { rich_text: rich(bullet[1]!.slice(0, 2000)) },
+        bulleted_list_item: { rich_text: blockRichText(bullet[1]!) },
       });
       continue;
     }
@@ -130,7 +129,7 @@ function markdownToNotionBlocks(content: string): object[] {
       blocks.push({
         object: 'block',
         type: 'numbered_list_item',
-        numbered_list_item: { rich_text: rich(numbered[1]!.slice(0, 2000)) },
+        numbered_list_item: { rich_text: blockRichText(numbered[1]!) },
       });
       continue;
     }
@@ -139,7 +138,7 @@ function markdownToNotionBlocks(content: string): object[] {
       blocks.push({
         object: 'block',
         type: 'callout',
-        callout: { rich_text: rich(calloutMatch[1]!.slice(0, 2000)), icon: { type: 'emoji', emoji: '💡' } },
+        callout: { rich_text: blockRichText(calloutMatch[1]!), icon: { type: 'emoji', emoji: '💡' } },
       });
       continue;
     }
@@ -148,21 +147,31 @@ function markdownToNotionBlocks(content: string): object[] {
       blocks.push({
         object: 'block',
         type: 'quote',
-        quote: { rich_text: rich(quoteMatch[1]!.slice(0, 2000)) },
+        quote: { rich_text: blockRichText(quoteMatch[1]!) },
       });
       continue;
     }
-    pushParagraphs(line);
+    blocks.push({ object: 'block', type: 'paragraph', paragraph: { rich_text: blockRichText(line) } });
   }
-  if (blocks.length <= 50) return blocks;
-  const head = blocks.slice(0, 49);
-  const tailText = lines.join('\n').slice(-1900);
-  head.push({ object: 'block', type: 'paragraph', paragraph: { rich_text: rich(tailText) } });
-  return head;
+  return blocks;
 }
 function plainRich(value: any): string {
   if (!Array.isArray(value)) badResponse();
   return value.map(item => typeof item?.plain_text === 'string' ? item.plain_text : typeof item?.text?.content === 'string' ? item.text.content : badResponse()).join('');
+}
+function dateEndpoint(raw: unknown, timeZone: unknown): string {
+  const value = typeof raw === 'string' ? raw.trim() : '';
+  if (typeof timeZone !== 'string' || !timeZone) return value;
+  const wallTime = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/.exec(value);
+  if (!wallTime) return value;
+  const [, day, hour, minute, second = '0', fraction = ''] = wallTime;
+  try {
+    const instant = zonedWallTimeToInstant(day!, Number(hour), Number(minute), Number(second), timeZone);
+    if (!instant.nonexistentWallTime) return new Date(instant.ms + Number(fraction.padEnd(3, '0'))).toISOString();
+  } catch {
+    // Treat invalid provider dates consistently with other malformed responses.
+  }
+  return badResponse();
 }
 function propertyText(value: any): string {
   if (!value || typeof value.type !== 'string') badResponse();
@@ -171,7 +180,7 @@ function propertyText(value: any): string {
     case 'title': case 'rich_text': return plainRich(data);
     case 'select': case 'status': return data?.name ?? '';
     case 'multi_select': return Array.isArray(data) ? data.map(item => item.name).join(', ') : badResponse();
-    case 'date': return data ? [data.start, data.end].filter(Boolean).join(' → ') : '';
+    case 'date': return data ? [dateEndpoint(data.start, data.time_zone), dateEndpoint(data.end, data.time_zone)].filter(Boolean).join(' → ') : '';
     case 'people': return Array.isArray(data) ? data.map(item => item.name ?? item.id).join(', ') : badResponse();
     case 'relation': return Array.isArray(data) ? data.map(item => item.id).join(', ') + (value.has_more === true ? ' [incomplete]' : '') : badResponse();
     case 'files': return Array.isArray(data) ? data.map(item => typeof item?.name === 'string' ? item.name : badResponse()).join(', ') : badResponse();
@@ -441,9 +450,9 @@ export class NotionAdapter extends BaseAdapter {
       try { return await response.json(); } catch { return badResponse(writing); }
     }
   }
-  private resource(value: any, object: string, id: string): void {
+  private resource(value: any, object: string, id: string, allowTrashed = false): void {
     if (value?.object !== object || uuid(value.id, true) !== id) badResponse();
-    if (value.in_trash === true || value.archived === true) denied();
+    if (!allowTrashed && (value.in_trash === true || value.archived === true)) denied();
   }
   private async database(id: string, signal?: AbortSignal): Promise<any> {
     const value = await this.request('databases/' + id, signal); this.resource(value, 'database', id); return value;
@@ -457,17 +466,21 @@ export class NotionAdapter extends BaseAdapter {
     const db = await this.database(id, signal);
     if (!Array.isArray(db.data_sources) || db.data_sources.length !== 1) invalid('database must have exactly one data source; choose an unambiguous database');
     const sourceId = uuid(db.data_sources[0]?.id, true);
+    const source = await this.sourceSchema(id, sourceId, signal);
+    return { ...source, db };
+  }
+  private async sourceSchema(id: string, sourceId: string, signal?: AbortSignal): Promise<{ id: string; properties: Record<string, any>; title: string }> {
     if (this.expectedDataSources && this.expectedDataSources.get(id) !== sourceId) denied();
     const source = await this.dataSource(sourceId, signal);
     if (uuid(source.parent.database_id, true) !== id) denied();
     if (!source.properties || typeof source.properties !== 'object' || Array.isArray(source.properties)) badResponse();
     const titles = Object.entries<any>(source.properties).filter(([, value]) => value?.type === 'title');
     if (titles.length !== 1) badResponse();
-    return { id: sourceId, properties: source.properties, title: titles[0]![0], db };
+    return { id: sourceId, properties: source.properties, title: titles[0]![0] };
   }
-  private async verifyPageInScope(id: string, signal?: AbortSignal): Promise<{ page: any; source: any; titleKey: string; url: string }> {
+  private async verifyPageInScope(id: string, signal?: AbortSignal, allowTrashed = false): Promise<{ page: any; source: any; titleKey: string; url: string }> {
     this.databaseIds();
-    const page = await this.request('pages/' + id, signal); this.resource(page, 'page', id);
+    const page = await this.request('pages/' + id, signal); this.resource(page, 'page', id, allowTrashed);
     if (page.parent?.type !== 'data_source_id') denied();
     const source = await this.dataSource(uuid(page.parent.data_source_id, true), signal);
     if (!source.properties || typeof source.properties !== 'object' || Array.isArray(source.properties)) badResponse();
@@ -558,12 +571,12 @@ export class NotionAdapter extends BaseAdapter {
           if (item?.in_trash === true || item?.archived === true) continue;
           if (item?.object !== 'page' || item.parent?.type !== 'data_source_id' || uuid(item.parent.data_source_id, true) !== source.id || !item.properties || Array.isArray(item.properties)) badResponse();
           if ((afterMs !== undefined || beforeMs !== undefined) && dateEntry) {
-            const rawDateProp = item.properties[dateEntry[0]];
-            const rawStart = typeof rawDateProp?.date?.start === 'string' ? rawDateProp.date.start.trim() : '';
-            if (!rawStart) continue;
-            const rawEnd = typeof rawDateProp?.date?.end === 'string' && rawDateProp.date.end.trim() ? rawDateProp.date.end.trim() : rawStart;
-            const itemStartMs = parseDateBoundMs(rawStart, false);
-            const itemEndMs = parseDateBoundMs(rawEnd, true);
+            const date = item.properties[dateEntry[0]]?.date;
+            const start = dateEndpoint(date?.start, date?.time_zone);
+            if (!start) continue;
+            const end = dateEndpoint(date?.end, date?.time_zone) || start;
+            const itemStartMs = parseDateBoundMs(start, false);
+            const itemEndMs = parseDateBoundMs(end, true);
             if (!Number.isFinite(itemStartMs) || !Number.isFinite(itemEndMs)) continue;
             if (afterMs !== undefined && itemEndMs < afterMs) continue;
             if (beforeMs !== undefined && itemStartMs > beforeMs) continue;
@@ -598,105 +611,68 @@ export class NotionAdapter extends BaseAdapter {
       only(args, ['query', 'databaseId', 'limit']);
       const query = text(args.query, 2000).trim();
       const maximum = limit(args.limit, 20);
-      if (args.databaseId !== undefined) {
-        const dbId = this.checkedDatabase(args.databaseId);
-        const source = await this.schema(dbId, signal);
-        const pages: Array<{ id: string; databaseId: string; title: string; url: string; lastEditedTime?: string }> = [];
-        let cursor: string | undefined; const cursors = new Set<string>(); let truncated = false;
-        for (let index = 0; index < 10; index++) {
-          const value = await this.request('data_sources/' + source.id + '/query', signal, 'POST', {
-            page_size: maximum - pages.length,
-            ...(query ? { filter: { property: source.title, title: { contains: query } } } : {}),
-            ...(cursor ? { start_cursor: cursor } : {}),
-          });
-          if (value?.object !== 'list' || !Array.isArray(value.results) || typeof value.has_more !== 'boolean') badResponse();
-          for (const item of value.results) {
-            if (item?.in_trash === true || item?.archived === true) continue;
-            if (item?.object !== 'page' || item.parent?.type !== 'data_source_id' || uuid(item.parent.data_source_id, true) !== source.id || !item.properties || Array.isArray(item.properties)) badResponse();
-            if (pages.length >= maximum) { truncated = true; break; }
-            const titleVal = item.properties[source.title] ? propertyText(item.properties[source.title]) : '';
-            pages.push({
-              id: uuid(item.id, true),
-              databaseId: dbId,
-              title: titleVal || '(Không có tiêu đề)',
-              url: link(item),
-              ...(typeof item.last_edited_time === 'string' ? { lastEditedTime: item.last_edited_time } : {}),
-            });
-          }
-          if (pages.length >= maximum || !value.has_more || index === 9) {
-            if (value.has_more) truncated = true;
-            return { pages, ...(truncated ? { truncated: true } : {}) };
-          }
-          const nextCursor = value.next_cursor;
-          if (typeof nextCursor !== 'string' || !nextCursor || cursors.has(nextCursor)) return badResponse();
-          cursor = nextCursor; cursors.add(nextCursor);
-        }
-        return { pages, truncated: true };
-      }
-      const allowedDbs = this.databaseIds();
-      const allowedSet = new Set(allowedDbs);
-      const sourceToDb = new Map<string, string>();
+      const allowedDbs = args.databaseId === undefined ? this.databaseIds() : [this.checkedDatabase(args.databaseId)];
+      const sources: Array<{ databaseId: string; sourceId: string }> = [];
+      let remainingRequests = MAX_SEARCH_REQUESTS;
       for (const dbId of allowedDbs) {
+        if (remainingRequests === 0) return { pages: [], truncated: true };
+        remainingRequests--;
         const db = await this.database(dbId, signal);
-        if (Array.isArray(db.data_sources)) {
-          for (const ds of db.data_sources) {
-            if (typeof ds?.id === 'string' && NOTION_ID_PATTERN.test(ds.id)) {
-              sourceToDb.set(normalizeNotionId(ds.id), dbId);
-            }
-          }
+        if (!Array.isArray(db.data_sources)) badResponse();
+        const sourceIds = new Set<string>(db.data_sources.map((source: any) => uuid(source?.id, true)));
+        for (const sourceId of sourceIds) {
+          sources.push({ databaseId: dbId, sourceId });
         }
       }
       const pages: Array<{ id: string; databaseId: string; title: string; url: string; lastEditedTime?: string }> = [];
       const seenPageIds = new Set<string>();
-      const cursors = new Set<string>();
-      let cursor: string | undefined;
       let truncated = false;
-      for (let index = 0; index < 3; index++) {
-        const value = await this.request('search', signal, 'POST', {
-          page_size: 20,
-          filter: { property: 'object', value: 'page' },
-          ...(query ? { query } : {}),
-          ...(cursor ? { start_cursor: cursor } : {}),
-        });
-        if (value?.object !== 'list' || !Array.isArray(value.results) || typeof value.has_more !== 'boolean') badResponse();
-        for (const item of value.results) {
-          if (item?.in_trash === true || item?.archived === true || item?.object !== 'page') continue;
-          let dbId: string | undefined;
-          if (item.parent?.type === 'data_source_id' && typeof item.parent.data_source_id === 'string' && NOTION_ID_PATTERN.test(item.parent.data_source_id)) {
-            dbId = sourceToDb.get(normalizeNotionId(item.parent.data_source_id));
-          } else if (item.parent?.type === 'database_id' && typeof item.parent.database_id === 'string' && NOTION_ID_PATTERN.test(item.parent.database_id)) {
-            const candidate = normalizeNotionId(item.parent.database_id);
-            if (allowedSet.has(candidate)) dbId = candidate;
+      for (const { databaseId, sourceId } of sources) {
+        if (pages.length >= maximum || remainingRequests < 2) return { pages, truncated: true };
+        remainingRequests--;
+        const source = await this.sourceSchema(databaseId, sourceId, signal);
+        const cursors = new Set<string>();
+        let cursor: string | undefined;
+        for (let index = 0; index < MAX_SEARCH_QUERIES_PER_SOURCE; index++) {
+          remainingRequests--;
+          const value = await this.request('data_sources/' + source.id + '/query', signal, 'POST', {
+            page_size: maximum - pages.length,
+            result_type: 'page',
+            ...(query ? { filter: { property: source.title, title: { contains: query } } } : {}),
+            ...(cursor ? { start_cursor: cursor } : {}),
+          });
+          if (value?.object !== 'list' || !Array.isArray(value.results) || typeof value.has_more !== 'boolean') badResponse();
+          if (value.request_status?.type === 'incomplete') truncated = true;
+          for (const item of value.results) {
+            if (item?.in_trash === true || item?.archived === true) continue;
+            if (item?.object !== 'page' || item.parent?.type !== 'data_source_id' || uuid(item.parent.data_source_id, true) !== source.id ||
+                (item.parent.database_id !== undefined && uuid(item.parent.database_id, true) !== databaseId) ||
+                !item.properties || typeof item.properties !== 'object' || Array.isArray(item.properties)) badResponse();
+            const id = uuid(item.id, true);
+            if (seenPageIds.has(id)) continue;
+            if (pages.length >= maximum) return { pages, truncated: true };
+            seenPageIds.add(id);
+            const title = item.properties[source.title] ? propertyText(item.properties[source.title]) : '';
+            pages.push({
+              id,
+              databaseId,
+              title: title || '(Không có tiêu đề)',
+              url: link(item),
+              ...(typeof item.last_edited_time === 'string' ? { lastEditedTime: item.last_edited_time } : {}),
+            });
           }
-          if (!dbId) continue;
-          const pid = uuid(item.id, true);
-          if (seenPageIds.has(pid)) continue;
-          if (pages.length >= maximum) {
+          if (!value.has_more) break;
+          if (pages.length >= maximum || remainingRequests === 0 || index + 1 === MAX_SEARCH_QUERIES_PER_SOURCE) {
             truncated = true;
             break;
           }
-          seenPageIds.add(pid);
-          const titleEntry = item.properties && typeof item.properties === 'object' && !Array.isArray(item.properties)
-            ? Object.values<any>(item.properties).find((p) => p?.type === 'title')
-            : undefined;
-          const titleStr = titleEntry ? propertyText(titleEntry) : '';
-          pages.push({
-            id: pid,
-            databaseId: dbId,
-            title: titleStr || '(Không có tiêu đề)',
-            url: link(item),
-            ...(typeof item.last_edited_time === 'string' ? { lastEditedTime: item.last_edited_time } : {}),
-          });
+          const nextCursor = value.next_cursor;
+          if (typeof nextCursor !== 'string' || !nextCursor || cursors.has(nextCursor)) return badResponse();
+          cursor = nextCursor;
+          cursors.add(nextCursor);
         }
-        if (pages.length >= maximum || !value.has_more || index === 2) {
-          if (value.has_more) truncated = true;
-          return { pages, ...(truncated ? { truncated: true } : {}) };
-        }
-        const nextCursor = value.next_cursor;
-        if (typeof nextCursor !== 'string' || !nextCursor || cursors.has(nextCursor)) return badResponse();
-        cursor = nextCursor; cursors.add(nextCursor);
       }
-      return { pages, truncated: true };
+      return { pages, ...(truncated ? { truncated: true } : {}) };
     }
     if (toolName === 'notion.create_page') {
       const { source, properties, content } = await preWrite(async () => {
@@ -798,7 +774,7 @@ export class NotionAdapter extends BaseAdapter {
         if (title === undefined && Object.keys(values).length === 0 && args.archived === undefined) {
           invalid('update_page requires at least one of title, properties, or archived');
         }
-        const { source, titleKey } = await this.verifyPageInScope(pageId, signal);
+        const { source, titleKey } = await this.verifyPageInScope(pageId, signal, args.archived === false);
         const conv = validateAndConvertProperties({ properties: source.properties, title: titleKey }, values, title);
         const reqBody: Record<string, any> = {};
         if (Object.keys(conv).length > 0) reqBody.properties = conv;
@@ -829,6 +805,7 @@ export class NotionAdapter extends BaseAdapter {
         only(args, ['pageId', 'content']); const pageId = uuid(args.pageId); const rawContent = text(args.content, 4000, true);
         const parsedBlocks = markdownToNotionBlocks(rawContent);
         if (parsedBlocks.length === 0) invalid('content must contain at least one block');
+        if (parsedBlocks.length > 50) invalid('content must contain at most 50 blocks');
         const verified = await this.verifyPageInScope(pageId, signal);
         return { id: pageId, children: parsedBlocks, url: verified.url };
       });

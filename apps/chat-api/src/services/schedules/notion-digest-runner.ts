@@ -97,20 +97,26 @@ function startOfDayInTimeZoneMs(ms: number, timeZone?: string): number {
   return startOfCalendarDateInTimeZoneMs(y, m, d, tz);
 }
 
-function parseNotionDateMs(raw: string, timeZone?: string): number | null {
+function parseNotionDueDate(raw: string, timeZone?: string): { ms: number; dateOnly: boolean } | null {
   const segments = raw.split('→').map((s) => s.trim()).filter(Boolean);
   const target = segments.length > 1 ? segments[segments.length - 1]! : (segments[0] ?? '');
   if (!target) return null;
   const isoDateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(target);
   if (isoDateOnly) {
-    return startOfCalendarDateInTimeZoneMs(Number(isoDateOnly[1]), Number(isoDateOnly[2]), Number(isoDateOnly[3]), timeZone);
+    return {
+      ms: startOfCalendarDateInTimeZoneMs(Number(isoDateOnly[1]), Number(isoDateOnly[2]), Number(isoDateOnly[3]), timeZone),
+      dateOnly: true,
+    };
   }
   const dmy = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(target);
   if (dmy) {
-    return startOfCalendarDateInTimeZoneMs(Number(dmy[3]), Number(dmy[2]), Number(dmy[1]), timeZone);
+    return {
+      ms: startOfCalendarDateInTimeZoneMs(Number(dmy[3]), Number(dmy[2]), Number(dmy[1]), timeZone),
+      dateOnly: true,
+    };
   }
   const parsed = Date.parse(target);
-  return Number.isFinite(parsed) ? parsed : null;
+  return Number.isFinite(parsed) ? { ms: parsed, dateOnly: false } : null;
 }
 
 export function analyzeNotionDigestPages(
@@ -166,9 +172,9 @@ export function analyzeNotionDigestPages(
     const isDone = /^(done|completed|complete|hoàn thành|đã xong|closed)$/i.test(statusVal);
     const isBlocked = /(blocked|bị chặn|quá hạn|overdue|stuck|khẩn)/i.test(statusVal);
     const isInProgress = /(in progress|in-progress|doing|đang làm|đang thực hiện|review|active)/i.test(statusVal);
-    const dueMs = dueVal ? parseNotionDateMs(dueVal, tz) : null;
-    const isPastDue = !isDone && dueMs !== null && dueMs < todayStartMs;
-    const isDueSoon = !isDone && !isBlocked && !isPastDue && dueMs !== null && dueMs >= todayStartMs && dueMs <= soonLimitMs;
+    const due = dueVal ? parseNotionDueDate(dueVal, tz) : null;
+    const isPastDue = !isDone && due !== null && due.ms < (due.dateOnly ? todayStartMs : nowMs);
+    const isDueSoon = !isDone && !isBlocked && !isPastDue && due !== null && due.ms <= soonLimitMs;
     const isUnassigned = !isDone && hasAssigneeField && !hasAssigneeValue;
 
     const editedMs = page.lastEditedTime ? Date.parse(page.lastEditedTime) : NaN;

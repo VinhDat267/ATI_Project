@@ -31,7 +31,7 @@ import { MessageRepo } from '../../db/repositories/message-repo.js';
 import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
 import { calendarDigestCandidateMatches, computeCalendarDigestHash, evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js';
-import { runState, runView } from './run-state.js';
+import { isNotionDeliveryUnknown, runState, runView } from './run-state.js';
 import { nextOccurrence, nextRuns } from './next-occurrence.js';
 import { captureScheduleArtifact, guardScheduleArtifact, prelockScheduleArtifacts, registerScheduleFields, scheduleRegistry, scheduleSourceContext, tagScheduleContext } from '../slack/slack-schedule-lineage.js';
 import { messageOutputSelectors } from '../slack/slack-message-selectors.js';
@@ -1951,8 +1951,9 @@ export class ScheduleService {
   }
 
   async listRuns(userId: string, scheduleId: string, limit: number, now: Date, scope?: ScheduleScope) {
-    if (!await this.repo.ownedSchedule(scheduleId, userId, this.options.pool, false, scope)) throw new ScheduleNotFound();
-    return this.repo.listRuns(scheduleId, limit, now);
+    const schedule = await this.repo.ownedSchedule(scheduleId, userId, this.options.pool, false, scope);
+    if (!schedule) throw new ScheduleNotFound();
+    return this.repo.listRuns(schedule, limit, now);
   }
 
   pendingCount(userId: string, now: Date, scope?: ScheduleScope) {
@@ -2123,13 +2124,7 @@ export class ScheduleService {
         run.delivery_started_at != null &&
         typeof run.error === 'string' &&
         run.error.trim().length > 0;
-      const isNotionUnknown =
-        schedule.kind === 'notion_digest' &&
-        run.status === 'needs_attention' &&
-        run.delivery_started_at != null &&
-        typeof run.error === 'string' &&
-        (run.error.includes('NOTION_DELIVERY_UNKNOWN') ||
-          run.error.includes('Chưa xác định bản tin Notion đã gửi hay chưa'));
+      const isNotionUnknown = isNotionDeliveryUnknown(run, schedule);
       if (!isSheetsUnknown && !isTrelloOrTelegramUnknown && !isNotionUnknown) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',

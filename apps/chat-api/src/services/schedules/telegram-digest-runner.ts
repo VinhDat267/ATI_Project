@@ -203,8 +203,16 @@ export function summarizeSourceItems(
     }
   }
 
+  const notionTruncated =
+    service === 'notion' &&
+    raw != null &&
+    typeof raw === 'object' &&
+    !Array.isArray(raw) &&
+    Boolean((raw as Record<string, unknown>).truncated);
+  const truncation = notionTruncated ? { truncated: true } : {};
+
   if (items.length === 0) {
-    return { count: 0, lines: ['  (Không có mục mới)'] };
+    return { count: 0, lines: ['  (Không có mục mới)'], ...truncation };
   }
 
   const nowMs = now.getTime();
@@ -294,19 +302,7 @@ export function summarizeSourceItems(
     lines.push(`  ... và ${items.length - maxItems} mục khác`);
   }
 
-  const notionTruncated =
-    service === 'notion' &&
-    raw != null &&
-    typeof raw === 'object' &&
-    !Array.isArray(raw) &&
-    Boolean((raw as Record<string, unknown>).truncated);
-  if (notionTruncated) {
-    lines.push('  _(Còn mục khác trên Notion chưa hiển thị hết — giới hạn 20 trang/database)_');
-  }
-
-  return notionTruncated
-    ? { count: items.length, lines, truncated: true }
-    : { count: items.length, lines };
+  return { count: items.length, lines, ...truncation };
 }
 
 export class TelegramDigestRunner {
@@ -1539,10 +1535,14 @@ export class TelegramDigestRunner {
       failedLabels.length > 0
         ? `\n\n⚠️ Tạm thời chưa lấy được dữ liệu từ: ${failedLabels.join(', ')}.`
         : '';
-    let digestText = `${header}${aiHighlight}${sections.join('\n\n')}${footer}`;
+    const notionFooter = sourceStatuses.some(({ service, truncated }) => service === 'notion' && truncated)
+      ? '\n  _(Còn mục khác trên Notion chưa hiển thị hết — giới hạn 20 trang/database)_'
+      : '';
+    let digestText = `${header}${aiHighlight}${sections.join('\n\n')}${footer}${notionFooter}`;
     const codepoints = Array.from(digestText);
     if (codepoints.length > 4000) {
-      digestText = codepoints.slice(0, 3994).join('') + '\n...';
+      const bodyLimit = 3994 - Array.from(notionFooter).length;
+      digestText = codepoints.slice(0, bodyLimit).join('') + '\n...' + notionFooter;
     }
 
     // 5 & 6. Prepare Telegram adapter outside transaction (zero recursive pool checkout), atomically verify
