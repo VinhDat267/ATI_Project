@@ -1,5 +1,6 @@
 // Active-state markup/classes copied from the approved React AuthAction prototype.
 import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from 'react';
+import { apiClient } from '../../services/api-client';
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import css from './page.css?inline';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
@@ -48,6 +49,10 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
   event.preventDefault(); navigate(event.currentTarget.getAttribute('href') ?? '/');
  };
  const [newPassword, setNewPassword] = useState(''), [strengthTouched, setStrengthTouched] = useState(false);
+ const [retryingGoogle, setRetryingGoogle] = useState(false);
+ const [googleRetryError, setGoogleRetryError] = useState<string | null>(null);
+ const googleRetryMounted = useRef(false);
+ useEffect(() => { googleRetryMounted.current = true; return () => { googleRetryMounted.current = false; }; }, []);
  const [matchMessage, setMatchMessage] = useState({ text: '', className: 'text-[11px] text-[#6B7280] mt-1' });
  const [visible, setVisible] = useState({ 'new-password-input': false, 'confirm-password-input': false });
  const resendInputRef = useRef<HTMLInputElement>(null), newPasswordRef = useRef<HTMLInputElement>(null), confirmPasswordRef = useRef<HTMLInputElement>(null);
@@ -115,7 +120,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
         </div>
       </header>
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-8" role="main">
-        <div className="w-full max-w-lg mx-auto">
+        <div className="w-full max-w-2xl mx-auto">
           {/* Card trung tâm */}
           <div id="action-card" className="bg-white border border-[#E7E7E2] rounded-3xl p-6 sm:p-8 shadow-soft relative overflow-hidden transition-all duration-200">
             {busy && mode === 'loading' && <p role="status">Đang xác minh tài khoản…</p>}
@@ -135,7 +140,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                 </div>
                 <div>
                   <span className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wider bg-[#16A34A]/10 text-[#16A34A] mb-2">
-                    {" Bước 1 / 3 hoàn tất "}
+                    {" Hoàn tất 2 / 2 bước "}
                   </span>
                   {' '}
                   <h1 id="title-verify-success" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
@@ -716,17 +721,42 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                   </li>
                 </ul>
               </div>
+              {googleRetryError && (
+                <p role="alert" className="text-xs text-[#B91C1C] bg-[#FEF2F2] border border-[#FECACA] rounded-xl px-3.5 py-2">
+                  {googleRetryError}
+                </p>
+              )}
               <div className="v3-space-y-2.5 pt-1">
-                <button type="button" onClick={() => navigate("/login")} className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#FF5701] hover:bg-[#E04C00] text-white font-medium text-sm transition-colors shadow-sm focus-visible:v3-outline-none">
+                <button
+                  type="button"
+                  disabled={retryingGoogle}
+                  onClick={() => {
+                    setGoogleRetryError(null);
+                    setRetryingGoogle(true);
+                    void apiClient.startGoogleAuth()
+                      .then(({ url }) => { if (googleRetryMounted.current) window.location.assign(url); })
+                      .catch((err) => {
+                        if (!googleRetryMounted.current) return;
+                        setRetryingGoogle(false);
+                        setGoogleRetryError(err instanceof Error && err.message ? err.message : 'Chưa thể kết nối Google lúc này. Bạn có thể đăng nhập bằng Email & Mật khẩu bên dưới.');
+                      });
+                  }}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#FF5701] hover:bg-[#E04C00] disabled:opacity-60 text-white font-medium text-sm transition-colors shadow-sm focus-visible:v3-outline-none cursor-pointer"
+                >
                   <span>
-                    Thử lại với Google
+                    {retryingGoogle ? 'Đang chuyển tới Google...' : 'Thử lại với Google'}
                   </span>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
+                  {retryingGoogle ? spinner : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  )}
                 </button>
-                <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E7E7E2] hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] font-medium text-xs sm:text-sm transition-colors">
+                <a onClick={followLink} href="/login" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E7E7E2] hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] font-medium text-xs sm:text-sm transition-colors">
                   Đăng nhập bằng Email &amp; Mật khẩu
+                </a>
+                <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2 px-4 rounded-xl text-[#4B5563] hover:text-[#111827] hover:bg-neutral-100/70 font-medium text-xs sm:text-sm transition-colors">
+                  ← Quay về trang chủ
                 </a>
               </div>
             </section>}
@@ -1005,10 +1035,10 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
               <a onClick={followLink} href="/" className="hover:text-[#111827] transition-colors">
                 Trang chủ
               </a>
-              <span className="text-[#D1D5DB]">
+              <span className="text-[#D1D5DB]" aria-hidden="true">
                 ·
               </span>
-              <a onClick={followLink} href="/privacy" className="text-[#FF5701] hover:underline font-medium transition-colors">
+              <a onClick={followLink} href="/privacy" className="text-[#B43E00] dark:text-[#FF8547] hover:underline font-medium transition-colors">
                 Chính sách an toàn &amp; Dữ liệu
               </a>
             </div>

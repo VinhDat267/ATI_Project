@@ -517,7 +517,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                 </svg>
                 <span>
-                  1. Hướng dẫn lấy khoá (8 dịch vụ)
+                  1. Hướng dẫn lấy khoá &amp; kết nối
                 </span>
               </button>
               <button type="button" role="tab" aria-controls="section-prompts" onClick={() => actions.switchMainTab('prompts')} id="tab-btn-prompts" {...tabProps('prompts')}>
@@ -725,7 +725,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
           <div className="bg-white rounded-2xl border border-[#E5E5E0] p-5 shadow-2xs flex items-start sm:items-center justify-between gap-4">
             <div className="v3-space-y-1">
               <h2 className="font-sans text-base sm:text-lg font-semibold text-[#111827]">
-                Bảng minh bạch năng lực của Planora trên 8 công cụ
+                Bảng minh bạch năng lực của Planora theo từng công cụ
               </h2>
               <p className="text-xs sm:text-sm text-[#4B5563]">
                 {"Planora tuân thủ nguyên tắc kiểm soát: "}

@@ -17,6 +17,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  color-scheme: light;
+  scrollbar-color: #CBD5E1 transparent;
   --bg-page: #F6F6F1;
   --surface: #FFFFFF;
   --surface-inset: #F6F6F1;
@@ -64,6 +66,8 @@
 /* Bản mẫu là các trang độc lập: header, main, footer là con trực tiếp của <body>. */
 :root[data-proto-page] #root { display: contents; }
 html.dark {
+  color-scheme: dark;
+  scrollbar-color: #334155 transparent;
   --bg-page: #0B1020;
   --surface: #131B2F;
   --surface-inset: #0E1528;
@@ -146,7 +150,7 @@ html.dark svg[fill="#0052cc"], html.dark svg[fill="#0052CC"] { fill: #60A5FA; }
 :root[data-proto-page="app-stage"] button:disabled { opacity: .5; cursor: not-allowed; }
 /* Multiline replacements for the prototype's inputs, and space for their fixed footer.
    The cockpit's refusal, answer and error screens (responses, errors) keep the same footer. */
-:root:is([data-proto-page="app-stage"], [data-proto-page="responses"], [data-proto-page="errors"]) body { padding-bottom: var(--cockpit-bottom-space, 96px); }
+:root:is([data-proto-page="app-stage"], [data-proto-page="responses"], [data-proto-page="errors"]) body { padding-bottom: calc(var(--cockpit-bottom-space, 96px) + 16px); scroll-padding-bottom: calc(var(--cockpit-bottom-space, 96px) + 24px); }
 /* Focus moved by the keyboard scrolls clear of that footer too, not just into the viewport behind it. */
 :root:is([data-proto-page="app-stage"], [data-proto-page="responses"], [data-proto-page="errors"]) { scroll-padding-bottom: var(--cockpit-bottom-space, 96px); }
 :root[data-proto-page="app-stage"] :is(#bottom-chat-input, #drawer-chat-input, #moment-4-chat-input) { min-width: 0; width: 100%; resize: none; max-height: 144px; }
@@ -160,3 +164,62 @@ html.dark svg[fill="#0052cc"], html.dark svg[fill="#0052CC"] { fill: #60A5FA; }
 :root[data-proto-page="settings"] .settings-result-empty { padding: 0; border: 0; }
 :root[data-proto-page="settings"] button:disabled { cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }
+
+/* Drawers keep scroll gestures isolated from the main document stage. */
+#history-drawer, #chat-drawer, #drawer-panel, #preview-modal-box { overscroll-behavior: contain; }
+
+/* Light-mode WCAG AA contrast fix for small text/link labels (keep solid CTA buttons untouched). */
+:root:not(.dark) .text-\[\#16A34A\]:not(.text-white) { color: #15803D; }
+:root:not(.dark) :is(.text-\[\#FF5701\], .text-brand-primary):not(.text-white) { color: #B43E00; }
+:root:not(.dark) :is(.text-\[\#6B7280\], .text-neutral-500, .text-neutral-600, .text-\[\#737373\]):not(.text-white) { color: #4B5563; }
+:root:not(.dark) .text-\[\#9CA3AF\]:not([aria-hidden="true"]) { color: #52525B; }
+:root:not(.dark) :is(.text-red-600, .text-\[\#DC2626\], .text-brand-danger):not(.text-white) { color: #B91C1C; }
+
+/* Unified Slate-Navy dark surfaces, crisp borders, and WCAG AA text contrast across all routes (/inbox included). */
+html.dark :is(.bg-\[\#F8F8F6\], .bg-\[\#FAF9F7\], .bg-\[\#FAFAF8\], .bg-\[\#F8F8F6\]\/95):not([class*="dark:bg-"]) { background-color: #0E1528 !important; }
+html.dark :is(.bg-white, .bg-\[\#FFFFFF\], .bg-\[\#FAFAFA\]):not([class*="dark:bg-"]) { background-color: #131B2F !important; }
+html.dark :is(.bg-\[\#F9F9F8\], .bg-\[\#F8F8F7\], .bg-\[\#F4F4F3\], .bg-\[\#F3F2EE\], .bg-\[\#F3F4F6\], .bg-\[\#F5F5F4\], .bg-\[\#F7F7F5\], .bg-neutral-50):not([class*="dark:bg-"]) { background-color: #172036 !important; }
+html.dark :is(.bg-\[\#F4F4F1\], .bg-\[\#F1F1EF\], .bg-\[\#F3F3F1\], .bg-\[\#F5F5F5\], .bg-\[\#ECECE9\], .bg-neutral-100):not([class*="dark:bg-"]) { background-color: #1E293B !important; }
+html.dark :is(.bg-\[\#FFF6EE\], .bg-\[\#FFF3ED\], .bg-\[\#FFF7ED\], .bg-\[\#FEF8EC\]):not([class*="dark:bg-"]) { background-color: rgba(255, 87, 1, 0.14) !important; }
+html.dark .bg-\[\#DCFAE5\]:not([class*="dark:bg-"]) { background-color: rgba(16, 185, 129, 0.16) !important; }
+html.dark .bg-\[\#1D1F20\]:not([class*="dark:bg-"]) { background-color: #24324D !important; }
+html.dark :is(.hover\:bg-\[\#F3F3F1\]:hover, .hover\:bg-\[\#F5F5F4\]:hover, .hover\:bg-neutral-50:hover, .hover\:bg-neutral-100:hover):not([class*="dark:hover:bg-"]) { background-color: #1F2A44 !important; }
+
+html.dark :is(.border-\[\#E5E5E0\], .border-\[\#E5E5E3\], .border-\[\#ECECE9\], .border-\[\#E7E7E2\], .border-\[\#E6E6E3\], .border-\[\#DFDFDC\], .border-\[\#E2E2DC\], .border-\[\#F3F4F6\]):not([class*="dark:border-"]) { border-color: rgba(148, 163, 184, 0.2) !important; }
+html.dark :is(.border-\[\#D1D5DB\], .border-\[\#D4D4CE\]):not([class*="dark:border-"]) { border-color: rgba(148, 163, 184, 0.32) !important; }
+html.dark .border-\[\#F7D7BE\]:not([class*="dark:border-"]) { border-color: rgba(255, 87, 1, 0.35) !important; }
+
+html.dark :is(.text-\[\#111827\], .text-\[\#111111\], .text-\[\#1D1F20\], .text-\[\#1F2937\]):not([class*="dark:text-"]) { color: #F1F5F9 !important; }
+html.dark .text-\[\#374151\]:not([class*="dark:text-"]) { color: #E2E8F0 !important; }
+html.dark :is(.text-\[\#4B5563\], .text-\[\#5F6368\]):not([class*="dark:text-"]) { color: #CBD5E1 !important; }
+html.dark :is(.text-\[\#6B7280\], .text-brand-muted):not([class*="dark:text-"]) { color: #A1AEC0 !important; }
+html.dark :is(.text-\[\#FF5701\], .text-brand-primary):not(.text-white):not([class*="dark:text-"]) { color: #FF8547 !important; }
+html.dark :is(.text-danger-text, .text-brand-danger, .text-\[\#DC2626\]):not([class*="dark:text-"]) { color: #FCA5A5 !important; }
+html.dark .text-\[\#B43E00\]:not([class*="dark:text-"]) { color: #FB923C !important; }
+html.dark .text-\[\#7A4100\]:not([class*="dark:text-"]) { color: #FCD34D !important; }
+html.dark .text-\[\#04250E\]:not([class*="dark:text-"]) { color: #6EE7B7 !important; }
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes cockpitStageEnter {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  [data-moment] {
+    animation: cockpitStageEnter 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  #history-drawer, #chat-drawer {
+    transition: opacity 200ms cubic-bezier(0.22, 1, 0.36, 1), transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  #drawer-panel {
+    transition: opacity 150ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  #preview-modal-box, [data-main-nav] [role="menu"] {
+    transition: opacity 160ms cubic-bezier(0.22, 1, 0.36, 1), transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @starting-style {
+    #history-drawer { opacity: 0; transform: translateX(-16px); }
+    #chat-drawer { opacity: 0; transform: translateX(16px); }
+    #drawer-panel { opacity: 0; }
+    #preview-modal-box, [data-main-nav] [role="menu"] { opacity: 0; transform: scale(0.97) translateY(-4px); }
+  }
+}

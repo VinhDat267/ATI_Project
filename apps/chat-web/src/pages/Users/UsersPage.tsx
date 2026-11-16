@@ -431,7 +431,7 @@ export function UsersPage({ user, navigate, onLogout }: UsersPageProps) {
           {/* VIEW 2: DANH SÁCH THÀNH VIÊN (ACTIVE MEMBERS) */}
           <div id="view-members" hidden={tab !== "members"} role="tabpanel" aria-labelledby="tab-btn-members" className={`${tab === 'members' ? '' : 'hidden '}v3-space-y-3`}>
             {/* Bảng danh sách trên Desktop */}
-            <div className={membersView && !membersEmpty ? `hidden ${TABLE_WRAPPER}` : `hidden ${TABLE_WRAPPER}`}>
+            <div className={membersView && !membersEmpty ? `hidden ${TABLE_WRAPPER}` : 'hidden'}>
               <table className="w-full text-left text-sm">
                 <thead className="bg-[#F8F8F6] text-xs font-semibold text-[#6B7280] border-b border-[#E7E7E2]">
                   <tr>

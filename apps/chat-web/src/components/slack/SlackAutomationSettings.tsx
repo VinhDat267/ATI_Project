@@ -13,8 +13,8 @@ import {slackAssistantApi,type SlackDirectoryChannelDto,type SlackDirectoryUserD
 import {slackSessionOwner} from '../../services/slack-connection';
 import {authStorage} from '../../services/auth-storage';
 
-const field='w-full min-w-0 rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] px-3 py-2 text-sm text-[#111827] dark:text-white';
-const button='rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] px-3 py-2 text-sm disabled:opacity-50';
+const field='w-full min-w-0 rounded-lg border border-[#D1D5DB] dark:border-[#293653] bg-white dark:bg-[#0E1528] px-3 py-2 text-sm text-[#111827] dark:text-[#F1F5F9]';
+const button='rounded-lg border border-[#D1D5DB] dark:border-[#293653] bg-white dark:bg-[#1A2540] hover:bg-[#F3F4F6] dark:hover:bg-[#24324D] px-3 py-2 text-sm disabled:opacity-50';
 
 const SERVICE_LABELS: Record<string, string> = {
  trello: 'Trello (Thẻ công việc)',
@@ -107,7 +107,7 @@ export function SlackAutomationSettings({connectionId,workspaceName,active}:{con
   }
  };
  const follow=async(value:boolean)=>{const owns=slackSessionOwner(),epoch=generation.current;if(!/^[A-Za-z0-9_-]{1,64}$/.test(channel)||!/^\d{1,10}(?:\.\d{1,6})?$/.test(thread)){setError('Nhập ID kênh và timestamp gốc hợp lệ.');return;}setBusy(true);setError('');setNotice('');try{await slackAssistantApi.follow(connectionId,channel,thread,value);if(owns()&&epoch===generation.current)setNotice(value?'Đã theo dõi các sự kiện mới trong thread.':'Đã dừng theo dõi các sự kiện mới trong thread.');}catch{if(owns()&&epoch===generation.current)setError('Chưa cập nhật được thread.');}finally{if(owns()&&epoch===generation.current)setBusy(false);}};
- return <div className="mt-4 border-t border-[#E7E7E2] dark:border-[#333333] pt-3 text-[#111827] dark:text-white">
+ return <div className="mt-4 border-t border-[#E7E7E2] dark:border-[#293653] pt-3 text-[#111827] dark:text-[#F1F5F9]">
   <button type="button" className={button} aria-expanded={open} aria-controls={id} onClick={()=>setOpen(value=>!value)} aria-label={'Tự động hóa '+workspaceName}>Tự động hóa và đề xuất</button>
   {open&&<div id={id} className="mt-3 space-y-4 min-w-0">
    {busy&&!view&&<p role="status">Đang tải tự động hóa…</p>}
@@ -128,7 +128,7 @@ export function SlackAutomationSettings({connectionId,workspaceName,active}:{con
      {(channels.length>0||users.length>0)&&<span className="text-xs text-[#4B5563] dark:text-[#9CA3AF]">Đã tải {channels.length} kênh · {users.length} thành viên</span>}
     </div>
     <details><summary className="cursor-pointer text-sm font-semibold">Luật dùng cho Rules và Hybrid</summary><div className="mt-3 space-y-4">
-     {draft.rules.map((r,index)=><fieldset key={r.id} className="rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] p-3 space-y-3 min-w-0"><legend className="px-1 text-sm">Luật {index+1}</legend>
+     {draft.rules.map((r,index)=><fieldset key={r.id} className="rounded-lg border border-[#D1D5DB] dark:border-[#293653] p-3 space-y-3 min-w-0"><legend className="px-1 text-sm">Luật {index+1}</legend>
       <label className="flex gap-2 text-sm"><input type="checkbox" checked={r.enabled} onChange={e=>rule(index,{enabled:e.target.checked})}/>Bật luật {index+1}</label>
       <label className="block text-sm">Tên luật<input className={field} value={r.name} maxLength={100} onChange={e=>rule(index,{name:e.target.value})}/></label>
       <label className="block text-sm">Từ khóa (mỗi dòng một từ khóa)<textarea className={field} value={r.keywords.join('\n')} rows={3} onChange={e=>rule(index,{keywords:e.target.value.split('\n')})}/></label>
@@ -160,7 +160,7 @@ export function SlackAutomationSettings({connectionId,workspaceName,active}:{con
      </fieldset>)}
      <button type="button" className={button} disabled={draft.rules.length>=20} onClick={()=>{const r=defaultSlackAssistantConfig().rules[0]!;patch({rules:[...draft.rules,{...r,id:crypto.randomUUID(),name:'Luật mới',keywords:[]}]});}}>Thêm luật</button>
     </div></details>
-    <details><summary className="cursor-pointer text-sm font-semibold">Đích dịch vụ mặc định cho đề xuất</summary><div className="mt-3 space-y-3 rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] p-3 min-w-0">
+    <details><summary className="cursor-pointer text-sm font-semibold">Đích dịch vụ mặc định cho đề xuất</summary><div className="mt-3 space-y-3 rounded-lg border border-[#D1D5DB] dark:border-[#293653] p-3 min-w-0">
      <p className="text-xs text-[#4B5563] dark:text-[#9CA3AF]">Cấu hình nơi ghi mặc định khi bạn bấm &ldquo;Xem trước kế hoạch&rdquo; trong Hộp thư đề xuất. Bạn vẫn có thể đổi đích ngay trên từng thẻ đề xuất.</p>
      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <label className="block text-sm">ID danh sách Trello (List ID)<input className={field} placeholder="Ví dụ: list-backlog-123" value={draft.targets.trello?.listId??''} onChange={e=>patchTargets({trello:{boardId:draft.targets.trello?.boardId||'default',listId:e.target.value}})}/></label>
@@ -183,12 +183,12 @@ export function SlackAutomationSettings({connectionId,workspaceName,active}:{con
       <label className="block text-sm">Múi giờ<input className={field} value={draft.timezone} maxLength={80} onChange={e=>patch({timezone:e.target.value})}/></label>
      </div>
     </fieldset>
-    <fieldset className="space-y-3 border-t border-[#E7E7E2] dark:border-[#333333] pt-3"><legend className="font-semibold text-sm">Bản tóm tắt hàng ngày</legend>
+    <fieldset className="space-y-3 border-t border-[#E7E7E2] dark:border-[#293653] pt-3"><legend className="font-semibold text-sm">Bản tóm tắt hàng ngày</legend>
      <label className="flex gap-2 items-start text-sm"><input type="checkbox" checked={draft.digest.enabled} onChange={e=>patch({digest:{...draft.digest,enabled:e.target.checked}})}/>Bật bản tóm tắt hàng ngày</label>
      <label className="block text-sm">Giờ gửi bản tóm tắt (HH:MM)<input className={field} value={draft.digest.time} maxLength={5} onChange={e=>patch({digest:{...draft.digest,time:e.target.value}})}/></label>
     </fieldset>
     <div className="flex flex-wrap items-center gap-2"><button type="button" className="rounded-lg bg-[#FF5701] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={busy} onClick={()=>void save()}>Lưu tự động hóa</button><a href="/inbox" className={button}>Mở hộp thư đề xuất</a></div>
-    <fieldset className="space-y-3 border-t border-[#E7E7E2] dark:border-[#333333] pt-3">
+    <fieldset className="space-y-3 border-t border-[#E7E7E2] dark:border-[#293653] pt-3">
      <legend className="text-sm font-semibold">Theo dõi một thread</legend>
      <p className="text-sm text-[#4B5563] dark:text-[#9CA3AF]">Chỉ nhận các sự kiện mới sau khi theo dõi; không quét lại lịch sử. Bạn có thể dán trực tiếp liên kết tin nhắn Slack để tự động điền kênh và timestamp.</p>
      <label className="block text-sm">

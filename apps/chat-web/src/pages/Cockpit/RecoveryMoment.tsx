@@ -16,7 +16,7 @@ export interface RecoveryControls {
 }
 const primary='px-4 py-2.5 bg-[#C84300] hover:bg-[#A83800] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-colors disabled:opacity-50';
 const secondary='px-4 py-2.5 bg-white hover:bg-neutral-50 border border-[#E5E5E0] text-[#111827] text-xs sm:text-sm font-medium rounded-xl transition-colors disabled:opacity-50';
-const card='bg-[#F8F8F6] rounded-xl border border-[#EAEAE4] p-4 sm:p-5 v3-space-y-4';
+const card='bg-[#F8F8F6] rounded-xl border border-[#EAEAE4] p-3.5 sm:p-5 v3-space-y-3 sm:v3-space-y-4';
 
 /** Reference values shown for manual inspection come only from saved successful outputs. */
 export function savedArguments(value: unknown, snapshot: ExecutionSnapshot): unknown {
@@ -204,7 +204,7 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
         {myjiraCheckUrl && <p className="text-sm text-[#111827]">Hãy tự kiểm tra trên Jira{myjiraAccount ? ` (${myjiraAccount})` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={myjiraCheckUrl} target="_blank" rel="noopener noreferrer" className="text-[#B43E00] font-medium underline">Mở Jira kiểm tra</a></p>}
         {controls?.error && <p role="alert" className="text-sm text-brand-danger">{controls.error}</p>}
       </div>
-      <div className="px-5 sm:px-6 py-4 bg-[#F8F8F6] border-t border-[#EAEAE4] flex flex-wrap items-center gap-2.5">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 bg-[#F8F8F6] border-t border-[#EAEAE4] flex flex-wrap items-center gap-2.5">
         {paused&&actions.includes('slack-reconcile')&&<button type="button" disabled={busy} onClick={()=>controls?.onSlackReconcile?.(paused.id)} className={primary}>Đối soát Slack</button>}
         {canRetry && <><button type="button" disabled={busy} onClick={()=>paused && controls?.onRetry(paused.id)} className={primary}>Thử lại việc {steps.findIndex(step=>step.id===paused?.id)+1}</button><button id="btn-recovery-edit" type="button" disabled={busy || !actions.includes('stop')} onClick={()=>setDialog('edit')} className={secondary}>Sửa rồi thử lại</button></>}
         {canContinue && <button type="button" disabled={busy} onClick={()=>controls?.onContinue()} className={primary}>Làm tiếp các việc còn lại</button>}

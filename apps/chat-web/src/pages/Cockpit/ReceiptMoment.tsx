@@ -6,6 +6,7 @@ import { ServiceLogo } from '../../components/ServiceLogo';
 import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
 import { ResultFields, type ExecutionStepInfo } from '../../components/ExecutionProgress';
 import {
+  friendlyFieldLabel,
   operation,
   serviceId,
   serviceName,
@@ -460,7 +461,7 @@ function ReceiptCard({
       data-highlighted-step={highlighted ? 'true' : undefined}
       className={`receipt-stagger-${Math.min(index + 1, 4)} min-w-0 rounded-lg border ${
         highlighted ? 'bg-[#FAFAFA] border-[#111827]' : 'bg-white border-[#E5E5E3]'
-      } p-4 flex flex-col hover:border-[#CFCFC9] transition-colors group`}
+      } p-2.5 sm:p-4 flex flex-col hover:border-[#CFCFC9] transition-colors group`}
       aria-label={serviceName(service, services)}
     >
       <div className="v3-space-y-2.5 min-w-0">
@@ -592,7 +593,7 @@ function ReceiptCard({
 
       {/* Unified Card Footer: never leaves an empty left gap or orphan duration */}
       {(hasLinks || hasDetails || showDuration) && (
-        <div className="pt-3 mt-3.5 border-t border-[#ECECE9] min-w-0">
+        <div className="pt-2 mt-2 sm:pt-3 sm:mt-3.5 border-t border-[#ECECE9] min-w-0">
           {hasLinks && (
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-3 flex-wrap">
@@ -663,7 +664,7 @@ function ReceiptCard({
                 )}
               </summary>
               <div className="mt-2 rounded-lg bg-[#F8F8F7] border border-[#E6E6E3] overflow-hidden min-w-0">
-                <div className="px-2.5 py-1.5 bg-[#F1F1EF] border-b border-[#E6E6E3] flex flex-wrap items-center justify-between gap-2">
+                <div className="px-2.5 py-1.5 bg-[#F1F1EF] dark:bg-[#1E293B] border-b border-[#E6E6E3] dark:border-[#293653] flex flex-wrap items-center justify-between gap-2">
                   <code className="font-mono text-[11px] font-medium text-[#111827]">{step.tool}</code>
                   {step.completedAt && (
                     <time className="font-mono text-[11px] text-[#5F6368] tabular-nums" dateTime={step.completedAt}>
@@ -814,10 +815,10 @@ export function ReceiptMoment({
       data-moment={terminalStatus ? 'unsuccessful' : '6'}
       aria-labelledby="heading-moment-6"
     >
-      <div className="rounded-xl border border-[#E5E5E3] bg-white overflow-hidden">
+      <div className="rounded-2xl border border-[#E5E5E3] bg-white overflow-hidden">
         {/* Ledger Header */}
-        <div className="px-5 sm:px-6 pt-5 pb-4 border-b border-[#ECECE9]">
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5 text-xs">
+        <div className="px-3.5 sm:px-6 pt-2.5 sm:pt-5 pb-2.5 sm:pb-4 border-b border-[#ECECE9]">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5 sm:mb-2.5 text-xs">
             <div className="inline-flex items-center gap-1.5 font-medium">
               <span
                 className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -861,7 +862,7 @@ export function ReceiptMoment({
           <RequestEcho request={request} />
           <h1
             id="heading-moment-6"
-            className="font-sans text-xl sm:text-[22px] text-[#111111] font-semibold tracking-[-0.02em] leading-snug"
+            className="font-sans text-lg sm:text-[22px] text-[#111827] font-semibold tracking-[-0.02em] leading-snug"
             tabIndex={-1}
           >
             {terminalStatus ? (
@@ -895,7 +896,7 @@ export function ReceiptMoment({
         </div>
 
         {/* Execution Ledger Body */}
-        <div className="p-5 sm:p-6 v3-space-y-4">
+        <div className="p-3 sm:p-5 v3-space-y-2 sm:v3-space-y-4">
           {canvasSteps.some((s) => s.tool === 'mysheets.create_doc') &&
             canvasSteps.some(
               (s) =>
@@ -941,7 +942,7 @@ export function ReceiptMoment({
             />
           )}
 
-          <div id="receipt-chain" className="flex flex-col gap-4">
+          <div id="receipt-chain" className="flex flex-col gap-2.5 sm:gap-4">
             {rows.map((row, rowIndex) => {
               const horizontal =
                 row.length === 2 ? refs.filter((edge) => edge.from === row[0].id && edge.to === row[1].id) : [];
@@ -957,7 +958,7 @@ export function ReceiptMoment({
                       to={edge.to}
                       sourceLabel={`${serviceName(serviceId(steps.find((s) => s.id === edge.from)!.tool), services)} (việc ${steps.findIndex((s) => s.id === edge.from) + 1})`}
                       targetLabel={`${serviceName(serviceId(steps.find((s) => s.id === edge.to)!.tool), services)} (việc ${steps.findIndex((s) => s.id === edge.to) + 1})`}
-                      field={edge.field}
+                      field={friendlyFieldLabel(edge.field)}
                     />
                   ))}
                   <div
@@ -982,7 +983,7 @@ export function ReceiptMoment({
                                 from: row[0].id,
                                 to: row[1].id,
                                 sourceIndex: rowIndex * 2 + 1,
-                                label: horizontal.map((edge) => edge.field).join(' + '),
+                                label: horizontal.map((edge) => friendlyFieldLabel(edge.field)).join(' + '),
                               }
                             : undefined
                         }

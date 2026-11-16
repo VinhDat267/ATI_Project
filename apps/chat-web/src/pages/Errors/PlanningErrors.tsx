@@ -1,8 +1,8 @@
 // Structure/classes ported from PROTO-01 ErrorsPage; progress is supplied by the server.
-import { getServiceDefinition } from '@wap/tool-schemas';
 import { toolDefinition } from '../../services/tool-definitions';
 import type { GatherState, ServiceInfo } from '../../types';
 import { RequestEcho, useScheduledOrigin } from '../Cockpit/RequestEcho';
+import { serviceName } from '../Cockpit/presentation';
 const primary = 'w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#C84300] hover:bg-[#A83800] text-white text-xs font-semibold shadow-sm transition-colors flex items-center justify-center gap-1.5';
 const secondary = 'w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white hover:bg-neutral-50 text-[#111827] text-xs font-medium border border-[#E5E5E0] transition-colors';
 export const latePlanNotice = 'Nếu kế hoạch đến sau, nó vẫn nằm trong hội thoại và chưa chạy cho tới khi bạn duyệt.';
@@ -38,7 +38,7 @@ export function SlowPlanningMoment({ request, seconds, gather, services, onDismi
             {gather?.steps.map((step, index) => {
               const id = toolDefinition(step.tool)?.service ?? step.tool.split('.')[0];
               return <div key={`${step.tool}:${index}`} className={`p-2.5 rounded-lg ${step.status === 'running' ? 'bg-[#FFF6EE] border-[#F7D7BE]' : 'bg-white border-[#E5E5E0]'} border flex items-center justify-between gap-2 flex-wrap`}>
-                <span className="break-words text-[#111827] font-medium">{services.find(row => row.id === id)?.name ?? getServiceDefinition(id)?.name ?? id}{step.result && <span className="block mt-1 font-normal text-[#4B5563]">{step.result}</span>}</span>
+                <span className="break-words text-[#111827] font-medium">{serviceName(id, services)}{step.result && <span className="block mt-1 font-normal text-[#4B5563]">{step.result}</span>}</span>
                 <span className={`${step.status === 'completed' ? 'text-emerald-700' : 'text-[#B43E00]'} font-semibold`}>{step.status === 'completed' ? '✓ Đã tra cứu' : 'Đang chờ phản hồi…'}</span>
               </div>;
             })}

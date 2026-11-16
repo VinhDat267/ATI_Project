@@ -673,7 +673,7 @@ export function NotionConnection({
                   Chưa tìm thấy database nào. Hãy chia sẻ database với kết nối trong Notion hoặc dán trực tiếp link/ID ở trên.
                 </p>
               ) : (
-                <div className="max-h-48 overflow-y-auto space-y-1.5 rounded-lg border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#111827] p-2">
+                <div className="max-h-48 overflow-y-auto space-y-1.5 rounded-lg border border-[#E7E7E2] dark:border-[#293653] bg-white dark:bg-[#0E1528] p-2">
                   {visibleCandidates.map((db) => {
                     const checked = selectedDatabases.has(db.id);
                     const disableNew = !checked && selectedDatabases.size >= 10;
@@ -682,8 +682,8 @@ export function NotionConnection({
                         key={db.id}
                         className={`flex items-center justify-between gap-2 text-xs ${
                           disableNew
-                            ? 'text-neutral-400 cursor-not-allowed'
-                            : 'text-[#111827] dark:text-neutral-200 cursor-pointer'
+                            ? 'text-neutral-400 dark:text-[#64748B] cursor-not-allowed'
+                            : 'text-[#111827] dark:text-[#E2E8F0] cursor-pointer'
                         }`}
                       >
                         <span className="flex items-center gap-2 min-w-0">

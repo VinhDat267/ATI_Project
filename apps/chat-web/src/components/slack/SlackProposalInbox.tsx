@@ -164,7 +164,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
   });
 
   return (
-    <div className="min-h-screen bg-[#F8F8F6] dark:bg-[#121212] text-[#111827] dark:text-white">
+    <div className="min-h-screen bg-[#F8F8F6] dark:bg-[#0B1020] text-[#111827] dark:text-[#F1F5F9]">
       <MainNav
         user={user}
         current="inbox"
@@ -174,7 +174,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
         onLogout={onLogout}
       />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E5E5E0] dark:border-[#333333] pb-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E5E5E0] dark:border-[#293653] pb-5">
           <div>
             <h1 className="font-sans text-2xl sm:text-[26px] font-semibold tracking-tight text-[#111827] dark:text-white">
               Hộp thư đề xuất &amp; Bản tóm tắt
@@ -189,7 +189,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
                 <span>Workspace</span>
                 <select
                   aria-label="Chọn workspace"
-                  className="rounded-xl border border-[#E5E5E0] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] px-3 py-1.5 text-sm !outline-none focus-visible:!outline-none focus:border-[#111827]"
+                  className="rounded-xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] px-3 py-1.5 text-sm !outline-none focus-visible:!outline-none focus:border-[#111827]"
                   value={selectedConnectionId}
                   onChange={(e) => setSelectedConnectionId(e.target.value)}
                 >
@@ -204,7 +204,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
                 type="button"
                 disabled={loading}
                 onClick={() => setReloadTick((v) => v + 1)}
-                className="rounded-xl border border-[#E5E5E0] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] px-3 py-1.5 text-xs font-semibold hover:bg-neutral-50 dark:hover:bg-[#2A2A2A] disabled:opacity-50"
+                className="rounded-xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#1A2540] px-3 py-1.5 text-xs font-semibold hover:bg-neutral-50 dark:hover:bg-[#24324D] disabled:opacity-50"
               >
                 Tải lại hộp thư
               </button>
@@ -214,19 +214,19 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
 
         {connections.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" aria-label="Thống kê đề xuất">
-            <div className="rounded-2xl border border-[#E5E5E0] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] p-4 shadow-2xs">
+            <div className="rounded-2xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] p-4 shadow-2xs">
               <p className="text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">Tổng đề xuất</p>
               <p className="mt-1 font-sans text-2xl font-semibold tabular-nums">{totalCount}</p>
             </div>
-            <div className="rounded-2xl border border-[#E5E5E0] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] p-4 shadow-2xs">
+            <div className="rounded-2xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] p-4 shadow-2xs">
               <p className="text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">Cần xử lý</p>
               <p className="mt-1 font-sans text-2xl font-semibold tabular-nums text-[#B43E00]">{actionNeededCount}</p>
             </div>
-            <div className="rounded-2xl border border-[#E5E5E0] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] p-4 shadow-2xs">
+            <div className="rounded-2xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] p-4 shadow-2xs">
               <p className="text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">Chờ phê duyệt</p>
               <p className="mt-1 font-sans text-2xl font-semibold tabular-nums text-amber-700 dark:text-amber-400">{awaitingApprovalCount}</p>
             </div>
-            <div className="rounded-2xl border border-[#E5E5E0] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] p-4 shadow-2xs">
+            <div className="rounded-2xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] p-4 shadow-2xs">
               <p className="text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">Đã xử lý</p>
               <p className="mt-1 font-sans text-2xl font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">{resolvedCount}</p>
             </div>
@@ -241,7 +241,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
         {loading && <p role="status" className="text-xs text-[#6B7280]">Đang tải hộp thư đề xuất…</p>}
 
         {!loading && connections.length === 0 && (
-          <div className="rounded-2xl border border-[#E5E5E0] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="rounded-2xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1.5">
               <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#B43E00] bg-[#FFF6EE] border border-[#F7D7BE] px-2.5 py-0.5 rounded-full">
                 <span>Đề xuất công việc từ tin nhắn Slack</span>
@@ -272,7 +272,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
             </h2>
             {proposals.length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-xl border border-[#E5E5E0] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] p-1 text-xs">
+                <div className="inline-flex rounded-xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#0E1528] p-1 text-xs">
                   {(
                     [
                       ['all', 'Tất cả'],
@@ -301,7 +301,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
                   placeholder="Tìm theo tiêu đề, kênh, nội dung…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="rounded-xl border border-[#E5E5E0] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] px-3 py-1.5 text-xs placeholder-[#6B7280] !outline-none focus-visible:!outline-none focus:border-[#111827]"
+                  className="rounded-xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] px-3 py-1.5 text-xs placeholder-[#6B7280] dark:placeholder-[#94A3B8] !outline-none focus-visible:!outline-none focus:border-[#111827]"
                 />
               </div>
             )}
@@ -339,13 +339,13 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
               {digests.map((digest) => (
                 <article
                   key={digest.id}
-                  className="rounded-2xl border border-[#E5E5E0] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] p-4 sm:p-5 space-y-2 shadow-2xs"
+                  className="rounded-2xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] p-4 sm:p-5 space-y-2 shadow-2xs"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="font-sans text-base font-semibold">Bản tóm tắt ngày {digest.localDate}</h3>
                     <button
                       type="button"
-                      className="rounded-lg border border-[#E5E5E0] dark:border-[#4B5563] px-3 py-1 text-xs font-medium hover:bg-neutral-50 disabled:opacity-50"
+                      className="rounded-lg border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#1A2540] px-3 py-1 text-xs font-medium hover:bg-neutral-50 dark:hover:bg-[#24324D] disabled:opacity-50"
                       disabled={refreshingDigestId === digest.id || digest.body === null}
                       onClick={() => void handleRefreshDigest(digest.id)}
                     >
@@ -387,7 +387,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
                                   • {item.title} ({item.status})
                                 </span>
                                 {digestStatusLabels[item.status] && (
-                                  <span className="rounded bg-[#F3F4F6] dark:bg-[#2A2A2A] px-1.5 py-0.5 text-[11px] font-medium text-[#374151] dark:text-[#D1D5DB]">
+                                  <span className="rounded bg-[#F3F4F6] dark:bg-[#1A2540] px-1.5 py-0.5 text-[11px] font-medium text-[#374151] dark:text-[#CBD5E1]">
                                     {digestStatusLabels[item.status]}
                                   </span>
                                 )}
@@ -404,7 +404,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
           )}
         </section>
 
-        <div className="pt-2 border-t border-[#E7E7E2] dark:border-[#333333]">
+        <div className="pt-2 border-t border-[#E7E7E2] dark:border-[#293653]">
           <ScheduleSection user={user} navigate={navigate} />
         </div>
       </main>

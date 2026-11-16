@@ -134,9 +134,9 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
 // PBI-05: chỉ mô tả đúng luồng có thật — lịch được lưu khi người dùng bấm "Xác nhận" trên đề xuất
 // lịch chạy (ScheduleMoment → POST /conversations/:convId/schedule-proposals/:messageId/confirm).
 function ScheduleEmptyState({ navigate }: { navigate: (path: string) => void }) {
-  return <div data-schedule-empty className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#1E1E1E] border border-[#E5E5E0] dark:border-[#374151] shadow-2xs v3-space-y-4 min-w-0">
+  return <div data-schedule-empty className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#131B2F] border border-[#E5E5E0] dark:border-[#293653] shadow-2xs v3-space-y-4 min-w-0">
     <div className="flex flex-col sm:flex-row sm:items-start gap-4 min-w-0">
-      <div aria-hidden="true" className="w-10 h-10 rounded-xl bg-[#F8F8F6] dark:bg-neutral-800 border border-[#E5E5E0] dark:border-[#374151] flex items-center justify-center flex-shrink-0 text-[#4B5563] dark:text-[#D1D5DB]">
+      <div aria-hidden="true" className="w-10 h-10 rounded-xl bg-[#F8F8F6] dark:bg-[#1A2540] border border-[#E5E5E0] dark:border-[#293653] flex items-center justify-center flex-shrink-0 text-[#4B5563] dark:text-[#CBD5E1]">
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
       </div>
       <div className="v3-space-y-2 min-w-0 flex-1">

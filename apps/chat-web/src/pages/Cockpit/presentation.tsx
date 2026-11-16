@@ -68,8 +68,9 @@ export function operation(tool:string):Operation {
   if(tool==='myslack.chat_postMessage')return {action:'Gửi tin',done:'Đã gửi',receipt:'Đã gửi trên Slack',kind:'Tin nhắn',link:'Mở Slack'};
   if(operations[tool]) return operations[tool];
   const verb=tool.split('.')[1] ?? '';
-  const action=toolDefinition(tool)?.sideEffect==='read' ? 'Đọc' : /^create/.test(verb) ? 'Tạo mới' : /^(send|post)/.test(verb) ? 'Gửi tin' : 'Cập nhật';
-  return {action,done:action==='Đọc'?'Đã đọc':action==='Tạo mới'?'Đã tạo':action==='Gửi tin'?'Đã gửi':'Đã cập nhật',receipt:action==='Đọc'?'Đã đọc':'Đã hoàn thành',kind:action,link:'Mở kết quả'};
+  const isRead=toolDefinition(tool)?.sideEffect==='read' || /^(search|find|list|get|read|query|fetch)(_|$)/i.test(verb);
+  const action=isRead ? 'Tra cứu dữ liệu' : /^create/.test(verb) ? 'Tạo mới' : /^(send|post)/.test(verb) ? 'Gửi tin' : 'Cập nhật';
+  return {action,done:isRead?'Đã tra cứu':action==='Tạo mới'?'Đã tạo':action==='Gửi tin'?'Đã gửi':'Đã cập nhật',receipt:isRead?'Đã tra cứu':'Đã hoàn thành',kind:isRead?'Dữ liệu':action,link:'Mở kết quả'};
 }
 export const statusLabel=(status:StepState)=>({pending:'Chờ',running:'Đang chạy',succeeded:'Hoàn thành',failed:'Lỗi đã biết',paused:'Tạm dừng',skipped:'Đã bỏ qua',unknown:'Chưa rõ kết quả'})[status];
 export function formatDuration(milliseconds:number):string {

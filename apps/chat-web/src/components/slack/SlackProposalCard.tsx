@@ -4,13 +4,14 @@ import { slackAssistantApi, type SlackProposalViewDto } from '../../services/sla
 import { apiClient } from '../../services/api-client';
 import { conversationPath } from '../../routes';
 import { slackSessionOwner } from '../../services/slack-connection';
+import { friendlyFieldLabel, operation, serviceId, serviceName } from '../../pages/Cockpit/presentation';
 
 const buttonClass =
-  'rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] px-3 py-1.5 text-xs font-medium text-[#111827] dark:text-white hover:bg-neutral-50 dark:hover:bg-[#262626] transition-colors disabled:opacity-50';
+  'rounded-lg border border-[#D1D5DB] dark:border-[#293653] bg-white dark:bg-[#1A2540] px-3 py-1.5 text-xs font-medium text-[#111827] dark:text-[#F1F5F9] hover:bg-neutral-50 dark:hover:bg-[#24324D] transition-colors disabled:opacity-50';
 const primaryClass =
   'rounded-lg bg-[#C84300] hover:bg-[#A83800] px-3 py-1.5 text-xs font-semibold text-white transition-colors disabled:opacity-50';
 const inputClass =
-  'w-full rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] bg-white dark:bg-[#1E1E1E] px-2.5 py-1.5 text-xs text-[#111827] dark:text-white !outline-none focus-visible:!outline-none focus:border-[#111827]';
+  'w-full rounded-lg border border-[#D1D5DB] dark:border-[#293653] bg-white dark:bg-[#0E1528] px-2.5 py-1.5 text-xs text-[#111827] dark:text-[#F1F5F9] !outline-none focus-visible:!outline-none focus:border-[#111827]';
 
 const statusLabels: Record<string, string> = {
   pending: 'Đang chờ xem xét',
@@ -29,15 +30,9 @@ const relevanceLabels: Record<string, string> = {
   keyword_match: 'Khớp từ khóa',
 };
 
-const serviceLabels: Record<string, string> = {
-  trello: 'Trello',
-  jira: 'Jira',
-  mysheets: 'Google Sheets',
-  mycalendar: 'Google Calendar',
-  github: 'GitHub',
-  gmail: 'Gmail',
-  myslack: 'Slack Thread',
-};
+function displayServiceLabel(id: string): string {
+  return id === 'myslack' ? 'Slack Thread' : serviceName(id);
+}
 
 function formatSlackTs(ts?: string): string {
   if (!ts) return '';
@@ -310,9 +305,9 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
   };
 
   return (
-    <article className="rounded-2xl border border-[#E5E5E0] dark:border-[#333333] bg-white dark:bg-[#1E1E1E] p-4 sm:p-5 space-y-3 text-[#111827] dark:text-white shadow-2xs">
+    <article className="rounded-2xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] p-4 sm:p-5 space-y-3 text-[#111827] dark:text-[#F1F5F9] shadow-2xs">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="inline-flex items-center rounded-full bg-[#F8F8F6] dark:bg-[#2A2A2A] border border-[#E5E5E0] dark:border-[#333333] px-2.5 py-0.5 text-xs font-semibold">
+        <span className="inline-flex items-center rounded-full bg-[#F8F8F6] dark:bg-[#1A2540] border border-[#E5E5E0] dark:border-[#293653] px-2.5 py-0.5 text-xs font-semibold">
           {statusLabels[proposal.status] ?? proposal.status}
         </span>
         <span className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
@@ -341,7 +336,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
               </p>
             )}
             {proposal.body.context.length > 0 && (
-              <blockquote className="rounded-xl border-l-2 border-[#C84300] bg-[#F8F8F6] dark:bg-[#262626] p-3 text-xs text-[#374151] dark:text-[#D1D5DB] space-y-1">
+              <blockquote className="rounded-xl border-l-2 border-[#C84300] bg-[#F8F8F6] dark:bg-[#0E1528] p-3 text-xs text-[#374151] dark:text-[#CBD5E1] space-y-1">
                 {proposal.body.context.map((msg) => {
                   const msgTime = formatSlackTs(msg.ts);
                   return (
@@ -358,14 +353,10 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
               <ul className="space-y-1 text-xs text-[#374151] dark:text-[#D1D5DB]">
                 {(proposal.body.decision.intents ?? []).map((intent, idx) => (
                   <li key={idx} className="flex flex-wrap items-center gap-1.5">
-                    <span>
-                      • [{intent.service}] {intent.summary}
+                    <span className="rounded bg-[#F3F4F6] dark:bg-[#2D2D2D] px-1.5 py-0.5 text-[11px] font-medium text-[#4B5563] dark:text-[#D1D5DB]">
+                      {displayServiceLabel(intent.service)}
                     </span>
-                    {serviceLabels[intent.service] && (
-                      <span className="rounded bg-[#F3F4F6] dark:bg-[#2D2D2D] px-1.5 py-0.5 text-[11px] font-medium text-[#4B5563] dark:text-[#D1D5DB]">
-                        {serviceLabels[intent.service]}
-                      </span>
-                    )}
+                    <span>{intent.summary}</span>
                   </li>
                 ))}
               </ul>
@@ -391,23 +382,23 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
       )}
 
       {isPreviewCurrent && planPreview && (
-        <div className="rounded-lg border border-[#D1D5DB] dark:border-[#4B5563] p-3 space-y-2">
+        <div className="rounded-lg border border-[#D1D5DB] dark:border-[#293653] p-3 space-y-2">
           <p className="text-xs font-semibold">{planPreview.summary}</p>
           <ol className="list-decimal list-inside space-y-1.5 text-xs text-[#4B5563] dark:text-[#9CA3AF]">
             {planPreview.steps.map((step) => (
               <li key={step.id} className="space-y-1">
                 <span className="font-medium text-[#111827] dark:text-white">{step.description}</span>
                 {step.tool && (
-                  <span className="ml-1.5 rounded bg-[#F3F4F6] dark:bg-[#2D2D2D] px-1.5 py-0.5 font-mono text-[11px]">
-                    {step.tool}
+                  <span className="ml-1.5 rounded bg-[#F3F4F6] dark:bg-[#1A2540] px-1.5 py-0.5 text-[11px] font-medium text-[#4B5563] dark:text-[#CBD5E1]">
+                    {serviceName(serviceId(step.tool))} · {operation(step.tool).action}
                   </span>
                 )}
                 {step.args && Object.keys(step.args).length > 0 && (
-                  <dl className="ml-4 grid grid-cols-1 gap-0.5 rounded bg-[#F8F8F6] dark:bg-[#262626] p-2 text-[11px]">
+                  <dl className="ml-4 grid grid-cols-1 gap-0.5 rounded bg-[#F8F8F6] dark:bg-[#0E1528] p-2 text-[11px]">
                     {Object.entries(step.args).map(([key, val]) => (
                       <div key={key} className="flex flex-wrap gap-1">
-                        <dt className="font-semibold text-[#374151] dark:text-[#D1D5DB]">{key}:</dt>
-                        <dd className="break-all font-mono">
+                        <dt className="font-semibold text-[#374151] dark:text-[#D1D5DB]">{friendlyFieldLabel(key)}:</dt>
+                        <dd className="break-all">
                           {typeof val === 'string' ? val : JSON.stringify(val)}
                         </dd>
                       </div>
@@ -418,27 +409,27 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
             ))}
           </ol>
           {planPreview.connections && Object.keys(planPreview.connections).length > 0 && (
-            <div className="border-t border-[#E7E7E2] dark:border-[#333333] pt-2 text-[11px] text-[#4B5563] dark:text-[#9CA3AF] space-y-1">
-              <p className="font-semibold text-[#111827] dark:text-white">Danh tính thực thi & phạm vi kết nối:</p>
+            <div className="border-t border-[#E7E7E2] dark:border-[#293653] pt-2 text-[11px] text-[#4B5563] dark:text-[#9CA3AF] space-y-1">
+              <p className="font-semibold text-[#111827] dark:text-white">Tài khoản &amp; phạm vi kết nối được áp dụng:</p>
               {Object.entries(planPreview.connections).map(([serviceKey, connVal]) => {
                 if (!connVal || typeof connVal !== 'object') return null;
                 if (serviceKey === 'myslack') {
                   const bindings = (connVal as { bindings?: Record<string, Record<string, unknown>> }).bindings ?? {};
                   return Object.entries(bindings).map(([bindKey, b]) => (
-                    <div key={`myslack-${bindKey}`} className="font-mono break-all">
-                      {serviceLabels[serviceKey] ?? serviceKey}: workspace={String(b.workspaceId ?? '')} actor=
-                      {String(b.slackUserId ?? '')} connection={String(b.connectionId ?? bindKey)}
+                    <div key={`myslack-${bindKey}`} className="break-all">
+                      {displayServiceLabel(serviceKey)}: Không gian {String(b.workspaceId ?? '')} · Tài khoản Slack{' '}
+                      {String(b.slackUserId ?? '')} · Kết nối {String(b.connectionId ?? bindKey)}
                     </div>
                   ));
                 }
                 const c = connVal as Record<string, unknown>;
                 const details = Object.entries(c)
                   .filter(([, v]) => v !== undefined && v !== null && v !== '')
-                  .map(([k, v]) => `${k}=${Array.isArray(v) ? v.join(',') : String(v)}`)
-                  .join(' ');
+                  .map(([k, v]) => `${friendlyFieldLabel(k)}: ${Array.isArray(v) ? v.join(', ') : String(v)}`)
+                  .join(' · ');
                 return (
-                  <div key={serviceKey} className="font-mono break-all">
-                    {serviceLabels[serviceKey] ?? serviceKey}: {details}
+                  <div key={serviceKey} className="break-all">
+                    {displayServiceLabel(serviceKey)}: {details}
                   </div>
                 );
               })}
@@ -448,9 +439,9 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
       )}
 
       {actionable && (
-        <div className="space-y-2 pt-2 border-t border-[#E7E7E2] dark:border-[#333333]">
+        <div className="space-y-2 pt-2 border-t border-[#E7E7E2] dark:border-[#293653]">
           {isQuestionProposal && (
-            <p className="text-xs text-[#B43E00] font-medium">
+            <p className="text-xs text-[#B43E00] dark:text-[#FB923C] font-medium">
               Đề xuất phản hồi câu hỏi Slack: nhập câu trả lời vào ô bên dưới để lên kế hoạch gửi trực tiếp vào thread nguồn.
             </p>
           )}
@@ -472,7 +463,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
               }}
             />
           </label>
-          <details className="rounded-lg border border-[#E7E7E2] dark:border-[#333333] bg-[#FAFAFA] dark:bg-[#242424] p-2.5 text-xs">
+          <details className="rounded-lg border border-[#E7E7E2] dark:border-[#293653] bg-[#FAFAFA] dark:bg-[#0E1528] p-2.5 text-xs">
             <summary className="cursor-pointer font-medium text-[#374151] dark:text-[#D1D5DB]">
               Đổi dịch vụ đích hoặc điền tham số đích cho đề xuất này
             </summary>
@@ -489,7 +480,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                     invalidatePreview();
                   }}
                 >
-                  <option value="">Theo gợi ý mặc định ({serviceLabels[primaryIntent?.service ?? ''] ?? (primaryIntent?.service || 'Tự động')})</option>
+                  <option value="">Theo gợi ý mặc định ({primaryIntent?.service ? displayServiceLabel(primaryIntent.service) : 'Tự động'})</option>
                   <option value="trello">Trello — Tạo thẻ công việc</option>
                   <option value="jira">Jira — Tạo Issue / Bug</option>
                   <option value="mysheets">Google Sheets — Ghi dòng tiến độ</option>

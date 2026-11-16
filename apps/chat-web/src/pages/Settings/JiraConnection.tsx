@@ -657,7 +657,7 @@ export function JiraConnection({
       }`}
     >
       {/* HEADER SECTION */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-[#E7E7E2] dark:border-[#374151]">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-[#E7E7E2] dark:border-[#293653]">
         <div className="flex items-center gap-3">
           <ServiceLogo service={JIRA_KEY} className="w-6 h-6" />
           <div>
@@ -781,7 +781,7 @@ export function JiraConnection({
       {standalone !== false && (
       <div
         data-testid="jira-setup-steps"
-        className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 rounded-xl bg-[#F8F8F6] dark:bg-[#1F2937]/40 border border-[#E7E7E2] dark:border-[#374151] text-xs"
+        className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 rounded-xl bg-[#F8F8F6] dark:bg-[#0E1528] border border-[#E7E7E2] dark:border-[#293653] text-xs"
       >
         <div className="flex items-center gap-2">
           <span
@@ -790,7 +790,7 @@ export function JiraConnection({
                 ? 'bg-[#16A34A] text-white'
                 : isIdentityConnected
                 ? 'bg-blue-600 text-white'
-                : 'bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300'
+                : 'bg-neutral-200 text-neutral-600 dark:bg-[#1A2540] dark:text-[#CBD5E1]'
             }`}
           >
             {isConnected ? '✓' : '1'}
@@ -813,7 +813,7 @@ export function JiraConnection({
             className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
               isWorkspaceActive
                 ? 'bg-[#16A34A] text-white'
-                : 'bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300'
+                : 'bg-neutral-200 text-neutral-600 dark:bg-[#1A2540] dark:text-[#CBD5E1]'
             }`}
           >
             {isWorkspaceActive ? '✓' : '2'}
@@ -834,7 +834,7 @@ export function JiraConnection({
             className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold flex-shrink-0 ${
               isConnected && isWorkspaceActive && (capabilities?.sites?.length ?? 0) > 0
                 ? 'bg-[#16A34A] text-white'
-                : 'bg-neutral-200 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300'
+                : 'bg-neutral-200 text-neutral-600 dark:bg-[#1A2540] dark:text-[#CBD5E1]'
             }`}
           >
             {isConnected && isWorkspaceActive && (capabilities?.sites?.length ?? 0) > 0 ? '✓' : '3'}
@@ -858,24 +858,12 @@ export function JiraConnection({
         <div
           id="jira-connection-error-alert"
           aria-live="polite"
-          className="mt-4 p-3.5 rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900 text-xs flex items-center justify-between gap-3"
+          className="mt-4 p-3.5 rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-900 text-xs flex items-center gap-2"
         >
-          <div className="flex items-center gap-2">
-            <svg className="w-4 h-4 flex-shrink-0 text-rose-600 dark:text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <span>{connectionError}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              void fetchConnection();
-              void fetchWorkspaces();
-            }}
-            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-100 hover:bg-rose-200 text-rose-800 dark:bg-rose-900 dark:hover:bg-rose-800 dark:text-rose-200 whitespace-nowrap"
-          >
-            Thử lại
-          </button>
+          <svg className="w-4 h-4 flex-shrink-0 text-rose-600 dark:text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span>{connectionError}</span>
         </div>
       )}
 
@@ -962,7 +950,7 @@ export function JiraConnection({
                 {data?.atlassianAccountId && (
                   <div>
                     <span className="font-medium text-[#111827] dark:text-white">ID tài khoản Atlassian: </span>
-                    <code className="text-[11px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">
+                    <code className="text-[11px] bg-neutral-100 dark:bg-[#1A2540] px-1 py-0.5 rounded">
                       {data.atlassianAccountId}
                     </code>
                   </div>
@@ -970,7 +958,7 @@ export function JiraConnection({
                 {data?.jiraAccountId && (
                   <div>
                     <span className="font-medium text-[#111827] dark:text-white">Jira Account ID: </span>
-                    <code className="text-[11px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">
+                    <code className="text-[11px] bg-neutral-100 dark:bg-[#1A2540] px-1 py-0.5 rounded">
                       {data.jiraAccountId}
                     </code>
                   </div>
@@ -1002,14 +990,14 @@ export function JiraConnection({
       {/* JIRA WORKSPACE MANAGEMENT SECTION */}
       <details
         open={standalone === false ? false : (!isDisconnected || workspaces.length > 0)}
-        className="pt-3.5 mt-3.5 border-t border-[#E7E7E2] dark:border-[#374151] group"
+        className="pt-3.5 mt-3.5 border-t border-[#E7E7E2] dark:border-[#293653] group"
       >
-        <summary className="cursor-pointer list-none flex items-center justify-between gap-2 text-xs font-semibold text-[#374151] dark:text-[#D1D5DB] hover:text-[#111827] dark:hover:text-white select-none">
+        <summary className="cursor-pointer list-none flex items-center justify-between gap-2 text-xs font-semibold text-[#374151] dark:text-[#CBD5E1] hover:text-[#111827] dark:hover:text-white select-none">
           <span className="inline-flex items-center gap-1.5">
             <span className="transition-transform group-open:rotate-90 text-[10px]">▸</span>
             <span>Quản lý Không gian làm việc Jira &amp; Dự án nhóm</span>
           </span>
-          <span className="text-[#6B7280] dark:text-[#9CA3AF] font-normal px-2 py-0.5 rounded-md bg-[#F8F8F6] dark:bg-[#262626] border border-[#E7E7E2] dark:border-[#374151]">
+          <span className="text-[#6B7280] dark:text-[#A1AEC0] font-normal px-2 py-0.5 rounded-md bg-[#F8F8F6] dark:bg-[#1A2540] border border-[#E7E7E2] dark:border-[#293653]">
             {workspaces.length > 0 ? `${workspaces.length} không gian làm việc` : 'Mở cấu hình nâng cao'}
           </span>
         </summary>
@@ -1171,13 +1159,13 @@ export function JiraConnection({
                     {members.map((mem) => (
                       <div
                         key={mem.userId}
-                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-2.5 rounded-lg bg-white dark:bg-[#111827] border border-[#E7E7E2] dark:border-[#374151] gap-2"
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-2.5 rounded-lg bg-white dark:bg-[#131B2F] border border-[#E7E7E2] dark:border-[#293653] gap-2"
                       >
                         <div>
                           <span className="font-medium text-[#111827] dark:text-white">
                             {mem.userId}
                           </span>
-                          <span className="ml-2 text-[11px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+                          <span className="ml-2 text-[11px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-[#1A2540] text-neutral-600 dark:text-[#CBD5E1]">
                             {mem.role}
                           </span>
                           <span className={`ml-2 text-[11px] font-medium ${
@@ -1509,7 +1497,7 @@ export function JiraConnection({
               type="button"
               disabled
               aria-disabled="true"
-              className="px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-200 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400 cursor-not-allowed whitespace-nowrap shadow-none"
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-neutral-200 text-neutral-500 dark:bg-[#1A2540] dark:text-[#94A3B8] cursor-not-allowed whitespace-nowrap shadow-none"
             >
               Bắt đầu hội thoại Jira
             </button>

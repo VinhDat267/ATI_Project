@@ -467,7 +467,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
             </section>}
           {mycalendarEnabled && <section aria-label="Dữ liệu Google Calendar của bạn" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3">
               <h3 className="font-semibold text-[#111827]">Dữ liệu Google Calendar của bạn</h3>
-              <p>Khi kết nối, Google cấp phạm vi OAuth đọc lịch (calendar.readonly) và quản lý sự kiện (calendar.events); ở tầng ứng dụng, Planora kiểm soát danh sách lịch được phép và chỉ đọc hoặc truy vấn sự kiện trên các lịch bạn đã chọn. Dữ liệu văn bản cần thiết được gửi qua 9router để model lập kế hoạch.</p>
+              <p>Khi kết nối, Google cấp quyền đọc lịch (calendar.readonly) và quản lý sự kiện (calendar.events); ở tầng ứng dụng, Planora kiểm soát danh sách lịch được phép và chỉ đọc hoặc truy vấn sự kiện trên các lịch bạn đã chọn. Dữ liệu văn bản cần thiết được gửi qua hệ thống AI lập kế hoạch để phân tích.</p>
               <p>Planora chỉ tạo, cập nhật hoặc huỷ sự kiện trên lịch đã chọn sau khi bạn bấm phê duyệt kế hoạch và chỉ gửi email mời họp khi bước kế hoạch bật rõ tuỳ chọn gửi lời mời.</p>
               <p>Bạn có thể thay đổi danh sách lịch được dùng hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#mycalendar" onClick={appLink(navigate, '/settings#mycalendar')} className="text-[#FF5701] underline font-medium">Kết nối dịch vụ</a>. Khi ngắt kết nối, Planora xoá token cùng phạm vi lịch đã lưu và gửi yêu cầu thu hồi token tới Google (hội thoại và kế hoạch cũ vẫn được giữ lại); bạn cũng có thể kiểm tra hoặc gỡ quyền trực tiếp trong trang quản lý quyền của tài khoản Google (Google Account).</p>
             </section>}
@@ -629,7 +629,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                     ✓
                   </span>
                   <span>
-                    Nhập, kiểm tra và cập nhật khoá kết nối cho 8 dịch vụ chung.
+                    Quản lý kết nối và phạm vi tài nguyên cho các dịch vụ dùng chung của nhóm.
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -788,10 +788,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
           </div>
           <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[#4B5563]">
             <a href="/" onClick={appLink(navigate, '/')} className="hover:text-[#111827] transition-colors">
-              Trang chủ
-            </a>
-            <a href="/" onClick={appLink(navigate, '/')} className="hover:text-[#111827] transition-colors">
-              Không gian làm việc
+              {user ? 'Không gian làm việc' : 'Trang chủ'}
             </a>
             <a href="/guide" onClick={appLink(navigate, '/guide')} className="hover:text-[#111827] transition-colors">
               Cẩm nang
