@@ -228,6 +228,69 @@ describe('Trello Digest Accuracy, Candidate Admission, Coverage Accounting & AI 
     }
   });
 
+  it('reports a complete scan with an exact total when every board was listed without a cap', async () => {
+    const config = {
+      credentialId: TRELLO_CRED_ID,
+      trelloMemberId: 'mem-1',
+      username: 'alice_trello',
+      boards: [{ id: 'b1', name: 'Frontend' }],
+      channelId: 'C_DEV',
+      channelName: 'dev',
+      dueSoonHours: 24,
+      includeAiSummary: false,
+    };
+    const configHash = computeTrelloDigestConfigHash({ config, recurrence, userId });
+    const cards: any[] = [
+      { id: 'c1', name: 'Overdue', url: 'https://trello.com/c/c1', due: '2026-04-01T00:00:00.000Z', dueComplete: false, idMembers: ['m1'] },
+      { id: 'c2', name: 'No due', url: 'https://trello.com/c/c2', due: null, dueComplete: false, idMembers: [] },
+    ];
+    Object.defineProperty(cards, 'scanMetadata', {
+      value: { scannedCount: 2, duplicateCountDropped: 0, prefixCapReached: false, truncatedByLimit: false },
+      enumerable: false,
+    });
+    const run = (meta: boolean) => createTrelloDigestRunner({
+      pool: { query: vi.fn().mockResolvedValue({ rowCount: 1, rows: [{ version: 1, status: 'active' }] }) } as any,
+      timeZone: 'Asia/Ho_Chi_Minh',
+      trelloConnection: async () => ({
+        status: 'connected',
+        connection: { credentialId: TRELLO_CRED_ID, memberId: 'mem-1', username: 'alice_trello', boardIds: ['b1'] },
+      }),
+      getAdapter: async (serviceName: string) => {
+        if (serviceName === 'trello') {
+          return { execute: vi.fn().mockImplementation(async (tool: string) => (tool === 'trello.search_cards' ? (meta ? cards : [...cards]) : [])) };
+        }
+        if (serviceName === 'slack') {
+          return {
+            execute: vi.fn().mockImplementation(async (tool: string) => {
+              if (tool === 'slack.search_channels') return [{ id: 'C_DEV', name: 'dev' }];
+              if (tool === 'slack.send_message') return { ts: '1700000300.001' };
+            }),
+          };
+        }
+        return null;
+      },
+    })({
+      runId: 'run-complete-1', scheduleId: 'sched-complete-1', scheduleVersion: 1, userId,
+      name: 'Báo cáo', request: 'Báo cáo Trello', dueAt: new Date('2026-04-20T01:00:00.000Z'),
+      trigger: 'scheduled', recurrence, digestConfig: config, digestConfigHash: configHash,
+    } as any, 'conv-complete-1', new AbortController().signal);
+
+    const complete = await run(true);
+    expect(complete.state).toBe('digest_sent');
+    if (complete.state === 'digest_sent') {
+      expect(complete.delivery.coverage).toMatchObject({ totalAvailable: 2, isComplete: true, truncatedByFetchLimit: false });
+      expect(complete.text).toContain('Đã quét đủ 2 thẻ đang mở trên 1 bảng');
+      expect(complete.text).not.toContain('UNKNOWN');
+    }
+
+    // Without scan metadata the adapter cannot vouch for completeness: total stays UNKNOWN.
+    const unknown = await run(false);
+    if (unknown.state === 'digest_sent') {
+      expect(unknown.delivery.coverage).toMatchObject({ totalAvailable: 'UNKNOWN', isComplete: false });
+      expect(unknown.text).toContain('chưa biết tổng số thẻ');
+    }
+  });
+
   it('TRELLO-AUDIT-05 (Coverage Accounting, Deduplication, UNKNOWN Total & Safe 3500-char Clipping): deduplicates cards, separates scanned/matched/displayed counts with totalAvailable UNKNOWN, consumes scanMetadata, and clips safely without erasing coverage footer or breaking URLs', async () => {
     const config = {
       credentialId: TRELLO_CRED_ID,
@@ -363,7 +426,7 @@ describe('Trello Digest Accuracy, Candidate Admission, Coverage Accounting & AI 
     expect(outcome.state).toBe('digest_sent');
     if (outcome.state === 'digest_sent') {
       // True matched counts across the 50 unique scanned cards: 25 overdue, 20 dueSoon, 30 unassigned
-      expect(outcome.delivery.counts).toEqual({
+      expect(outcome.delivery.counts).toMatchObject({
         overdueCards: 25,
         dueSoonCards: 20,
         unassignedCards: 30,
@@ -393,7 +456,7 @@ describe('Trello Digest Accuracy, Candidate Admission, Coverage Accounting & AI 
       // Message length is strictly <= 3,500 chars
       expect(outcome.text.length).toBeLessThanOrEqual(3500);
       // Coverage disclosure footer is preserved even after clipping!
-      expect(outcome.text).toContain('UNKNOWN');
+      expect(outcome.text).toContain('chưa biết tổng số thẻ');
       expect(outcome.text).toContain('50 thẻ/bảng');
       expect(outcome.text).toContain('15 thẻ/nhóm');
       // Every Slack link '<https://...|...>' in the clipped text is properly closed (no broken link at end)

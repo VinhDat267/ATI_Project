@@ -658,19 +658,24 @@ export interface TrelloDigestCoverage {
   scannedCount: number;
   uniqueScannedCount: number;
   duplicateCountDropped: number;
-  totalAvailable: 'UNKNOWN';
-  isComplete: false;
+  /** A number only when every board was listed in full (no fetch cap reached). */
+  totalAvailable: 'UNKNOWN' | number;
+  isComplete: boolean;
   truncatedByFetchLimit: boolean;
   truncatedByDisplayLimit: boolean;
   matchedCounts: {
     overdueCards: number;
     dueSoonCards: number;
     unassignedCards: number;
+    completedCards?: number;
+    noDueCards?: number;
   };
   displayedCounts: {
     overdueCards: number;
     dueSoonCards: number;
     unassignedCards: number;
+    completedCards?: number;
+    noDueCards?: number;
   };
 }
 
@@ -678,7 +683,7 @@ export interface TrelloDigestDelivery {
   channelId: string;
   channelName: string;
   ts: string | null;
-  counts: { overdueCards: number; dueSoonCards: number; unassignedCards: number };
+  counts: { overdueCards: number; dueSoonCards: number; unassignedCards: number; completedCards?: number; noDueCards?: number };
   coverage?: TrelloDigestCoverage;
   telegramChatId?: string;
   telegramChatTitle?: string;

@@ -25,8 +25,10 @@ export class TrelloAdapter extends TrelloWriteTools {
         return this.searchCards(args as any, opts);
       case 'trello.get_card':
         return this.getCard(args as any, opts);
+      case 'trello.search_labels':
+        return this.searchLabels(args as any, opts);
 
-      // 4 Write tools
+      // Write tools
       case 'trello.create_card':
         return this.createCard(args as any, opts);
       case 'trello.update_card':
@@ -45,6 +47,10 @@ export class TrelloAdapter extends TrelloWriteTools {
         return this.updateChecklistItem(args as any, opts);
       case 'trello.set_card_due_complete':
         return this.setCardDueComplete(args as any, opts);
+      case 'trello.add_label':
+        return this.addLabel(args as any, opts);
+      case 'trello.remove_label':
+        return this.removeLabel(args as any, opts);
 
       default:
         throw new StepError({

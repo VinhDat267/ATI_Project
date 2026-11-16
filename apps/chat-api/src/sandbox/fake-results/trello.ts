@@ -150,5 +150,26 @@ export const TRELLO_FAKE: FakeService = {
       dueComplete: Boolean(args.dueComplete),
       url: `https://trello.com/c/${args.cardId || 'card_1'}`,
     }),
+    'trello.search_labels': (args) => {
+      const boardId = args.boardId || 'b1';
+      const labels = [
+        { id: 'label_bug', name: 'Bug', color: 'red', boardId },
+        { id: 'label_priority_high', name: 'Ưu tiên cao', color: 'orange', boardId },
+        { id: 'label_frontend', name: 'Frontend', color: 'blue', boardId },
+      ];
+      const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
+      return query
+        ? labels.filter((l) => l.name.toLowerCase().includes(query) || l.color.includes(query))
+        : labels;
+    },
+    'trello.add_label': (args) => ({
+      id: args.cardId || 'card_1',
+      labelId: args.labelId || 'label_bug',
+      idLabels: [args.labelId || 'label_bug'],
+    }),
+    'trello.remove_label': (args) => ({
+      id: args.cardId || 'card_1',
+      labelId: args.labelId || 'label_bug',
+    }),
   },
 };

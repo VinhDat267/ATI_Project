@@ -7,7 +7,7 @@ const tool = (name: string) => ALL_TOOLS.find((candidate) => candidate.name === 
 describe('compact tool listing', () => {
   it('describes a write tool with required markers, types, resources and returned fields', () => {
     const text = describeToolCompact(tool('trello.create_card'));
-    expect(text).toContain('trello.create_card (write, risk: low)');
+    expect(text).toContain('trello.create_card (write, risk: medium)');
     expect(text).toContain('listId* string [x-resource: list]');
     expect(text).toContain('title* string');
     expect(text).toContain('idMembers string[] [x-resource: member]');

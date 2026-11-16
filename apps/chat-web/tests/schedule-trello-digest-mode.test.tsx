@@ -185,7 +185,7 @@ describe('Trello Digest ScheduleMoment & ScheduleSection UI', () => {
 
     const badge = screen.getByText('Tự gửi');
     expect(badge).toHaveAttribute('data-schedule-kind', 'trello_digest');
-    expect(screen.getByText('Đã gửi · 6 mục')).toBeInTheDocument();
+    expect(screen.getByText('Đã gửi · 2 quá hạn · 1 sắp đến hạn · 3 chưa gán')).toBeInTheDocument();
     expect(screen.getByText('(#team)')).toBeInTheDocument();
   });
 

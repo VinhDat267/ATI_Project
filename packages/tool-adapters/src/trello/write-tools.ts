@@ -1,5 +1,51 @@
 import { TrelloReadTools } from './read-tools.js';
 import { StepError } from '../base-adapter.js';
+import {
+  TRELLO_CARD_MAX_LABELS,
+  TRELLO_CHECKLIST_ITEM_MAX_LENGTH,
+  TRELLO_CHECKLIST_MAX_ITEMS,
+  TRELLO_COMMENT_MAX_LENGTH,
+  TRELLO_DESC_MAX_LENGTH,
+  TRELLO_DUE_PATTERN,
+  TRELLO_NAME_MAX_LENGTH,
+} from '@wap/tool-schemas';
+
+const TRELLO_DUE_REGEX = new RegExp(TRELLO_DUE_PATTERN);
+
+function trelloValidationError(message: string, field: string): StepError {
+  return new StepError({
+    message,
+    category: 'VALIDATION',
+    statusCode: 400,
+    retryable: false,
+    details: { requestSent: false, field },
+  });
+}
+
+/** Rejects a missing/empty (when required) or over-long text field before any request. */
+function assertTrelloText(
+  value: unknown,
+  field: string,
+  maxLength: number,
+  options: { required?: boolean; allowEmpty?: boolean } = {}
+): void {
+  if (value === undefined || value === null) {
+    if (options.required) throw trelloValidationError(`${field} is required`, field);
+    return;
+  }
+  if (typeof value !== 'string') throw trelloValidationError(`${field} must be a string`, field);
+  if (!options.allowEmpty && !value.trim()) throw trelloValidationError(`${field} must not be empty`, field);
+  if (value.length > maxLength) {
+    throw trelloValidationError(`${field} exceeds the maximum length of ${maxLength} characters`, field);
+  }
+}
+
+function assertTrelloDue(value: unknown): void {
+  if (value === undefined || value === null) return;
+  if (typeof value !== 'string' || !TRELLO_DUE_REGEX.test(value) || Number.isNaN(Date.parse(value))) {
+    throw trelloValidationError('due must be an ISO-8601 date-time with a timezone', 'due');
+  }
+}
 
 export class TrelloWriteTools extends TrelloReadTools {
   private async preWriteRequest<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -21,6 +67,30 @@ export class TrelloWriteTools extends TrelloReadTools {
   }
 
   /**
+   * Fetches only the fields needed to verify a card's board (plus `extraFields`) and asserts scope,
+   * so no data of a card on a foreign board is pulled before rejecting it.
+   */
+  private async fetchScopedCard(
+    cardId: string,
+    options: { signal?: AbortSignal; boardId?: string } | undefined,
+    extraFields: string[] = []
+  ): Promise<any> {
+    const fields = ['id', 'idBoard', ...extraFields].join(',');
+    const cardInfo = await this.preWriteRequest<any>(`/cards/${cardId}?fields=${fields}`, { signal: options?.signal });
+    this.assertParentBoard(cardInfo, options?.boardId);
+    return cardInfo;
+  }
+
+  private async fetchScopedList(
+    listId: string,
+    options: { signal?: AbortSignal; boardId?: string } | undefined
+  ): Promise<any> {
+    const listInfo = await this.preWriteRequest<any>(`/lists/${listId}?fields=id,idBoard`, { signal: options?.signal });
+    this.assertParentBoard(listInfo, options?.boardId);
+    return listInfo;
+  }
+
+  /**
    * Create a new card on a list.
    */
   async createCard(
@@ -31,10 +101,14 @@ export class TrelloWriteTools extends TrelloReadTools {
       due?: string;
       dueComplete?: boolean;
       idMembers?: string[];
+      idLabels?: string[];
     },
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; name: string; url: string; listId: string; dueComplete?: boolean }> {
     const safeListId = this.assertValidResourceId(args.listId, 'listId');
+    assertTrelloText(args.title, 'title', TRELLO_NAME_MAX_LENGTH, { required: true });
+    assertTrelloText(args.desc, 'desc', TRELLO_DESC_MAX_LENGTH, { allowEmpty: true });
+    assertTrelloDue(args.due);
     if (args.idMembers !== undefined) {
       if (!Array.isArray(args.idMembers)) {
         throw new StepError({
@@ -49,11 +123,21 @@ export class TrelloWriteTools extends TrelloReadTools {
         this.assertValidResourceId(memberId, 'idMembers');
       }
     }
+    if (args.idLabels !== undefined) {
+      if (!Array.isArray(args.idLabels) || args.idLabels.length > TRELLO_CARD_MAX_LABELS) {
+        throw trelloValidationError(
+          `idLabels must be an array of at most ${TRELLO_CARD_MAX_LABELS} Trello label IDs`,
+          'idLabels'
+        );
+      }
+      for (const labelId of args.idLabels) {
+        this.assertValidResourceId(labelId, 'idLabels');
+      }
+    }
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const listInfo = await this.preWriteRequest<any>(`/lists/${safeListId}`, { signal: options?.signal });
-    this.assertParentBoard(listInfo, options?.boardId);
+    const listInfo = await this.fetchScopedList(safeListId, options);
 
     if (Array.isArray(args.idMembers) && args.idMembers.length > 0) {
       const boardMembers = await this.preWriteRequest<any[]>(`/boards/${listInfo.idBoard}/members`, {
@@ -75,6 +159,20 @@ export class TrelloWriteTools extends TrelloReadTools {
       }
     }
 
+    if (Array.isArray(args.idLabels) && args.idLabels.length > 0) {
+      const boardLabels = await this.preWriteRequest<any[]>(`/boards/${listInfo.idBoard}/labels?fields=id&limit=1000`, {
+        signal: options?.signal,
+      });
+      const allowedLabelIds = new Set(
+        Array.isArray(boardLabels) ? boardLabels.map((l) => String(l?.id ?? '')) : []
+      );
+      for (const labelId of args.idLabels) {
+        if (!allowedLabelIds.has(labelId)) {
+          throw trelloValidationError(`Label '${labelId}' does not belong to the list's board`, 'idLabels');
+        }
+      }
+    }
+
     const body: Record<string, any> = {
       idList: safeListId,
       name: args.title,
@@ -83,6 +181,7 @@ export class TrelloWriteTools extends TrelloReadTools {
     if (args.due !== undefined) body.due = args.due;
     if (args.dueComplete !== undefined) body.dueComplete = args.dueComplete;
     if (args.idMembers !== undefined) body.idMembers = args.idMembers;
+    if (args.idLabels !== undefined) body.idLabels = args.idLabels;
 
     const res = await this.request<any>('/cards', {
       method: 'POST',
@@ -130,14 +229,24 @@ export class TrelloWriteTools extends TrelloReadTools {
     if (args.idList !== undefined) {
       this.assertValidResourceId(args.idList, 'idList');
     }
+    assertTrelloText(args.title, 'title', TRELLO_NAME_MAX_LENGTH);
+    assertTrelloText(args.desc, 'desc', TRELLO_DESC_MAX_LENGTH, { allowEmpty: true });
+    assertTrelloDue(args.due);
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.preWriteRequest<any>(`/cards/${safeCardId}`, { signal: options?.signal });
-    this.assertParentBoard(cardInfo, options?.boardId);
+    const cardInfo = await this.fetchScopedCard(safeCardId, options);
     if (args.idList) {
-      const listInfo = await this.preWriteRequest<any>(`/lists/${args.idList}`, { signal: options?.signal });
-      this.assertParentBoard(listInfo, options?.boardId);
+      const listInfo = await this.preWriteRequest<any>(`/lists/${args.idList}?fields=id,idBoard`, { signal: options?.signal });
+      // A list on a board outside the allowlist is a scope violation (AUTH_ERROR)...
+      this.assertParentBoard(listInfo);
+      // ...while a list on another allowed board is an unsupported cross-board move.
+      if (listInfo.idBoard !== cardInfo.idBoard) {
+        throw trelloValidationError(
+          'Moving a card to a list on another board is not supported; choose a list on the same board',
+          'idList'
+        );
+      }
     }
 
     const body: Record<string, any> = {};
@@ -178,8 +287,7 @@ export class TrelloWriteTools extends TrelloReadTools {
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.preWriteRequest<any>(`/cards/${safeCardId}`, { signal: options?.signal });
-    this.assertParentBoard(cardInfo, options?.boardId);
+    const cardInfo = await this.fetchScopedCard(safeCardId, options);
 
     const boardMembers = await this.preWriteRequest<any[]>(`/boards/${cardInfo.idBoard}/members`, { signal: options?.signal });
     const isBoardMember = Array.isArray(boardMembers) && boardMembers.some((m) => m.id === safeMemberId);
@@ -227,26 +335,22 @@ export class TrelloWriteTools extends TrelloReadTools {
     items: Array<{ id: string; name: string; state: string }>;
   }> {
     const safeCardId = this.assertValidResourceId(args.cardId, 'cardId');
+    assertTrelloText(args.title ?? args.name, 'title', TRELLO_NAME_MAX_LENGTH);
+    if (args.items !== undefined) {
+      if (!Array.isArray(args.items) || args.items.length > TRELLO_CHECKLIST_MAX_ITEMS) {
+        throw trelloValidationError(
+          `items must be an array of at most ${TRELLO_CHECKLIST_MAX_ITEMS} checklist items`,
+          'items'
+        );
+      }
+      args.items.forEach((item, idx) =>
+        assertTrelloText(item, `items[${idx}]`, TRELLO_CHECKLIST_ITEM_MAX_LENGTH, { required: true })
+      );
+    }
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    let cardInfo: any;
-    try {
-      cardInfo = await this.request<any>(`/cards/${safeCardId}`, { signal: options?.signal });
-    } catch (err: any) {
-      if (err instanceof StepError) {
-        throw new StepError({
-          message: err.message,
-          category: err.category,
-          statusCode: err.statusCode,
-          retryable: err.retryable,
-          cause: err.cause ?? err,
-          details: { ...(err.details ?? {}), requestSent: false },
-        });
-      }
-      throw err;
-    }
-    this.assertParentBoard(cardInfo, options?.boardId);
+    await this.fetchScopedCard(safeCardId, options);
 
     const checklistTitle = args.title || args.name || 'Checklist';
     const chkRes = await this.request<any>(`/cards/${safeCardId}/checklists`, {
@@ -323,11 +427,11 @@ export class TrelloWriteTools extends TrelloReadTools {
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; cardId: string; text: string }> {
     const safeCardId = this.assertValidResourceId(args.cardId, 'cardId');
+    assertTrelloText(args.text, 'text', TRELLO_COMMENT_MAX_LENGTH, { required: true });
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.preWriteRequest<any>(`/cards/${safeCardId}`, { signal: options?.signal });
-    this.assertParentBoard(cardInfo, options?.boardId);
+    await this.fetchScopedCard(safeCardId, options);
 
     const res = await this.request<any>(`/cards/${safeCardId}/actions/comments`, {
       method: 'POST',
@@ -355,6 +459,7 @@ export class TrelloWriteTools extends TrelloReadTools {
     options?: { signal?: AbortSignal; boardId?: string }
   ): Promise<{ id: string; name: string; boardId: string }> {
     const safeBoardId = this.assertValidResourceId(args.boardId, 'boardId');
+    assertTrelloText(args.name, 'name', TRELLO_NAME_MAX_LENGTH, { required: true });
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
       if (options.boardId !== safeBoardId) {
@@ -404,8 +509,7 @@ export class TrelloWriteTools extends TrelloReadTools {
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.preWriteRequest<any>(`/cards/${safeCardId}`, { signal: options?.signal });
-    this.assertParentBoard(cardInfo, options?.boardId);
+    const cardInfo = await this.fetchScopedCard(safeCardId, options, ['idMembers']);
 
     const deleteEndpoint = `/cards/${encodeURIComponent(safeCardId)}/idMembers/${encodeURIComponent(safeMemberId)}`;
     const segments = deleteEndpoint.split('/').filter(Boolean);
@@ -463,8 +567,7 @@ export class TrelloWriteTools extends TrelloReadTools {
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.preWriteRequest<any>(`/cards/${safeCardId}`, { signal: options?.signal });
-    this.assertParentBoard(cardInfo, options?.boardId);
+    await this.fetchScopedCard(safeCardId, options);
 
     const checklists = await this.preWriteRequest<any[]>(`/cards/${safeCardId}/checklists`, { signal: options?.signal });
     const needle = (args.itemName || '').trim().toLowerCase();
@@ -588,8 +691,7 @@ export class TrelloWriteTools extends TrelloReadTools {
     if (options?.boardId !== undefined) {
       this.assertBoardInScope(options.boardId);
     }
-    const cardInfo = await this.preWriteRequest<any>(`/cards/${safeCardId}`, { signal: options?.signal });
-    this.assertParentBoard(cardInfo, options?.boardId);
+    const cardInfo = await this.fetchScopedCard(safeCardId, options, ['name']);
 
     const res = await this.request<any>(`/cards/${safeCardId}`, {
       method: 'PUT',
@@ -603,5 +705,76 @@ export class TrelloWriteTools extends TrelloReadTools {
       name: String(res?.name || cardInfo?.name || ''),
       dueComplete: typeof res?.dueComplete === 'boolean' ? res.dueComplete : Boolean(args.dueComplete),
     };
+  }
+
+  /**
+   * Attach an existing board label to a card. The label must belong to the card's (allowed) board.
+   */
+  async addLabel(
+    args: { cardId: string; labelId: string },
+    options?: { signal?: AbortSignal; boardId?: string }
+  ): Promise<{ id: string; labelId: string; idLabels: string[]; alreadyPresent?: true }> {
+    const safeCardId = this.assertValidResourceId(args.cardId, 'cardId');
+    const safeLabelId = this.assertValidResourceId(args.labelId, 'labelId');
+    if (options?.boardId !== undefined) {
+      this.assertBoardInScope(options.boardId);
+    }
+    const cardInfo = await this.fetchScopedCard(safeCardId, options, ['idLabels']);
+    const labelInfo = await this.preWriteRequest<any>(`/labels/${safeLabelId}?fields=id,idBoard,name,color`, {
+      signal: options?.signal,
+    });
+    if (typeof labelInfo?.idBoard !== 'string' || labelInfo.idBoard !== cardInfo.idBoard) {
+      throw trelloValidationError(`Label '${safeLabelId}' does not belong to the card's board`, 'labelId');
+    }
+
+    const currentLabels: string[] = Array.isArray(cardInfo?.idLabels) ? cardInfo.idLabels.map(String) : [];
+    if (currentLabels.includes(safeLabelId)) {
+      // Already attached: nothing to write, and Trello would reject a duplicate with 400.
+      return { id: safeCardId, labelId: safeLabelId, idLabels: currentLabels, alreadyPresent: true };
+    }
+
+    const res = await this.request<any>(`/cards/${safeCardId}/idLabels`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: safeLabelId }),
+      signal: options?.signal,
+    });
+
+    const idLabels: string[] = Array.isArray(res)
+      ? res.map(String)
+      : Array.isArray(res?.idLabels)
+        ? res.idLabels.map(String)
+        : [...currentLabels, safeLabelId];
+    return { id: safeCardId, labelId: safeLabelId, idLabels };
+  }
+
+  /**
+   * Detach a label from a card in an allowed board. The label itself is not deleted from the board.
+   */
+  async removeLabel(
+    args: { cardId: string; labelId: string },
+    options?: { signal?: AbortSignal; boardId?: string }
+  ): Promise<{ id: string; labelId: string }> {
+    const safeCardId = this.assertValidResourceId(args.cardId, 'cardId');
+    const safeLabelId = this.assertValidResourceId(args.labelId, 'labelId');
+    if (options?.boardId !== undefined) {
+      this.assertBoardInScope(options.boardId);
+    }
+    const cardInfo = await this.fetchScopedCard(safeCardId, options, ['idLabels']);
+    if (Array.isArray(cardInfo?.idLabels) && !cardInfo.idLabels.map(String).includes(safeLabelId)) {
+      throw new StepError({
+        message: `Label '${safeLabelId}' is not on card '${safeCardId}'`,
+        category: 'NOT_FOUND',
+        statusCode: 404,
+        retryable: false,
+        details: { requestSent: false },
+      });
+    }
+
+    await this.request<any>(`/cards/${safeCardId}/idLabels/${safeLabelId}`, {
+      method: 'DELETE',
+      signal: options?.signal,
+    });
+    return { id: safeCardId, labelId: safeLabelId };
   }
 }

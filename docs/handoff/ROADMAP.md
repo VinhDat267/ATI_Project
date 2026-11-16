@@ -7,3 +7,5 @@ Danh sách ngắn, việc trên cùng làm trước. Xong việc nào thì xoá 
 3. **Dọn PR mở cũ:** #302, #298, #296, #273, #264, #262, #235, #189, #182, #87, #47. Đóng PR đã lỗi thời.
 4. **Dọn worktree:** `git worktree prune`; xoá worktree và nhánh đã merge.
 5. **Mở rộng Telegram v4 (tuỳ chọn):** nối `runJiraDigest`/`myjiraDigestConnection` ở `server.ts` kèm truyền `connections.telegram` trong `jira-digest-runner.ts`; hỗ trợ webhook mode và lịch tự động lấy tin Telegram làm nguồn tổng hợp sang Trello/Notion/Email.
+6. **Trello: giá trị người dùng (sau nghiệm thu):** prompt/nút "biên bản họp → nhiều thẻ"; digest kèm hành động "nhắc người phụ trách"; pin `slackCredentialId` cho digest Slack (candidate chưa có nguồn id); đóng PR #329 (phần khóa refresh Trello đã thay bằng advisory lock) và draft #296.
+7. **Automation mức cao hơn (cân nhắc):** lịch ghi định kỳ duyệt một lần theo mẫu cố định (khóa `plan_hash`); trigger sự kiện qua webhook Trello/GitHub.

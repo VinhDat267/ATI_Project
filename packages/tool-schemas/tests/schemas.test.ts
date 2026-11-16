@@ -109,10 +109,13 @@ describe('packages/tool-schemas (Task 2)', () => {
       'trello.remove_member',
       'trello.update_checklist_item',
       'trello.set_card_due_complete',
+      'trello.search_labels',
+      'trello.add_label',
+      'trello.remove_label',
     ]);
     expect(getToolDefinition('trello.add_comment')?.inputSchema.required).toEqual(['cardId', 'text']);
     expect(getToolDefinition('trello.add_comment')?.sideEffect).toBe('write');
-    expect(getToolDefinition('trello.add_comment')?.riskLevel).toBe('low');
+    expect(getToolDefinition('trello.add_comment')?.riskLevel).toBe('medium');
     expect(getToolDefinition('trello.create_list')?.inputSchema.required).toEqual(['boardId', 'name']);
     expect(getToolDefinition('trello.remove_member')?.inputSchema.required).toEqual(['cardId', 'memberId']);
     expect(getToolDefinition('trello.update_checklist_item')?.inputSchema.required).toEqual(['cardId', 'itemName', 'state']);
@@ -145,7 +148,7 @@ describe('packages/tool-schemas (Task 2)', () => {
     expect(createCard).toBeDefined();
     expect(createCard?.service).toBe('trello');
     expect(createCard?.sideEffect).toBe('write');
-    expect(createCard?.riskLevel).toBe('low');
+    expect(createCard?.riskLevel).toBe('medium');
 
     const sendMessage = getToolDefinition('slack.send_message');
     expect(sendMessage).toBeDefined();
@@ -167,7 +170,10 @@ describe('packages/tool-schemas (Task 2)', () => {
 
       if (tool.name.includes('.search_')) {
         expect(tool.inputSchema.properties.limit).toBeDefined();
-        expect(tool.inputSchema.properties.limit.maximum).toBeLessThanOrEqual(tool.listable ? 10 : 20);
+        // trello.search_cards also serves the digest's 50-card board scan; planner lookups are still
+        // clamped to MAX_RESULTS_PER_CALL (10) by the planner itself.
+        const max = tool.name === 'trello.search_cards' ? 50 : tool.listable ? 10 : 20;
+        expect(tool.inputSchema.properties.limit.maximum).toBeLessThanOrEqual(max);
       }
     }
   });
@@ -176,11 +182,11 @@ describe('packages/tool-schemas (Task 2)', () => {
     const writeTools = ALL_TOOLS.filter((t) => t.sideEffect === 'write');
     expect(writeTools).toHaveLength(14);
 
-    // Trello writes are low risk
-    const trelloWrites = writeTools.filter((t) => t.service === 'trello');
-    expect(trelloWrites).toHaveLength(4);
+    // Every Trello write (shared and OAuth catalogs) is medium risk, like GitHub writes
+    const trelloWrites = [...writeTools, ...TRELLO_OAUTH_TOOLS].filter((t) => t.service === 'trello' && t.sideEffect === 'write');
+    expect(trelloWrites).toHaveLength(11);
     for (const tool of trelloWrites) {
-      expect(tool.riskLevel).toBe('low');
+      expect(tool.riskLevel).toBe('medium');
     }
 
     // Slack send_message is medium risk

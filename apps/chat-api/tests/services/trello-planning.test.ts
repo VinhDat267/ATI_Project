@@ -60,7 +60,7 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
       expect(catalog.some((t) => t.service === 'trello')).toBe(false);
     });
 
-    it('includes all 14 trello.* tools (TRELLO_TOOLS + TRELLO_OAUTH_TOOLS) when caller is connected and is a member of at least one board', async () => {
+    it('includes all 17 trello.* tools (TRELLO_TOOLS + TRELLO_OAUTH_TOOLS) when caller is connected and is a member of at least one board', async () => {
       const repo = mockCredRepo({ id: 'cred-1', status: 'active', config: 'dummy' });
       const catalog = await getToolCatalogFor(repo, encryptionKey, {
         userId,
@@ -73,7 +73,7 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
         }),
       });
       const trelloTools = catalog.filter((t) => t.service === 'trello');
-      expect(trelloTools.length).toBe(14);
+      expect(trelloTools.length).toBe(17);
       expect(trelloTools.map((t) => t.name).sort()).toEqual(
         [...TRELLO_TOOLS, ...TRELLO_OAUTH_TOOLS].map((t) => t.name).sort()
       );
@@ -99,7 +99,7 @@ describe('Task 8: Trello planning, catalog, refusal, and execution guards', () =
           memberBoards: [{ boardId: 'b1', boardName: 'Bugs' }],
         }),
       });
-      expect(catalogEligible.filter((t) => t.service === 'trello').length).toBe(14);
+      expect(catalogEligible.filter((t) => t.service === 'trello').length).toBe(17);
     });
   });
 

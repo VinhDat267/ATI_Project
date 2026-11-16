@@ -123,6 +123,10 @@ export class TrelloOAuthClient {
     workspaceId: string,
     signal: AbortSignal
   ): Promise<TrelloBoardSummary[]> {
+    // /members/me/boards lists only boards the caller belongs to; Trello board
+    // objects carry no `member` field, so absence of `member` means member.
+    // Do not add `filter=members`: live Trello then drops workspace-visible
+    // boards the caller is a member of (verified against the real API).
     const body = await this.send(`${this.config.apiBaseUrl}/members/me/boards`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -132,6 +136,7 @@ export class TrelloOAuthClient {
     return items
       .filter((b: any) => {
         if (!b || b.idOrganization !== workspaceId) return false;
+        if (b.closed === true) return false;
         const perm = b.prefs?.permissionLevel || b.permissionLevel;
         return perm !== 'private';
       })
@@ -139,7 +144,7 @@ export class TrelloOAuthClient {
         id: String(b.id),
         name: String(b.name || ''),
         workspaceId: String(b.idOrganization),
-        member: b.member !== undefined ? Boolean(b.member) : true,
+        member: b.member !== false,
       }));
   }
 

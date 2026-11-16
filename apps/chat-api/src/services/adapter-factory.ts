@@ -36,6 +36,7 @@ import type { TelegramMessageRepo } from '../db/repositories/telegram-message-re
 import type { NotionConnectionRepo } from '../db/repositories/notion-connection-repo.js';
 import { NotionOAuthError } from './notion/oauth-client.js';
 import type { NotionTokenManager } from './notion/token-manager.js';
+import { toTrelloStepError, trelloSignal } from './trello/failure.js';
 import type { JiraDispatchGuard, DispatchScope } from './jira/jira-dispatch-guard.js';
 import type { JiraLeaseManager } from './jira/jira-lease-manager.js';
 
@@ -53,6 +54,8 @@ export interface AdapterContext {
   stepLeaseMap?: Map<string, string>;
   gatheredSourceRefs?: any[];
   repo?: string;
+  /** The run's abort signal: personal OAuth lookups during adapter construction stop with the run. */
+  signal?: AbortSignal;
 }
 
 export interface AdapterFactoryOptions {
@@ -502,16 +505,21 @@ export class AdapterFactory {
     }
 
     const provider = this.options.trelloTokens.forConnection(userId, record.id, refreshToken);
-    const accessToken = await provider.getAccessToken();
-
+    let accessToken: string;
     let liveMemberBoardIds: Set<string> = currentTeamBoardIds;
-    if (this.options.trelloOAuthClient) {
-      const callerBoards = await this.options.trelloOAuthClient.boards(
-        accessToken,
-        scope.workspaceId,
-        AbortSignal.timeout(10_000)
-      );
-      liveMemberBoardIds = new Set<string>(callerBoards.filter((b: any) => b.member === true).map((b: any) => String(b.id)));
+    try {
+      accessToken = await provider.getAccessToken({ signal: trelloSignal(10_000, context?.signal) });
+      if (this.options.trelloOAuthClient) {
+        const callerBoards = await this.options.trelloOAuthClient.boards(
+          accessToken,
+          scope.workspaceId,
+          trelloSignal(10_000, context?.signal)
+        );
+        liveMemberBoardIds = new Set<string>(callerBoards.filter((b: any) => b.member === true).map((b: any) => String(b.id)));
+      }
+    } catch (error) {
+      // Lost grant → AUTH_ERROR; outage → NETWORK/SERVER_ERROR (never a raw OAuth error).
+      throw toTrelloStepError(error);
     }
 
     const previewedBoardIds: string[] = (context?.connections?.trello?.boardIds ?? Array.from(currentTeamBoardIds)) as string[];

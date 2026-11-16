@@ -6,14 +6,14 @@
 
 - Planora: chat → AI lập kế hoạch → người dùng duyệt → thực thi trên dịch vụ ngoài, kèm lịch digest định kỳ.
 - 12 dịch vụ trong registry runtime, khoảng 95 tool. Chạy được ở `RUNTIME_MODE=sandbox` (fixture) và `live`.
-- **CI `main`: ĐỎ** từ #318 vì test chập chờn `apps/chat-api/tests/routes/google-grant-isolation.test.ts` ("a mycalendar scope change cancels an old refresh…", nhận 200 thay vì 409). PR #318 xanh trên chính PR đó.
+- **CI `main`: XANH** (5 lần chạy gần nhất đến #337, 16/11/2026). Test `google-grant-isolation.test.ts` từng chập chờn sau #318.
 - **Production: chưa bật.** Chưa nghiệm thu đầy đủ với dịch vụ thật (FLOW-07 còn mở).
 
 ## Từng dịch vụ
 
 | Dịch vụ | Trạng thái | Gần nhất | Còn thiếu |
 |---|---|---|---|
-| Trello | OAuth cá nhân, chọn workspace và bảng; digest sang Slack/Telegram; chuẩn hóa `requestSent: false` pre-dispatch | #325 | Nghiệm thu thật |
+| Trello | OAuth cá nhân, chọn workspace và bảng; 17 tool (thêm nhãn: `search_labels`/`add_label`/`remove_label`, `idLabels` khi tạo thẻ; ghi = rủi ro trung bình; pre-check chỉ lấy `id,idBoard`; chặn chuyển thẻ khác bảng); digest Slack/Telegram có mục "Đã xong", "chưa có hạn", pin credential Telegram, báo đủ/thiếu dữ liệu trung thực; lỗi mạng ≠ `reconnect_required` (không tạm dừng lịch); khóa refresh token đa tiến trình bằng advisory lock PostgreSQL | feat/trello-complete-v3 | Đã chạy thật trên bảng test 16/11/2026 (21/21 tool đọc/ghi/nhãn/scope và xem trước digest); còn gửi digest thật qua Slack/Telegram |
 | Slack | Bot dùng chung; có `slack.read_messages`; chặn retry 429 trên `postMessage` & siết allowlist `SlackProposalService` | #324 | Slack cá nhân (`myslack`) chưa có trong runtime registry |
 | GitHub | OAuth cá nhân, 13 tool (Issue/PR/Comment/Review) + digest Slack/Telegram; scope theo workspace (Personal & Org); chuẩn hóa `requestSent: false` pre-dispatch (#325); kiểm tra live repo membership trên `/api/services` (#324) | #331 | Đã nghiệm thu OAuth thật (`gho_`), Issue/PR/Comment + digest Telegram trên `VinhDat267/ati-test` (15/11/2026); còn kiểm tra live `request_reviewers` happy-path với cộng tác viên ngoài tác giả PR & digest Slack trực tiếp |
 | Sheets / MySheets | Sheets Digest v2 (#289–#299), khóa chặn ghi Drive (#300); chuẩn hóa `requestSent: false` pre-dispatch (#325) & chuẩn hóa `mimeType` Drive | #324 | Runbook staging GAS-03 chưa chạy |
@@ -31,6 +31,6 @@
 
 ## Lỗi và giới hạn đã biết
 
-- Test chập chờn ở trên làm `main` đỏ.
+- `google-grant-isolation.test.ts` có thể chập chờn trở lại; nếu CI đỏ ở đây thì chạy lại trước khi điều tra.
 - Gửi tin ra Slack/Telegram/Gmail không có "exactly-once": khi không rõ kết quả, hệ thống dừng ở `needs_attention`, không gửi lại.
 - Full check trên Windows hay lỗi vì môi trường (cổng DB, harness); dùng CI làm chuẩn.

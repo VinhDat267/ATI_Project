@@ -2,6 +2,7 @@ import { decryptCredentials } from '@wap/tool-adapters';
 import type { PlanConnections } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import type { TrelloTeamRepo } from '../../db/repositories/trello-team-repo.js';
+import { isTrelloAuthFailure } from './failure.js';
 import type { TrelloOAuthClient } from './oauth-client.js';
 import type { TrelloTokenManager } from './token-manager.js';
 
@@ -17,7 +18,12 @@ export interface TrelloConnectionLookupOptions {
 }
 
 export interface TrelloConnectionLookupResult {
-  status: 'not_connected' | 'reconnect_required' | 'needs_scope' | 'needs_membership' | 'connected';
+  /**
+   * `unavailable`: Trello or the token endpoint failed transiently (network,
+   * timeout, 5xx, 429). The grant is still good; callers retry later and must
+   * not pause schedules or ask the user to reconnect.
+   */
+  status: 'not_connected' | 'reconnect_required' | 'unavailable' | 'needs_scope' | 'needs_membership' | 'connected';
   connection?: TrelloConnectionReference;
   teamBoards: Array<{ boardId: string; boardName: string }>;
   memberBoards: Array<{ boardId: string; boardName: string }>;
@@ -74,15 +80,16 @@ export function createTrelloConnectionLookup(options: TrelloConnectionLookupOpti
     if (options.tokens && options.client) {
       try {
         const provider = options.tokens.forConnection(userId, record.id, refreshToken);
-        const accessToken = await provider.getAccessToken();
+        const accessToken = await provider.getAccessToken({ signal: AbortSignal.timeout(timeoutMs) });
         callerBoards = await options.client.boards(
           accessToken,
           scope.workspaceId,
           AbortSignal.timeout(timeoutMs)
         );
-      } catch {
+      } catch (error) {
+        // Only a lost grant asks the user to reconnect; an outage is retryable.
         return {
-          status: 'reconnect_required',
+          status: isTrelloAuthFailure(error) ? 'reconnect_required' : 'unavailable',
           username,
           memberId,
           teamBoards,

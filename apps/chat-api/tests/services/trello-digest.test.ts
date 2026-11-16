@@ -52,6 +52,7 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
         channelId: 'C_DEV',
         channelName: 'dev',
         dueSoonHours: 24,
+        destination: 'slack',
       });
       expect(candidate.configHash).toMatch(/^[0-9a-f]{64}$/);
     });
@@ -194,6 +195,8 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
             overdueCards: 1,
             dueSoonCards: 1,
             unassignedCards: 1,
+            completedCards: 0,
+            noDueCards: 1,
           },
           coverage: expect.objectContaining({
             perBoardFetchLimit: 50,
@@ -401,6 +404,8 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
           overdueCards: 1,
           dueSoonCards: 0,
           unassignedCards: 1,
+          completedCards: 0,
+          noDueCards: 0,
         },
         coverage: expect.objectContaining({
           perBoardFetchLimit: 50,
