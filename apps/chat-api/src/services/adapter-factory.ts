@@ -30,7 +30,8 @@ import { PostgresSheetsAppendLeaseStore } from './sheets/sheets-append-lease-sto
 
 export { PostgresSheetsAppendLeaseStore };
 import type { GmailTokenManager } from './gmail/token-manager.js';
-import type { TelegramBotClient } from './telegram/bot-client.js';
+import { TelegramBotError, type TelegramBotClient } from './telegram/bot-client.js';
+import type { TelegramMessageRepo } from '../db/repositories/telegram-message-repo.js';
 import type { NotionConnectionRepo } from '../db/repositories/notion-connection-repo.js';
 import { NotionOAuthError } from './notion/oauth-client.js';
 import type { NotionTokenManager } from './notion/token-manager.js';
@@ -86,7 +87,11 @@ export interface AdapterFactoryOptions {
     botUsername: string;
     apiBaseUrl?: string;
   };
-  telegramBotClient?: Pick<TelegramBotClient, 'getChatMember'>;
+  telegramBotClient?: Pick<TelegramBotClient, 'getChatMember'> & {
+    pollUpdates?: (signal: AbortSignal) => Promise<void>;
+    botKey?: string;
+  };
+  telegramMessageStore?: Pick<TelegramMessageRepo, 'list'>;
   createTelegramAdapter?: (input: {
     userId: string;
     telegramUserId: string;
@@ -744,12 +749,32 @@ export class AdapterFactory {
       throw telegramError('VALIDATION', 'Telegram chưa sẵn sàng trên máy chủ này.');
     }
 
+    const botClient = this.options.telegramBotClient;
+    const messageStore = this.options.telegramMessageStore;
+    const messageSource =
+      botClient?.pollUpdates && botClient.botKey && messageStore
+        ? async (chatId: string, limit: number, signal?: AbortSignal) => {
+            try {
+              await botClient.pollUpdates!(signal ?? AbortSignal.timeout(10_000));
+            } catch (err) {
+              if (err instanceof TelegramBotError) {
+                const category =
+                  err.kind === 'unauthorized' ? 'AUTH_ERROR' : err.kind === 'network' ? 'NETWORK' : 'SERVER_ERROR';
+                throw new StepError({ category, statusCode: err.status, message: 'Không thể đồng bộ tin nhắn Telegram.', retryable: false });
+              }
+              throw err;
+            }
+            return messageStore.list(botClient.botKey!, chatId, limit);
+          }
+        : undefined;
+
     return new TelegramAdapter({
       credentials: { botToken: this.options.telegramBot.botToken },
       baseUrl: this.options.telegramBot.apiBaseUrl,
       telegramUserId,
       allowedScope: { chats: allowedChats },
       knownChats: selectedChats,
+      messageSource,
       fetchFn: this.options.serviceFetchFn,
     });
   }

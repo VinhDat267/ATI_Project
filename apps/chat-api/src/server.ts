@@ -52,7 +52,9 @@ import { TrelloTokenManager } from './services/trello/token-manager.js';
 import { TrelloOAuthClient } from './services/trello/oauth-client.js';
 import { TrelloTeamRepo } from './db/repositories/trello-team-repo.js';
 import { TelegramTeamRepo } from './db/repositories/telegram-team-repo.js';
+import { TelegramMessageRepo } from './db/repositories/telegram-message-repo.js';
 import { TelegramUpdateRepo } from './db/repositories/telegram-update-repo.js';
+import { loadActiveTelegramChatAllowlist, invalidateTelegramAllowlistCache } from './services/telegram/allowed-chats.js';
 import { TelegramBotClient } from './services/telegram/bot-client.js';
 import { createTelegramConnectionLookup } from './services/telegram/connection-reference.js';
 import { TelegramDigestRunner } from './services/schedules/telegram-digest-runner.js';
@@ -525,8 +527,19 @@ async function bootstrap() {
   const githubConnection = githubLookup ?? sandboxGitHubConnection;
 
   const telegramAvailable = Boolean(env.TELEGRAM_BOT && pool);
+  const telegramMessageRepo = telegramAvailable && pool ? new TelegramMessageRepo(pool) : undefined;
   const telegramBotClient = telegramAvailable && pool
-    ? new TelegramBotClient(env.TELEGRAM_BOT!, fetch, new TelegramUpdateRepo(pool))
+    ? new TelegramBotClient(
+        env.TELEGRAM_BOT!,
+        fetch,
+        new TelegramUpdateRepo(pool),
+        telegramMessageRepo
+          ? {
+              allowedChatIds: () => loadActiveTelegramChatAllowlist(pool, env.ENCRYPTION_KEY),
+              messageStore: telegramMessageRepo,
+            }
+          : undefined,
+      )
     : undefined;
   const telegramTeamRepo = pool ? new TelegramTeamRepo(pool) : undefined;
   const telegramLookup = telegramAvailable && telegramBotClient
@@ -864,6 +877,7 @@ async function bootstrap() {
     trelloApiBaseUrl: env.TRELLO_OAUTH?.apiBaseUrl,
     telegramBot: env.TELEGRAM_BOT,
     telegramBotClient,
+    telegramMessageStore: telegramMessageRepo,
     notionRepo,
     notionTokens,
     notionApiBaseUrl: env.NOTION_OAUTH?.apiBaseUrl,
@@ -1140,6 +1154,7 @@ async function bootstrap() {
       teamRepo: telegramTeamRepo,
       onConnectionChanged: (userId: string) => {
         realAdapterFactory.clearPersonal(userId, 'telegram');
+        if (pool) invalidateTelegramAllowlistCache(pool);
       },
     },
     telegramTeamRepo,

@@ -1,7 +1,63 @@
 import { createHash } from 'node:crypto';
+import type { TelegramChatMessage } from '@wap/tool-adapters';
+import { normalizeTelegramChatId, TELEGRAM_CHAT_ID_PATTERN } from '@wap/tool-schemas';
 
 export interface TelegramUpdateStore {
-  poll(botKey: string, signal: AbortSignal, fetchPage: (offset?: number) => Promise<any[]>): Promise<any[]>;
+  poll(
+    botKey: string,
+    signal: AbortSignal,
+    fetchPage: (offset?: number, txClient?: any) => Promise<any[]>,
+  ): Promise<any[]>;
+}
+
+const isRecord = (value: unknown): value is Record<string, any> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+export function extractAllowedTelegramMessages(
+  rawUpdates: unknown[],
+  allowedChatIds: Set<string>,
+  botToken: string,
+): TelegramChatMessage[] {
+  if (!Array.isArray(rawUpdates) || allowedChatIds.size === 0) return [];
+  const extracted: TelegramChatMessage[] = [];
+  for (const update of rawUpdates) {
+    if (!isRecord(update)) continue;
+    const msg = update.message ?? update.edited_message ?? update.channel_post;
+    if (!isRecord(msg)) continue;
+    if (!Number.isSafeInteger(msg.message_id) || msg.message_id <= 0) continue;
+    if (!Number.isSafeInteger(msg.date) || msg.date < 0) continue;
+    if (!isRecord(msg.chat) || !Number.isSafeInteger(msg.chat.id)) continue;
+
+    const rawChatId = String(msg.chat.id);
+    if (!TELEGRAM_CHAT_ID_PATTERN.test(rawChatId)) continue;
+    const chatId = normalizeTelegramChatId(rawChatId);
+    if (!allowedChatIds.has(chatId)) continue;
+
+    const rawText =
+      typeof msg.text === 'string'
+        ? msg.text.trim()
+        : typeof msg.caption === 'string'
+          ? msg.caption.trim()
+          : '';
+    if (!rawText || /^\/start(?:@[A-Za-z0-9_]+)?\s+ati_/i.test(rawText)) continue;
+    if ((botToken && rawText.includes(botToken)) || /api\.telegram\.org\/bot/i.test(rawText)) continue;
+
+    const from = isRecord(msg.from) ? msg.from : isRecord(msg.sender_chat) ? msg.sender_chat : undefined;
+    const rawSender =
+      (from && [from.first_name, from.last_name].filter((p) => typeof p === 'string' && p.trim()).join(' ').trim()) ||
+      (from && typeof from.username === 'string' && from.username.trim() ? from.username.trim() : '') ||
+      (from && typeof from.title === 'string' && from.title.trim() ? from.title.trim() : '') ||
+      'Thành viên';
+
+    extracted.push({
+      chatId,
+      messageId: msg.message_id,
+      senderName: Array.from(rawSender).slice(0, 200).join(''),
+      text: Array.from(rawText).slice(0, 1000).join(''),
+      date: msg.date,
+    });
+  }
+  return extracted;
 }
 
 export const telegramStateHash = (state: string) => createHash('sha256').update(state).digest('hex');

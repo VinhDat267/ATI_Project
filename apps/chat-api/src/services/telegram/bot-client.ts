@@ -1,6 +1,13 @@
+import type { TelegramChatMessage } from '@wap/tool-adapters';
 import type { TelegramBotConfig } from '../../config/env.js';
 import type { TelegramChatType, TelegramTeamChatItem } from '../../db/repositories/telegram-team-repo.js';
-import { MemoryTelegramUpdateStore, projectTelegramUpdate, telegramStateHash, type TelegramUpdateStore } from './update-inbox.js';
+import {
+  extractAllowedTelegramMessages,
+  MemoryTelegramUpdateStore,
+  projectTelegramUpdate,
+  telegramStateHash,
+  type TelegramUpdateStore,
+} from './update-inbox.js';
 
 export class TelegramBotError extends Error {
   constructor(
@@ -34,12 +41,25 @@ function normalizeChatType(raw: unknown): TelegramChatType {
   return 'supergroup';
 }
 
+export interface TelegramMessageRetentionOptions {
+  allowedChatIds?: () => Promise<Set<string>> | Set<string>;
+  messageStore?: {
+    upsertMany(botKey: string, messages: TelegramChatMessage[], now: Date, client?: any): Promise<void>;
+    list?(botKey: string, chatId: string, limit: number, now?: Date): Promise<TelegramChatMessage[]>;
+  };
+}
+
 export class TelegramBotClient {
   constructor(
     private config: TelegramBotConfig,
     private fetchFn: typeof fetch = fetch,
     private updates: TelegramUpdateStore = new MemoryTelegramUpdateStore(),
+    private retention?: TelegramMessageRetentionOptions,
   ) {}
+
+  get botKey(): string {
+    return telegramStateHash(`${this.config.apiBaseUrl}:${this.config.botToken}`);
+  }
 
   get botUsername(): string {
     return this.config.botUsername;
@@ -185,18 +205,45 @@ export class TelegramBotClient {
     }
   }
 
+  async pollUpdates(signal: AbortSignal): Promise<void> {
+    const maxPages = 5;
+    for (let page = 0; page < maxPages; page++) {
+      const { rawCount } = await this.pollOnePage(signal);
+      if (rawCount < 100) break;
+    }
+  }
+
   private async getUpdates(signal: AbortSignal): Promise<any[]> {
-    const botKey = telegramStateHash(`${this.config.apiBaseUrl}:${this.config.botToken}`);
+    const { updates } = await this.pollOnePage(signal);
+    return updates;
+  }
+
+  private async pollOnePage(signal: AbortSignal): Promise<{ updates: any[]; rawCount: number }> {
+    let rawCount = 0;
     try {
-      return await this.updates.poll(botKey, signal, async (offset) => {
+      const updates = await this.updates.poll(this.botKey, signal, async (offset, txClient) => {
         const result = await this.callMethod(
           'getUpdates',
-          { limit: 100, timeout: 0, allowed_updates: ['message', 'my_chat_member', 'channel_post'], ...(offset !== undefined ? { offset } : {}) },
+          {
+            limit: 100,
+            timeout: 0,
+            allowed_updates: ['message', 'edited_message', 'my_chat_member', 'channel_post'],
+            ...(offset !== undefined ? { offset } : {}),
+          },
           signal,
         );
         if (!Array.isArray(result)) throw new TelegramBotError('server');
+        rawCount = result.length;
+        if (this.retention?.allowedChatIds && this.retention.messageStore && result.length > 0) {
+          const allowed = await this.retention.allowedChatIds();
+          const msgs = extractAllowedTelegramMessages(result, allowed, this.config.botToken);
+          if (msgs.length > 0) {
+            await this.retention.messageStore.upsertMany(this.botKey, msgs, new Date(), txClient);
+          }
+        }
         return result.map(projectTelegramUpdate);
       });
+      return { updates, rawCount };
     } catch (error) {
       if (error instanceof TelegramBotError) throw error;
       throw new TelegramBotError(signal.aborted ? 'network' : 'server');

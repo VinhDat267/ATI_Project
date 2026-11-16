@@ -1,7 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { encryptCredentials } from '@wap/tool-adapters';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
+import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
+import { TelegramMessageRepo } from '../../src/db/repositories/telegram-message-repo.js';
 import { TelegramUpdateRepo } from '../../src/db/repositories/telegram-update-repo.js';
+import { loadActiveTelegramChatAllowlist } from '../../src/services/telegram/allowed-chats.js';
 import { TelegramBotClient } from '../../src/services/telegram/bot-client.js';
+import { AdapterFactory } from '../../src/services/adapter-factory.js';
+
+const KEY = '0123456789abcdef0123456789abcdef';
 
 const config = {
   botToken: '123456789:fixture_only_telegram_token', botUsername: 'AtiFixtureBot',
@@ -115,5 +122,166 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
     await db.pool.query('INSERT INTO telegram_update_cursors(bot_key,next_update_id,updated_at) VALUES($1,201,$2)', ['empty-poll-bot', lastUpdate]);
     await new TelegramUpdateRepo(db.pool).poll('empty-poll-bot', AbortSignal.timeout(2000), async () => []);
     expect((await db.pool.query("SELECT updated_at FROM telegram_update_cursors WHERE bot_key='empty-poll-bot'")).rows[0].updated_at.getTime()).toBe(lastUpdate.getTime());
+  });
+
+  it('retains allowlisted chat messages across cursor-advancing polls and drops unapproved chats, /start, and token leaks', async () => {
+    const member = await db.person('Member Retain');
+    const outsider = await db.person('Outsider Reconnect');
+    const credRepo = new CredentialRepo(db.pool, KEY);
+    const msgRepo = new TelegramMessageRepo(db.pool);
+
+    await credRepo.saveCredentials(
+      'telegram',
+      encryptCredentials(
+        {
+          telegramUserId: '777001',
+          username: 'an',
+          selectedChats: [{ chatId: '-100111', title: 'Nhóm Allowlist', type: 'supergroup' }],
+        },
+        KEY,
+      ),
+      member.id,
+    );
+    await credRepo.upsertPersonalCredentials({
+      service: 'telegram',
+      userId: outsider.id,
+      status: 'reconnect_required',
+      config: encryptCredentials(
+        {
+          telegramUserId: '888002',
+          username: 'outsider',
+          selectedChats: [{ chatId: '-100999', title: 'Nhóm Đã Thu Hồi', type: 'supergroup' }],
+        },
+        KEY,
+      ),
+    });
+
+    let queue = [
+      {
+        update_id: 501,
+        message: {
+          message_id: 1,
+          chat: { id: -100111, type: 'supergroup', title: 'Nhóm Allowlist' },
+          from: { id: 777001, is_bot: false, first_name: 'An' },
+          date: 1794816000,
+          text: 'Tin cần giữ lại',
+        },
+      },
+      {
+        update_id: 502,
+        edited_message: {
+          message_id: 1,
+          chat: { id: -100111, type: 'supergroup', title: 'Nhóm Allowlist' },
+          from: { id: 777001, is_bot: false, first_name: 'An' },
+          date: 1794816005,
+          text: 'Tin cần giữ lại (đã sửa)',
+        },
+      },
+      {
+        update_id: 503,
+        message: {
+          message_id: 2,
+          chat: { id: -100111, type: 'supergroup', title: 'Nhóm Allowlist' },
+          from: { id: 777001, is_bot: false, first_name: 'An' },
+          date: 1794816010,
+          text: `/start ati_${'f'.repeat(43)}`,
+        },
+      },
+      {
+        update_id: 504,
+        message: {
+          message_id: 3,
+          chat: { id: -100111, type: 'supergroup', title: 'Nhóm Allowlist' },
+          from: { id: 777001, is_bot: false, first_name: 'An' },
+          date: 1794816015,
+          text: `leak ${config.botToken}`,
+        },
+      },
+      {
+        update_id: 505,
+        message: {
+          message_id: 4,
+          chat: { id: -100999, type: 'supergroup', title: 'Nhóm Đã Thu Hồi' },
+          from: { id: 888002, is_bot: false, first_name: 'Outsider' },
+          date: 1794816020,
+          text: 'Tin không được phép lưu',
+        },
+      },
+    ];
+
+    const fetchFn: typeof fetch = async (url, init) => {
+      if (String(url).endsWith('/getChatMember')) {
+        return Response.json({ ok: true, result: { status: 'member' } });
+      }
+      const body = JSON.parse(String(init?.body));
+      if (body.offset !== undefined) {
+        queue = queue.filter((u) => u.update_id >= body.offset);
+      }
+      return Response.json({ ok: true, result: queue.slice(0, body.limit) });
+    };
+
+    const client = new TelegramBotClient(
+      config,
+      fetchFn,
+      new TelegramUpdateRepo(db.pool),
+      {
+        allowedChatIds: () => loadActiveTelegramChatAllowlist(db.pool, KEY),
+        messageStore: msgRepo,
+      },
+    );
+
+    // Poll 1: simulates Settings / discovery poll consuming queue from Telegram
+    await client.discoverGroups(AbortSignal.timeout(5000));
+    // Poll 2: simulates another Settings/pairing poll with advancing offset (queue now empty)
+    await client.pollUpdates(AbortSignal.timeout(5000));
+
+    expect(await msgRepo.list(client.botKey, '-100111', 10)).toEqual([
+      {
+        chatId: '-100111',
+        messageId: 1,
+        senderName: 'An',
+        text: 'Tin cần giữ lại (đã sửa)',
+        date: 1794816005,
+      },
+    ]);
+    expect(await msgRepo.list(client.botKey, '-100999', 10)).toEqual([]);
+
+    const inboxDump = JSON.stringify((await db.pool.query('SELECT payload FROM telegram_update_inbox')).rows);
+    expect(inboxDump).not.toContain('Tin cần giữ lại');
+    expect(inboxDump).not.toContain('Tin không được phép lưu');
+
+    // End-to-end through AdapterFactory: even with Telegram getUpdates queue already acked, read_messages returns retained text
+    const serviceFetchFn: typeof fetch = async (url) => {
+      if (String(url).endsWith('/getUpdates')) {
+        return fetchFn(url, { body: JSON.stringify({ limit: 100 }) } as any);
+      }
+      if (String(url).endsWith('/getChatMember')) {
+        return Response.json({ ok: true, result: { status: 'member' } });
+      }
+      if (String(url).endsWith('/getChat')) {
+        return Response.json({ ok: true, result: { id: -100111, title: 'Nhóm Allowlist', type: 'supergroup' } });
+      }
+      return Response.json({ ok: false, error_code: 404 }, { status: 404 });
+    };
+    const adapter = await new AdapterFactory({
+      credentialRepo: credRepo,
+      encryptionKey: KEY,
+      telegramBot: config,
+      telegramBotClient: client,
+      telegramMessageStore: msgRepo,
+      serviceFetchFn,
+    }).getAdapterForService('telegram', { userId: member.id, phase: 'planning' });
+
+    const readRes = await adapter.execute('telegram.read_messages', { chatId: '-100111', limit: 10 });
+    expect(readRes.messages).toEqual([
+      {
+        id: '1',
+        messageId: 1,
+        chatId: '-100111',
+        senderName: 'An',
+        text: 'Tin cần giữ lại (đã sửa)',
+        date: 1794816005,
+      },
+    ]);
   });
 });

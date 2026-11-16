@@ -191,6 +191,8 @@ describe('service credential and health boundary', () => {
     expect(trelloScoped).toMatchObject({ personalStatus: 'connected', username: 'vinhnguyndt1', allowedScope: ['b-123'] });
     expect(githubScoped).toMatchObject({ personalStatus: 'connected', username: 'vinhgh', allowedScope: ['ati/wap-v3'] });
     expect(telegramScoped).toMatchObject({ personalStatus: 'connected', username: 'vinhtg', allowedScope: ['111'] });
+    expect(telegramEmpty.tools).toEqual(['telegram.list_chats', 'telegram.send_message']);
+    expect(telegramScoped.tools).toContain('telegram.read_messages');
   });
 
   it('still returns 200 on GET /api/services when trelloTeamRepo.get or githubTeamRepo.get rejects with a DB error', async () => {
