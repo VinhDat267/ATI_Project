@@ -4,6 +4,7 @@ import type { CalendarDigestConfig, CalendarDigestDelivery } from '@wap/tool-sch
 import { computeCalendarDigestHash } from './calendar-digest-candidate.js';
 import { localLabel } from './next-occurrence.js';
 import type { RunToPlan } from './schedule-runner.js';
+import { slackMrkdwnToTelegramPlain } from './telegram-plain-text.js';
 
 export const CALENDAR_DELIVERY_UNKNOWN = 'Chưa xác định bản tin lịch đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
 export const MAX_DIGEST_DISPLAY_EVENTS = 20;
@@ -490,12 +491,12 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
       };
     }
 
-    // Verify destination service (slack or telegram)
+    // Verify destination service (slack shared or personal telegram)
     const destService = config.destination.service;
     const destRow = (
       await options.pool.query(
         destService === 'telegram'
-          ? 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND (user_id = $2 OR user_id IS NULL) ORDER BY user_id IS NULL ASC LIMIT 1'
+          ? 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND user_id = $2 LIMIT 1'
           : 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL LIMIT 1',
         destService === 'telegram' ? [destService, run.userId] : [destService],
       )
@@ -505,6 +506,17 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
       return {
         state: 'blocked',
         pauseReason: `Dịch vụ ${destService === 'slack' ? 'Slack' : 'Telegram'} không còn hoạt động.`,
+      };
+    }
+
+    if (
+      config.destination.service === 'telegram' &&
+      config.destination.credentialId &&
+      String(destRow.id) !== config.destination.credentialId
+    ) {
+      return {
+        state: 'blocked',
+        pauseReason: 'Kết nối Telegram đã thay đổi kể từ lúc duyệt lịch.',
       };
     }
 
@@ -710,7 +722,7 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
       } else {
         await destAdapter.execute(
           'telegram.send_message',
-          { chatId: config.destination.chatId, text: formatted.text },
+          { chatId: config.destination.chatId, text: slackMrkdwnToTelegramPlain(formatted.text) },
           { signal },
         );
       }

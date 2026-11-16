@@ -40,7 +40,9 @@ export function isUncertainSheetsDeliveryRun(
       run.error.includes('TRELLO_DELIVERY_UNKNOWN') ||
       run.error.includes('TELEGRAM_DELIVERY_UNKNOWN') ||
       run.error.includes('NOTION_DELIVERY_UNKNOWN') ||
-      run.error.includes('Chưa xác định bản tin Notion đã gửi hay chưa'))
+      run.error.includes('Chưa xác định bản tin Notion đã gửi hay chưa') ||
+      run.error.includes('Chưa xác định bản tin lịch đã gửi hay chưa') ||
+      run.error.includes('Chưa xác định bản tin GitHub đã gửi hay chưa'))
   );
 }
 

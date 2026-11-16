@@ -1,6 +1,7 @@
 import type { ScheduleRecurrence } from '@wap/tool-schemas';
 import { computeJiraDigestConfigHash, type JiraDigestConfig } from './jira-digest-candidate.js';
 import { escapeSlackMrkdwn } from './github-digest-runner.js';
+import { slackMrkdwnToTelegramPlain } from './telegram-plain-text.js';
 
 export interface JiraDigestIssueItem {
   key: string;
@@ -183,7 +184,7 @@ export async function runJiraDigest(
     const tgAdapter = await input.getAdapter('telegram', { userId, phase: 'execution' });
     await tgAdapter.execute(
       'telegram.send_message',
-      { chatId: digestConfig.telegramChatId, text },
+      { chatId: digestConfig.telegramChatId, text: slackMrkdwnToTelegramPlain(text) },
       { signal },
     );
     return { state: 'digest_sent', text };

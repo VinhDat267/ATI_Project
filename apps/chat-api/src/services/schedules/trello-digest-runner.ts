@@ -9,6 +9,7 @@ import { isUuid } from '../../db/repositories/uuid.js';
 import { computeTrelloDigestConfigHash } from './trello-digest-candidate.js';
 import { escapeSlackMrkdwn } from './github-digest-runner.js';
 import type { RunToPlan } from './schedule-runner.js';
+import { slackMrkdwnToTelegramPlain } from './telegram-plain-text.js';
 
 export const TRELLO_DELIVERY_UNKNOWN =
   'TRELLO_DELIVERY_UNKNOWN: Chưa xác định bản tin Trello đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
@@ -894,7 +895,7 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
       try {
         const sendRes = await telegramAdapter.execute(
           'telegram.send_message',
-          { chatId: config.telegramChatId, text: messageText },
+          { chatId: config.telegramChatId, text: slackMrkdwnToTelegramPlain(messageText) },
           { signal, chatId: config.telegramChatId }
         );
         if (!isValidTelegramMessageId(sendRes?.messageId)) {

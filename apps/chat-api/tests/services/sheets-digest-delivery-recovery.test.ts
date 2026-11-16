@@ -5,6 +5,8 @@ import { createApp } from '../../src/app.js';
 import { generateAccessToken } from '../../src/auth/jwt.js';
 import { computeSheetsDigestHash } from '../../src/services/schedules/sheets-digest-candidate.js';
 import { SHEETS_DELIVERY_UNKNOWN } from '../../src/services/schedules/sheets-digest-runner.js';
+import { CALENDAR_DELIVERY_UNKNOWN } from '../../src/services/schedules/calendar-digest-runner.js';
+import { GITHUB_DELIVERY_UNKNOWN } from '../../src/services/schedules/github-digest-runner.js';
 import { ScheduleService } from '../../src/services/schedules/schedule-service.js';
 import { certifyScheduleFixture } from '../../src/services/slack/slack-schedule-origin.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
@@ -720,6 +722,113 @@ describe('Task 5B (PR-5B): Manual Delivery Recovery API & Audit Preservation (TC
       expect(runsInDb[0].error).toBe(SHEETS_DELIVERY_UNKNOWN);
     }
     expect(plannedRuns).toEqual([]);
+  });
+
+  it('7b. resolves uncertain Telegram delivery for calendar_digest and github_digest (mark_sent + retry_new_run)', async () => {
+    const service = buildService();
+    const app = buildApp(service);
+    const { personalA } = fixtures;
+    const recurrence = { type: 'daily' as const, time: '08:00' };
+    const cases = [
+      {
+        kind: 'calendar_digest',
+        error: CALENDAR_DELIVERY_UNKNOWN,
+        config: {
+          version: 1,
+          source: 'mycalendar',
+          credentialId: 'cal-cred-not-uuid',
+          email: 'an@example.com',
+          calendars: [{ id: 'primary', summary: 'An', primary: true }],
+          destination: { service: 'telegram', chatId: '-100777', chatTitle: 'Đội Sản Phẩm' },
+          windowHours: 24,
+          includeSummary: false,
+        },
+      },
+      {
+        kind: 'github_digest',
+        error: GITHUB_DELIVERY_UNKNOWN,
+        config: {
+          credentialId: 'gh-cred-not-uuid',
+          githubUserId: '1',
+          login: 'an',
+          repos: ['ati/app'],
+          channelId: '',
+          channelName: '',
+          staleDays: 3,
+          telegramChatId: '-100777',
+          telegramChatTitle: 'Đội Sản Phẩm',
+        },
+      },
+    ] as const;
+
+    for (const testCase of cases) {
+      const conv = await fixtures.convRepo.createConversation(personalA.user.id, `Hội thoại ${testCase.kind}`, {
+        workspaceMode: 'personal',
+        workspaceId: null,
+      });
+      const sched = (
+        await db.pool.query(
+          `INSERT INTO schedules (
+             user_id, conv_id, name, request, recurrence, services, status, pause_reason,
+             version, next_run_at, workspace_id, workspace_mode, kind, digest_config, digest_config_hash, digest_approved_at
+           )
+           VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'active', NULL, 1, $7, NULL, 'personal', $8, $9::jsonb, $10, $11)
+           RETURNING *`,
+          [
+            personalA.user.id,
+            conv.id,
+            `Lịch ${testCase.kind}`,
+            `Yêu cầu ${testCase.kind}`,
+            JSON.stringify(recurrence),
+            ['telegram'],
+            new Date('2026-11-03T01:00:00.000Z'),
+            testCase.kind,
+            JSON.stringify(testCase.config),
+            'b'.repeat(64),
+            new Date('2026-11-01T12:00:00.000Z'),
+          ],
+        )
+      ).rows[0];
+      await certifyScheduleFixture(db.pool, sched.id);
+
+      const insertUnknownRun = async (dueAt: string) =>
+        (
+          await db.pool.query(
+            `INSERT INTO schedule_runs (
+               schedule_id, schedule_version, trigger, due_at, status, conv_id, error, delivery_started_at
+             )
+             VALUES ($1, 1, 'scheduled', $2, 'needs_attention', $3, $4, $5)
+             RETURNING *`,
+            [sched.id, new Date(dueAt), conv.id, testCase.error, CLAIMED_AT],
+          )
+        ).rows[0];
+
+      const first = await insertUnknownRun('2026-11-02T01:00:00.000Z');
+      const markSent = await request(app)
+        .post(`/api/schedule-runs/${first.id}/resolve-delivery`)
+        .set('Authorization', bearer(personalA.user))
+        .send({ resolution: 'mark_sent' });
+      expect(markSent.status, `mark_sent for ${testCase.kind}`).toBe(200);
+      const markedRow = (await db.pool.query('SELECT * FROM schedule_runs WHERE id = $1', [first.id])).rows[0];
+      expect(markedRow.status).toBe('digest_sent');
+      expect(markedRow.delivery_resolution).toBe('confirmed_sent');
+      expect(markedRow.error).toBeNull();
+      if (testCase.kind === 'calendar_digest') {
+        expect(markedRow.delivery).toMatchObject({ destinationService: 'telegram', channelId: '-100777' });
+      } else {
+        expect(markedRow.delivery).toMatchObject({ telegramChatId: '-100777', telegramChatTitle: 'Đội Sản Phẩm' });
+      }
+
+      const second = await insertUnknownRun('2026-11-02T01:30:00.000Z');
+      const retry = await request(app)
+        .post(`/api/schedule-runs/${second.id}/resolve-delivery`)
+        .set('Authorization', bearer(personalA.user))
+        .send({ resolution: 'retry_new_run', confirmDuplicateRisk: true });
+      expect(retry.status, `retry_new_run for ${testCase.kind}: ${JSON.stringify(retry.body)}`).toBe(200);
+      const oldRow = (await db.pool.query('SELECT * FROM schedule_runs WHERE id = $1', [second.id])).rows[0];
+      expect(oldRow.delivery_resolution).toBe('retried_new_run');
+      expect(oldRow.delivery_followup_run_id).toBeTruthy();
+    }
   });
 
   it('8. rejects needs_attention runs whose error does not include SHEETS_DELIVERY_UNKNOWN with 409 RUN_NOT_AWAITING_DELIVERY_RESOLUTION and zero DB mutations', async () => {

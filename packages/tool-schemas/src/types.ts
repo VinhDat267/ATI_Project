@@ -506,7 +506,7 @@ export interface CalendarDigestConfig {
   calendars: Array<{ id: string; summary: string; primary?: boolean }>;
   destination:
     | { service: 'slack'; channelId: string; channelName?: string }
-    | { service: 'telegram'; chatId: string; chatTitle?: string };
+    | { service: 'telegram'; chatId: string; chatTitle?: string; credentialId?: string };
   windowHours: number;
   includeSummary: boolean;
 }

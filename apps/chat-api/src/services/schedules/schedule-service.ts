@@ -5,7 +5,10 @@ import {
   normalizeTelegramChatId,
   TELEGRAM_CHAT_ID_PATTERN,
   type CalendarDigestCandidate,
+  type CalendarDigestConfig,
+  type CalendarDigestDelivery,
   type GithubDigestConfig,
+  type GithubDigestDelivery,
   type ScheduleApprovalMode,
   type ScheduleDigestCandidate,
   type ScheduleKind,
@@ -32,6 +35,8 @@ import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } fr
 import { isUuid } from '../../db/repositories/uuid.js';
 import { calendarDigestCandidateMatches, computeCalendarDigestHash, evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js';
 import { isNotionDeliveryUnknown, runState, runView } from './run-state.js';
+import { CALENDAR_DELIVERY_UNKNOWN } from './calendar-digest-runner.js';
+import { GITHUB_DELIVERY_UNKNOWN } from './github-digest-runner.js';
 import { nextOccurrence, nextRuns } from './next-occurrence.js';
 import { captureScheduleArtifact, guardScheduleArtifact, prelockScheduleArtifacts, registerScheduleFields, scheduleRegistry, scheduleSourceContext, tagScheduleContext } from '../slack/slack-schedule-lineage.js';
 import { messageOutputSelectors } from '../slack/slack-message-selectors.js';
@@ -2071,7 +2076,9 @@ export class ScheduleService {
         schedule.kind !== 'sheets_digest' &&
         schedule.kind !== 'trello_digest' &&
         schedule.kind !== 'telegram_digest' &&
-        schedule.kind !== 'notion_digest'
+        schedule.kind !== 'notion_digest' &&
+        schedule.kind !== 'calendar_digest' &&
+        schedule.kind !== 'github_digest'
       ) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
@@ -2125,7 +2132,13 @@ export class ScheduleService {
         typeof run.error === 'string' &&
         run.error.trim().length > 0;
       const isNotionUnknown = isNotionDeliveryUnknown(run, schedule);
-      if (!isSheetsUnknown && !isTrelloOrTelegramUnknown && !isNotionUnknown) {
+      const isCalendarOrGithubUnknown =
+        run.status === 'needs_attention' &&
+        run.delivery_started_at != null &&
+        typeof run.error === 'string' &&
+        ((schedule.kind === 'calendar_digest' && run.error.includes(CALENDAR_DELIVERY_UNKNOWN)) ||
+          (schedule.kind === 'github_digest' && run.error.includes(GITHUB_DELIVERY_UNKNOWN)));
+      if (!isSheetsUnknown && !isTrelloOrTelegramUnknown && !isNotionUnknown && !isCalendarOrGithubUnknown) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
           'Lượt chạy này không ở trạng thái chờ xác nhận kết quả gửi.',
@@ -2275,6 +2288,87 @@ export class ScheduleService {
             },
           };
           deliveryPayload = delivery as unknown as Record<string, unknown>;
+        } else if (schedule.kind === 'calendar_digest') {
+          const cfg =
+            run.dispatched_config && typeof run.dispatched_config === 'object'
+              ? (run.dispatched_config as unknown as CalendarDigestConfig)
+              : schedule.version === run.schedule_version &&
+                  schedule.digest_config &&
+                  typeof schedule.digest_config === 'object'
+                ? (schedule.digest_config as unknown as CalendarDigestConfig)
+                : null;
+          const prevDelivery =
+            run.delivery && typeof run.delivery === 'object'
+              ? (run.delivery as Partial<CalendarDigestDelivery>)
+              : {};
+          const dest = cfg?.destination;
+          const fallbackLabel =
+            dest?.service === 'slack' ? dest.channelName : dest?.service === 'telegram' ? dest.chatTitle : undefined;
+          const delivery: CalendarDigestDelivery & Record<string, unknown> = {
+            ...(prevDelivery.destinationService ?? dest?.service
+              ? { destinationService: prevDelivery.destinationService ?? dest?.service }
+              : {}),
+            channelId:
+              prevDelivery.channelId ??
+              (dest?.service === 'slack' ? dest.channelId : dest?.service === 'telegram' ? dest.chatId : 'unknown'),
+            ...(prevDelivery.channelName ?? fallbackLabel
+              ? { channelName: prevDelivery.channelName ?? fallbackLabel }
+              : {}),
+            calendarsChecked:
+              typeof prevDelivery.calendarsChecked === 'number'
+                ? prevDelivery.calendarsChecked
+                : Array.isArray(cfg?.calendars)
+                  ? cfg.calendars.length
+                  : 0,
+            totalEvents: typeof prevDelivery.totalEvents === 'number' ? prevDelivery.totalEvents : 0,
+            conflictCount: typeof prevDelivery.conflictCount === 'number' ? prevDelivery.conflictCount : 0,
+            summaryIncluded:
+              typeof prevDelivery.summaryIncluded === 'boolean' ? prevDelivery.summaryIncluded : false,
+            sentAt: typeof prevDelivery.sentAt === 'string' ? prevDelivery.sentAt : resolvedAtIso,
+            manualConfirmedAt: resolvedAtIso,
+            manualResolution: {
+              status: 'confirmed_sent',
+              resolvedAt: resolvedAtIso,
+              manualConfirmedAt: resolvedAtIso,
+              resolvedBy: userId,
+            },
+          };
+          deliveryPayload = delivery;
+        } else if (schedule.kind === 'github_digest') {
+          const cfg =
+            run.dispatched_config && typeof run.dispatched_config === 'object'
+              ? (run.dispatched_config as unknown as GithubDigestConfig)
+              : schedule.version === run.schedule_version &&
+                  schedule.digest_config &&
+                  typeof schedule.digest_config === 'object'
+                ? (schedule.digest_config as unknown as GithubDigestConfig)
+                : null;
+          const prevDelivery =
+            run.delivery && typeof run.delivery === 'object'
+              ? (run.delivery as Partial<GithubDigestDelivery>)
+              : {};
+          const isTelegram = Boolean(prevDelivery.telegramChatId ?? cfg?.telegramChatId);
+          const delivery: GithubDigestDelivery & Record<string, unknown> = {
+            channelId: prevDelivery.channelId ?? (isTelegram ? '' : cfg?.channelId ?? 'unknown'),
+            channelName: prevDelivery.channelName ?? (isTelegram ? '' : cfg?.channelName ?? 'unknown'),
+            ts: typeof prevDelivery.ts === 'string' && prevDelivery.ts.trim() ? prevDelivery.ts : null,
+            counts: prevDelivery.counts ?? { newIssues: 0, stalePrs: 0, unassignedIssues: 0 },
+            ...(isTelegram
+              ? {
+                  telegramChatId: prevDelivery.telegramChatId ?? cfg?.telegramChatId,
+                  telegramChatTitle: prevDelivery.telegramChatTitle ?? cfg?.telegramChatTitle ?? '',
+                  messageId: typeof prevDelivery.messageId === 'number' ? prevDelivery.messageId : null,
+                }
+              : {}),
+            manualConfirmedAt: resolvedAtIso,
+            manualResolution: {
+              status: 'confirmed_sent',
+              resolvedAt: resolvedAtIso,
+              manualConfirmedAt: resolvedAtIso,
+              resolvedBy: userId,
+            },
+          };
+          deliveryPayload = delivery;
         } else {
           const cfg =
             run.dispatched_config && typeof run.dispatched_config === 'object'
@@ -2428,6 +2522,29 @@ export class ScheduleService {
             throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
           }
           await this.assertNotionSourceInTx(client, schedule);
+        } else if (schedule.kind === 'calendar_digest' || schedule.kind === 'github_digest') {
+          const credIds: string[] = [];
+          if (schedule.kind === 'calendar_digest') {
+            const cfg = schedule.digest_config as unknown as CalendarDigestConfig;
+            if (cfg.credentialId) credIds.push(cfg.credentialId);
+            if (cfg.destination?.service === 'telegram' && cfg.destination.credentialId) {
+              credIds.push(cfg.destination.credentialId);
+            }
+          } else {
+            const cfg = schedule.digest_config as unknown as GithubDigestConfig;
+            if (cfg.credentialId) credIds.push(cfg.credentialId);
+            if (cfg.telegramCredentialId) credIds.push(cfg.telegramCredentialId);
+          }
+          for (const credId of credIds) {
+            if (!isUuid(credId)) continue;
+            const credRes = await client.query<{ status: string }>(
+              'SELECT status FROM service_credentials WHERE id = $1 AND user_id = $2',
+              [credId, schedule.user_id],
+            );
+            if (credRes.rows[0]?.status !== 'active') {
+              throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+            }
+          }
         }
       }
       const busy = await client.query(
