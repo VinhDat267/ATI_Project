@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { encryptCredentials } from '@wap/tool-adapters';
 import { createApp } from '../../src/app.js';
+import { validateEnv } from '../../src/config/env.js';
 import { generateAccessToken } from '../../src/auth/jwt.js';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
@@ -122,6 +123,43 @@ describe('Task 9: Shared Trello credentials removal', () => {
     expect(trello.personalStatus).toBe('connected');
     expect(trello.username).toBe('alice_trello');
     expect(typeof trello.connectedAt).toBe('string');
+  });
+
+  it('checks personal Trello credentials with the validated sandbox endpoint', async () => {
+    const env = validateEnv({
+      RUNTIME_MODE: 'sandbox',
+      TRELLO_OAUTH_CLIENT_ID: 'fixture-client',
+      TRELLO_OAUTH_CLIENT_SECRET: 'fixture-secret',
+      TRELLO_OAUTH_REDIRECT_URI: 'http://127.0.0.1:5174/connections/trello/callback',
+      TRELLO_OAUTH_AUTH_URL: 'http://127.0.0.1:9/authorize',
+      TRELLO_OAUTH_TOKEN_URL: 'http://127.0.0.1:9/token',
+      TRELLO_API_BASE_URL: 'http://127.0.0.1:9/trello/1',
+    });
+    await credentials.saveCredentials(
+      'trello',
+      encryptCredentials({ accessToken: 'fixture-token' }, key),
+      member.id
+    );
+    const app = createApp({
+      jwtSecret: secret,
+      userRepo: db.users,
+      credentialRepo: credentials,
+      encryptionKey: key,
+      runtimeMode: env.RUNTIME_MODE,
+      trello: { oauth: env.TRELLO_OAUTH },
+      serviceFetchFn: async (url) => {
+        expect(String(url)).toBe('http://127.0.0.1:9/trello/1/members/me');
+        return Response.json({ id: 'fixture-member' });
+      },
+    });
+
+    const res = await request(app)
+      .post('/api/services/trello/test')
+      .set('Authorization', bearer(member))
+      .set('x-workspace-id', 'personal');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'healthy' });
   });
 
   it('uses the explicit encryptionKey passed to CredentialRepo constructor when rotating personal Trello refresh tokens', async () => {

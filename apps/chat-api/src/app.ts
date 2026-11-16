@@ -476,6 +476,7 @@ export function createApp(options: AppOptions): Express {
       jiraOAuthRepo: options.jira?.repo,
       jiraWorkspaceRepo: options.jiraWorkspaceRepo,
       trelloTeamRepo: options.trelloTeamRepo ?? options.trello?.teamRepo,
+      trelloApiBaseUrl: options.trello?.oauth?.apiBaseUrl,
       githubTeamRepo: options.githubTeamRepo ?? options.github?.teamRepo,
       githubOAuthClient:
         options.githubOAuthClient ??

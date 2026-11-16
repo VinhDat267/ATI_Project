@@ -81,6 +81,7 @@ describe('AdapterFactory Trello: boards failures and signals', () => {
     await expect(factory.getAdapterForService('trello', context())).rejects.toSatisfy((err: any) => {
       expect(err).toBeInstanceOf(StepError);
       expect(err.category).toBe('NETWORK');
+      expect(err.details).toMatchObject({ requestSent: false });
       return true;
     });
   });
@@ -90,6 +91,34 @@ describe('AdapterFactory Trello: boards failures and signals', () => {
     await expect(down.factory.getAdapterForService('trello', context())).rejects.toMatchObject({ category: 'SERVER_ERROR' });
     const revoked = build(() => Promise.reject(new TrelloOAuthError('rejected', 401)));
     await expect(revoked.factory.getAdapterForService('trello', context())).rejects.toMatchObject({ category: 'AUTH_ERROR' });
+  });
+
+  it('preserves RATE_LIMIT when membership lookup is throttled before a tool request', async () => {
+    const { factory } = build(() => Promise.reject(new TrelloOAuthError('rejected', 429)));
+    await expect(factory.getAdapterForService('trello', context())).rejects.toMatchObject({
+      category: 'RATE_LIMIT',
+      statusCode: 429,
+      details: { requestSent: false },
+    });
+  });
+
+  it('marks an invalid preflight connection as unsent', async () => {
+    const { factory } = build(async () => []);
+    await expect(factory.getAdapterForService('trello')).rejects.toMatchObject({
+      category: 'AUTH_ERROR',
+      details: { requestSent: false },
+    });
+  });
+
+  it('classifies a credential storage failure before dispatch as transient', async () => {
+    const factory = new AdapterFactory({
+      credentialRepo: { getPersonalCredentials: async () => { throw new Error('Database unavailable'); } } as any,
+      encryptionKey,
+    });
+    await expect(factory.getAdapterForService('trello', context())).rejects.toMatchObject({
+      category: 'NETWORK',
+      details: { requestSent: false },
+    });
   });
 
   it('passes the run signal to token refresh and boards lookup', async () => {
@@ -149,21 +178,11 @@ describe('Trello shared transport checkConnection', () => {
     vi.unstubAllEnvs();
   });
 
-  it('uses the configured API base URL instead of the hard-coded production host', async () => {
-    const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 'm1' }), { status: 200 }));
-    const ok = await TRELLO_TRANSPORT.checkConnection(
-      { accessToken: 'at', apiBaseUrl: 'http://127.0.0.1:9/trello/1' },
-      fetchFn as any,
-      new AbortController().signal
-    );
-    expect(ok).toBe(true);
-    expect(String(fetchFn.mock.calls[0]?.[0])).toBe('http://127.0.0.1:9/trello/1/members/me');
-  });
-
-  it('falls back to TRELLO_API_BASE_URL from the environment', async () => {
+  it('defaults to the official endpoint even when the process has a fixture override', async () => {
     vi.stubEnv('TRELLO_API_BASE_URL', 'http://127.0.0.1:9/fake/1/');
     const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: 'm1' }), { status: 200 }));
-    await TRELLO_TRANSPORT.checkConnection({ accessToken: 'at' }, fetchFn as any, new AbortController().signal);
-    expect(String(fetchFn.mock.calls[0]?.[0])).toBe('http://127.0.0.1:9/fake/1/members/me');
+    const ok = await TRELLO_TRANSPORT.checkConnection({ accessToken: 'fake-token' }, fetchFn, new AbortController().signal);
+    expect(ok).toBe(true);
+    expect(String(fetchFn.mock.calls[0]?.[0])).toBe('https://api.trello.com/1/members/me');
   });
 });

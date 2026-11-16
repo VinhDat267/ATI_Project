@@ -24,6 +24,10 @@ interface Cached {
   expiresAt: number;
 }
 
+type RefreshResult =
+  | { kind: 'token'; entry: Cached; refreshToken: string }
+  | { kind: 'lost_grant'; marked: boolean };
+
 /** Where a refresh reads and writes the stored secret. */
 interface SecretStore {
   read?: PersonalSecretSession['read'];
@@ -64,11 +68,12 @@ export class TrelloTokenManager {
     this.refreshTimeoutMs = options.refreshTimeoutMs ?? 10_000;
   }
 
-  private failure(category: 'AUTH_ERROR' | 'NETWORK' | 'SERVER_ERROR', statusCode?: number) {
+  private failure(category: 'AUTH_ERROR' | 'NETWORK' | 'SERVER_ERROR' | 'RATE_LIMIT', statusCode?: number) {
     return new StepError({
       category,
       statusCode,
       retryable: false,
+      details: { requestSent: false },
       message:
         category === 'AUTH_ERROR'
           ? 'Trello cần được kết nối lại.'
@@ -145,85 +150,77 @@ export class TrelloTokenManager {
     }
 
     const credentials = this.options.credentials;
-    if (!credentials.withPersonalSecretLock) {
-      return this.refreshWith(userId, credentialId, key, forceRefresh, {
-        rotate: (next) =>
-          credentials.rotatePersonalSecret({
-            service: 'trello',
-            userId,
-            credentialId,
-            previousRefreshToken: next.previousRefreshToken,
-            nextRefreshToken: next.nextRefreshToken,
-          }),
-        markReconnectRequired: () => credentials.markReconnectRequired('trello', userId, credentialId),
-      });
-    }
-
-    let lostGrant = false;
+    const generation = this.generation.get(userId) ?? 0;
+    const initialRefreshToken = this.refreshTokens.get(key);
+    let result: RefreshResult;
     try {
-      return await credentials.withPersonalSecretLock(
-        {
-          service: 'trello',
-          userId,
-          credentialId,
-          lockTimeoutMs: this.refreshTimeoutMs + LOCK_WAIT_SLACK_MS,
-        },
-        async (session) => {
-          try {
-            return await this.refreshWith(userId, credentialId, key, forceRefresh, session);
-          } catch (error) {
-            if (error instanceof StepError && error.category === 'AUTH_ERROR') lostGrant = true;
-            throw error;
-          }
-        }
-      );
-    } catch (error) {
-      if (error instanceof StepError) {
-        // Notify only after the lock transaction committed the reconnect mark.
-        if (lostGrant) this.options.onReconnectRequired?.(userId);
-        throw error;
+      const run = (store: SecretStore) => this.refreshWith(initialRefreshToken, forceRefresh, store);
+      if (credentials.withPersonalSecretLock) {
+        result = await credentials.withPersonalSecretLock(
+          { service: 'trello', userId, credentialId, lockTimeoutMs: this.refreshTimeoutMs + LOCK_WAIT_SLACK_MS },
+          run
+        );
+      } else {
+        result = await run({
+          rotate: (next) =>
+            credentials.rotatePersonalSecret({
+              service: 'trello',
+              userId,
+              credentialId,
+              previousRefreshToken: next.previousRefreshToken,
+              nextRefreshToken: next.nextRefreshToken,
+            }),
+          markReconnectRequired: () => credentials.markReconnectRequired('trello', userId, credentialId),
+        });
       }
-      // Lock timeout, lost DB connection, commit failure: transient.
+    } catch (error) {
+      if (error instanceof StepError) throw error;
+      // A lock, SQL or commit failure does not establish that the grant is invalid.
       throw this.failure('NETWORK');
     }
+
+    if ((this.generation.get(userId) ?? 0) === generation) {
+      if (result.kind === 'token') {
+        this.refreshTokens.set(key, result.refreshToken);
+        this.cache.set(key, result.entry);
+      } else {
+        this.cache.delete(key);
+        this.refreshTokens.delete(key);
+        this.revokedConnections.add(key);
+        if (result.marked) this.options.onReconnectRequired?.(userId);
+      }
+    }
+    if (result.kind === 'lost_grant') throw this.failure('AUTH_ERROR', 400);
+    return result.entry;
   }
 
   private async refreshWith(
-    userId: string,
-    credentialId: string,
-    key: string,
+    initialRefreshToken: string | undefined,
     forceRefresh: boolean,
     store: SecretStore
-  ): Promise<Cached> {
-    const generation = this.generation.get(userId) ?? 0;
-
+  ): Promise<RefreshResult> {
+    let currentRefreshToken = initialRefreshToken;
     if (store.read) {
       const stored = await store.read();
       if (!stored || stored.status !== 'active' || !stored.refreshToken) {
-        // Disconnected, reconnected under a new id, or already marked: never send the old token.
-        await this.handleLostGrant(userId, key, store, false);
-        throw this.failure('AUTH_ERROR', 400);
+        return { kind: 'lost_grant', marked: await store.markReconnectRequired() };
       }
-      if (stored.refreshToken !== this.refreshTokens.get(key)) {
-        // Another instance rotated while we waited: its refresh token is the live one.
-        this.refreshTokens.set(key, stored.refreshToken);
-      }
+      currentRefreshToken = stored.refreshToken;
       if (
         !forceRefresh &&
         stored.accessToken &&
         stored.accessTokenExpiresAt !== undefined &&
         stored.accessTokenExpiresAt - this.clock() > REFRESH_SKEW_MS
       ) {
-        const adopted: Cached = { accessToken: stored.accessToken, expiresAt: stored.accessTokenExpiresAt };
-        if ((this.generation.get(userId) ?? 0) === generation) this.cache.set(key, adopted);
-        return adopted;
+        return {
+          kind: 'token',
+          refreshToken: currentRefreshToken,
+          entry: { accessToken: stored.accessToken, expiresAt: stored.accessTokenExpiresAt },
+        };
       }
     }
 
-    const currentRefreshToken = this.refreshTokens.get(key);
-    if (!currentRefreshToken) {
-      throw this.failure('AUTH_ERROR', 400);
-    }
+    if (!currentRefreshToken) throw this.failure('AUTH_ERROR', 400);
 
     let tokens: { accessToken: string; refreshToken?: string; expiresInSeconds: number };
     try {
@@ -233,8 +230,10 @@ export class TrelloTokenManager {
       );
     } catch (error) {
       if (error instanceof TrelloOAuthError && error.kind === 'invalid_grant') {
-        await this.handleLostGrant(userId, key, store, !store.read);
-        throw this.failure('AUTH_ERROR', 400);
+        return { kind: 'lost_grant', marked: await store.markReconnectRequired() };
+      }
+      if (error instanceof TrelloOAuthError && error.status === 429) {
+        throw this.failure('RATE_LIMIT', 429);
       }
       if (error instanceof TrelloOAuthError && error.kind !== 'network') {
         throw this.failure('SERVER_ERROR', error.status);
@@ -243,53 +242,26 @@ export class TrelloTokenManager {
     }
 
     if (typeof tokens.refreshToken !== 'string' || !tokens.refreshToken.trim()) {
-      await this.handleLostGrant(userId, key, store, !store.read);
-      throw this.failure('AUTH_ERROR', 400);
+      return { kind: 'lost_grant', marked: await store.markReconnectRequired() };
     }
 
     const nextRefreshToken = tokens.refreshToken;
     const expiresAt = this.clock() + tokens.expiresInSeconds * 1000;
-
-    let rotateResult: 'rotated' | 'mismatch' | 'missing';
-    try {
-      rotateResult = await store.rotate({
-        previousRefreshToken: currentRefreshToken,
-        nextRefreshToken,
-        nextAccessToken: tokens.accessToken,
-        nextAccessTokenExpiresAt: expiresAt,
-      });
-    } catch {
-      await this.handleLostGrant(userId, key, store, !store.read);
-      throw this.failure('AUTH_ERROR', 400);
-    }
-
+    const rotateResult = await store.rotate({
+      previousRefreshToken: currentRefreshToken,
+      nextRefreshToken,
+      nextAccessToken: tokens.accessToken,
+      nextAccessTokenExpiresAt: expiresAt,
+    });
     if (rotateResult !== 'rotated') {
-      await this.handleLostGrant(userId, key, store, !store.read);
-      throw this.failure('AUTH_ERROR', 400);
+      return { kind: 'lost_grant', marked: await store.markReconnectRequired() };
     }
 
-    this.refreshTokens.set(key, nextRefreshToken);
-
-    const entry: Cached = { accessToken: tokens.accessToken, expiresAt };
-
-    if ((this.generation.get(userId) ?? 0) === generation) {
-      this.cache.set(key, entry);
-    }
-
-    return entry;
-  }
-
-  /** `notify`: call onReconnectRequired now (the locked path notifies after commit). */
-  private async handleLostGrant(userId: string, key: string, store: SecretStore, notify: boolean): Promise<void> {
-    this.cache.delete(key);
-    this.refreshTokens.delete(key);
-    this.revokedConnections.add(key);
-    try {
-      await store.markReconnectRequired();
-    } catch {
-      // still a lost grant
-    }
-    if (notify) this.options.onReconnectRequired?.(userId);
+    return {
+      kind: 'token',
+      refreshToken: nextRefreshToken,
+      entry: { accessToken: tokens.accessToken, expiresAt },
+    };
   }
 
   private wait<T>(shared: Promise<T>, signal?: AbortSignal): Promise<T> {

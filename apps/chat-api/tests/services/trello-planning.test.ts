@@ -1,17 +1,59 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
-import { StepError, encryptCredentials } from '@wap/tool-adapters';
-import { ALL_TOOLS, TRELLO_TOOLS, TRELLO_OAUTH_TOOLS, type PlanResponse } from '@wap/tool-schemas';
+import { StepError, TrelloAdapter, encryptCredentials } from '@wap/tool-adapters';
+import { ALL_TOOLS, SERVICE_REGISTRY, TRELLO_TOOLS, TRELLO_OAUTH_TOOLS, type PlanResponse } from '@wap/tool-schemas';
 import { getToolCatalogFor } from '../../src/services/registered-services.js';
 import { runtimeToolCatalog } from '../../src/config/gmail-tools-runtime.js';
 import { ChatService } from '../../src/services/chat-service.js';
 import { resourceLabels } from '../../src/services/resource-labels.js';
 import { AdapterFactory } from '../../src/services/adapter-factory.js';
-import { WorkingMemory } from '@wap/planner';
+import { AIPlanner, MockLLMProvider, WorkingMemory } from '@wap/planner';
 
 describe('Task 8: Trello planning, catalog, refusal, and execution guards', () => {
   const encryptionKey = '0123456789abcdef0123456789abcdef';
   const userId = 'user-1';
+
+  it('uses a color-only Trello label in regex gather and exposes a name for preview', async () => {
+    const adapter = new TrelloAdapter({
+      credentials: { accessToken: 'fixture-token' },
+      allowedBoardIds: ['B1'],
+      fetchFn: async () => Response.json([{ id: 'LB1', idBoard: 'B1', color: 'red', name: '' }]),
+    });
+    const provider = new MockLLMProvider();
+    provider.setPlanResponses([{ kind: 'clarification', question: 'Thẻ nào?', context: 'Trello' }]);
+    const memory = new WorkingMemory();
+    const planner = new AIPlanner({
+      provider,
+      toolCatalog: [...TRELLO_TOOLS, ...TRELLO_OAUTH_TOOLS],
+      serviceRegistry: SERVICE_REGISTRY,
+      searchMode: 'regex',
+      gatherSearch: ({ tool, args }) => tool === 'trello.search_boards'
+        ? Promise.resolve([{ id: 'B1', name: 'Frontend' }])
+        : adapter.execute(tool, args),
+    });
+
+    await planner.processMessage({
+      userMessage: 'Add label red to card "Fix Login" on board Frontend',
+      memory,
+    });
+
+    expect(provider.getCallCount()).toBe(1);
+    expect(memory.getEntity('trello_label')).toMatchObject({ id: 'LB1', name: 'red', color: 'red' });
+    const previewLabels = resourceLabels({
+      kind: 'plan',
+      thinking: '',
+      summary: '',
+      steps: [{
+        id: 's1',
+        tool: 'trello.add_label',
+        description: 'Gắn nhãn',
+        args: { boardId: 'B1', cardId: 'C1', labelId: 'LB1' },
+        dependsOn: [],
+      }],
+      warnings: [],
+    }, memory);
+    expect(previewLabels.LB1).toBe('red (board Frontend)');
+  });
 
   describe('1. Tool Catalog: getToolCatalogFor & runtimeToolCatalog', () => {
     const mockCredRepo = (personalRecord: any = null, sharedRecord: any = null) =>

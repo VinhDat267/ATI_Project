@@ -220,7 +220,11 @@ export class AdapterFactory {
     if (serviceName === 'gmail') return this.gmailAdapter(context);
     if (serviceName === 'mycalendar') return this.mycalendarAdapter(context);
     if (serviceName === 'mysheets') return this.mysheetsAdapter(context);
-    if (serviceName === 'trello') return this.trelloAdapter(context);
+    if (serviceName === 'trello') {
+      return this.trelloAdapter(context).catch((error: unknown) => {
+        throw toTrelloStepError(error);
+      });
+    }
     if (serviceName === 'github') return this.githubAdapter(context);
     if (serviceName === 'telegram') return this.telegramAdapter(context);
     if (serviceName === 'notion' && this.options.notionRepo && context?.userId && context.workspaceMode !== 'organization') {
@@ -505,21 +509,15 @@ export class AdapterFactory {
     }
 
     const provider = this.options.trelloTokens.forConnection(userId, record.id, refreshToken);
-    let accessToken: string;
-    let liveMemberBoardIds: Set<string> = currentTeamBoardIds;
-    try {
-      accessToken = await provider.getAccessToken({ signal: trelloSignal(10_000, context?.signal) });
-      if (this.options.trelloOAuthClient) {
-        const callerBoards = await this.options.trelloOAuthClient.boards(
-          accessToken,
-          scope.workspaceId,
-          trelloSignal(10_000, context?.signal)
-        );
-        liveMemberBoardIds = new Set<string>(callerBoards.filter((b: any) => b.member === true).map((b: any) => String(b.id)));
-      }
-    } catch (error) {
-      // Lost grant → AUTH_ERROR; outage → NETWORK/SERVER_ERROR (never a raw OAuth error).
-      throw toTrelloStepError(error);
+    const accessToken = await provider.getAccessToken({ signal: trelloSignal(10_000, context?.signal) });
+    let liveMemberBoardIds = currentTeamBoardIds;
+    if (this.options.trelloOAuthClient) {
+      const callerBoards = await this.options.trelloOAuthClient.boards(
+        accessToken,
+        scope.workspaceId,
+        trelloSignal(10_000, context?.signal)
+      );
+      liveMemberBoardIds = new Set<string>(callerBoards.filter((b: any) => b.member === true).map((b: any) => String(b.id)));
     }
 
     const previewedBoardIds: string[] = (context?.connections?.trello?.boardIds ?? Array.from(currentTeamBoardIds)) as string[];

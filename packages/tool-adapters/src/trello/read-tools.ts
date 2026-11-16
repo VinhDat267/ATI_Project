@@ -260,11 +260,18 @@ export class TrelloReadTools extends TrelloBaseAdapter {
         const targetBoards = effectiveBoardId ? [effectiveBoardId] : [...this.allowedBoardIds];
         for (const bId of targetBoards) {
           this.assertAllowedScope('boards', bId);
-          const res = await this.request<any[]>(
+          const boardCards = await this.request<unknown>(
             `/boards/${bId}/cards?fields=${TRELLO_CARD_SCAN_FIELDS}`,
             { signal }
           );
-          const boardCards = Array.isArray(res) ? res : [];
+          if (!Array.isArray(boardCards)) {
+            throw new StepError({
+              message: 'Trello returned an invalid board cards response',
+              category: 'SERVER_ERROR',
+              retryable: false,
+              details: { requestSent: false },
+            });
+          }
           perBoard.push({
             boardId: bId,
             fetchedCount: boardCards.length,
@@ -496,12 +503,13 @@ export class TrelloReadTools extends TrelloBaseAdapter {
           String(l.color || '').toLowerCase().includes(queryLower)
       );
     }
-    return labels.slice(0, limit).map((l) => ({
-      id: String(l.id),
-      name: String(l.name || ''),
-      color: typeof l.color === 'string' && l.color ? l.color : null,
-      boardId: safeBoardId,
-    }));
+    return labels.slice(0, limit).map((label) => {
+      const color = typeof label.color === 'string' ? label.color.trim() || null : null;
+      const name = typeof label.name === 'string' && label.name.trim()
+        ? label.name
+        : color ?? `Nhãn ${label.id}`;
+      return { id: label.id, name, color, boardId: safeBoardId };
+    });
   }
 
   override async execute(

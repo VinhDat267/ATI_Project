@@ -230,6 +230,17 @@ describe('TrelloTokenManager', () => {
     expect(reconnectCalls).toEqual([{ service: 'trello', userId, credentialId }]);
   });
 
+  it('preserves RATE_LIMIT when token refresh is throttled', async () => {
+    mockClient.refresh.mockRejectedValueOnce(new TrelloOAuthError('rejected', 429));
+    const manager = createManager();
+    await expect(manager.forConnection(userId, credentialId, initialRefreshToken).getAccessToken()).rejects.toMatchObject({
+      category: 'RATE_LIMIT',
+      statusCode: 429,
+      details: { requestSent: false },
+    });
+    expect(reconnectCalls).toEqual([]);
+  });
+
   it('TrelloOAuthClient classifies Atlassian 403 refresh_token is invalid as invalid_grant', async () => {
     const client = new TrelloOAuthClient(
       {
@@ -486,6 +497,56 @@ describe('TrelloTokenManager', () => {
         expect(decryptCredentials(row!.config, encryptionKey).refreshToken).toBe('refresh-1');
       } finally {
         await tokenServer.close();
+      }
+    });
+
+    it.each(['statement', 'commit'] as const)('does not publish a rotation when PostgreSQL rejects the %s', async (failurePoint) => {
+      const user = await db.person('Refresh storage fault');
+      const repo = new CredentialRepo(db.pool, encryptionKey);
+      const initial = 'initial-refresh';
+      const saved = await repo.saveCredentials('trello', encryptCredentials({ refreshToken: initial }, encryptionKey), user.id);
+      const refresh = vi.fn<TrelloOAuthClient['refresh']>()
+        .mockResolvedValueOnce({ accessToken: 'fresh-access', refreshToken: 'fresh-refresh', expiresInSeconds: 3600 })
+        .mockRejectedValueOnce(new TrelloOAuthError('invalid_grant', 400));
+      const onReconnectRequired = vi.fn();
+      const manager = new TrelloTokenManager({ client: { refresh }, credentials: repo, onReconnectRequired });
+      const provider = manager.forConnection(user.id, saved.id, initial);
+
+      await db.pool.query(`
+        CREATE FUNCTION reject_trello_refresh() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+          RAISE EXCEPTION 'test rotation failure';
+        END;
+        $$;
+      `);
+      try {
+        const trigger = failurePoint === 'statement' ? 'TRIGGER' : 'CONSTRAINT TRIGGER';
+        const deferred = failurePoint === 'commit' ? 'DEFERRABLE INITIALLY DEFERRED' : '';
+        await db.pool.query(`
+          CREATE ${trigger} reject_trello_refresh
+          AFTER UPDATE OF config ON service_credentials
+          ${deferred}
+          FOR EACH ROW EXECUTE FUNCTION reject_trello_refresh();
+        `);
+
+        await expect(provider.getAccessToken()).rejects.toMatchObject({
+          category: 'NETWORK',
+          details: { requestSent: false },
+        });
+        expect(onReconnectRequired).not.toHaveBeenCalled();
+        const row = await repo.getPersonalConnectionStatus('trello', user.id);
+        expect(row?.status).toBe('active');
+        expect(decryptCredentials(row!.config, encryptionKey)).toEqual({ refreshToken: initial });
+
+        // The provider consumed the old token before PostgreSQL rolled back the rotation.
+        // The next call must use the stored token and surface the provider's definitive rejection.
+        await expect(provider.getAccessToken()).rejects.toMatchObject({ category: 'AUTH_ERROR' });
+        expect(refresh.mock.calls).toEqual([[initial, expect.any(AbortSignal)], [initial, expect.any(AbortSignal)]]);
+        expect(onReconnectRequired).toHaveBeenCalledWith(user.id);
+        expect((await repo.getPersonalConnectionStatus('trello', user.id))?.status).toBe('reconnect_required');
+      } finally {
+        await db.pool.query('DROP TRIGGER IF EXISTS reject_trello_refresh ON service_credentials');
+        await db.pool.query('DROP FUNCTION reject_trello_refresh()');
       }
     });
 

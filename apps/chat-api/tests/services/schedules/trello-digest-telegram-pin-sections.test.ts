@@ -370,6 +370,19 @@ describe('Trello digest completed + no-due sections', () => {
     expect(outcome.text).toContain('Có 2 thẻ đã xong trong 24h qua');
   });
 
+  it('describes completion status and recent activity separately in the deterministic fallback', async () => {
+    const { runner } = makeRunner(async () => '999 thẻ đã xong trong 24h qua');
+    const outcome = await runner(
+      runInput({ ...slackConfig, includeAiSummary: true }),
+      'conv-1',
+      new AbortController().signal,
+    );
+    expect(outcome.state).toBe('digest_sent');
+    if (outcome.state !== 'digest_sent') return;
+    const summary = outcome.text.split('\n').find((line) => line.includes('Nhận xét AI'));
+    expect(summary).toContain('2 thẻ đã xong có cập nhật trong 24h qua');
+  });
+
   it('Telegram output stays plain text with the new sections', async () => {
     const sends: any[] = [];
     const config = telegramConfig({ includeAiSummary: false });
@@ -407,7 +420,7 @@ describe('Trello digest completed + no-due sections', () => {
 });
 
 describe('isTrelloDoneListName', () => {
-  it.each(['Done', '✅ Done', '05 - Hoàn thành', 'Xong', 'Đã xong', 'Completed', 'Complete', 'DONE this sprint'])(
+  it.each(['Done', '✅ Done', '05 - Hoàn thành', 'Xong', 'Đã xong', 'Completed', 'Complete', 'DONE this sprint', '2. Done', '[Release] Done', '[Done]', 'Done - Sprint 5'])(
     'matches done list name %s',
     (name) => {
       expect(isTrelloDoneListName(name)).toBe(true);
@@ -415,6 +428,11 @@ describe('isTrelloDoneListName', () => {
   );
 
   it.each([
+    'Almost Done',
+    'Ready to Complete',
+    'Almost done this sprint',
+    'Sắp hoàn thành',
+    'Done soon',
     'Not done',
     'Not yet done',
     'not-done',

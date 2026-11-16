@@ -338,6 +338,15 @@ describe('trello.search_cards scan coverage', () => {
     expect(result.scanMetadata.perBoard).toEqual([{ boardId: 'B1', fetchedCount: 80, capReached: false }]);
   });
 
+  it('does not describe a malformed board-card response as a complete empty scan', async () => {
+    const { adapter } = makeAdapter((call) =>
+      call.path === '/boards/B1/cards' ? json({ message: 'Unexpected response' }) : undefined
+    );
+
+    await expect(adapter.execute('trello.search_cards', { query: '', boardId: 'B1' }))
+      .rejects.toMatchObject({ category: 'SERVER_ERROR' });
+  });
+
   it('clamps limit to 50, matching the input schema', async () => {
     const { adapter } = makeAdapter((c) => (c.path === '/boards/B1/cards' ? json(cards(80)) : undefined));
     const result: any = await adapter.execute('trello.search_cards', { query: '', boardId: 'B1', limit: 500 });

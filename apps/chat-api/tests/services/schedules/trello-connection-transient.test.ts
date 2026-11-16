@@ -41,6 +41,59 @@ describe('Trello digest runner: transient connection lookup', () => {
     expect(getAdapter).not.toHaveBeenCalled();
   });
 
+  it('classifies a Trello read deadline as a temporary outage', async () => {
+    const controller = new AbortController();
+    const timeout = AbortSignal.timeout.bind(AbortSignal);
+    const deadline = vi.spyOn(AbortSignal, 'timeout').mockImplementationOnce(() => timeout(15));
+    const executeSlack = vi.fn().mockResolvedValue([{ id: 'C1' }]);
+    const runner = createTrelloDigestRunner({
+      pool: {} as any,
+      trelloConnection: async () => ({
+        status: 'connected',
+        connection: { credentialId: 'cred-1', boardIds: ['b1'] },
+      }),
+      getAdapter: (serviceName) => ({
+        execute: serviceName === 'slack' ? executeSlack : async (_tool: string, _args: unknown, options: { signal: AbortSignal }) => {
+          if (options.signal === controller.signal) throw new Error('Missing Trello read deadline');
+          return new Promise((_, reject) => {
+            options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true });
+          });
+        },
+      }),
+    });
+    try {
+      const outcome = await runner(run, 'conv-1', controller.signal);
+      expect(outcome).toMatchObject({
+        state: 'digest_failed',
+        error: expect.stringMatching(/^Trello tạm thời không khả dụng/),
+      });
+      expect(controller.signal.aborted).toBe(false);
+      expect(executeSlack.mock.calls.map(([tool]) => tool)).toEqual(['slack.search_channels']);
+    } finally {
+      deadline.mockRestore();
+    }
+  });
+
+  it.each(['trello.search_cards', 'trello.search_lists'])('blocks a denied %s before delivery', async (deniedTool) => {
+    const executeSlack = vi.fn().mockResolvedValue([{ id: 'C1' }]);
+    const runner = createTrelloDigestRunner({
+      pool: {} as any,
+      trelloConnection: async () => ({
+        status: 'connected',
+        connection: { credentialId: 'cred-1', boardIds: ['b1'] },
+      }),
+      getAdapter: (serviceName) => ({
+        execute: serviceName === 'slack' ? executeSlack : async (tool: string) => {
+          if (tool === deniedTool) throw Object.assign(new Error('Forbidden'), { category: 'AUTH_ERROR' });
+          return [];
+        },
+      }),
+    });
+    const outcome = await runner(run, 'conv-1', new AbortController().signal);
+    expect(outcome.state).toBe('blocked');
+    expect(executeSlack.mock.calls.map(([tool]) => tool)).toEqual(['slack.search_channels']);
+  });
+
   it('still blocks (pauses) when the grant is gone', async () => {
     const runner = createTrelloDigestRunner({
       pool: {} as any,

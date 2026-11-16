@@ -357,16 +357,11 @@ export class CredentialRepo {
           return (res.rowCount ?? 0) > 0;
         },
       };
-      // fn's writes (rotation or reconnect mark) persist even when fn then throws.
-      let outcome: { ok: true; value: T } | { ok: false; error: unknown };
-      try {
-        outcome = { ok: true, value: await fn(session) };
-      } catch (error) {
-        outcome = { ok: false, error };
-      }
-      await client.query('COMMIT');
-      if (!outcome.ok) throw outcome.error;
-      return outcome.value;
+      const result = await fn(session);
+      const commit = await client.query('COMMIT');
+      // PostgreSQL can return ROLLBACK when a statement aborted the transaction.
+      if (commit.command !== 'COMMIT') throw new Error('Personal secret transaction was rolled back');
+      return result;
     } catch (err) {
       await client.query('ROLLBACK').catch(() => {
         healthy = false;

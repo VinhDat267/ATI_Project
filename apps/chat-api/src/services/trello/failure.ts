@@ -15,22 +15,35 @@ export function isTrelloAuthFailure(error: unknown): boolean {
   return false;
 }
 
-/** The StepError the executor sees for a failed Trello membership/token lookup. */
+/** Normalize Trello preflight errors before any tool request is dispatched. */
 export function toTrelloStepError(error: unknown): StepError {
-  if (error instanceof StepError) return error;
+  if (error instanceof StepError) {
+    if (error.details?.requestSent === false) return error;
+    return new StepError({
+      category: error.category,
+      statusCode: error.statusCode,
+      retryable: error.retryable,
+      message: error.message,
+      details: { ...error.details, requestSent: false },
+      cause: error.cause,
+    });
+  }
+
+  const statusCode = error instanceof TrelloOAuthError ? error.status : undefined;
+  const details = { requestSent: false };
   if (isTrelloAuthFailure(error)) {
     return new StepError({
       category: 'AUTH_ERROR',
-      statusCode: error instanceof TrelloOAuthError ? error.status : undefined,
-      retryable: false,
+      statusCode,
+      details,
       message: 'Trello cần được kết nối lại.',
     });
   }
   const network = !(error instanceof TrelloOAuthError) || error.kind === 'network';
   return new StepError({
-    category: network ? 'NETWORK' : 'SERVER_ERROR',
-    statusCode: error instanceof TrelloOAuthError ? error.status : undefined,
-    retryable: false,
+    category: statusCode === 429 ? 'RATE_LIMIT' : network ? 'NETWORK' : 'SERVER_ERROR',
+    statusCode,
+    details,
     message: 'Trello tạm thời không phản hồi. Hãy thử lại sau.',
   });
 }
