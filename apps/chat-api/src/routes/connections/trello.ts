@@ -11,6 +11,7 @@ import type { WorkspaceRepo } from '../../db/repositories/workspace-repo.js';
 import { createWorkspaceContextMiddleware } from '../../middleware/workspace-context.js';
 import { TrelloOAuthClient, type TrelloBoardSummary } from '../../services/trello/oauth-client.js';
 import type { TrelloTokenManager } from '../../services/trello/token-manager.js';
+import { isTrelloAuthFailure } from '../../services/trello/failure.js';
 
 const COOKIE = 'ati_trello_browser';
 const COOKIE_PATH = '/api/connections/trello';
@@ -496,18 +497,27 @@ export function createTrelloConnectionRoutes(options: TrelloConnectionsOptions):
       if (options.tokens && refreshToken && client) {
         try {
           const provider = options.tokens.forConnection(user.id, cred.id, refreshToken);
-          const accessToken = await provider.getAccessToken();
+          const accessToken = await provider.getAccessToken({ signal: AbortSignal.timeout(trelloTimeoutMs) });
           callerBoards = await client.boards(
             accessToken,
             scope.workspaceId,
             AbortSignal.timeout(trelloTimeoutMs)
           );
-        } catch {
+        } catch (error) {
           const updated = await options.credentialRepo!.getPersonalConnectionStatus('trello', user.id);
-          if (updated?.status === 'reconnect_required') {
+          if (updated?.status === 'reconnect_required' || isTrelloAuthFailure(error)) {
             res.json({ status: 'reconnect_required', username, boards: [] });
             return;
           }
+          // Outage, not lost membership: keep the grant, let the UI retry.
+          res.status(503).json({
+            status: 'unavailable',
+            username,
+            workspaceName: scope.workspaceName,
+            boards: [],
+            error: 'Trello tạm thời không phản hồi. Hãy thử lại sau.',
+          });
+          return;
         }
       }
 

@@ -228,6 +228,69 @@ describe('Trello Digest Accuracy, Candidate Admission, Coverage Accounting & AI 
     }
   });
 
+  it.each(['complete', 'unknown', 'malformed'])('handles %s card-scan coverage', async (scan) => {
+    const config = {
+      credentialId: TRELLO_CRED_ID,
+      trelloMemberId: 'mem-1',
+      username: 'alice_trello',
+      boards: [{ id: 'b1', name: 'Frontend' }],
+      channelId: 'C_DEV',
+      channelName: 'dev',
+      dueSoonHours: 24,
+      includeAiSummary: false,
+    };
+    const configHash = computeTrelloDigestConfigHash({ config, recurrence, userId });
+    const cards = Array.from({ length: 50 }, (_, index) => ({
+      id: `c${index}`, name: `Card ${index}`, idMembers: ['m1'],
+    }));
+    Object.defineProperty(cards, 'scanMetadata', {
+      value: { scannedCount: 50, duplicateCountDropped: 0, prefixCapReached: false, truncatedByLimit: false },
+      enumerable: false,
+    });
+    const run = (cardResult: unknown) => createTrelloDigestRunner({
+      pool: { query: vi.fn().mockResolvedValue({ rowCount: 1, rows: [{ version: 1, status: 'active' }] }) } as any,
+      timeZone: 'Asia/Ho_Chi_Minh',
+      trelloConnection: async () => ({
+        status: 'connected',
+        connection: { credentialId: TRELLO_CRED_ID, memberId: 'mem-1', username: 'alice_trello', boardIds: ['b1'] },
+      }),
+      getAdapter: async (serviceName: string) => {
+        if (serviceName === 'trello') {
+          return { execute: vi.fn().mockImplementation(async (tool: string) => (tool === 'trello.search_cards' ? cardResult : [])) };
+        }
+        if (serviceName === 'slack') {
+          return {
+            execute: vi.fn().mockImplementation(async (tool: string) => {
+              if (tool === 'slack.search_channels') return [{ id: 'C_DEV', name: 'dev' }];
+              if (tool === 'slack.send_message') return { ts: '1700000300.001' };
+            }),
+          };
+        }
+        return null;
+      },
+    })({
+      runId: 'run-complete-1', scheduleId: 'sched-complete-1', scheduleVersion: 1, userId,
+      name: 'Báo cáo', request: 'Báo cáo Trello', dueAt: new Date('2026-04-20T01:00:00.000Z'),
+      trigger: 'scheduled', recurrence, digestConfig: config, digestConfigHash: configHash,
+    } as any, 'conv-complete-1', new AbortController().signal);
+
+    const outcome = await run(scan === 'complete' ? cards : scan === 'unknown' ? [...cards] : { cards: [] });
+    if (scan === 'malformed') {
+      expect(outcome.state).toBe('digest_failed');
+      return;
+    }
+    expect(outcome.state).toBe('digest_sent');
+    if (outcome.state !== 'digest_sent') return;
+    if (scan === 'complete') {
+      expect(outcome.delivery.coverage).toMatchObject({ totalAvailable: 50, isComplete: true, truncatedByFetchLimit: false });
+      expect(outcome.text).toContain('Đã quét đủ 50 thẻ đang mở trên 1 bảng');
+      expect(outcome.text).not.toContain('UNKNOWN');
+    } else {
+      expect(outcome.delivery.coverage).toMatchObject({ totalAvailable: 'UNKNOWN', isComplete: false });
+      expect(outcome.text).toContain('chưa biết tổng số thẻ');
+    }
+  });
+
   it('TRELLO-AUDIT-05 (Coverage Accounting, Deduplication, UNKNOWN Total & Safe 3500-char Clipping): deduplicates cards, separates scanned/matched/displayed counts with totalAvailable UNKNOWN, consumes scanMetadata, and clips safely without erasing coverage footer or breaking URLs', async () => {
     const config = {
       credentialId: TRELLO_CRED_ID,
@@ -241,7 +304,7 @@ describe('Trello Digest Accuracy, Candidate Admission, Coverage Accounting & AI 
     };
     const configHash = computeTrelloDigestConfigHash({ config, recurrence, userId });
 
-    // Generate 25 unique overdue cards, 20 due-soon cards, and 5 unassigned cards (50 unique + 2 duplicates = 52 raw items)
+    // Generate 25 unique overdue cards, 20 due-soon cards, and 4 unassigned cards and 1 completed card (50 unique + 2 duplicates = 52 raw items)
     // with long titles and URLs so the unclipped message exceeds 3,500 characters.
     const rawCards: any[] = [];
     for (let i = 1; i <= 25; i++) {
@@ -264,7 +327,7 @@ describe('Trello Digest Accuracy, Candidate Admission, Coverage Accounting & AI 
         idMembers: ['m1'],
       });
     }
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= 4; i++) {
       rawCards.push({
         id: `c_unassigned_only_${i}`,
         name: `Thẻ chưa gán thành viên số ${i}`,
@@ -274,6 +337,10 @@ describe('Trello Digest Accuracy, Candidate Admission, Coverage Accounting & AI 
         idMembers: [],
       });
     }
+    rawCards.push({
+      id: 'c_completed', name: 'Release checklist', url: 'https://trello.com/c/completed',
+      dueComplete: true, dateLastActivity: '2026-11-02T07:00:00.000Z',
+    });
     // Add 2 duplicate cards with identical IDs
     rawCards.push({ ...rawCards[0] });
     rawCards.push({ ...rawCards[1] });
@@ -362,11 +429,13 @@ describe('Trello Digest Accuracy, Candidate Admission, Coverage Accounting & AI 
 
     expect(outcome.state).toBe('digest_sent');
     if (outcome.state === 'digest_sent') {
-      // True matched counts across the 50 unique scanned cards: 25 overdue, 20 dueSoon, 30 unassigned
-      expect(outcome.delivery.counts).toEqual({
+      // True matched counts across the 50 unique scanned cards: 25 overdue, 20 dueSoon, 29 unassigned, 1 completed
+      expect(outcome.delivery.counts).toMatchObject({
         overdueCards: 25,
         dueSoonCards: 20,
-        unassignedCards: 30,
+        unassignedCards: 29,
+        completedCards: 1,
+        noDueCards: 4,
       });
       expect(outcome.delivery.coverage).toMatchObject({
         perBoardFetchLimit: 50,
@@ -381,19 +450,35 @@ describe('Trello Digest Accuracy, Candidate Admission, Coverage Accounting & AI 
         matchedCounts: {
           overdueCards: 25,
           dueSoonCards: 20,
-          unassignedCards: 30,
-        },
-        displayedCounts: {
-          overdueCards: 15,
-          dueSoonCards: 15,
-          unassignedCards: 15,
+          unassignedCards: 29,
+          completedCards: 1,
+          noDueCards: 4,
         },
       });
+
+      const headings = [
+        ['Thẻ quá hạn', 'overdueCards', 25],
+        ['Thẻ sắp đến hạn', 'dueSoonCards', 20],
+        ['Thẻ chưa gán người phụ trách', 'unassignedCards', 29],
+        ['Đã xong', 'completedCards', 1],
+      ] as const;
+      const lines = outcome.text.split('\n');
+      for (const [name, category, matched] of headings) {
+        const headingIndex = lines.findIndex((line) => line.startsWith('•') && line.includes(name));
+        expect(headingIndex).toBeGreaterThan(-1);
+        expect([ `(${matched}):*`, `/${matched}):*` ].some((label) => lines[headingIndex]!.endsWith(label))).toBe(true);
+        const details = lines.slice(headingIndex + 1).join('\n').split('\n•')[0]!;
+        const shownCards = (details.match(/<https:\/\/trello\.com\/c\//g) ?? []).length;
+        expect(shownCards).toBeGreaterThan(0);
+        expect(outcome.delivery.coverage?.displayedCounts[category]).toBe(shownCards);
+      }
+      expect(outcome.text).toContain('Thẻ đang mở chưa có hạn: 4');
+      expect(outcome.text).toContain('Release checklist');
 
       // Message length is strictly <= 3,500 chars
       expect(outcome.text.length).toBeLessThanOrEqual(3500);
       // Coverage disclosure footer is preserved even after clipping!
-      expect(outcome.text).toContain('UNKNOWN');
+      expect(outcome.text).toContain('chưa biết tổng số thẻ');
       expect(outcome.text).toContain('50 thẻ/bảng');
       expect(outcome.text).toContain('15 thẻ/nhóm');
       // Every Slack link '<https://...|...>' in the clipped text is properly closed (no broken link at end)

@@ -51,12 +51,21 @@ export function runLabel(run: ScheduleRunView): string {
     }
     if (run.delivery && 'counts' in run.delivery && run.delivery.counts) {
       const counts = run.delivery.counts;
+      if ('overdueCards' in counts) {
+        // Trello categories overlap (a card can be overdue and unassigned), so never sum them.
+        const parts = [
+          `${counts.overdueCards} quá hạn`,
+          `${counts.dueSoonCards} sắp đến hạn`,
+          `${counts.unassignedCards} chưa gán`,
+        ];
+        const completed = (counts as { completedCards?: unknown }).completedCards;
+        if (typeof completed === 'number' && completed > 0) parts.push(`${completed} đã xong`);
+        return `Đã gửi · ${parts.join(' · ')}`;
+      }
       const total =
         'totalPages' in counts
           ? counts.totalPages
-          : 'overdueCards' in counts
-            ? counts.overdueCards + counts.dueSoonCards + counts.unassignedCards
-            : counts.newIssues + counts.stalePrs + counts.unassignedIssues;
+          : counts.newIssues + counts.stalePrs + counts.unassignedIssues;
       return `Đã gửi · ${total} mục`;
     }
     if (run.delivery && ('chatId' in run.delivery || 'sources' in run.delivery)) {

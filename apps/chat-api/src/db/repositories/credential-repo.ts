@@ -17,6 +17,24 @@ export interface ServiceCredentialRow {
 
 export type CredentialRecord = ServiceCredentialRow;
 
+/** Reads and writes one personal OAuth secret while its cross-process refresh lock is held. */
+export interface PersonalSecretSession {
+  /** The current row (fresh snapshot), or null after a disconnect/reconnect. */
+  read(): Promise<{
+    status: CredentialStatus;
+    refreshToken?: string;
+    accessToken?: string;
+    accessTokenExpiresAt?: number;
+  } | null>;
+  rotate(next: {
+    previousRefreshToken: string;
+    nextRefreshToken: string;
+    nextAccessToken?: string;
+    nextAccessTokenExpiresAt?: number;
+  }): Promise<'rotated' | 'mismatch' | 'missing'>;
+  markReconnectRequired(): Promise<boolean>;
+}
+
 function requireUser(userId: string | null | undefined): string {
   if (!userId) throw new Error('A personal credential needs a user id');
   return userId;
@@ -267,51 +285,138 @@ export class CredentialRepo {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      const res = await client.query<ServiceCredentialRow>(
-        'SELECT * FROM service_credentials WHERE id = $1 AND service = $2 AND user_id = $3 AND workspace_id IS NULL FOR UPDATE',
-        [input.credentialId, input.service, requireUser(input.userId)]
-      );
-      const row = res.rows[0];
-      if (!row) {
-        await client.query('ROLLBACK');
-        return 'missing';
-      }
-
-      let data: Record<string, any>;
-      try {
-        data = decryptCredentials(row.config, this.encryptionKey);
-      } catch {
-        await client.query('ROLLBACK');
-        return 'mismatch';
-      }
-
-      if (data.refreshToken !== input.previousRefreshToken) {
-        await client.query('ROLLBACK');
-        return 'mismatch';
-      }
-
-      const updatedData = {
-        ...data,
-        refreshToken: input.nextRefreshToken,
-        ...(input.nextAccessToken ? { accessToken: input.nextAccessToken } : {}),
-      };
-      const newConfig = encryptCredentials(updatedData, this.encryptionKey);
-
-      await client.query(
-        `UPDATE service_credentials
-         SET config = $1, status = 'active', status_changed_at = now()
-         WHERE id = $2`,
-        [newConfig, row.id]
-      );
-
-      await client.query('COMMIT');
-      return 'rotated';
+      const result = await this.rotateWithin(client, input);
+      await client.query(result === 'rotated' ? 'COMMIT' : 'ROLLBACK');
+      return result;
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;
     } finally {
       client.release();
     }
+  }
+
+  /**
+   * Serializes refresh of one personal credential across every chat-api process.
+   * A transaction-scoped advisory lock (released on COMMIT/ROLLBACK or when the
+   * connection dies) is held on one dedicated connection; `fn` reads, rotates and
+   * marks through that same connection so a refresh never needs a second pool
+   * connection. Waiting is bounded by `lockTimeoutMs` (PostgreSQL lock_timeout).
+   * The credential row itself is not locked while `fn` runs, so a disconnect
+   * (DELETE) or reconnect (new id) is never blocked by an in-flight refresh and
+   * the later rotation sees `missing`.
+   */
+  async withPersonalSecretLock<T>(
+    input: { service: 'trello' | 'github'; userId: string; credentialId: string; lockTimeoutMs: number },
+    fn: (session: PersonalSecretSession) => Promise<T>
+  ): Promise<T> {
+    const userId = requireUser(input.userId);
+    const client = await this.pool.connect();
+    let healthy = true;
+    try {
+      await client.query('BEGIN');
+      await client.query("SELECT set_config('lock_timeout', $1, true)", [`${Math.max(1, Math.ceil(input.lockTimeoutMs))}ms`]);
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [
+        `oauth-refresh:${input.service}`,
+        input.credentialId,
+      ]);
+      const session: PersonalSecretSession = {
+        read: async () => {
+          const res = await client.query<ServiceCredentialRow>(
+            'SELECT * FROM service_credentials WHERE id = $1 AND service = $2 AND user_id = $3 AND workspace_id IS NULL',
+            [input.credentialId, input.service, userId]
+          );
+          const row = res.rows[0];
+          if (!row) return null;
+          let data: Record<string, any>;
+          try {
+            data = decryptCredentials(row.config, this.encryptionKey);
+          } catch {
+            return { status: row.status, refreshToken: undefined };
+          }
+          return {
+            status: row.status,
+            refreshToken: typeof data.refreshToken === 'string' ? data.refreshToken : undefined,
+            accessToken: typeof data.accessToken === 'string' ? data.accessToken : undefined,
+            accessTokenExpiresAt: Number.isFinite(data.accessTokenExpiresAt) ? Number(data.accessTokenExpiresAt) : undefined,
+          };
+        },
+        rotate: (next) =>
+          this.rotateWithin(client, {
+            service: input.service,
+            userId,
+            credentialId: input.credentialId,
+            ...next,
+          }),
+        markReconnectRequired: async () => {
+          const res = await client.query(
+            `UPDATE service_credentials SET status = 'reconnect_required', status_changed_at = now()
+             WHERE id = $3 AND service = $1 AND user_id = $2 AND workspace_id IS NULL AND status = 'active'`,
+            [input.service, userId, input.credentialId]
+          );
+          return (res.rowCount ?? 0) > 0;
+        },
+      };
+      const result = await fn(session);
+      const commit = await client.query('COMMIT');
+      // PostgreSQL can return ROLLBACK when a statement aborted the transaction.
+      if (commit.command !== 'COMMIT') throw new Error('Personal secret transaction was rolled back');
+      return result;
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {
+        healthy = false;
+      });
+      throw err;
+    } finally {
+      // A broken connection is destroyed, which also drops the advisory lock.
+      client.release(healthy ? undefined : true);
+    }
+  }
+
+  /** Compare-and-swap of the refresh token on an open transaction (row locked FOR UPDATE). */
+  private async rotateWithin(
+    client: pg.PoolClient,
+    input: {
+      service: 'trello' | 'github';
+      userId: string;
+      credentialId: string;
+      previousRefreshToken: string;
+      nextRefreshToken: string;
+      nextAccessToken?: string;
+      nextAccessTokenExpiresAt?: number;
+    }
+  ): Promise<'rotated' | 'mismatch' | 'missing'> {
+    const res = await client.query<ServiceCredentialRow>(
+      'SELECT * FROM service_credentials WHERE id = $1 AND service = $2 AND user_id = $3 AND workspace_id IS NULL FOR UPDATE',
+      [input.credentialId, input.service, requireUser(input.userId)]
+    );
+    const row = res.rows[0];
+    if (!row) return 'missing';
+
+    let data: Record<string, any>;
+    try {
+      data = decryptCredentials(row.config, this.encryptionKey);
+    } catch {
+      return 'mismatch';
+    }
+
+    if (data.refreshToken !== input.previousRefreshToken) return 'mismatch';
+
+    const updatedData = {
+      ...data,
+      refreshToken: input.nextRefreshToken,
+      ...(input.nextAccessToken ? { accessToken: input.nextAccessToken } : {}),
+      ...(input.nextAccessTokenExpiresAt ? { accessTokenExpiresAt: input.nextAccessTokenExpiresAt } : {}),
+    };
+    const newConfig = encryptCredentials(updatedData, this.encryptionKey);
+
+    await client.query(
+      `UPDATE service_credentials
+       SET config = $1, status = 'active', status_changed_at = now()
+       WHERE id = $2`,
+      [newConfig, row.id]
+    );
+    return 'rotated';
   }
 
   /** Read and transform shared config under the same lock as key replacement. */

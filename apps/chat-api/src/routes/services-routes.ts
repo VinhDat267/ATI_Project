@@ -30,6 +30,7 @@ import {
 import { isAdmin } from '../auth/jwt.js';
 import type { NotionConnectionRepo } from '../db/repositories/notion-connection-repo.js';
 import { createNotionConnectionLookup } from '../services/notion/connection-reference.js';
+import { createTrelloTransport } from '../services/transports/trello.js';
 
 export interface ServicesRoutesOptions {
   slackOAuthAvailable?: boolean;
@@ -68,6 +69,7 @@ export interface ServicesRoutesOptions {
       sites?: Array<{ siteId: string; siteName?: string }>;
     } | null>;
   };
+  trelloApiBaseUrl?: string;
   trelloTeamRepo?: {
     get: (scopeId?: string) => Promise<{ boards?: Array<{ boardId: string; boardName?: string }> } | null>;
   };
@@ -97,7 +99,8 @@ const MYJIRA_PERSONAL_ONLY = 'Jira dùng đăng nhập OAuth cá nhân và Plano
 async function verifyService(
   service: string,
   config: Record<string, unknown>,
-  fetchFn: typeof fetch
+  fetchFn: typeof fetch,
+  trelloApiBaseUrl?: string
 ): Promise<{ healthy: boolean; message: string; latencyMs: number }> {
   const registration = getRegisteredService(service);
   if (!registration) throw new Error(`Unsupported service '${service}'`);
@@ -105,7 +108,10 @@ async function verifyService(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10_000);
   try {
-    const healthy = await registration.transport.checkConnection(config, fetchFn, controller.signal);
+    const transport = service === 'trello' && trelloApiBaseUrl
+      ? createTrelloTransport(trelloApiBaseUrl)
+      : registration.transport;
+    const healthy = await transport.checkConnection(config, fetchFn, controller.signal);
     return {
       healthy,
       message: healthy ? `Successfully connected to ${service}` : `Provider rejected ${service} credentials`,
@@ -892,7 +898,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
         return;
       }
       const config = decryptCredentials(record.config, encryptionKey);
-      const result = await verifyService(service, config, fetchFn);
+      const result = await verifyService(service, config, fetchFn, options.trelloApiBaseUrl);
       if ((generations.get(key) ?? 0) === generation) {
         checks.set(key, {
           credentialVersion,

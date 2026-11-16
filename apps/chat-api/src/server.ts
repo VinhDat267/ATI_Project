@@ -969,8 +969,16 @@ async function bootstrap() {
       trelloConnection,
       telegramConnection,
       getAdapter: (serviceName, context) => adapterFactory.getAdapterForService(serviceName, context),
-      summarizeDigest: async ({ boards, overdueCards, dueSoonCards, unassignedCards, dueSoonHours }, signal) => {
-        if (overdueCards.length === 0 && dueSoonCards.length === 0 && unassignedCards.length === 0) {
+      summarizeDigest: async (
+        { boards, overdueCards, dueSoonCards, unassignedCards, dueSoonHours, completedCards, completedCount, completedWindowHours, noDueCount },
+        signal,
+      ) => {
+        if (
+          overdueCards.length === 0 &&
+          dueSoonCards.length === 0 &&
+          unassignedCards.length === 0 &&
+          (completedCards?.length ?? 0) === 0
+        ) {
           return null;
         }
         if (typeof provider?.generateText !== 'function') return null;
@@ -980,6 +988,10 @@ async function bootstrap() {
           dueSoonCards,
           unassignedCards,
           dueSoonHours,
+          ...(completedCards ? { completedCards } : {}),
+          ...(typeof completedCount === 'number' ? { completedCount } : {}),
+          ...(typeof completedWindowHours === 'number' ? { completedWindowHours } : {}),
+          ...(typeof noDueCount === 'number' ? { noDueCount } : {}),
         });
         return provider.generateText(
           systemPrompt,

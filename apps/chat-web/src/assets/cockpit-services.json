@@ -583,6 +583,32 @@
       "titleField": "name",
       "previewStyle": "card"
     },
+    "trello.add_label": {
+      "action": "Gắn nhãn",
+      "done": "Đã gắn nhãn",
+      "receipt": "Đã gắn nhãn cho thẻ",
+      "kind": "Label",
+      "link": "Mở thẻ trên Trello",
+      "titleField": "labelId",
+      "previewStyle": "card"
+    },
+    "trello.remove_label": {
+      "action": "Gỡ nhãn",
+      "done": "Đã gỡ nhãn",
+      "receipt": "Đã gỡ nhãn khỏi thẻ",
+      "kind": "Label",
+      "link": "Mở thẻ trên Trello",
+      "titleField": "labelId",
+      "previewStyle": "card"
+    },
+    "trello.search_labels": {
+      "action": "Tìm nhãn",
+      "done": "Đã tìm",
+      "receipt": "Đã tìm nhãn",
+      "kind": "Danh sách nhãn",
+      "link": "Mở kết quả",
+      "previewStyle": "card"
+    },
     "trello.search_cards": {
       "action": "Tìm kiếm thẻ",
       "done": "Đã tìm",

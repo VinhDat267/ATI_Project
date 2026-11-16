@@ -440,7 +440,8 @@ describe('Trello & Slack Audit Remediation Suite (Worker A: TRELLO-AUDIT-01..05,
         matchedCount: 59,
         displayedCount: 50,
         limitApplied: 50,
-        prefixCapReached: true,
+        // /boards/{id}/cards returns every card, so nothing was capped; the display limit truncated instead.
+        prefixCapReached: false,
         truncatedByLimit: true,
         isComplete: false,
       });

@@ -115,7 +115,7 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
   const notionCheckUrl = paused?.status === 'unknown' && ['notion.create_page', 'notion.update_page', 'notion.append_text', 'notion.append_blocks', 'notion.add_comment'].includes(planStep?.tool ?? '')
     ? 'https://www.notion.so' : undefined;
   const trelloUsername = snapshot?.plan.connections?.trello?.username;
-  const trelloCheckUrl = moment === 8 && paused?.status === 'unknown' && Boolean(trelloUsername) && ['trello.create_card', 'trello.update_card', 'trello.add_member', 'trello.remove_member', 'trello.add_checklist', 'trello.update_checklist_item', 'trello.add_comment', 'trello.create_list', 'trello.set_card_due_complete'].includes(planStep?.tool ?? '')
+  const trelloCheckUrl = moment === 8 && paused?.status === 'unknown' && Boolean(trelloUsername) && ['trello.create_card', 'trello.update_card', 'trello.add_member', 'trello.remove_member', 'trello.add_checklist', 'trello.update_checklist_item', 'trello.add_comment', 'trello.create_list', 'trello.set_card_due_complete', 'trello.add_label', 'trello.remove_label'].includes(planStep?.tool ?? '')
     ? (typeof planStep?.args.boardId === 'string' && planStep.args.boardId ? `https://trello.com/b/${encodeURIComponent(planStep.args.boardId)}` : 'https://trello.com') : undefined;
   const myjiraAccount = snapshot?.plan.connections?.myjira?.atlassianAccountId;
   const myjiraCheckUrl = moment === 8 && paused?.status === 'unknown' && ['myjira.create_issue', 'myjira.update_issue', 'myjira.transition_issue', 'myjira.add_comment'].includes(planStep?.tool ?? '')

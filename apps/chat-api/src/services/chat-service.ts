@@ -835,6 +835,12 @@ export class ChatService {
       if (!trello || trello.status === 'not_connected' || trello.status === 'reconnect_required') {
         unavailableServices.push({ id: 'trello', name: 'Trello' });
         reasons.push('Tài khoản của bạn chưa Kết nối Trello hoặc cần kết nối lại.');
+      } else if (trello.status === 'unavailable') {
+        return {
+          kind: 'refusal',
+          reason: 'Trello tạm thời không phản hồi.',
+          suggestion: 'Kết nối Trello của bạn vẫn còn hiệu lực. Hãy thử lại sau ít phút.',
+        };
       } else if (trello.status === 'needs_scope') {
         return {
           kind: 'refusal',

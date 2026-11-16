@@ -52,6 +52,7 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
         channelId: 'C_DEV',
         channelName: 'dev',
         dueSoonHours: 24,
+        destination: 'slack',
       });
       expect(candidate.configHash).toMatch(/^[0-9a-f]{64}$/);
     });
@@ -194,6 +195,8 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
             overdueCards: 1,
             dueSoonCards: 1,
             unassignedCards: 1,
+            completedCards: 0,
+            noDueCards: 1,
           },
           coverage: expect.objectContaining({
             perBoardFetchLimit: 50,
@@ -401,6 +404,8 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
           overdueCards: 1,
           dueSoonCards: 0,
           unassignedCards: 1,
+          completedCards: 0,
+          noDueCards: 0,
         },
         coverage: expect.objectContaining({
           perBoardFetchLimit: 50,
@@ -412,6 +417,104 @@ describe('Trello Automated Digest (Task 3: trello_digest & Telegram Trello enric
           isComplete: false,
         }),
       });
+    });
+
+    it('fails unsent Trello outages across repeated runs while retaining the normal pause threshold', async () => {
+      const user = await db.person('TrelloOutageOwner');
+      const { rows: [{ id: credentialId }] } = await db.pool.query(
+        "INSERT INTO service_credentials (service, user_id, config, status) VALUES ('trello', $1, 'fixture', 'active') RETURNING id",
+        [user.id],
+      );
+      const { rows: [{ id: convId }] } = await db.pool.query(
+        "INSERT INTO conversations(user_id, status, title) VALUES ($1, 'chatting', 'Trello outages') RETURNING id",
+        [user.id],
+      );
+      const config = {
+        credentialId,
+        trelloMemberId: 'mem-1',
+        username: 'alice_trello',
+        boards: [{ id: 'b1', name: 'Frontend' }],
+        channelId: 'C_DEV',
+        channelName: 'dev',
+        dueSoonHours: 24,
+        includeAiSummary: false,
+      };
+      let now = new Date('2026-11-02T01:30:00.000Z');
+      const { rows: [{ id: scheduleId }] } = await db.pool.query(
+        `INSERT INTO schedules(user_id, conv_id, name, request, recurrence, services, status, next_run_at,
+                              kind, digest_config, digest_config_hash, digest_approved_at)
+         VALUES ($1, $2, 'Trello', 'Trello digest', $3, ARRAY['trello','slack'], 'active', $4,
+                 'trello_digest', $5, $6, $4)
+         RETURNING id`,
+        [user.id, convId, recurrence, now, config,
+          computeTrelloDigestConfigHash({ config, recurrence, userId: user.id })],
+      );
+      const service = new ScheduleService({ pool: db.pool, timeZone: 'Asia/Ho_Chi_Minh' });
+      let phase = 'initial';
+      let connectionChecks = 0;
+      let slackWrites = 0;
+      const outage = (category: string) => Object.assign(new Error('Temporary test outage'), { category });
+      const runner = new ScheduleRunner({
+        pool: db.pool,
+        timeZone: 'Asia/Ho_Chi_Minh',
+        now: () => now,
+        planRun: async () => { throw new Error('should use the digest runner'); },
+        runTrelloDigest: createTrelloDigestRunner({
+          pool: db.pool,
+          trelloConnection: async () => {
+            connectionChecks++;
+            if (phase === 'initial') return { status: 'unavailable' };
+            if (phase === 'initial-throw' || (phase === 'revalidation' && connectionChecks === 2)) {
+              throw new Error('Temporary connection database outage');
+            }
+            return { status: 'connected', connection: { credentialId, boardIds: ['b1'] } };
+          },
+          getAdapter: async (serviceName) => {
+            if (serviceName === 'trello') {
+              if (phase === 'adapter') throw outage('RATE_LIMIT');
+              return {
+                execute: async (tool: string) => {
+                  if (phase === 'cards' && tool === 'trello.search_cards') throw outage('NETWORK');
+                  if (phase === 'lists' && tool === 'trello.search_lists') throw outage('SERVER_ERROR');
+                  return [];
+                },
+              };
+            }
+            return {
+              execute: async (tool: string) => {
+                if (tool === 'slack.search_channels') return phase === 'slack' ? null : [{ id: 'C_DEV' }];
+                slackWrites++;
+                return { ts: '1700000009.001' };
+              },
+            };
+          },
+        }),
+        recordState: (client, row, time) => service.recordState(client, row, time),
+      });
+
+      async function tick() {
+        connectionChecks = 0;
+        await runner.tick();
+        const result = await db.pool.query(
+          'SELECT status, delivery_started_at FROM schedule_runs WHERE schedule_id = $1 AND due_at = $2',
+          [scheduleId, now],
+        );
+        expect(result.rows, phase).toEqual([{ status: 'digest_failed', delivery_started_at: null }]);
+        expect(slackWrites).toBe(0);
+        now = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        const schedule = await db.pool.query('SELECT status FROM schedules WHERE id = $1', [scheduleId]);
+        return schedule.rows[0]?.status;
+      }
+
+      for (phase of ['initial', 'initial-throw', 'adapter', 'cards', 'lists', 'revalidation']) {
+        expect(await tick(), phase).toBe('active');
+        const [latest] = await service.listRuns(user.id, scheduleId, 1, now);
+        expect(latest?.error).toMatch(/^Trello tạm thời không khả dụng/);
+      }
+      phase = 'slack';
+      expect(await tick()).toBe('active');
+      expect(await tick()).toBe('active');
+      expect(await tick()).toBe('paused');
     });
 
     it('marks run as needs_attention on ambiguous delivery failure (blocking duplicate replan) and discards when schedule is cancelled before delivery', async () => {

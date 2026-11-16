@@ -11,7 +11,13 @@ import type { ScheduleChange } from './schedule-service.js';
 import { SHEETS_DELIVERY_UNKNOWN, type SheetsDigestRunner } from './sheets-digest-runner.js';
 import type { DigestRunOutcome as GithubDigestRunOutcome, RunGithubDigest } from './github-digest-runner.js';
 import { GITHUB_DELIVERY_UNKNOWN } from './github-digest-runner.js';
-import { TRELLO_DELIVERY_UNKNOWN, type TrelloDigestRunOutcome, type RunTrelloDigest } from './trello-digest-runner.js';
+import {
+  TRELLO_DELIVERY_UNKNOWN,
+  TRELLO_READ_UNAVAILABLE,
+  TRELLO_READ_UNAVAILABLE_PREFIX,
+  type TrelloDigestRunOutcome,
+  type RunTrelloDigest,
+} from './trello-digest-runner.js';
 import { NOTION_DELIVERY_UNKNOWN, type NotionDigestRunOutcome, type RunNotionDigest } from './notion-digest-runner.js';
 import { TELEGRAM_DELIVERY_UNKNOWN, type DigestRunInput, type DigestRunOutcome } from './telegram-digest-runner.js';
 import { assertDigestScheduleLiveScopeAndAuth } from './digest-scope-guard.js';
@@ -1067,17 +1073,25 @@ export class ScheduleRunner {
       }
 
       const errText = outcome?.state === 'digest_failed' ? outcome.error : failure ?? 'Không gửi được bản tin lúc này. Hãy thử lại.';
+      const retryableTrelloOutage = started.kind === 'trello_digest' && outcome?.state === 'digest_failed' &&
+        'failureCode' in outcome && outcome.failureCode === TRELLO_READ_UNAVAILABLE;
+      const storedError = retryableTrelloOutage ? TRELLO_READ_UNAVAILABLE_PREFIX + errText : errText;
       await this.messages.createMessage(started.convId, 'system', `Lỗi: ${errText}`, { type: 'planning_error', ...replyTo }, client);
-      await client.query("UPDATE schedule_runs SET status='digest_failed', error=$2, updated_at=now() WHERE id=$1", [runId, errText]);
+      await client.query("UPDATE schedule_runs SET status='digest_failed', error=$2, updated_at=now() WHERE id=$1", [runId, storedError]);
 
-      const recentRuns = await client.query(
-        'SELECT status FROM schedule_runs WHERE schedule_id = $1 ORDER BY created_at DESC, id DESC LIMIT 3',
+      if (retryableTrelloOutage) {
+        return { kind: 'error' as const, error: errText, changes };
+      }
+
+      const recentRuns = await client.query<{ status: string; error: string | null }>(
+        'SELECT status, error FROM schedule_runs WHERE schedule_id = $1 ORDER BY created_at DESC, id DESC LIMIT 3',
         [schedule.id],
       );
       if (
         schedule.status === 'active' &&
         recentRuns.rows.length === 3 &&
-        recentRuns.rows.every((r: { status: string }) => r.status === 'digest_failed')
+        recentRuns.rows.every((r) => r.status === 'digest_failed' &&
+          !(started.kind === 'trello_digest' && r.error?.startsWith(TRELLO_READ_UNAVAILABLE_PREFIX)))
       ) {
         const paused = await this.pause(client, schedule.id, GITHUB_DIGEST_FAILED_3X);
         changes.push(await this.options.recordState(client, paused, now));

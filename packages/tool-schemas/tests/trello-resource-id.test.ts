@@ -25,6 +25,9 @@ describe('packages/tool-schemas (Trello Resource ID Schema & Validator Invariant
       'trello.remove_member': ['cardId', 'memberId'],
       'trello.update_checklist_item': ['cardId', 'checkItemId'],
       'trello.set_card_due_complete': ['cardId'],
+      'trello.search_labels': ['boardId'],
+      'trello.add_label': ['cardId', 'labelId'],
+      'trello.remove_label': ['cardId', 'labelId'],
     };
 
     for (const [toolName, fields] of Object.entries(expectedScalarFields)) {
@@ -46,7 +49,13 @@ describe('packages/tool-schemas (Trello Resource ID Schema & Validator Invariant
       minLength: 1,
       maxLength: 128,
     });
-    expect(allTrelloTools).toHaveLength(14);
+    expect(createCard.inputSchema.properties.idLabels.items).toMatchObject({
+      type: 'string',
+      pattern: TRELLO_RESOURCE_ID_PATTERN,
+      minLength: 1,
+      maxLength: 128,
+    });
+    expect(allTrelloTools).toHaveLength(17);
   });
 
   it('validates legitimate Trello IDs and rejects traversal, URL, percent-encoded, and control-character inputs', () => {

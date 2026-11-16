@@ -63,7 +63,10 @@ describe('Trello scope and workspace management routes', () => {
     }
 
     // Mock boards endpoint
-    if (url === 'https://api.trello.com/1/members/me/boards') {
+    if (url.split('?')[0] === 'https://api.trello.com/1/members/me/boards') {
+      if (authHeader.includes('boards-down')) {
+        return new Response(JSON.stringify({ error: 'unavailable' }), { status: 503 });
+      }
       if (authHeader.includes('admin')) {
         return new Response(
           JSON.stringify([
@@ -138,6 +141,9 @@ describe('Trello scope and workspace management routes', () => {
         refresh: async (token) => {
           if (token.includes('invalid_grant') || token.includes('revoked')) {
             throw new TrelloOAuthError('invalid_grant', 400);
+          }
+          if (token.includes('outage')) {
+            throw new TrelloOAuthError('network');
           }
           return {
             accessToken: `access-token-for-${token}`,
@@ -437,6 +443,31 @@ describe('Trello scope and workspace management routes', () => {
         username: 'alice_trello',
         boards: [],
       });
+    });
+
+    it.each([
+      ['token refresh cannot reach Trello', 'alice-outage-token'],
+      ['the boards request fails with 5xx', 'alice-boards-down-token'],
+    ])('reports a transient outage, not needs_membership or reconnect, when %s', async (_label, refreshToken) => {
+      const app = build();
+      await request(app)
+        .put('/api/connections/trello/scope')
+        .set('Authorization', bearer(admin))
+        .send({ workspaceId: 'ws-1', boardIds: ['board-1'] });
+      await credentials.saveCredentials(
+        'trello',
+        encryptCredentials({ refreshToken, username: 'alice_trello' }, key),
+        memberAlice.id
+      );
+
+      const res = await request(app)
+        .get('/api/connections/trello')
+        .set('Authorization', bearer(memberAlice));
+
+      expect(res.status).toBe(503);
+      expect(res.body.status).toBe('unavailable');
+      const row = await credentials.getPersonalConnectionStatus('trello', memberAlice.id);
+      expect(row?.status).toBe('active');
     });
 
     it('deduplicates boardIds in PUT /api/connections/trello/scope cleanly without database constraint error', async () => {

@@ -14,6 +14,7 @@ import type { ScheduleRow } from '../../db/repositories/schedule-repo.js';
 import { CALENDAR_DELIVERY_UNKNOWN } from './calendar-digest-runner.js';
 import { GITHUB_DELIVERY_UNKNOWN } from './github-digest-runner.js';
 import { NOTION_DELIVERY_UNKNOWN } from './notion-digest-runner.js';
+import { TRELLO_READ_UNAVAILABLE_PREFIX } from './trello-digest-runner.js';
 
 /** A schedule_runs row joined with the latest plan of its conversation (see RUN_SELECT). */
 export interface RunRow {
@@ -146,13 +147,17 @@ export function isNotionDeliveryUnknown(run: RunRow, schedule?: DeliverySchedule
 }
 
 export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): ScheduleRunView {
+  let error = isNotionDeliveryUnknown(row, schedule) ? NOTION_DELIVERY_UNKNOWN : row.error;
+  if (row.status === 'digest_failed' && error?.startsWith(TRELLO_READ_UNAVAILABLE_PREFIX)) {
+    error = error.slice(TRELLO_READ_UNAVAILABLE_PREFIX.length);
+  }
   const view: ScheduleRunView = {
     id: row.id, scheduleId: row.schedule_id, trigger: row.trigger,
     dueAt: iso(row.due_at), createdAt: iso(row.created_at),
     state: runState(row, now), missedCount: row.missed_count,
     convId: row.conv_id, planId: row.latest_plan_id ?? row.plan_id ?? null,
     planStatus: row.plan_status ?? null,
-    error: isNotionDeliveryUnknown(row, schedule) ? NOTION_DELIVERY_UNKNOWN : row.error,
+    error,
     delivery: row.delivery ?? null,
     deliveryStartedAt: row.delivery_started_at ? iso(row.delivery_started_at) : null,
     deliveryResolution: row.delivery_resolution ?? null,

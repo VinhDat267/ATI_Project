@@ -36,6 +36,7 @@ import type { TelegramMessageRepo } from '../db/repositories/telegram-message-re
 import type { NotionConnectionRepo } from '../db/repositories/notion-connection-repo.js';
 import { NotionOAuthError } from './notion/oauth-client.js';
 import type { NotionTokenManager } from './notion/token-manager.js';
+import { toTrelloStepError, trelloSignal } from './trello/failure.js';
 import type { JiraDispatchGuard, DispatchScope } from './jira/jira-dispatch-guard.js';
 import type { JiraLeaseManager } from './jira/jira-lease-manager.js';
 
@@ -53,6 +54,8 @@ export interface AdapterContext {
   stepLeaseMap?: Map<string, string>;
   gatheredSourceRefs?: any[];
   repo?: string;
+  /** The run's abort signal: personal OAuth lookups during adapter construction stop with the run. */
+  signal?: AbortSignal;
 }
 
 export interface AdapterFactoryOptions {
@@ -217,7 +220,11 @@ export class AdapterFactory {
     if (serviceName === 'gmail') return this.gmailAdapter(context);
     if (serviceName === 'mycalendar') return this.mycalendarAdapter(context);
     if (serviceName === 'mysheets') return this.mysheetsAdapter(context);
-    if (serviceName === 'trello') return this.trelloAdapter(context);
+    if (serviceName === 'trello') {
+      return this.trelloAdapter(context).catch((error: unknown) => {
+        throw toTrelloStepError(error);
+      });
+    }
     if (serviceName === 'github') return this.githubAdapter(context);
     if (serviceName === 'telegram') return this.telegramAdapter(context);
     if (serviceName === 'notion' && this.options.notionRepo && context?.userId && context.workspaceMode !== 'organization') {
@@ -502,14 +509,13 @@ export class AdapterFactory {
     }
 
     const provider = this.options.trelloTokens.forConnection(userId, record.id, refreshToken);
-    const accessToken = await provider.getAccessToken();
-
-    let liveMemberBoardIds: Set<string> = currentTeamBoardIds;
+    const accessToken = await provider.getAccessToken({ signal: trelloSignal(10_000, context?.signal) });
+    let liveMemberBoardIds = currentTeamBoardIds;
     if (this.options.trelloOAuthClient) {
       const callerBoards = await this.options.trelloOAuthClient.boards(
         accessToken,
         scope.workspaceId,
-        AbortSignal.timeout(10_000)
+        trelloSignal(10_000, context?.signal)
       );
       liveMemberBoardIds = new Set<string>(callerBoards.filter((b: any) => b.member === true).map((b: any) => String(b.id)));
     }

@@ -6,7 +6,11 @@ import type {
   ScheduleRecurrence,
 } from '@wap/tool-schemas';
 import { isUuid } from '../../db/repositories/uuid.js';
-import { computeTrelloDigestConfigHash } from './trello-digest-candidate.js';
+import { trelloSignal } from '../trello/failure.js';
+import {
+  computeTrelloDigestConfigHash,
+  isTrelloDigestTelegramDestination,
+} from './trello-digest-candidate.js';
 import { escapeSlackMrkdwn } from './github-digest-runner.js';
 import type { RunToPlan } from './schedule-runner.js';
 import { slackMrkdwnToTelegramPlain } from './telegram-plain-text.js';
@@ -14,9 +18,17 @@ import { slackMrkdwnToTelegramPlain } from './telegram-plain-text.js';
 export const TRELLO_DELIVERY_UNKNOWN =
   'TRELLO_DELIVERY_UNKNOWN: Chưa xác định bản tin Trello đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
 
+export const TRELLO_READ_UNAVAILABLE = 'TRELLO_READ_UNAVAILABLE';
+export const TRELLO_READ_UNAVAILABLE_PREFIX = `${TRELLO_READ_UNAVAILABLE}: `;
+
 const PER_BOARD_FETCH_LIMIT = 50;
+const TRELLO_READ_TIMEOUT_MS = 10_000;
+const TRELLO_TEMPORARILY_UNAVAILABLE =
+  'Trello tạm thời không khả dụng. Lượt này chưa gửi. Lịch đang hoạt động sẽ thử lại ở lượt sau.';
 const PER_CATEGORY_DISPLAY_LIMIT = 15;
 const MAX_DIGEST_CHARS = 3500;
+/** trello.search_lists caps results at 10 lists per board. */
+const DONE_LIST_LOOKUP_LIMIT = 10;
 
 export interface TrelloDigestRunInput extends RunToPlan {
   recurrence: ScheduleRecurrence;
@@ -26,7 +38,7 @@ export interface TrelloDigestRunInput extends RunToPlan {
 
 export type TrelloDigestRunOutcome =
   | { state: 'digest_sent'; delivery: TrelloDigestDelivery; text: string }
-  | { state: 'digest_failed'; error: string }
+  | { state: 'digest_failed'; error: string; failureCode?: typeof TRELLO_READ_UNAVAILABLE }
   | { state: 'delivery_unknown'; error: string }
   | { state: 'blocked'; error: string; pauseReason: string }
   | { state: 'discarded' };
@@ -58,10 +70,46 @@ export interface TrelloDigestRunnerOptions {
       dueSoonCards: TrelloCardDigestItem[];
       unassignedCards: TrelloCardDigestItem[];
       dueSoonHours: number;
+      completedCards?: TrelloCardDigestItem[];
+      completedCount?: number;
+      completedWindowHours?: number;
+      noDueCount?: number;
     },
     signal: AbortSignal
   ) => Promise<string | null>;
   aiTimeoutMs?: number;
+}
+
+/** Coverage persisted on the delivery receipt, plus the completed-section window. */
+type TrelloDigestCoverageWithWindow = TrelloDigestCoverage & { completedWindowHours: number };
+
+/**
+ * Accept a clear completion label with cosmetic prefixes or a sprint qualifier.
+ * Strip prefixes in separate passes so punctuation and bracketed tags are unambiguous.
+ */
+const DONE_LIST_NAME_REGEX =
+  /^(?:done|completed?|xong|hoàn\s+thành|đã\s+xong)(?:[\s\p{P}\p{S}\p{M}]+(?:(?:this|last)\s+sprint|sprint\s+\d+))?[\s\p{P}\p{S}\p{M}]*$/iu;
+const BRACKETED_LIST_PREFIX_REGEX = /^(?:[\s\p{S}\p{M}]*\[[^\]\r\n]*\])+/u;
+/** Negated names ("Not done", "Chưa xong", "Không hoàn thành", "Not yet done") are open work. */
+const NEGATED_DONE_LIST_NAME_REGEX =
+  /(?:^|[^\p{L}\p{N}])(?:not|un|in|chưa|không|ko|never)(?:[\s\-_]+(?:yet|được|có|đã))?[\s\-_]*(?:done|completed?|xong|hoàn\s*thành)(?:$|[^\p{L}\p{N}])/iu;
+
+export function isTrelloDoneListName(name: unknown): boolean {
+  const normalized = String(name ?? '').normalize('NFC');
+  if (NEGATED_DONE_LIST_NAME_REGEX.test(normalized)) return false;
+  const matchesStatus = (label: string) => DONE_LIST_NAME_REGEX.test(
+    label.replace(/^[\s\p{P}\p{S}\p{M}]+/u, '').replace(/^\p{N}+[\s\p{P}\p{S}\p{M}]+/u, ''),
+  );
+  return matchesStatus(normalized) || matchesStatus(normalized.replace(BRACKETED_LIST_PREFIX_REGEX, ''));
+}
+
+/** Window for the "completed recently" section: weekly schedules look back 7 days, others 24h. */
+export function trelloCompletedWindowHours(recurrence: ScheduleRecurrence | null | undefined): number {
+  return recurrence?.type === 'weekly' ? 168 : 24;
+}
+
+function formatWindowLabel(hours: number): string {
+  return hours % 24 === 0 && hours >= 48 ? `${hours / 24} ngày qua` : `${hours}h qua`;
 }
 
 export function sanitizeUntrustedTrelloText(raw: unknown, maxLen = 80): string {
@@ -79,6 +127,10 @@ export function buildTrelloAiPromptPayload(input: {
   dueSoonCards: TrelloCardDigestItem[];
   unassignedCards: TrelloCardDigestItem[];
   dueSoonHours: number;
+  completedCards?: TrelloCardDigestItem[];
+  completedCount?: number;
+  completedWindowHours?: number;
+  noDueCount?: number;
 }): { systemPrompt: string; userPrompt: string } {
   const safeBoards = input.boards
     .slice(0, 5)
@@ -104,6 +156,14 @@ export function buildTrelloAiPromptPayload(input: {
     `- Thẻ quá hạn (${input.overdueCards.length}): ${formatItems(input.overdueCards)}`,
     `- Thẻ sắp đến hạn trong ${input.dueSoonHours}h (${input.dueSoonCards.length}): ${formatItems(input.dueSoonCards)}`,
     `- Thẻ chưa gán người phụ trách (${input.unassignedCards.length}): ${formatItems(input.unassignedCards)}`,
+    ...(typeof input.noDueCount === 'number'
+      ? [`- Thẻ đang mở chưa có hạn: ${input.noDueCount}`]
+      : []),
+    ...(input.completedCards
+      ? [
+          `- Thẻ đã xong có cập nhật trong ${formatWindowLabel(input.completedWindowHours ?? 24)} (${input.completedCount ?? input.completedCards.length}): ${formatItems(input.completedCards)}`,
+        ]
+      : []),
     '</trello_data>',
   ].join('\n');
 
@@ -132,9 +192,6 @@ function formatTrelloDueInTimeZone(isoDue: string, timeZone: string): string {
 }
 
 function formatTrelloSectionItems(items: TrelloCardDigestItem[], timeZone: string): string[] {
-  if (items.length === 0) {
-    return ['  - _(Không có thẻ nào trong mẫu quét)_'];
-  }
   return items.map((item) => {
     const safeTitle = escapeSlackMrkdwn(sanitizeUntrustedTrelloText(item.name, 120));
     const safeBoard = escapeSlackMrkdwn(sanitizeUntrustedTrelloText(item.boardName, 60));
@@ -165,29 +222,26 @@ function buildDeterministicGroundedSummary(counts: {
   dueSoon: number;
   unassigned: number;
   dueSoonHours: number;
+  noDue: number;
+  completed: number;
+  completedWindowHours: number;
 }): string {
-  return `Trong mẫu quét hiện tại có ${counts.overdue} thẻ quá hạn, ${counts.dueSoon} thẻ sắp đến hạn trong ${counts.dueSoonHours}h tới và ${counts.unassigned} thẻ chưa gán người phụ trách.`;
+  return `Trong mẫu quét hiện tại có ${counts.overdue} thẻ quá hạn, ${counts.dueSoon} thẻ sắp đến hạn trong ${counts.dueSoonHours}h tới và ${counts.unassigned} thẻ chưa gán người phụ trách; ${counts.noDue} thẻ đang mở chưa có hạn, ${counts.completed} thẻ đã xong có cập nhật trong ${formatWindowLabel(counts.completedWindowHours)}.`;
 }
 
-function assembleClippedDigestText(bodyLines: string[], footerLine: string): string {
-  const full = [...bodyLines, footerLine].join('\n');
-  if (full.length <= MAX_DIGEST_CHARS) {
-    return full;
-  }
-  const omissionNotice = '  - _(... đã lược bớt một số dòng để vừa giới hạn 3.500 ký tự)_';
-  const reservedSuffix = `\n${omissionNotice}\n${footerLine}`;
-  const maxBodyBudget = Math.max(0, MAX_DIGEST_CHARS - reservedSuffix.length);
-  const keptLines: string[] = [];
-  let currentLen = 0;
-  for (const line of bodyLines) {
-    const addedLen = keptLines.length === 0 ? line.length : currentLen + 1 + line.length;
-    if (addedLen > maxBodyBudget) {
-      break;
-    }
-    keptLines.push(line);
-    currentLen = addedLen;
-  }
-  return `${keptLines.join('\n')}${reservedSuffix}`;
+function trelloReadUnavailable(): TrelloDigestRunOutcome {
+  return { state: 'digest_failed', error: TRELLO_TEMPORARILY_UNAVAILABLE, failureCode: TRELLO_READ_UNAVAILABLE };
+}
+
+function isRetryableTrelloReadError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === 'TimeoutError') return true;
+  if (!error || typeof error !== 'object' || !('category' in error)) return false;
+  return error.category === 'NETWORK' || error.category === 'SERVER_ERROR' || error.category === 'RATE_LIMIT';
+}
+
+function isTrelloReadAuthError(error: unknown): boolean {
+  if (!error || typeof error !== 'object' || !('category' in error)) return false;
+  return error.category === 'AUTH_ERROR' || error.category === 'PERMISSION_DENIED';
 }
 
 function isDefiniteWriteRejection(err: any): boolean {
@@ -443,9 +497,13 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
         scopeId !== undefined
           ? await options.trelloConnection?.(run.userId, scopeId)
           : await options.trelloConnection?.(run.userId);
-    } catch {
+    } catch (error) {
+      signal.throwIfAborted();
+      if (!isTrelloReadAuthError(error)) return trelloReadUnavailable();
       trello = null;
     }
+
+    if (trello?.status === 'unavailable') return trelloReadUnavailable();
 
     if (
       !trello ||
@@ -469,7 +527,14 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
       };
     }
 
-    const isTelegramDest = Boolean(config.telegramChatId);
+    const isTelegramDest = isTrelloDigestTelegramDestination(config);
+    if (isTelegramDest && !String(config.telegramChatId ?? '').trim()) {
+      return {
+        state: 'blocked',
+        error: 'Cấu hình bản tin Trello thiếu cuộc trò chuyện Telegram nhận bản tin, cần xác nhận lại.',
+        pauseReason: 'Cấu hình bản tin Trello thiếu cuộc trò chuyện Telegram nhận bản tin, cần xác nhận lại.',
+      };
+    }
     let trelloAdapter: any;
     let slackAdapter: any;
     let telegramAdapter: any;
@@ -478,6 +543,7 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
       trelloAdapter = await options.getAdapter?.('trello', {
         userId: run.userId,
         phase: 'execution',
+        signal,
         ...workspaceContext,
         connections: {
           trello: {
@@ -488,6 +554,13 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
           },
         },
       });
+    } catch (error) {
+      signal.throwIfAborted();
+      if (isRetryableTrelloReadError(error)) return trelloReadUnavailable();
+      const msg = error instanceof Error ? error.message : 'Kết nối Trello không khả dụng.';
+      return { state: 'blocked', error: msg, pauseReason: msg };
+    }
+    try {
       if (isTelegramDest) {
         let tgBinding:
           | { credentialId: string; telegramUserId: string; username: string; chatIds: string[] }
@@ -504,10 +577,11 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
               pauseReason: 'Cuộc trò chuyện Telegram nhận bản tin không còn nằm trong phạm vi cho phép.',
             };
           }
+          // Fail closed: a pinned Telegram credential must match the live connection exactly.
+          // A missing live credentialId cannot prove the bot was not swapped.
           if (
             config.telegramCredentialId &&
-            tg.connection?.credentialId &&
-            tg.connection.credentialId !== config.telegramCredentialId
+            tg.connection?.credentialId !== config.telegramCredentialId
           ) {
             return {
               state: 'blocked',
@@ -596,15 +670,18 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
       }
     }
 
-    // 2. Scan Trello boards for Overdue, Due-Soon, and Unassigned cards
+    // 2. Scan Trello boards for Overdue, Due-Soon, Unassigned, No-due and recently Completed cards
     const timeZone = options.timeZone?.trim() || 'Asia/Ho_Chi_Minh';
     const nowMs = run.dueAt.getTime();
     const dueSoonHours = Math.min(168, Math.max(1, config.dueSoonHours || 24));
     const dueSoonLimitMs = nowMs + dueSoonHours * 3600_000;
+    const completedWindowHours = trelloCompletedWindowHours(run.recurrence);
+    const completedSinceMs = nowMs - completedWindowHours * 3600_000;
 
     const overdueCards: TrelloCardDigestItem[] = [];
     const dueSoonCards: TrelloCardDigestItem[] = [];
     const unassignedCards: TrelloCardDigestItem[] = [];
+    const completedCards: TrelloCardDigestItem[] = [];
 
     const seenCardIds = new Set<string>();
     let scannedCount = 0;
@@ -614,6 +691,12 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
     let matchedOverdueCount = 0;
     let matchedDueSoonCount = 0;
     let matchedUnassignedCount = 0;
+    let matchedNoDueCount = 0;
+    let matchedCompletedCount = 0;
+    let completedUnknownTimeCount = 0;
+    let doneListLookupFailedBoards = 0;
+    let doneListLookupCappedBoards = 0;
+    let everyBoardFullyListed = true;
 
     try {
       for (const board of config.boards) {
@@ -621,12 +704,45 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
         const cards = await trelloAdapter.execute(
           'trello.search_cards',
           { query: '', boardId: board.id, limit: PER_BOARD_FETCH_LIMIT },
-          { signal, boardId: board.id }
+          { signal: trelloSignal(TRELLO_READ_TIMEOUT_MS, signal), boardId: board.id }
         );
-        if (!Array.isArray(cards)) continue;
+        if (!Array.isArray(cards)) {
+          return { state: 'digest_failed', error: 'Trello trả về danh sách thẻ không hợp lệ. Lượt này chưa gửi.' };
+        }
+
+        // A lookup outage or denial blocks delivery. Other lookup failures narrow the
+        // completed rule to dueComplete=true and are disclosed in the footer.
+        const doneListIds = new Set<string>();
+        try {
+          const lists = await trelloAdapter.execute(
+            'trello.search_lists',
+            { boardId: board.id, query: '', limit: DONE_LIST_LOOKUP_LIMIT },
+            { signal: trelloSignal(TRELLO_READ_TIMEOUT_MS, signal), boardId: board.id }
+          );
+          if (Array.isArray(lists)) {
+            if (lists.length >= DONE_LIST_LOOKUP_LIMIT) doneListLookupCappedBoards++;
+            for (const l of lists) {
+              if (l && typeof l === 'object' && l.id && isTrelloDoneListName(l.name)) {
+                doneListIds.add(String(l.id));
+              }
+            }
+          } else {
+            doneListLookupFailedBoards++;
+          }
+        } catch (listErr) {
+          if (signal.aborted || isRetryableTrelloReadError(listErr) || isTrelloReadAuthError(listErr)) {
+            throw listErr;
+          }
+          doneListLookupFailedBoards++;
+        }
 
         const scanMeta = (cards as any)?.scanMetadata;
         const hasScanMeta = Boolean(scanMeta && typeof scanMeta === 'object');
+        // A board counts as fully listed only when the adapter reports scan metadata
+        // and nothing was capped; otherwise the total stays UNKNOWN.
+        if (scanMeta?.prefixCapReached !== false || scanMeta?.truncatedByLimit !== false) {
+          everyBoardFullyListed = false;
+        }
         if (hasScanMeta) {
           scannedCount +=
             typeof scanMeta.scannedCount === 'number' ? scanMeta.scannedCount : cards.length;
@@ -635,8 +751,7 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
           }
           if (
             scanMeta.prefixCapReached === true ||
-            scanMeta.truncatedByLimit === true ||
-            cards.length >= PER_BOARD_FETCH_LIMIT
+            scanMeta.truncatedByLimit === true
           ) {
             truncatedByFetchLimit = true;
           }
@@ -659,7 +774,6 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
           seenCardIds.add(cardId);
           uniqueScannedCount++;
 
-          if (c?.dueComplete === true) continue;
           const item: TrelloCardDigestItem = {
             boardName: board.name,
             id: cardId,
@@ -668,9 +782,28 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
             due: typeof c.due === 'string' ? c.due : null,
           };
 
+          const inDoneList = doneListIds.has(String(c?.listId ?? c?.idList ?? ''));
+          if (c?.dueComplete === true || inDoneList) {
+            // Completed rule: marked complete OR sitting in a Done-style list, with the card's
+            // last activity inside the window. Done cards never count as open work below.
+            const activityMs =
+              typeof c.dateLastActivity === 'string' ? Date.parse(c.dateLastActivity) : Number.NaN;
+            if (Number.isNaN(activityMs)) {
+              completedUnknownTimeCount++;
+            } else if (activityMs >= completedSinceMs && activityMs <= nowMs) {
+              matchedCompletedCount++;
+              if (completedCards.length < PER_CATEGORY_DISPLAY_LIMIT) {
+                completedCards.push({ ...item, due: null });
+              }
+            }
+            continue;
+          }
+
+          let hasValidDue = false;
           if (typeof c.due === 'string' && c.due) {
             const dueMs = Date.parse(c.due);
             if (!Number.isNaN(dueMs)) {
+              hasValidDue = true;
               if (dueMs < nowMs) {
                 matchedOverdueCount++;
                 if (overdueCards.length < PER_CATEGORY_DISPLAY_LIMIT) overdueCards.push(item);
@@ -680,6 +813,9 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
               }
             }
           }
+          if (!hasValidDue) {
+            matchedNoDueCount++;
+          }
 
           const members = Array.isArray(c.idMembers) ? c.idMembers : [];
           if (members.length === 0) {
@@ -688,9 +824,11 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
           }
         }
       }
-    } catch (err: any) {
-      if (err?.category === 'AUTH_ERROR') {
-        const msg = err.message || 'Không có quyền đọc bảng Trello.';
+    } catch (error) {
+      signal.throwIfAborted();
+      if (isRetryableTrelloReadError(error)) return trelloReadUnavailable();
+      if (isTrelloReadAuthError(error)) {
+        const msg = error instanceof Error ? error.message : 'Không có quyền đọc bảng Trello.';
         return { state: 'blocked', error: msg, pauseReason: msg };
       }
       return {
@@ -699,31 +837,13 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
       };
     }
 
-    const truncatedByDisplayLimit =
-      matchedOverdueCount > overdueCards.length ||
-      matchedDueSoonCount > dueSoonCards.length ||
-      matchedUnassignedCount > unassignedCards.length;
-
-    const coverage: TrelloDigestCoverage = {
-      perBoardFetchLimit: PER_BOARD_FETCH_LIMIT,
-      perCategoryDisplayLimit: PER_CATEGORY_DISPLAY_LIMIT,
-      scannedCount,
-      uniqueScannedCount,
-      duplicateCountDropped,
-      totalAvailable: 'UNKNOWN',
-      isComplete: false,
-      truncatedByFetchLimit,
-      truncatedByDisplayLimit,
-      matchedCounts: {
-        overdueCards: matchedOverdueCount,
-        dueSoonCards: matchedDueSoonCount,
-        unassignedCards: matchedUnassignedCount,
-      },
-      displayedCounts: {
-        overdueCards: overdueCards.length,
-        dueSoonCards: dueSoonCards.length,
-        unassignedCards: unassignedCards.length,
-      },
+    const scanComplete = everyBoardFullyListed && !truncatedByFetchLimit;
+    const deliveryCounts = {
+      overdueCards: matchedOverdueCount,
+      dueSoonCards: matchedDueSoonCount,
+      unassignedCards: matchedUnassignedCount,
+      completedCards: matchedCompletedCount,
+      noDueCards: matchedNoDueCount,
     };
 
     // 3. Optional AI bottleneck summary with strict AbortSignal timeout, consent check, title sanitization & grounding validation
@@ -758,6 +878,12 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
         overdueCards.length,
         dueSoonCards.length,
         unassignedCards.length,
+        matchedCompletedCount,
+        completedCards.length,
+        matchedNoDueCount,
+        completedUnknownTimeCount,
+        completedWindowHours,
+        completedWindowHours / 24,
       ]);
 
       const aiController = new AbortController();
@@ -776,6 +902,10 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
               dueSoonCards: sanitizeCardList(dueSoonCards),
               unassignedCards: sanitizeCardList(unassignedCards),
               dueSoonHours,
+              completedCards: sanitizeCardList(completedCards),
+              completedCount: matchedCompletedCount,
+              completedWindowHours,
+              noDueCount: matchedNoDueCount,
             },
             aiController.signal
           ),
@@ -792,6 +922,9 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
                 dueSoon: matchedDueSoonCount,
                 unassigned: matchedUnassignedCount,
                 dueSoonHours,
+                noDue: matchedNoDueCount,
+                completed: matchedCompletedCount,
+                completedWindowHours,
               }),
             );
           }
@@ -808,23 +941,93 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
     const formatCountLabel = (displayed: number, matched: number) =>
       matched > displayed ? `hiển thị ${displayed}/${matched}` : `${matched}`;
 
-    const bodyLines: string[] = [
-      `*Bản tin Trello tự động của Planora* · thiết lập bởi @${escapeSlackMrkdwn(config.username)}`,
-    ];
-    if (aiSummary) {
-      bodyLines.push(`> 💡 *Nhận xét AI:* ${aiSummary}`);
-    }
-    bodyLines.push(
-      `• *🚨 Thẻ quá hạn (${formatCountLabel(overdueCards.length, matchedOverdueCount)}):*`,
-      ...formatTrelloSectionItems(overdueCards, timeZone),
-      `• *⏰ Thẻ sắp đến hạn trong ${dueSoonHours}h tới (${formatCountLabel(dueSoonCards.length, matchedDueSoonCount)}):*`,
-      ...formatTrelloSectionItems(dueSoonCards, timeZone),
-      `• *👤 Thẻ chưa gán người phụ trách (${formatCountLabel(unassignedCards.length, matchedUnassignedCount)}):*`,
-      ...formatTrelloSectionItems(unassignedCards, timeZone)
+    const section = (title: string, items: TrelloCardDigestItem[], matched: number) => ({
+      title,
+      rows: formatTrelloSectionItems(items, timeZone),
+      shown: 0,
+      matched,
+    });
+    const overdue = section('🚨 Thẻ quá hạn', overdueCards, matchedOverdueCount);
+    const dueSoon = section(`⏰ Thẻ sắp đến hạn trong ${dueSoonHours}h tới`, dueSoonCards, matchedDueSoonCount);
+    const unassigned = section('👤 Thẻ chưa gán người phụ trách', unassignedCards, matchedUnassignedCount);
+    const completed = section(
+      `✅ Đã xong (đánh dấu hoàn thành hoặc ở danh sách Done/Xong/Hoàn thành) có cập nhật trong ${formatWindowLabel(completedWindowHours)}`,
+      completedCards,
+      matchedCompletedCount,
     );
+    const sections = [overdue, dueSoon, unassigned, completed];
+    const renderSection = ({ title, rows, shown, matched }: ReturnType<typeof section>) => [
+      `• *${title} (${formatCountLabel(shown, matched)}):*`,
+      ...(matched === 0 ? ['  - _(Không có thẻ nào trong mẫu quét)_'] : rows.slice(0, shown)),
+    ];
 
-    const footerLine = `⚠️ _Phạm vi dữ liệu: Đã quét ${uniqueScannedCount} thẻ (tối đa ${PER_BOARD_FETCH_LIMIT} thẻ/bảng, hiển thị tối đa ${PER_CATEGORY_DISPLAY_LIMIT} thẻ/nhóm; tổng số thẻ trên Trello: UNKNOWN — dữ liệu có thể chưa đầy đủ)._`;
-    const messageText = assembleClippedDigestText(bodyLines, footerLine);
+    const username = escapeSlackMrkdwn(sanitizeUntrustedTrelloText(config.username));
+    const titleLine = `*Bản tin Trello tự động của Planora* · thiết lập bởi @${username}`;
+    const noDueLine = `• *📭 Thẻ đang mở chưa có hạn: ${matchedNoDueCount}*`;
+    const unknownActivityLine =
+      `  - _(${completedUnknownTimeCount} thẻ đã xong nhưng không rõ thời điểm cập nhật, không tính vào mục này)_`;
+    const omissionNotice = '  - _(... đã lược bớt một số dòng để vừa giới hạn 3.500 ký tự)_';
+
+    const listLookupNotes: string[] = [];
+    if (doneListLookupFailedBoards > 0) {
+      listLookupNotes.push(
+        `không đọc được danh sách của ${doneListLookupFailedBoards} bảng nên mục "Đã xong" ở đó chỉ tính thẻ đánh dấu hoàn thành`,
+      );
+    }
+    if (doneListLookupCappedBoards > 0) {
+      listLookupNotes.push(`chỉ dò danh sách Done trong ${DONE_LIST_LOOKUP_LIMIT} danh sách đầu mỗi bảng`);
+    }
+    const listLookupSuffix = listLookupNotes.length ? `; ${listLookupNotes.join('; ')}` : '';
+    const footerLine = scanComplete
+      ? `ℹ️ _Phạm vi dữ liệu: Đã quét đủ ${uniqueScannedCount} thẻ đang mở trên ${config.boards.length} bảng (hiển thị tối đa ${PER_CATEGORY_DISPLAY_LIMIT} thẻ/nhóm${listLookupSuffix})._`
+      : `⚠️ _Phạm vi dữ liệu: Đã quét ${uniqueScannedCount} thẻ (tối đa ${PER_BOARD_FETCH_LIMIT} thẻ/bảng, hiển thị tối đa ${PER_CATEGORY_DISPLAY_LIMIT} thẻ/nhóm; chưa biết tổng số thẻ trên Trello nên dữ liệu có thể chưa đầy đủ${listLookupSuffix})._`;
+    const renderDigest = (clipped: boolean) => [
+      titleLine,
+      ...(aiSummary ? [`> 💡 *Nhận xét AI:* ${aiSummary}`] : []),
+      ...renderSection(overdue),
+      ...renderSection(dueSoon),
+      ...renderSection(unassigned),
+      noDueLine,
+      ...renderSection(completed),
+      ...(completedUnknownTimeCount > 0 ? [unknownActivityLine] : []),
+      ...(clipped ? [omissionNotice] : []),
+      footerLine,
+    ].join('\n');
+
+    for (const group of sections) group.shown = group.rows.length;
+    let messageText = renderDigest(false);
+    if (messageText.length > MAX_DIGEST_CHARS) {
+      for (const group of sections) group.shown = 0;
+      // Add one intact line per group per pass, so earlier groups cannot consume the budget.
+      for (let pass = 0; pass < PER_CATEGORY_DISPLAY_LIMIT; pass++) {
+        for (const group of sections) {
+          if (group.shown !== pass || group.shown >= group.rows.length) continue;
+          group.shown++;
+          if (renderDigest(true).length > MAX_DIGEST_CHARS) group.shown--;
+        }
+      }
+      messageText = renderDigest(true);
+    }
+
+    const coverage: TrelloDigestCoverageWithWindow = {
+      perBoardFetchLimit: PER_BOARD_FETCH_LIMIT,
+      perCategoryDisplayLimit: PER_CATEGORY_DISPLAY_LIMIT,
+      scannedCount,
+      uniqueScannedCount,
+      duplicateCountDropped,
+      totalAvailable: scanComplete ? uniqueScannedCount : 'UNKNOWN',
+      isComplete: scanComplete,
+      truncatedByFetchLimit,
+      truncatedByDisplayLimit: sections.some((group) => group.shown < group.matched),
+      matchedCounts: deliveryCounts,
+      displayedCounts: {
+        overdueCards: overdue.shown,
+        dueSoonCards: dueSoon.shown,
+        unassignedCards: unassigned.shown,
+        completedCards: completed.shown,
+      },
+      completedWindowHours,
+    };
 
     // 5. Pre-send revalidation of connection/scope + schedule version/status + mark delivery_started_at
     signal.throwIfAborted();
@@ -835,9 +1038,12 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
           scopeId !== undefined
             ? await options.trelloConnection(run.userId, scopeId)
             : await options.trelloConnection(run.userId);
-      } catch {
+      } catch (error) {
+        signal.throwIfAborted();
+        if (!isTrelloReadAuthError(error)) return trelloReadUnavailable();
         latestTrello = null;
       }
+      if (latestTrello?.status === 'unavailable') return trelloReadUnavailable();
       if (
         !latestTrello ||
         latestTrello.status !== 'connected' ||
@@ -911,11 +1117,7 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
           telegramChatId: config.telegramChatId,
           telegramChatTitle: config.telegramChatTitle ?? '',
           messageId: sendRes.messageId,
-          counts: {
-            overdueCards: matchedOverdueCount,
-            dueSoonCards: matchedDueSoonCount,
-            unassignedCards: matchedUnassignedCount,
-          },
+          counts: deliveryCounts,
           coverage,
         };
         return { state: 'digest_sent', delivery, text: messageText };
@@ -955,11 +1157,7 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
         channelId: config.channelId,
         channelName: config.channelName,
         ts: sendRes.ts.trim(),
-        counts: {
-          overdueCards: matchedOverdueCount,
-          dueSoonCards: matchedDueSoonCount,
-          unassignedCards: matchedUnassignedCount,
-        },
+        counts: deliveryCounts,
         coverage,
       };
       return { state: 'digest_sent', delivery, text: messageText };

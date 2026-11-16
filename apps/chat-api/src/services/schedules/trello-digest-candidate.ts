@@ -35,11 +35,29 @@ export function computeTrelloDigestConfigHash(input: {
   return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
 
+/**
+ * A Trello digest delivers to Telegram when `destination === 'telegram'`, or — for legacy
+ * stored configs written before `destination` was pinned — when a Telegram chat id is present.
+ */
+export function isTrelloDigestTelegramDestination(config: TrelloDigestConfig | null | undefined): boolean {
+  if (!config) return false;
+  if (config.destination === 'telegram') return true;
+  if (config.destination === 'slack') return false;
+  return nonEmptyString(config.telegramChatId) !== undefined;
+}
+
+function nonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== 'string' && typeof value !== 'number') return undefined;
+  const trimmed = String(value).trim();
+  return trimmed ? trimmed : undefined;
+}
+
 export function getTrelloDigestPinnedCredentialIds(config: TrelloDigestConfig): string[] {
   const ids: string[] = [];
   if (config.credentialId) ids.push(config.credentialId);
-  const destCredId =
-    config.destination === 'telegram' ? config.telegramCredentialId : config.slackCredentialId;
+  const destCredId = isTrelloDigestTelegramDestination(config)
+    ? config.telegramCredentialId
+    : config.slackCredentialId;
   if (destCredId) ids.push(destCredId);
   return ids;
 }
@@ -51,18 +69,36 @@ export function buildConfirmedTrelloDigestDelivery(input: {
   resolvedBy: string;
 }): Record<string, unknown> {
   const { config: cfg, previousDelivery: prevDelivery, resolvedAtIso, resolvedBy } = input;
+  const prevDestination =
+    prevDelivery.destination === 'telegram' || prevDelivery.destination === 'slack'
+      ? prevDelivery.destination
+      : undefined;
+  const isTelegram =
+    prevDestination !== undefined
+      ? prevDestination === 'telegram'
+      : nonEmptyString(prevDelivery.telegramChatId) !== undefined || isTrelloDigestTelegramDestination(cfg);
+  const targetId =
+    nonEmptyString(prevDelivery.targetId) ??
+    (isTelegram
+      ? nonEmptyString(prevDelivery.telegramChatId) ?? nonEmptyString(cfg?.telegramChatId)
+      : nonEmptyString(prevDelivery.channelId) ?? nonEmptyString(cfg?.channelId)) ??
+    'unknown';
+  const targetLabel =
+    nonEmptyString(prevDelivery.targetLabel) ??
+    (isTelegram
+      ? nonEmptyString(prevDelivery.telegramChatTitle) ?? nonEmptyString(cfg?.telegramChatTitle)
+      : nonEmptyString(prevDelivery.channelName) ?? nonEmptyString(cfg?.channelName));
+  const prevCounts =
+    prevDelivery.counts && typeof prevDelivery.counts === 'object'
+      ? (prevDelivery.counts as Record<string, unknown>)
+      : {};
+  const pickCount = (topLevel: unknown, nested: unknown): number =>
+    typeof topLevel === 'number' ? topLevel : typeof nested === 'number' ? nested : 0;
   return {
     ...prevDelivery,
-    destination: prevDelivery.destination ?? cfg?.destination ?? 'slack',
-    targetId:
-      prevDelivery.targetId ??
-      (cfg?.destination === 'telegram' ? cfg?.telegramChatId : cfg?.channelId) ??
-      'unknown',
-    ...(cfg?.destination === 'telegram' && cfg?.telegramChatTitle
-      ? { targetLabel: prevDelivery.targetLabel ?? cfg.telegramChatTitle }
-      : cfg?.channelName
-        ? { targetLabel: prevDelivery.targetLabel ?? cfg.channelName }
-        : {}),
+    destination: isTelegram ? 'telegram' : 'slack',
+    targetId,
+    ...(targetLabel ? { targetLabel } : {}),
     boardCount:
       typeof prevDelivery.boardCount === 'number'
         ? prevDelivery.boardCount
@@ -70,10 +106,9 @@ export function buildConfirmedTrelloDigestDelivery(input: {
           ? cfg.boards.length
           : 0,
     cardCount: typeof prevDelivery.cardCount === 'number' ? prevDelivery.cardCount : 0,
-    overdueCount: typeof prevDelivery.overdueCount === 'number' ? prevDelivery.overdueCount : 0,
-    dueSoonCount: typeof prevDelivery.dueSoonCount === 'number' ? prevDelivery.dueSoonCount : 0,
-    unassignedCount:
-      typeof prevDelivery.unassignedCount === 'number' ? prevDelivery.unassignedCount : 0,
+    overdueCount: pickCount(prevDelivery.overdueCount, prevCounts.overdueCards),
+    dueSoonCount: pickCount(prevDelivery.dueSoonCount, prevCounts.dueSoonCards),
+    unassignedCount: pickCount(prevDelivery.unassignedCount, prevCounts.unassignedCards),
     summaryMode:
       prevDelivery.summaryMode === 'ai' || prevDelivery.summaryMode === 'deterministic'
         ? prevDelivery.summaryMode
@@ -318,8 +353,10 @@ export async function evaluateTrelloDigestCandidate(
       channelId: '',
       channelName: '',
       dueSoonHours,
+      destination: 'telegram',
       telegramChatId: String(matchedChat.chatId),
       telegramChatTitle: String(matchedChat.title),
+      ...(tg.connection?.credentialId ? { telegramCredentialId: String(tg.connection.credentialId) } : {}),
     });
 
     const configHash = computeTrelloDigestConfigHash({
@@ -387,6 +424,7 @@ export async function evaluateTrelloDigestCandidate(
     channelId: matchedChannel.id,
     channelName: matchedChannel.name,
     dueSoonHours,
+    destination: 'slack',
   });
 
   const configHash = computeTrelloDigestConfigHash({
