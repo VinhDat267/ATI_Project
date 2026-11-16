@@ -2303,14 +2303,14 @@ export class ScheduleService {
               : {};
           const dest = cfg?.destination;
           const fallbackLabel =
-            dest?.service === 'slack' ? dest.channelName : dest?.service === 'telegram' ? dest.chatTitle : undefined;
+            dest && 'channelName' in dest ? dest.channelName : dest?.service === 'telegram' ? dest.chatTitle : undefined;
           const delivery: CalendarDigestDelivery & Record<string, unknown> = {
             ...(prevDelivery.destinationService ?? dest?.service
               ? { destinationService: prevDelivery.destinationService ?? dest?.service }
               : {}),
             channelId:
               prevDelivery.channelId ??
-              (dest?.service === 'slack' ? dest.channelId : dest?.service === 'telegram' ? dest.chatId : 'unknown'),
+              (dest && 'channelId' in dest ? dest.channelId : dest?.service === 'telegram' ? dest.chatId : 'unknown'),
             ...(prevDelivery.channelName ?? fallbackLabel
               ? { channelName: prevDelivery.channelName ?? fallbackLabel }
               : {}),
