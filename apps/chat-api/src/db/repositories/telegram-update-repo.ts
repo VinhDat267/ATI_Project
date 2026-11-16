@@ -4,7 +4,11 @@ import { TELEGRAM_CURSOR_IDLE_MS, telegramUpdateRetention, type TelegramUpdateSt
 export class TelegramUpdateRepo implements TelegramUpdateStore {
   constructor(private pool: pg.Pool) {}
 
-  async poll(botKey: string, signal: AbortSignal, fetchPage: (offset?: number) => Promise<any[]>): Promise<any[]> {
+  async poll(
+    botKey: string,
+    signal: AbortSignal,
+    fetchPage: (offset?: number, txClient?: pg.PoolClient) => Promise<any[]>,
+  ): Promise<any[]> {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -16,7 +20,7 @@ export class TelegramUpdateRepo implements TelegramUpdateStore {
       signal.throwIfAborted();
       const idle = Date.now() - cursor.updated_at.getTime() >= TELEGRAM_CURSOR_IDLE_MS;
       const offset = cursor.next_update_id === null || idle ? undefined : Number(cursor.next_update_id);
-      const batch = await fetchPage(offset);
+      const batch = await fetchPage(offset, client);
       signal.throwIfAborted();
       const now = Date.now();
       // Remove expired IDs before upserting: Telegram may reuse an ID after idle.

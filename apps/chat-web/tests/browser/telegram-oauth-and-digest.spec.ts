@@ -44,7 +44,7 @@ test('TELEGRAM-E2E-1: /guide 1-click showcase, TELEGRAM_PAIRING_PENDING auto-foc
   await page.getByText('Xem tóm tắt nhanh 7 dịch vụ hỗ trợ liên kết trực tiếp').click();
   await expect(page.getByText('Telegram cá nhân & Nhóm')).toBeVisible();
 
-  // 2. Setup mocked Telegram 1-click pairing endpoints (1st call: 409 TELEGRAM_PAIRING_PENDING, 2nd call on window focus: 200 connected/needs_scope)
+  // 2. Setup mocked Telegram 1-click pairing endpoints (1st call: 409 TELEGRAM_PAIRING_PENDING, 2nd call on window focus: 200 pairing result)
   const candidateChats = [
     {
       chatId: '777001',
@@ -52,12 +52,14 @@ test('TELEGRAM-E2E-1: /guide 1-click showcase, TELEGRAM_PAIRING_PENDING auto-foc
       type: 'private' as const,
       username: 'an_telegram',
       member: true,
+      selected: false,
     },
     {
       chatId: '-100999888',
       title: 'Đội Sản Phẩm',
       type: 'supergroup' as const,
       member: true,
+      selected: false,
     },
     {
       chatId: '-1001234567890',
@@ -65,6 +67,7 @@ test('TELEGRAM-E2E-1: /guide 1-click showcase, TELEGRAM_PAIRING_PENDING auto-foc
       type: 'supergroup' as const,
       username: 'ati_ops_group',
       member: true,
+      selected: false,
     },
   ];
 
@@ -73,13 +76,11 @@ test('TELEGRAM-E2E-1: /guide 1-click showcase, TELEGRAM_PAIRING_PENDING auto-foc
     botUsername: string;
     username?: string;
     chats: typeof candidateChats;
-    selectedChats: typeof candidateChats;
   } = {
     status: 'not_connected',
     botUsername: 'ati_assistant_bot',
     username: undefined,
     chats: [],
-    selectedChats: [],
   };
 
   await page.route('**/api/connections/telegram', async (route) => {
@@ -114,38 +115,40 @@ test('TELEGRAM-E2E-1: /guide 1-click showcase, TELEGRAM_PAIRING_PENDING auto-foc
         },
       });
     }
+    const nextChats = candidateChats.map((c) => ({ ...c, selected: false }));
     telegramState = {
       status: 'needs_scope',
       botUsername: 'ati_assistant_bot',
       username: 'an_telegram',
-      chats: candidateChats,
-      selectedChats: [],
+      chats: nextChats,
     };
     return route.fulfill({
       json: {
-        status: 'needs_scope',
         telegramUserId: '777001',
         username: 'an_telegram',
         displayName: 'An',
-        chats: telegramState.chats,
-        selectedChats: [],
+        chats: nextChats,
       },
     });
+  });
+
+  await page.route('**/api/connections/telegram/candidate-chats', async (route) => {
+    return route.fulfill({ json: { chats: telegramState.chats } });
   });
 
   await page.route('**/api/connections/telegram/scope', async (route) => {
     if (route.request().method() === 'PUT') {
       const body = route.request().postDataJSON();
       const pickedIds = new Set<string>(body?.chatIds ?? []);
+      const nextChats = candidateChats.map((c) => ({ ...c, selected: pickedIds.has(c.chatId) }));
       telegramState = {
         ...telegramState,
         status: 'connected',
-        selectedChats: candidateChats.filter((c) => pickedIds.has(c.chatId)),
+        chats: nextChats,
       };
       return route.fulfill({
         json: {
-          status: 'connected',
-          selectedChats: telegramState.selectedChats,
+          chats: nextChats.filter((c) => c.selected),
         },
       });
     }
@@ -191,12 +194,15 @@ test('TELEGRAM-E2E-1: /guide 1-click showcase, TELEGRAM_PAIRING_PENDING auto-foc
 
   await scopeSection.getByRole('checkbox', { name: /Nhóm Vận Hành ATI/i }).check();
   await filterInput.fill('');
+  await page.locator('#telegram-refresh-chats').click();
+  await expect(scopeSection.getByRole('checkbox', { name: /Nhóm Vận Hành ATI/i })).toBeChecked();
   await scopeSection.getByRole('checkbox', { name: /Telegram của tôi \(An\)/i }).check();
   await expect(scopeSection.getByText('Đã chọn 2 / 10')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('telegram-scope-selector.png'), fullPage: true });
 
   await page.locator('#telegram-save-scope').click();
   await expect(telegramRow).toContainText('Nhóm Vận Hành ATI');
+  await expect(page.locator('#telegram-edit-scope')).toBeVisible();
   await expect(telegramRow.getByRole('link', { name: /\+ Thêm bot vào nhóm mới/i })).toBeVisible();
 
   // 4. Verify ScheduleMoment #schedule-auto-digest-scope and /history ScheduleSection RunLink

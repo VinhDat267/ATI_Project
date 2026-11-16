@@ -35,6 +35,7 @@ export function computeCalendarDigestHash(config: CalendarDigestConfig): string 
             service: 'telegram' as const,
             chatId: config.destination.chatId,
             ...(config.destination.chatTitle ? { chatTitle: config.destination.chatTitle } : {}),
+            ...(config.destination.credentialId ? { credentialId: config.destination.credentialId } : {}),
           },
     windowHours: config.windowHours,
     includeSummary: config.includeSummary,
@@ -168,12 +169,12 @@ export async function evaluateCalendarDigestCandidate(
     };
   }
 
-  // 2. Check destination service (slack or telegram)
+  // 2. Check destination service (slack shared or personal telegram)
   const destRow = (
     await pool.query(
       destService === 'telegram'
-        ? 'SELECT config, status FROM service_credentials WHERE service = $1 AND (user_id = $2 OR user_id IS NULL) ORDER BY user_id IS NULL ASC LIMIT 1'
-        : 'SELECT config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL LIMIT 1',
+        ? 'SELECT id, config, status FROM service_credentials WHERE service = $1 AND user_id = $2 LIMIT 1'
+        : 'SELECT id, config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL LIMIT 1',
       destService === 'telegram' ? [destService, userId] : [destService],
     )
   ).rows[0];
@@ -268,19 +269,46 @@ export async function evaluateCalendarDigestCandidate(
   const scopeChats: string[] = rawChats.filter(
     (c: unknown) => typeof c === 'string' && TELEGRAM_CHAT_ID_RE.test(c),
   );
-  const allChatIds = [...new Set([...destSelectedChats.map((c) => c.chatId), ...scopeChats])];
-  if (allChatIds.length !== 1) {
+  const chatMap = new Map<string, { chatId: string; title?: string }>();
+  for (const c of destSelectedChats) {
+    chatMap.set(c.chatId, c);
+  }
+  for (const id of scopeChats) {
+    if (!chatMap.has(id)) chatMap.set(id, { chatId: id });
+  }
+  const chats = Array.from(chatMap.values());
+  if (chats.length === 0) {
     return {
       candidate: {
         canAutoDigest: false,
         defaultMode: 'manual',
-        disabledReason: 'Chế độ tự gửi chỉ bật khi phạm vi Telegram được khóa vào đúng 1 nhóm/chat.',
+        disabledReason: 'Telegram cá nhân chưa có nhóm/chat nào trong phạm vi được phép gửi.',
       },
     };
   }
-  const chatId = allChatIds[0]!;
-  const matchedSelectedChat = destSelectedChats.find((c) => c.chatId === chatId);
-  const chatTitle = matchedSelectedChat?.title;
+  let chosenChat: { chatId: string; title?: string } | undefined;
+  if (chats.length === 1) {
+    chosenChat = chats[0];
+  } else {
+    const reqLower = request.toLocaleLowerCase();
+    const matched = chats.filter(
+      (c) =>
+        reqLower.includes(c.chatId.toLocaleLowerCase()) ||
+        (typeof c.title === 'string' && c.title.trim() !== '' && reqLower.includes(c.title.trim().toLocaleLowerCase())),
+    );
+    if (matched.length === 1) chosenChat = matched[0];
+  }
+  if (!chosenChat) {
+    return {
+      candidate: {
+        canAutoDigest: false,
+        defaultMode: 'manual',
+        disabledReason: 'Hãy nêu rõ tên hoặc mã cuộc trò chuyện Telegram nhận bản tin trong yêu cầu để khóa đúng 1 đích gửi.',
+      },
+    };
+  }
+  const chatId = chosenChat.chatId;
+  const chatTitle = chosenChat.title;
   const config: CalendarDigestConfig = {
     version: 1,
     source: 'mycalendar',
@@ -291,6 +319,7 @@ export async function evaluateCalendarDigestCandidate(
       service: 'telegram',
       chatId,
       ...(chatTitle ? { chatTitle } : {}),
+      ...(destRow.id ? { credentialId: String(destRow.id) } : {}),
     },
     windowHours: input.windowHours ?? 24,
     includeSummary: input.includeSummary ?? true,

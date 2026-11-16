@@ -506,7 +506,7 @@ export interface CalendarDigestConfig {
   calendars: Array<{ id: string; summary: string; primary?: boolean }>;
   destination:
     | { service: 'slack'; channelId: string; channelName?: string }
-    | { service: 'telegram'; chatId: string; chatTitle?: string };
+    | { service: 'telegram'; chatId: string; chatTitle?: string; credentialId?: string };
   windowHours: number;
   includeSummary: boolean;
 }
@@ -782,6 +782,8 @@ export interface ScheduleRunView {
   delivery?: SheetsDigestDelivery | CalendarDigestDelivery | GithubDigestDelivery | TelegramDigestDelivery | TrelloDigestDelivery | NotionDigestDelivery | null;
   deliveryStartedAt?: string | null;
   deliveryResolution?: ScheduleRunDeliveryResolution | null;
+  /** The current schedule and dispatched configuration permit a confirmed resend for this run. */
+  canRetryDelivery?: boolean;
   deliveryResolvedAt?: string | null;
   deliveryFollowupRunId?: string | null;
 }

@@ -40,7 +40,9 @@ export function isUncertainSheetsDeliveryRun(
       run.error.includes('TRELLO_DELIVERY_UNKNOWN') ||
       run.error.includes('TELEGRAM_DELIVERY_UNKNOWN') ||
       run.error.includes('NOTION_DELIVERY_UNKNOWN') ||
-      run.error.includes('Chưa xác định bản tin Notion đã gửi hay chưa'))
+      run.error.includes('Chưa xác định bản tin Notion đã gửi hay chưa') ||
+      run.error.includes('Chưa xác định bản tin lịch đã gửi hay chưa') ||
+      run.error.includes('Chưa xác định bản tin GitHub đã gửi hay chưa'))
   );
 }
 
@@ -64,13 +66,17 @@ export function SheetsDeliveryRecoveryControl({
   const [busy, setBusy] = useState(false);
   const [resolveError, setResolveError] = useState('');
   const locked = useRef(false);
-  const isScheduleNotActive = Boolean(scheduleStatus && scheduleStatus !== 'active');
+  const isRetryUnavailable = run.canRetryDelivery === false || Boolean(
+    scheduleStatus &&
+      scheduleStatus !== 'active' &&
+      !(scheduleStatus === 'completed' && run.canRetryDelivery),
+  );
 
   if (trackedRunIdentity !== runIdentity) {
     setTrackedRunIdentity(runIdentity);
     setConfirmDuplicateRisk(false);
     setResolveError('');
-  } else if (isScheduleNotActive && confirmDuplicateRisk) {
+  } else if (isRetryUnavailable && confirmDuplicateRisk) {
     setConfirmDuplicateRisk(false);
   }
 
@@ -106,7 +112,7 @@ export function SheetsDeliveryRecoveryControl({
 
   const handleResolve = async (mode: 'mark_sent' | 'retry_new_run') => {
     if (locked.current) return;
-    if (mode === 'retry_new_run' && (!confirmDuplicateRisk || isScheduleNotActive)) return;
+    if (mode === 'retry_new_run' && (!confirmDuplicateRisk || isRetryUnavailable)) return;
     locked.current = true;
     setBusy(true);
     setResolveError('');
@@ -147,7 +153,7 @@ export function SheetsDeliveryRecoveryControl({
         <p className="text-[#4B5563]">Xác nhận báo cáo đã tới kênh đích (không gửi lại).</p>
       </div>
       <div className="pt-2 border-t border-amber-200/80 v3-space-y-2">
-        {isScheduleNotActive && (
+        {isRetryUnavailable && (
           <p
             data-testid="paused-schedule-retry-warning"
             role="note"
@@ -155,7 +161,11 @@ export function SheetsDeliveryRecoveryControl({
           >
             {scheduleStatus === 'unknown'
               ? 'Chưa xác minh được trạng thái hoạt động hiện tại của lịch. Vui lòng tải lại để kiểm tra lịch đang bật trước khi tạo lượt gửi bù mới.'
-              : 'Lịch đang tạm dừng hoặc đã hủy. Vui lòng tiếp tục (Chạy tiếp) hoặc cấp quyền lại lịch trước khi tạo lượt gửi bù mới để lượt chạy bù không bị hủy.'}
+              : scheduleStatus === 'completed'
+                ? 'Lịch đã chạy xong. Lượt chạy này không thể tạo lượt gửi bù.'
+                : scheduleStatus === 'active'
+                  ? 'Cấu hình lịch đã thay đổi. Lượt chạy này không thể tạo lượt gửi bù.'
+                  : 'Lịch đang tạm dừng hoặc đã hủy. Vui lòng tiếp tục (Chạy tiếp) hoặc cấp quyền lại lịch trước khi tạo lượt gửi bù mới để lượt chạy bù không bị hủy.'}
           </p>
         )}
         <label className="flex items-start gap-2 cursor-pointer text-[#111827]">
@@ -163,7 +173,7 @@ export function SheetsDeliveryRecoveryControl({
             type="checkbox"
             data-testid="checkbox-confirm-duplicate-risk"
             checked={confirmDuplicateRisk}
-            disabled={busy || isScheduleNotActive}
+            disabled={busy || isRetryUnavailable}
             onChange={e => setConfirmDuplicateRisk(e.target.checked)}
             className="mt-0.5"
           />
@@ -175,7 +185,7 @@ export function SheetsDeliveryRecoveryControl({
           <button
             type="button"
             data-testid="btn-resolve-retry-new-run"
-            disabled={busy || !confirmDuplicateRisk || isScheduleNotActive}
+            disabled={busy || !confirmDuplicateRisk || isRetryUnavailable}
             className={primaryScheduleButton}
             onClick={() => void handleResolve('retry_new_run')}
           >

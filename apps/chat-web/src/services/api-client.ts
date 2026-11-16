@@ -448,8 +448,7 @@ export class ApiClient {
       telegramUserId?: string;
       username?: string;
       displayName?: string;
-      chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
-      selectedChats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
+      chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean; selected: boolean }>;
     }>('/api/connections/telegram', { credentials: 'include' });
   }
   startTelegramConnection(options: { returnTo?: string } = {}) {
@@ -466,12 +465,10 @@ export class ApiClient {
   }
   completeTelegramConnection(state: string) {
     return this.request<{
-      status: 'connected' | 'needs_scope';
       telegramUserId: string;
       username: string;
       displayName?: string;
-      chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
-      selectedChats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
+      chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean; selected: boolean }>;
       returnTo?: string;
     }>('/api/connections/telegram/callback', {
       method: 'POST',
@@ -479,16 +476,14 @@ export class ApiClient {
       body: JSON.stringify({ state }),
     }, true);
   }
-  getTelegramChats() {
+  getTelegramCandidateChats() {
     return this.request<{
-      chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
-      selectedChatIds: string[];
-    }>('/api/connections/telegram/chats', { credentials: 'include' });
+      chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean; selected: boolean }>;
+    }>('/api/connections/telegram/candidate-chats', { credentials: 'include' });
   }
   saveTelegramScope(chatIds: string[]) {
     return this.request<{
-      status: 'connected';
-      selectedChats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean }>;
+      chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean; selected: boolean }>;
     }>('/api/connections/telegram/scope', {
       method: 'PUT',
       credentials: 'include',

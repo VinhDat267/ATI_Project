@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { ReceiptMoment } from '../src/pages/Cockpit/ReceiptMoment';
 import { RequestMoment } from '../src/pages/Cockpit/RequestMoments';
 import { resourceDestination } from '../src/components/Cockpit';
@@ -187,5 +187,49 @@ describe('DEMO-01: 9-Service Receipt Metrics & Comprehensive Playbooks', () => {
     expect(screen.getByTestId('sheets-receipt-metrics')).toHaveTextContent('Đã ghi 1 dòng');
     expect(screen.getByTestId('gmail-receipt-metrics')).toHaveTextContent('✉️ Mã thư: msg_sent_1');
     expect(screen.getByTestId('telegram-receipt-metrics')).toHaveTextContent('📨 Tin nhắn #701');
+  });
+
+  function renderTelegramRead(messages: unknown[], query?: string) {
+    cleanup();
+    const steps: ExecutionStepInfo[] = [
+      {
+        id: 'step_r',
+        tool: 'telegram.read_messages',
+        description: 'Đọc tin nhắn nhóm Telegram',
+        status: 'succeeded',
+        output: { chatId: '-1001', messages },
+      },
+    ];
+    render(
+      <ReceiptMoment
+        request="Đọc tin nhắn nhóm"
+        steps={steps}
+        planSteps={steps.map((s) => ({ id: s.id, tool: s.tool, description: s.description, args: { query } }))}
+        services={NINE_SERVICES}
+        destination={resourceDestination}
+        onNewConversation={() => {}}
+        onFollowup={() => {}}
+      />,
+    );
+  }
+
+  it('shows message count for telegram.read_messages', () => {
+    renderTelegramRead([
+      { messageId: 1, text: 'a', senderName: 'A', date: 1 },
+      { messageId: 2, text: 'b', senderName: 'B', date: 2 },
+    ]);
+    expect(screen.getByTestId('telegram-receipt-metrics')).toHaveTextContent('💬 2 tin nhắn');
+    expect(screen.queryByTestId('telegram-read-empty-hint')).not.toBeInTheDocument();
+  });
+
+  it('explains that no messages matched a Telegram search', () => {
+    renderTelegramRead([], 'từ khóa');
+    expect(screen.getByTestId('telegram-read-empty-hint')).toHaveTextContent('Không tìm thấy tin nhắn khớp');
+  });
+
+  it('explains Privacy Mode when telegram.read_messages returns nothing', () => {
+    renderTelegramRead([]);
+    expect(screen.getByTestId('telegram-receipt-metrics')).toHaveTextContent('💬 0 tin nhắn');
+    expect(screen.getByTestId('telegram-read-empty-hint')).toHaveTextContent('Privacy Mode');
   });
 });

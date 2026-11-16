@@ -1536,7 +1536,7 @@ export class TelegramDigestRunner {
         ? `\n\n⚠️ Tạm thời chưa lấy được dữ liệu từ: ${failedLabels.join(', ')}.`
         : '';
     const notionFooter = sourceStatuses.some(({ service, truncated }) => service === 'notion' && truncated)
-      ? '\n  _(Còn mục khác trên Notion chưa hiển thị hết — giới hạn 20 trang/database)_'
+      ? '\n  (Còn mục khác trên Notion chưa hiển thị hết — giới hạn 20 trang/database)'
       : '';
     let digestText = `${header}${aiHighlight}${sections.join('\n\n')}${footer}${notionFooter}`;
     const codepoints = Array.from(digestText);

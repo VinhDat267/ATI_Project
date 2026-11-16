@@ -231,4 +231,51 @@ describe('TelegramBotClient', () => {
     await expect(clientAbort.verifyPairing('d'.repeat(43), aborted.signal)).rejects.toMatchObject({ kind: 'network' });
     expect(neverFetch).not.toHaveBeenCalled();
   });
+
+  it('pollUpdates drains >100 backlog updates and saves only allowlisted messages once without calling Telegram directly for non-allowlisted chats', async () => {
+    const updates = Array.from({ length: 105 }, (_, i) => ({
+      update_id: i + 1,
+      message: {
+        message_id: i + 10,
+        chat: { id: i === 104 ? -100111 : -100777, type: 'supergroup', title: 'Group' },
+        from: { id: 555, is_bot: false, first_name: 'Tester' },
+        date: 1794817000 + i,
+        text: i === 104 ? 'Tin ở trang 2' : 'Tin nhóm khác',
+      },
+    }));
+
+    const offsets: Array<number | undefined> = [];
+    const savedBatches: any[] = [];
+    const client = new TelegramBotClient(
+      config,
+      async (_url, init) => {
+        const body = JSON.parse(String(init?.body));
+        offsets.push(body.offset);
+        const batch = updates.filter((u) => body.offset === undefined || u.update_id >= body.offset).slice(0, body.limit);
+        return Response.json({ ok: true, result: batch });
+      },
+      undefined,
+      {
+        allowedChatIds: () => new Set(['-100111']),
+        messageStore: {
+          upsertMany: async (_botKey, msgs) => {
+            savedBatches.push(...msgs);
+          },
+          list: async () => savedBatches,
+        },
+      },
+    );
+
+    await client.pollUpdates(AbortSignal.timeout(2000));
+    expect(offsets).toEqual([undefined, 101]);
+    expect(savedBatches).toEqual([
+      {
+        chatId: '-100111',
+        messageId: 114,
+        senderName: 'Tester',
+        text: 'Tin ở trang 2',
+        date: 1794817104,
+      },
+    ]);
+  });
 });

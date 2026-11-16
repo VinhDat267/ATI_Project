@@ -147,20 +147,28 @@ async function claimGithubDigestDelivery(
   run: DigestRunInput,
   signal: AbortSignal,
 ): Promise<'claimed' | 'discarded'> {
+  const config = JSON.stringify(run.digestConfig);
   if (typeof pool.connect !== 'function') {
     const marked = await pool.query(
       `UPDATE schedule_runs r
-          SET delivery_started_at = now(), updated_at = now()
+          SET delivery_started_at = now(), updated_at = now(),
+              dispatched_config = COALESCE(r.dispatched_config, $4::jsonb),
+              dispatched_config_hash = COALESCE(r.dispatched_config_hash, $5)
          FROM schedules s
         WHERE r.id = $1
           AND r.schedule_id = s.id
           AND s.id = $2
           AND r.status = 'planning'
           AND r.delivery_started_at IS NULL
+          AND r.schedule_version = $3
           AND s.version = $3
-          AND s.status IN ('active', 'completed')
+          AND s.kind = 'github_digest' AND s.user_id = $6
+          AND s.digest_config = $4::jsonb AND s.digest_config_hash = $5
+          AND (s.status = 'active' OR (s.status = 'completed' AND s.recurrence->>'type' = 'once'))
+          AND (r.dispatched_config IS NULL OR r.dispatched_config = $4::jsonb)
+          AND (r.dispatched_config_hash IS NULL OR r.dispatched_config_hash = $5)
         RETURNING r.id`,
-      [run.runId, run.scheduleId, run.scheduleVersion],
+      [run.runId, run.scheduleId, run.scheduleVersion, config, run.digestConfigHash, run.userId],
     );
     return marked.rowCount ? 'claimed' : 'discarded';
   }
@@ -182,12 +190,12 @@ async function claimGithubDigestDelivery(
       await client.query('SELECT id FROM conversations WHERE id = $1 FOR UPDATE', [scheduleConvId]);
       const schedule = (
         await client.query(
-          `SELECT s.id, s.user_id, s.kind, s.version, s.status, s.digest_config_hash
+          `SELECT s.user_id, s.kind, s.version, s.status, s.recurrence, s.digest_config_hash
              FROM schedules s
              JOIN users u ON u.id = s.user_id AND u.status = 'active'
-            WHERE s.id = $1
+            WHERE s.id = $1 AND s.digest_config = $2::jsonb
               FOR UPDATE OF s`,
-          [run.scheduleId],
+          [run.scheduleId, config],
         )
       ).rows[0];
       signal.throwIfAborted();
@@ -197,7 +205,7 @@ async function claimGithubDigestDelivery(
         schedule.kind !== 'github_digest' ||
         schedule.version !== run.scheduleVersion ||
         schedule.digest_config_hash !== run.digestConfigHash ||
-        (schedule.status !== 'active' && schedule.status !== 'completed')
+        (schedule.status !== 'active' && !(schedule.status === 'completed' && schedule.recurrence.type === 'once'))
       ) {
         await client.query('COMMIT');
         return 'discarded';
@@ -234,13 +242,18 @@ async function claimGithubDigestDelivery(
 
       const marked = await client.query(
         `UPDATE schedule_runs
-            SET delivery_started_at = now(), updated_at = now()
+            SET delivery_started_at = now(), updated_at = now(),
+                dispatched_config = COALESCE(dispatched_config, $4::jsonb),
+                dispatched_config_hash = COALESCE(dispatched_config_hash, $5)
           WHERE id = $1
             AND schedule_id = $2
+            AND schedule_version = $3
             AND status = 'planning'
             AND delivery_started_at IS NULL
+            AND (dispatched_config IS NULL OR dispatched_config = $4::jsonb)
+            AND (dispatched_config_hash IS NULL OR dispatched_config_hash = $5)
         RETURNING id`,
-        [run.runId, run.scheduleId],
+        [run.runId, run.scheduleId, run.scheduleVersion, config, run.digestConfigHash],
       );
       await client.query('COMMIT');
       return marked.rowCount ? 'claimed' : 'discarded';
@@ -321,8 +334,6 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
 
     const isTelegramDest = Boolean(config.telegramChatId);
     let githubAdapter: any;
-    let slackAdapter: any;
-    let telegramAdapter: any;
     try {
       githubAdapter = await options.getAdapter?.('github', {
         userId: run.userId,
@@ -338,96 +349,15 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
           },
         },
       });
-      if (isTelegramDest) {
-        let tg: any = null;
-        if (options.telegramConnection) {
-          tg = await options.telegramConnection(run.userId);
-          const allowedChatIds = new Set(
-            ((tg?.connection?.chatIds ?? []) as string[]).map((id) => String(id)),
-          );
-          if (
-            !tg ||
-            tg.status !== 'connected' ||
-            (config.telegramCredentialId && tg.connection?.credentialId !== config.telegramCredentialId) ||
-            (config.telegramUserId && tg.connection?.telegramUserId !== config.telegramUserId) ||
-            !allowedChatIds.has(String(config.telegramChatId))
-          ) {
-            return {
-              state: 'blocked',
-              error: 'Cuộc trò chuyện Telegram nhận bản tin không còn nằm trong phạm vi cho phép.',
-              pauseReason: 'Cuộc trò chuyện Telegram nhận bản tin không còn nằm trong phạm vi cho phép.',
-            };
-          }
-        }
-        const telegramCredentialId = config.telegramCredentialId ?? tg?.connection?.credentialId ?? '';
-        const telegramUserId = config.telegramUserId ?? tg?.connection?.telegramUserId ?? '';
-        const telegramUsername = config.telegramUsername ?? tg?.connection?.username ?? '';
-        telegramAdapter = await options.getAdapter?.('telegram', {
-          userId: run.userId,
-          ...(run.workspaceId !== undefined ? { workspaceId: run.workspaceId } : {}),
-          ...(run.workspaceMode !== undefined ? { workspaceMode: run.workspaceMode } : {}),
-          phase: 'execution',
-          connections: {
-            telegram: {
-              credentialId: telegramCredentialId,
-              telegramUserId,
-              username: telegramUsername,
-              chatIds: [String(config.telegramChatId)],
-            },
-          },
-        });
-      } else {
-        slackAdapter = await options.getAdapter?.('slack', {
-          userId: run.userId,
-          ...(run.workspaceId !== undefined ? { workspaceId: run.workspaceId } : {}),
-          ...(run.workspaceMode !== undefined ? { workspaceMode: run.workspaceMode } : {}),
-          phase: 'execution',
-        });
-      }
     } catch (err: any) {
       const msg = err?.message || 'Kết nối dịch vụ không khả dụng.';
       return { state: 'blocked', error: msg, pauseReason: msg };
     }
-
-    if (!githubAdapter || (isTelegramDest ? !telegramAdapter : !slackAdapter)) {
-      return {
-        state: 'blocked',
-        error: isTelegramDest
-          ? 'Không khởi tạo được kết nối GitHub hoặc Telegram.'
-          : 'Không khởi tạo được kết nối GitHub hoặc Slack.',
-        pauseReason: isTelegramDest
-          ? 'Không khởi tạo được kết nối GitHub hoặc Telegram.'
-          : 'Không khởi tạo được kết nối GitHub hoặc Slack.',
-      };
-    }
-
-    if (!isTelegramDest) {
-      // Verify Slack channel is still in allowedScope
-      try {
-        const channels = await slackAdapter.execute(
-          'slack.search_channels',
-          { query: config.channelName },
-          { signal },
-        );
-        if (
-          Array.isArray(channels) &&
-          !channels.some((c: any) => String(c.id) === config.channelId)
-        ) {
-          return {
-            state: 'blocked',
-            error: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
-            pauseReason: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
-          };
-        }
-      } catch (err: any) {
-        if (err?.category === 'AUTH_ERROR') {
-          return {
-            state: 'blocked',
-            error: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
-            pauseReason: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
-          };
-        }
-      }
+    if (!githubAdapter) {
+      const msg = isTelegramDest
+        ? 'Không khởi tạo được kết nối GitHub hoặc Telegram.'
+        : 'Không khởi tạo được kết nối GitHub hoặc Slack.';
+      return { state: 'blocked', error: msg, pauseReason: msg };
     }
 
     // 2. Compute SINCE from the latest 'scheduled' digest_sent run's due_at
@@ -550,6 +480,103 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
       { label: `PR chờ review quá ${staleDays} ngày`, items: stalePrs, kind: 'pull', hitRepoCap: staleHitCap },
       { label: 'Issue mở chưa ai nhận', items: unassignedIssues, kind: 'issues', hitRepoCap: unassignedHitCap },
     ], isTelegramDest ? 'telegram' : 'slack');
+
+    // Resolve the approved destination after source reads and AI work.
+    signal.throwIfAborted();
+    let slackAdapter: any;
+    let telegramAdapter: any;
+    try {
+      if (isTelegramDest) {
+        let tg: any = null;
+        if (options.telegramConnection) {
+          tg = await options.telegramConnection(run.userId);
+          const allowedChatIds = new Set(
+            ((tg?.connection?.chatIds ?? []) as string[]).map((id) => String(id)),
+          );
+          if (
+            !tg ||
+            tg.status !== 'connected' ||
+            (config.telegramCredentialId && tg.connection?.credentialId !== config.telegramCredentialId) ||
+            (config.telegramUserId && tg.connection?.telegramUserId !== config.telegramUserId) ||
+            !allowedChatIds.has(String(config.telegramChatId))
+          ) {
+            return {
+              state: 'blocked',
+              error: 'Cuộc trò chuyện Telegram nhận bản tin không còn nằm trong phạm vi cho phép.',
+              pauseReason: 'Cuộc trò chuyện Telegram nhận bản tin không còn nằm trong phạm vi cho phép.',
+            };
+          }
+        }
+        const telegramCredentialId = config.telegramCredentialId ?? tg?.connection?.credentialId ?? '';
+        const telegramUserId = config.telegramUserId ?? tg?.connection?.telegramUserId ?? '';
+        const telegramUsername = config.telegramUsername ?? tg?.connection?.username ?? '';
+        telegramAdapter = await options.getAdapter?.('telegram', {
+          userId: run.userId,
+          ...(run.workspaceId !== undefined ? { workspaceId: run.workspaceId } : {}),
+          ...(run.workspaceMode !== undefined ? { workspaceMode: run.workspaceMode } : {}),
+          phase: 'execution',
+          connections: {
+            telegram: {
+              credentialId: telegramCredentialId,
+              telegramUserId,
+              username: telegramUsername,
+              chatIds: [String(config.telegramChatId)],
+            },
+          },
+        });
+      } else {
+        slackAdapter = await options.getAdapter?.('slack', {
+          userId: run.userId,
+          ...(run.workspaceId !== undefined ? { workspaceId: run.workspaceId } : {}),
+          ...(run.workspaceMode !== undefined ? { workspaceMode: run.workspaceMode } : {}),
+          phase: 'execution',
+        });
+      }
+    } catch (err: any) {
+      const msg = err?.message || 'Kết nối dịch vụ không khả dụng.';
+      return { state: 'blocked', error: msg, pauseReason: msg };
+    }
+
+    if (isTelegramDest ? !telegramAdapter : !slackAdapter) {
+      return {
+        state: 'blocked',
+        error: isTelegramDest
+          ? 'Không khởi tạo được kết nối GitHub hoặc Telegram.'
+          : 'Không khởi tạo được kết nối GitHub hoặc Slack.',
+        pauseReason: isTelegramDest
+          ? 'Không khởi tạo được kết nối GitHub hoặc Telegram.'
+          : 'Không khởi tạo được kết nối GitHub hoặc Slack.',
+      };
+    }
+
+    if (!isTelegramDest) {
+      // Verify Slack channel is still in allowedScope
+      try {
+        const channels = await slackAdapter.execute(
+          'slack.search_channels',
+          { query: config.channelName },
+          { signal },
+        );
+        if (
+          Array.isArray(channels) &&
+          !channels.some((c: any) => String(c.id) === config.channelId)
+        ) {
+          return {
+            state: 'blocked',
+            error: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
+            pauseReason: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
+          };
+        }
+      } catch (err: any) {
+        if (err?.category === 'AUTH_ERROR') {
+          return {
+            state: 'blocked',
+            error: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
+            pauseReason: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
+          };
+        }
+      }
+    }
 
     // 6. Pre-send schedule version and status check + mark delivery_started_at
     signal.throwIfAborted();

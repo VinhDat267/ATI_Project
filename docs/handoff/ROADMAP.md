@@ -6,3 +6,4 @@ Danh sách ngắn, việc trên cùng làm trước. Xong việc nào thì xoá 
 2. **Nghiệm thu thật từng dịch vụ:** nhóm trưởng kết nối OAuth thật (Gmail `GMAIL-04` đã xong 14/11; còn các dịch vụ khác), chạy 3–5 thao tác chính cho mỗi dịch vụ, ghi kết quả vào bảng trong `CURRENT-STATE.md`.
 3. **Dọn PR mở cũ:** #302, #298, #296, #273, #264, #262, #235, #189, #182, #87, #47. Đóng PR đã lỗi thời.
 4. **Dọn worktree:** `git worktree prune`; xoá worktree và nhánh đã merge.
+5. **Mở rộng Telegram v4 (tuỳ chọn):** nối `runJiraDigest`/`myjiraDigestConnection` ở `server.ts` kèm truyền `connections.telegram` trong `jira-digest-runner.ts`; hỗ trợ webhook mode và lịch tự động lấy tin Telegram làm nguồn tổng hợp sang Trello/Notion/Email.

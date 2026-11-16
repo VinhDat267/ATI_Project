@@ -1,4 +1,4 @@
-import { TELEGRAM_CHAT_ID_PATTERN, normalizeTelegramChatId } from '@wap/tool-schemas';
+import { TELEGRAM_CHAT_ID_PATTERN, TELEGRAM_MESSAGE_RETENTION_MS, normalizeTelegramChatId } from '@wap/tool-schemas';
 import { BaseAdapter, StepError, type BaseAdapterConfig, type ErrorCategory } from '../base-adapter.js';
 import { GlobalRateLimiter, waitWithSignal } from '../rate-limiter.js';
 
@@ -8,11 +8,22 @@ export interface TelegramKnownChat {
   type: string;
 }
 
+export interface TelegramChatMessage {
+  chatId: string;
+  messageId: number;
+  senderName: string;
+  text: string;
+  date: number;
+}
+
+export type TelegramMessageFilter = (message: TelegramChatMessage) => boolean;
+
 export interface TelegramAdapterConfig extends BaseAdapterConfig {
   credentials: { botToken: string };
   baseUrl?: string;
   telegramUserId?: string;
   knownChats?: TelegramKnownChat[];
+  messageSource?: (chatId: string, limit: number, signal?: AbortSignal, matches?: TelegramMessageFilter) => Promise<TelegramChatMessage[]>;
   fetchFn?: typeof fetch;
   chatRateLimiter?: GlobalRateLimiter;
   groupRateLimiter?: GlobalRateLimiter;
@@ -62,6 +73,7 @@ export class TelegramAdapter extends BaseAdapter {
   private readonly baseUrl: string;
   private readonly telegramUserId?: string;
   private readonly knownChatMap: Map<string, TelegramKnownChat>;
+  private readonly messageSource?: TelegramAdapterConfig['messageSource'];
   private readonly fetchFn: typeof fetch;
   private readonly chatRate: GlobalRateLimiter;
   private readonly groupRate: GlobalRateLimiter;
@@ -79,6 +91,7 @@ export class TelegramAdapter extends BaseAdapter {
           return [normalized, { id: normalized, title: c.title, type: c.type }];
         }),
     );
+    this.messageSource = config.messageSource;
     this.fetchFn = config.fetchFn ?? fetch;
     this.rateLimiter = config.rateLimiter ?? requestLimiter;
     this.chatRate = config.chatRateLimiter ?? chatLimiter;
@@ -126,56 +139,67 @@ export class TelegramAdapter extends BaseAdapter {
       }
       const rawChat = await this.request('getChat', { chat_id: id }, false, signal);
       this.chat(rawChat, id);
-      const updatesRaw = await this.request(
-        'getUpdates',
-        { limit: 100, timeout: 0, allowed_updates: ['message', 'edited_message', 'channel_post'] },
-        false,
-        signal,
-      );
-      const updates = Array.isArray(updatesRaw) ? updatesRaw : [];
       const byId = new Map<number, { id: string; messageId: number; chatId: string; senderName: string; text: string; date: number }>();
+
+      const addSanitized = (messageId: number, rawChatId: string, senderName: string, rawText: string, date: number) => {
+        if (!TELEGRAM_CHAT_ID_PATTERN.test(rawChatId.trim()) || normalizeTelegramChatId(rawChatId) !== id) return;
+        const text = rawText.trim();
+        if (!text || /^\/start(?:@[A-Za-z0-9_]+)?\s+ati_/i.test(text)) return;
+        if (text.includes(this.token) || /api\.telegram\.org\/bot/i.test(text)) return;
+        byId.set(messageId, {
+          id: String(messageId),
+          messageId,
+          chatId: id,
+          senderName: senderName.trim() || 'Thành viên',
+          text: Array.from(text).slice(0, 1000).join(''),
+          date,
+        });
+      };
 
       const addMessage = (msg: any) => {
         if (!record(msg) || !integer(msg.message_id, 1) || !integer(msg.date)) return;
-        if (!record(msg.chat) || !Number.isSafeInteger(msg.chat.id) || String(msg.chat.id) !== id) return;
-        const text = typeof msg.text === 'string' ? msg.text.trim() : typeof msg.caption === 'string' ? msg.caption.trim() : '';
-        if (!text || /^\/start(?:@[A-Za-z0-9_]+)?\s+ati_/i.test(text)) return;
-        if (text.includes(this.token) || /api\.telegram\.org\/bot/i.test(text)) return;
+        if (!record(msg.chat) || !Number.isSafeInteger(msg.chat.id)) return;
+        const text = typeof msg.text === 'string' ? msg.text : typeof msg.caption === 'string' ? msg.caption : '';
         const from = record(msg.from) ? msg.from : record(msg.sender_chat) ? msg.sender_chat : undefined;
         const senderName =
           (from && [from.first_name, from.last_name].filter(p => typeof p === 'string' && p.trim()).join(' ').trim()) ||
           (from && typeof from.username === 'string' && from.username.trim() ? from.username.trim() : '') ||
           (from && typeof from.title === 'string' && from.title.trim() ? from.title.trim() : '') ||
           'Thành viên';
-        byId.set(msg.message_id, {
-          id: String(msg.message_id),
-          messageId: msg.message_id,
-          chatId: id,
-          senderName,
-          text: Array.from(text).slice(0, 1000).join(''),
-          date: msg.date,
-        });
+        addSanitized(msg.message_id, String(msg.chat.id), senderName, text, msg.date);
       };
+
+      const rawQuery = typeof args.query === 'string' ? args.query.trim() : '';
+      const foldedQuery = foldVietnamese(rawQuery);
+      const lowerQuery = rawQuery.toLocaleLowerCase();
+      const matches: TelegramMessageFilter | undefined = rawQuery
+        ? ({ text, senderName }) => [text, senderName].some(value =>
+          value.toLocaleLowerCase().includes(lowerQuery) || foldVietnamese(value).includes(foldedQuery))
+        : undefined;
+      const limit = args.limit ?? 10;
 
       if (record(rawChat) && record(rawChat.pinned_message)) {
         addMessage(rawChat.pinned_message);
       }
-      for (const u of updates) {
-        if (!record(u)) continue;
-        addMessage(u.message ?? u.edited_message ?? u.channel_post);
+      if (this.messageSource) {
+        const stored = await this.messageSource(id, limit, signal, matches);
+        for (const item of Array.isArray(stored) ? stored : []) {
+          if (!item || !integer(item.messageId, 1) || !integer(item.date) || typeof item.chatId !== 'string' || typeof item.text !== 'string') {
+            continue;
+          }
+          addSanitized(
+            item.messageId,
+            item.chatId,
+            typeof item.senderName === 'string' ? item.senderName : 'Thành viên',
+            item.text,
+            item.date,
+          );
+        }
       }
 
-      const rawQuery = typeof args.query === 'string' ? args.query.trim() : '';
-      const foldedQuery = rawQuery ? foldVietnamese(rawQuery) : '';
-      const limit = args.limit ?? 10;
-
+      const cutoff = Date.now() - TELEGRAM_MESSAGE_RETENTION_MS;
       const messages = [...byId.values()]
-        .filter(item => {
-          if (!rawQuery) return true;
-          if (item.text.toLocaleLowerCase().includes(rawQuery.toLocaleLowerCase())) return true;
-          if (item.senderName.toLocaleLowerCase().includes(rawQuery.toLocaleLowerCase())) return true;
-          return foldVietnamese(item.text).includes(foldedQuery) || foldVietnamese(item.senderName).includes(foldedQuery);
-        })
+        .filter(item => item.date * 1000 > cutoff && (!matches || matches(item)))
         .sort((a, b) => b.date - a.date || b.messageId - a.messageId)
         .slice(0, limit);
 
@@ -281,7 +305,7 @@ export class TelegramAdapter extends BaseAdapter {
     return Number.isFinite(delay) && delay >= 0 ? delay : null;
   }
 
-  private async request(method: 'getMe' | 'getChat' | 'getUpdates' | 'sendMessage', body: object, write: boolean, signal?: AbortSignal,
+  private async request(method: 'getMe' | 'getChat' | 'sendMessage', body: object, write: boolean, signal?: AbortSignal,
     pacing?: { limiter: GlobalRateLimiter; key: string }): Promise<any> {
     if (typeof this.token !== 'string' || !/^\d{1,20}:[A-Za-z0-9_-]{10,200}$/.test(this.token)) throw fail('AUTH_ERROR', 401, { requestSent: false });
     let networkRetries = 0; let serverRetries = 0; let rateRetries = 0;

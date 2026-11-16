@@ -1,11 +1,12 @@
 /** @vitest-environment jsdom */
 import '@testing-library/jest-dom/vitest';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { ScheduleSection } from '../src/pages/History/ScheduleSection';
 import { ScheduleRunRecovery } from '../src/pages/Cockpit/ScheduleRunRecovery';
 import { apiClient } from '../src/services/api-client';
 import * as useSchedulesHook from '../src/hooks/use-schedules';
+import type { ScheduleRunView, ScheduleView } from '@wap/tool-schemas';
 import type { ChatMessage, User } from '../src/types';
 
 describe('FLOW-06 Web: Schedule approval modes, timezone, next run, and recovery', () => {
@@ -149,6 +150,60 @@ describe('FLOW-06 Web: Schedule approval modes, timezone, next run, and recovery
     render(<ScheduleRunRecovery message={runMsg} navigate={vi.fn()} />);
     expect(await screen.findByRole('status')).toHaveTextContent(/Chưa xác định bản tin lịch đã gửi hay chưa/);
     expect(screen.queryByRole('button', { name: 'Lập lại kế hoạch' })).toBeNull();
+  });
+
+  it.each([
+    ['completed', 'calendar_digest', true, 'Chưa xác định bản tin lịch đã gửi hay chưa'],
+    ['completed', 'github_digest', true, 'Chưa xác định bản tin GitHub đã gửi hay chưa'],
+    ['completed', 'github_digest', false, 'Chưa xác định bản tin GitHub đã gửi hay chưa'],
+    ['active', 'plan', false, 'Chưa xác định bản tin lịch đã gửi hay chưa'],
+  ] as const)('sets recovery availability for %s %s with eligibility %s', async (status, kind, eligible, error) => {
+    const run: ScheduleRunView = {
+      id: 'run-1', scheduleId: 'schedule-1', dueAt: '2026-11-04T02:00:00.000Z',
+      createdAt: '2026-11-04T02:00:00.000Z', trigger: 'scheduled', state: 'needs_attention',
+      convId: 'conv-run-1', planId: null, planStatus: null, missedCount: 0, error,
+      deliveryStartedAt: '2026-11-04T02:00:01.000Z', canRetryDelivery: eligible,
+    };
+    const schedule: ScheduleView = {
+      id: run.scheduleId, convId: 'conv-schedule-1', name: 'Bản tin một lần', request: 'Gửi bản tin',
+      recurrence: { type: 'once', date: '2026-11-04', time: '09:00' },
+      services: [kind === 'calendar_digest' ? 'mycalendar' : 'github', 'slack'],
+      status, pauseReason: null, version: 1, nextRuns: [], kind, lastRun: run,
+    };
+    vi.spyOn(useSchedulesHook, 'useSchedulesEnabled').mockReturnValue(true);
+    vi.spyOn(apiClient, 'getSchedules').mockResolvedValue({ schedules: [schedule] });
+    vi.spyOn(apiClient, 'getScheduleRuns').mockResolvedValue({ runs: [run] });
+    const resolve = vi.spyOn(apiClient, 'resolveScheduleRunDelivery').mockResolvedValue({
+      run: { ...run, deliveryResolution: 'retried_new_run', deliveryFollowupRunId: 'follow-up-1' },
+      followUpRun: { ...run, id: 'follow-up-1', trigger: 'manual', state: 'planning' },
+      schedule,
+    });
+    const message: ChatMessage = {
+      id: 'msg-run-1', role: 'system', content: 'Lượt chạy cần bạn xem',
+      metadata: { type: 'schedule_run', scheduleId: run.scheduleId, runId: run.id },
+    };
+
+    for (const page of [
+      <ScheduleSection user={user} navigate={vi.fn()} />,
+      <ScheduleRunRecovery message={message} navigate={vi.fn()} />,
+    ]) {
+      const mounted = render(page);
+      const confirm = await screen.findByTestId('checkbox-confirm-duplicate-risk');
+      const retry = screen.getByTestId('btn-resolve-retry-new-run');
+      expect(retry).toBeDisabled();
+      if (eligible) {
+        expect(confirm).toBeEnabled();
+        fireEvent.click(confirm);
+        fireEvent.click(retry);
+        expect(await screen.findByTestId('delivery-resolution-badge')).toBeInTheDocument();
+        expect(resolve).toHaveBeenLastCalledWith(run.id, { resolution: 'retry_new_run', confirmDuplicateRisk: true });
+      } else {
+        expect(confirm).toBeDisabled();
+        expect(screen.getByTestId('btn-resolve-mark-sent')).toBeEnabled();
+        expect(resolve).not.toHaveBeenCalled();
+      }
+      mounted.unmount();
+    }
   });
 
   it('displays notice for awaiting_approval run in ScheduleSection', async () => {

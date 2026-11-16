@@ -8,10 +8,11 @@ import { CredentialRepo } from '../../../src/db/repositories/credential-repo.js'
 import { GitHubTeamRepo } from '../../../src/db/repositories/github-team-repo.js';
 import { createGitHubConnectionLookup } from '../../../src/services/github/connection-reference.js';
 import { GitHubTokenManager } from '../../../src/services/github/token-manager.js';
-import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
-import { ScheduleService } from '../../../src/services/schedules/schedule-service.js';
+import { reconcileScheduleRuns, ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
+import { ScheduleNotFound, ScheduleService } from '../../../src/services/schedules/schedule-service.js';
 import { computeDigestConfigHash, evaluateGithubDigestCandidate } from '../../../src/services/schedules/github-digest-candidate.js';
-import { createGithubDigestRunner, escapeSlackMrkdwn } from '../../../src/services/schedules/github-digest-runner.js';
+import { createGithubDigestRunner, escapeSlackMrkdwn, GITHUB_DELIVERY_UNKNOWN } from '../../../src/services/schedules/github-digest-runner.js';
+import { certifyScheduleFixture } from '../../../src/services/slack/slack-schedule-origin.js';
 import { createMigratedSchema } from '../../helpers/gmail-test-db.js';
 
 const VN = 'Asia/Ho_Chi_Minh';
@@ -873,12 +874,14 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
 
       const saved = (
         await db.pool.query(
-          'SELECT id, status, delivery_started_at FROM schedule_runs WHERE schedule_id = $1',
+          'SELECT id, status, delivery_started_at, dispatched_config, dispatched_config_hash FROM schedule_runs WHERE schedule_id = $1',
           [schedule.id],
         )
       ).rows[0];
 
       expect(sendCalls).toBe(1);
+      expect(saved.dispatched_config).toEqual(candidate.config);
+      expect(saved.dispatched_config_hash).toBe(candidate.configHash);
       expect(saved.delivery_started_at).not.toBeNull();
       expect(saved.status).toBe('needs_attention');
 
@@ -886,8 +889,118 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
         service.startRun({ userId: owner.id, runId: saved.id, trigger: 'replan', now }),
       ).rejects.toMatchObject({ code: 'RUN_NOT_REPLANNABLE' });
       expect(sendCalls).toBe(1);
+
+      const edited = { ...candidate.config!, telegramChatId: '-100111222', telegramChatTitle: 'New Alerts' };
+      await db.pool.query(
+        'UPDATE schedules SET version = version + 1, digest_config = $2, digest_config_hash = $3 WHERE id = $1',
+        [schedule.id, edited, computeDigestConfigHash({ config: edited, recurrence: dailyRecurrence, userId: owner.id })],
+      );
+      const resolved = await service.resolveRunDelivery({ userId: owner.id, runId: saved.id, resolution: 'mark_sent', now });
+      expect(resolved.run.delivery).toMatchObject({ telegramChatId: '-100999888', telegramChatTitle: 'Dev Alerts' });
+      expect(sendCalls).toBe(1);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it('recovers GitHub delivery after restart when the schedule now requires manual approval', async () => {
+    const schedule = await insertDigestSchedule();
+    const run = await service.startRun({ userId: owner.id, scheduleId: schedule.id, trigger: 'manual', now });
+    const send = vi.fn().mockResolvedValue({});
+    const execute = createGithubDigestRunner({
+      pool: db.pool,
+      githubConnection: async () => ({
+        status: 'connected',
+        connection: { credentialId: GH_CRED_ID, githubUserId: '1001', login: 'octocat', repos: ['nhom/ati'] },
+      }),
+      getAdapter: serviceName => serviceName === 'github'
+        ? { execute: async () => [] }
+        : { execute: (tool: string) => tool === 'slack.search_channels' ? [{ id: 'C0123456789' }] : send() },
+    });
+    // Dispatch with the real claim path and leave the run unsettled to model worker loss.
+    expect(await execute({
+      runId: run.id, scheduleId: schedule.id, scheduleVersion: 1, userId: owner.id,
+      name: schedule.name, request: schedule.request, dueAt: now, trigger: 'manual',
+      recurrence: dailyRecurrence, digestConfig: baseConfig, digestConfigHash: schedule.digest_config_hash,
+    }, schedule.conv_id, new AbortController().signal)).toMatchObject({ state: 'delivery_unknown' });
+    await db.pool.query(
+      "UPDATE schedules SET kind = 'plan', version = version + 1, digest_config = NULL, digest_config_hash = NULL, digest_approved_at = NULL WHERE id = $1",
+      [schedule.id],
+    );
+
+    await certifyScheduleFixture(db.pool, schedule.id);
+    await reconcileScheduleRuns(db.pool);
+    const [reconciled] = await service.listRuns(owner.id, schedule.id, 1, now);
+    expect(reconciled).toMatchObject({ state: 'needs_attention', error: GITHUB_DELIVERY_UNKNOWN, canRetryDelivery: false });
+    const resolved = await service.resolveRunDelivery({ userId: owner.id, runId: run.id, resolution: 'mark_sent', now });
+    expect(resolved.run).toMatchObject({
+      deliveryResolution: 'confirmed_sent',
+      delivery: { channelId: 'C0123456789', channelName: 'team' },
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['allowed', 'revoked during the follow-up read'] as const)('rechecks delivery scope for a completed one-time GitHub digest with scope %s', async (scope) => {
+    const schedule = await insertDigestSchedule({ recurrence: { type: 'once', date: '2026-10-26', time: '08:00' } });
+    const send = vi.fn().mockResolvedValueOnce({}).mockResolvedValueOnce({ ts: '1.001' });
+    let isSlackScopeAllowed = true;
+    const runGithubDigest = createGithubDigestRunner({
+      pool: db.pool,
+      githubConnection: async () => ({
+        status: 'connected',
+        connection: { credentialId: GH_CRED_ID, githubUserId: '1001', login: 'octocat', repos: ['nhom/ati'] },
+      }),
+      getAdapter: serviceName => serviceName === 'github'
+        ? { execute: async () => {
+            if (send.mock.calls.length > 0 && scope !== 'allowed') isSlackScopeAllowed = false;
+            return [];
+          } }
+        : { execute: (tool: string) => tool === 'slack.search_channels'
+            ? (isSlackScopeAllowed ? [{ id: 'C0123456789' }] : [])
+            : send() },
+    });
+    const runner = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: VN,
+      now: () => now,
+      planRun: async () => { throw new Error('GitHub digest must not use the planner'); },
+      runGithubDigest,
+      recordState: (client, row, at) => service.recordState(client, row, at),
+    });
+    service = new ScheduleService({ pool: db.pool, timeZone: VN, runner });
+    try {
+      await runner.tick();
+      const [run] = await service.listRuns(owner.id, schedule.id, 1, now);
+      expect(run).toMatchObject({ state: 'needs_attention', trigger: 'scheduled' });
+      if (!run) throw new Error('The due one-time schedule did not create a run');
+
+      const recovery = { userId: owner.id, runId: run.id, resolution: 'retry_new_run', confirmDuplicateRisk: true, now };
+      await expect(service.resolveRunDelivery({ ...recovery, scope: { workspaceMode: 'organization', workspaceId: owner.id } }))
+        .rejects.toBeInstanceOf(ScheduleNotFound);
+      await db.pool.query('UPDATE schedules SET version = 2 WHERE id = $1', [schedule.id]);
+      const [staleRun] = await service.listRuns(owner.id, schedule.id, 1, now);
+      expect(staleRun?.canRetryDelivery).toBeFalsy();
+      await expect(service.resolveRunDelivery(recovery)).rejects.toMatchObject({ code: 'CONFIG_CHANGED_SINCE_RUN' });
+      expect(send).toHaveBeenCalledTimes(1);
+
+      await db.pool.query('UPDATE schedules SET version = 1 WHERE id = $1', [schedule.id]);
+      const [currentRun] = await service.listRuns(owner.id, schedule.id, 1, now);
+      expect(currentRun?.canRetryDelivery).toBe(true);
+      const result = await service.resolveRunDelivery(recovery);
+      expect(result.schedule).toMatchObject({ status: 'completed', version: 1, nextRuns: [] });
+      expect(result.followUpRun).toMatchObject({ state: 'planning', trigger: 'manual' });
+      expect(result.run.deliveryFollowupRunId).toBe(result.followUpRun?.id);
+      await vi.waitFor(async () => {
+        const delivery = (await db.pool.query('SELECT status, delivery FROM schedule_runs WHERE id = $1', [result.followUpRun!.id])).rows[0];
+        expect(delivery).toMatchObject(scope === 'allowed'
+          ? { status: 'digest_sent', delivery: { channelId: 'C0123456789', ts: '1.001' } }
+          : { status: 'blocked', delivery: null });
+      });
+      expect(send).toHaveBeenCalledTimes(scope === 'allowed' ? 2 : 1);
+      const [current] = await service.list(owner.id, now);
+      expect(current).toMatchObject({ status: 'completed', version: 1, nextRuns: [] });
+    } finally {
+      await runner.stop();
     }
   });
 
@@ -986,6 +1099,18 @@ describe('Task 8: GitHub auto_digest execution in ScheduleRunner on PostgreSQL',
             service.startRun({ userId: owner.id, runId: saved.id, trigger: 'replan', now }),
           ).rejects.toMatchObject({ code: 'RUN_NOT_REPLANNABLE' });
           expect(slackWrites).toBe(1);
+          if (mode === 'lost_ack') {
+            const edited = { ...baseConfig, channelId: 'C9876543210', channelName: 'new-team' };
+            await db.pool.query(
+              'UPDATE schedules SET version = version + 1, digest_config = $2, digest_config_hash = $3 WHERE id = $1',
+              [schedule.id, edited, computeDigestConfigHash({ config: edited, recurrence: dailyRecurrence, userId: owner.id })],
+            );
+            const resolved = await service.resolveRunDelivery({
+              userId: owner.id, runId: saved.id, resolution: 'mark_sent', now,
+            });
+            expect(resolved.run.delivery).toMatchObject({ channelId: 'C0123456789', channelName: 'team' });
+            expect(slackWrites).toBe(1);
+          }
         } else {
           expect(saved.delivery_started_at).toBeNull();
           expect(saved.status).toBe('digest_failed');

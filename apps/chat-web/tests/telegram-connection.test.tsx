@@ -36,7 +36,6 @@ describe('Task 9: Telegram 1-Click Pairing UI, Settings & Cockpit Moments', () =
         status: 'not_connected',
         botUsername: 'ati_assistant_bot',
         chats: [],
-        selectedChats: [],
       });
 
       render(<TelegramConnection user={memberUser} refresh={vi.fn()} navigate={vi.fn()} />);
@@ -59,27 +58,22 @@ describe('Task 9: Telegram 1-Click Pairing UI, Settings & Cockpit Moments', () =
         username: 'an_nguyen',
         displayName: 'Nguyễn Văn An',
         chats: [
-          { chatId: '777001', title: 'Telegram của tôi (Nguyễn Văn An)', type: 'private', member: true },
-          { chatId: '-100999888', title: 'Đội Sản Phẩm', type: 'supergroup', member: true },
-          { chatId: '-100999777', title: 'Kênh Cảnh Báo', type: 'supergroup', member: true },
-        ],
-        selectedChats: [
-          { chatId: '777001', title: 'Telegram của tôi (Nguyễn Văn An)', type: 'private', member: true },
+          { chatId: '777001', title: 'Telegram của tôi (Nguyễn Văn An)', type: 'private', member: true, selected: true },
+          { chatId: '-100999888', title: 'Đội Sản Phẩm', type: 'supergroup', member: true, selected: false },
+          { chatId: '-100999777', title: 'Kênh Cảnh Báo', type: 'supergroup', member: true, selected: false },
         ],
       });
-      const refreshChatsSpy = vi.spyOn(apiClient, 'getTelegramChats').mockResolvedValue({
+      const refreshChatsSpy = vi.spyOn(apiClient, 'getTelegramCandidateChats').mockResolvedValue({
         chats: [
-          { chatId: '777001', title: 'Telegram của tôi (Nguyễn Văn An)', type: 'private', member: true },
-          { chatId: '-100999888', title: 'Đội Sản Phẩm', type: 'supergroup', member: true },
-          { chatId: '-100999777', title: 'Kênh Cảnh Báo', type: 'supergroup', member: true },
+          { chatId: '777001', title: 'Telegram của tôi (Nguyễn Văn An)', type: 'private', member: true, selected: true },
+          { chatId: '-100999888', title: 'Đội Sản Phẩm', type: 'supergroup', member: true, selected: false },
+          { chatId: '-100999777', title: 'Kênh Cảnh Báo', type: 'supergroup', member: true, selected: false },
         ],
-        selectedChatIds: ['777001'],
       });
       const saveScopeSpy = vi.spyOn(apiClient, 'saveTelegramScope').mockResolvedValue({
-        status: 'connected',
-        selectedChats: [
-          { chatId: '777001', title: 'Telegram của tôi (Nguyễn Văn An)', type: 'private', member: true },
-          { chatId: '-100999888', title: 'Đội Sản Phẩm', type: 'supergroup', member: true },
+        chats: [
+          { chatId: '777001', title: 'Telegram của tôi (Nguyễn Văn An)', type: 'private', member: true, selected: true },
+          { chatId: '-100999888', title: 'Đội Sản Phẩm', type: 'supergroup', member: true, selected: true },
         ],
       });
 
@@ -151,8 +145,7 @@ describe('Task 9: Telegram 1-Click Pairing UI, Settings & Cockpit Moments', () =
       vi.spyOn(apiClient, 'getTelegramConnection').mockResolvedValue({
         status: 'connected',
         username: 'an_nguyen',
-        chats: [{ chatId: '777001', title: 'Telegram của tôi (An)', type: 'private', member: true }],
-        selectedChats: [{ chatId: '777001', title: 'Telegram của tôi (An)', type: 'private', member: true }],
+        chats: [{ chatId: '777001', title: 'Telegram của tôi (An)', type: 'private', member: true, selected: true }],
       });
       authStorage.setStoredTokens({ user: adminUser });
       telegramConnectionNotice.set('an_nguyen');
@@ -163,6 +156,105 @@ describe('Task 9: Telegram 1-Click Pairing UI, Settings & Cockpit Moments', () =
       expect(document.getElementById('service-row-telegram')).not.toBeNull();
       // Shared list only contains slack (1 item), not telegram
       expect(document.getElementById('badge-count-unconnected')).toHaveTextContent('1');
+    });
+
+    it('renders selected chats and edit button from the real backend payload', async () => {
+      vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+        if (url === '/api/connections/telegram') {
+          return new Response(
+            JSON.stringify({
+              status: 'connected',
+              botUsername: 'ati_assistant_bot',
+              telegramUserId: '777001',
+              username: 'an_nguyen',
+              displayName: 'Nguyễn Văn An',
+              chats: [
+                { chatId: '777001', title: 'Telegram của tôi (Nguyễn Văn An)', type: 'private', member: true, selected: true },
+                { chatId: '-100123', title: 'Nhóm Vận Hành ATI', type: 'supergroup', member: true, selected: false },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        throw new Error(`Unexpected fetch: ${url}`);
+      }));
+
+      render(<TelegramConnection user={memberUser} refresh={vi.fn()} navigate={vi.fn()} />);
+
+      expect(await screen.findByText('Cuộc trò chuyện được phép dùng (1/10):')).toBeInTheDocument();
+      expect(screen.getByText('Telegram của tôi (Nguyễn Văn An)')).toBeInTheDocument();
+      expect(screen.queryByText('Nhóm Vận Hành ATI')).not.toBeInTheDocument();
+      expect(document.getElementById('telegram-edit-scope')).not.toBeNull();
+    });
+
+    it('refresh calls /candidate-chats and keeps current ticks', async () => {
+      const requestedUrls: string[] = [];
+      vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+        requestedUrls.push(String(url));
+        if (url === '/api/connections/telegram') {
+          return new Response(
+            JSON.stringify({
+              status: 'needs_scope',
+              botUsername: 'ati_assistant_bot',
+              telegramUserId: '777001',
+              username: 'an_nguyen',
+              chats: [
+                { chatId: '777001', title: 'Telegram của tôi (An)', type: 'private', member: true, selected: false },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        if (url === '/api/connections/telegram/candidate-chats') {
+          return new Response(
+            JSON.stringify({
+              chats: [
+                { chatId: '777001', title: 'Telegram của tôi (An)', type: 'private', member: true, selected: false },
+                { chatId: '-100999888', title: 'Đội Sản Phẩm', type: 'supergroup', member: true, selected: false },
+              ],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        return new Response(JSON.stringify({ error: 'Not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+      }));
+
+      render(<TelegramConnection user={memberUser} refresh={vi.fn()} navigate={vi.fn()} />);
+
+      const privateCheckbox = await screen.findByRole('checkbox', { name: /Telegram của tôi \(An\)/i });
+      fireEvent.click(privateCheckbox);
+      expect(privateCheckbox).toBeChecked();
+      expect(screen.getByText(/Đã chọn 1 \/ 10/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: /Làm mới danh sách/i }));
+
+      expect(await screen.findByRole('checkbox', { name: /Đội Sản Phẩm/i })).toBeInTheDocument();
+      expect(requestedUrls).toContain('/api/connections/telegram/candidate-chats');
+      expect(requestedUrls).not.toContain('/api/connections/telegram/chats');
+      expect(screen.getByRole('checkbox', { name: /Telegram của tôi \(An\)/i })).toBeChecked();
+      expect(screen.getByText(/Đã chọn 1 \/ 10/)).toBeInTheDocument();
+    });
+
+    it('auto-loads candidate chats when needs_scope returns an empty chat list', async () => {
+      vi.spyOn(apiClient, 'getTelegramConnection').mockResolvedValue({
+        status: 'needs_scope',
+        botUsername: 'ati_assistant_bot',
+        telegramUserId: '777001',
+        username: 'an_nguyen',
+        chats: [],
+      });
+      const candidates = vi.spyOn(apiClient, 'getTelegramCandidateChats').mockResolvedValue({
+        chats: [
+          { chatId: '777001', title: 'Telegram của tôi (An)', type: 'private', member: true, selected: false },
+          { chatId: '-100999888', title: 'Đội Sản Phẩm', type: 'supergroup', member: true, selected: false },
+        ],
+      });
+
+      render(<TelegramConnection user={memberUser} refresh={vi.fn()} navigate={vi.fn()} />);
+
+      expect(await screen.findByRole('checkbox', { name: /Đội Sản Phẩm/i })).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: /Telegram của tôi \(An\)/i })).toBeInTheDocument();
+      expect(candidates).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -178,12 +270,10 @@ describe('Task 9: Telegram 1-Click Pairing UI, Settings & Cockpit Moments', () =
           })
         )
         .mockResolvedValueOnce({
-          status: 'connected',
           telegramUserId: '777001',
           username: 'an_nguyen',
           displayName: 'Nguyễn Văn An',
-          chats: [{ chatId: '777001', title: 'Telegram của tôi (Nguyễn Văn An)', type: 'private', member: true }],
-          selectedChats: [{ chatId: '777001', title: 'Telegram của tôi (Nguyễn Văn An)', type: 'private', member: true }],
+          chats: [{ chatId: '777001', title: 'Telegram của tôi (Nguyễn Văn An)', type: 'private', member: true, selected: true }],
           returnTo: '/c/11111111-2222-3333-4444-555555555555',
         });
 
@@ -380,12 +470,10 @@ describe('Task 9: Telegram 1-Click Pairing UI, Settings & Cockpit Moments', () =
           })
         )
         .mockResolvedValueOnce({
-          status: 'connected',
           telegramUserId: '777001',
           username: 'an_nguyen',
           displayName: 'An Nguyen',
-          chats: [{ chatId: '777001', title: 'Telegram của tôi (An)', type: 'private', member: true }],
-          selectedChats: [{ chatId: '777001', title: 'Telegram của tôi (An)', type: 'private', member: true }],
+          chats: [{ chatId: '777001', title: 'Telegram của tôi (An)', type: 'private', member: true, selected: true }],
         });
 
       authStorage.setStoredTokens({ accessToken: 'tok-1', user: memberUser });
@@ -419,12 +507,11 @@ describe('Task 9: Telegram 1-Click Pairing UI, Settings & Cockpit Moments', () =
         telegramUserId: '777001',
         username: 'an_nguyen',
         chats: [
-          { chatId: '777001', title: 'Telegram của tôi (An)', type: 'private', member: true },
-          { chatId: '-1001', title: 'Nhóm Kỹ Thuật', type: 'supergroup', username: 'eng_team', member: true },
-          { chatId: '-1002', title: 'Nhóm Kinh Doanh', type: 'group', member: true },
-          { chatId: '-1003', title: 'Kênh Thông Báo', type: 'channel', member: true },
+          { chatId: '777001', title: 'Telegram của tôi (An)', type: 'private', member: true, selected: false },
+          { chatId: '-1001', title: 'Nhóm Kỹ Thuật', type: 'supergroup', username: 'eng_team', member: true, selected: false },
+          { chatId: '-1002', title: 'Nhóm Kinh Doanh', type: 'group', member: true, selected: false },
+          { chatId: '-1003', title: 'Kênh Thông Báo', type: 'channel', member: true, selected: false },
         ],
-        selectedChats: [],
       });
 
       const { unmount: unmountConn } = render(

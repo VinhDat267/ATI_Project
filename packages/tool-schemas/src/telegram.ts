@@ -1,5 +1,6 @@
 import type { ToolDefinition } from './types.js';
 
+export const TELEGRAM_MESSAGE_RETENTION_MS = 24 * 60 * 60_000;
 export const TELEGRAM_CHAT_ID_PATTERN = /^-?\d{1,20}$/;
 export function normalizeTelegramChatId(value: string): string {
   const id = value.trim();

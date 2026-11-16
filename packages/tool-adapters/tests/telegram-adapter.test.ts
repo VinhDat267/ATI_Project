@@ -270,6 +270,8 @@ it('rejects telegram.send_message when context.chatId mismatches args.chatId bef
   expect(fetchFn).not.toHaveBeenCalled();
 });
 
+const recentTelegramDate = Math.floor(Date.now() / 1000) - 600;
+
 it('reads recent and pinned messages for an allowed chat via telegram.read_messages, filtering out other chats, /start pairing commands, and accent-insensitive queries', async () => {
   const fetchFn = vi.fn(async (url: any) => {
     if (String(url).endsWith('/getChat')) {
@@ -278,60 +280,47 @@ it('reads recent and pinned messages for an allowed chat via telegram.read_messa
         pinned_message: {
           message_id: 10,
           chat,
-          date: 1791000000,
+          date: recentTelegramDate,
           from: { id: 1001, first_name: 'Minh', last_name: 'Lead' },
           text: 'Quy trình xử lý lỗi thanh toán Sprint 5',
         },
       });
     }
-    if (String(url).endsWith('/getUpdates')) {
-      return ok([
-        {
-          update_id: 1,
-          message: {
-            message_id: 11,
-            chat,
-            date: 1791000100,
-            from: { id: 1002, first_name: 'Lan', last_name: 'QA' },
-            text: '/start ati_1234567890abcdef1234567890abcdef',
-          },
-        },
-        {
-          update_id: 2,
-          message: {
-            message_id: 12,
-            chat: { id: -1009999999999, title: 'Other Group', type: 'supergroup' },
-            date: 1791000200,
-            from: { id: 1003, first_name: 'Outsider' },
-            text: 'Lỗi thanh toán bên nhóm khác',
-          },
-        },
-        {
-          update_id: 3,
-          message: {
-            message_id: 13,
-            chat,
-            date: 1791000300,
-            from: { id: 1002, first_name: 'Lan', last_name: 'QA' },
-            text: 'Khách báo lỗi thanh toán VNPay bị treo lúc 9h sáng',
-          },
-        },
-        {
-          update_id: 4,
-          message: {
-            message_id: 14,
-            chat,
-            date: 1791000400,
-            from: { id: 1004, username: 'dev_tuan' },
-            text: 'Đã kiểm tra log server bình thường',
-          },
-        },
-      ]);
-    }
     return error(404);
   });
 
-  const a = make(fetchFn);
+  const a = make(fetchFn, {
+    messageSource: async () => [
+      {
+        chatId: id,
+        messageId: 11,
+        senderName: 'Lan QA',
+        text: '/start ati_1234567890abcdef1234567890abcdef',
+        date: recentTelegramDate + 100,
+      },
+      {
+        chatId: '-1009999999999',
+        messageId: 12,
+        senderName: 'Outsider',
+        text: 'Lỗi thanh toán bên nhóm khác',
+        date: recentTelegramDate + 200,
+      },
+      {
+        chatId: id,
+        messageId: 13,
+        senderName: 'Lan QA',
+        text: 'Khách báo lỗi thanh toán VNPay bị treo lúc 9h sáng',
+        date: recentTelegramDate + 300,
+      },
+      {
+        chatId: id,
+        messageId: 14,
+        senderName: 'dev_tuan',
+        text: 'Đã kiểm tra log server bình thường',
+        date: recentTelegramDate + 400,
+      },
+    ],
+  });
   const allRes = await a.execute('telegram.read_messages', { chatId: id });
   expect(allRes).toEqual({
     messages: [
@@ -341,7 +330,7 @@ it('reads recent and pinned messages for an allowed chat via telegram.read_messa
         chatId: id,
         senderName: 'dev_tuan',
         text: 'Đã kiểm tra log server bình thường',
-        date: 1791000400,
+        date: recentTelegramDate + 400,
       },
       {
         id: '13',
@@ -349,7 +338,7 @@ it('reads recent and pinned messages for an allowed chat via telegram.read_messa
         chatId: id,
         senderName: 'Lan QA',
         text: 'Khách báo lỗi thanh toán VNPay bị treo lúc 9h sáng',
-        date: 1791000300,
+        date: recentTelegramDate + 300,
       },
       {
         id: '10',
@@ -357,7 +346,7 @@ it('reads recent and pinned messages for an allowed chat via telegram.read_messa
         chatId: id,
         senderName: 'Minh Lead',
         text: 'Quy trình xử lý lỗi thanh toán Sprint 5',
-        date: 1791000000,
+        date: recentTelegramDate,
       },
     ],
   });
@@ -371,7 +360,7 @@ it('reads recent and pinned messages for an allowed chat via telegram.read_messa
         chatId: id,
         senderName: 'Lan QA',
         text: 'Khách báo lỗi thanh toán VNPay bị treo lúc 9h sáng',
-        date: 1791000300,
+        date: recentTelegramDate + 300,
       },
     ],
   });
@@ -385,5 +374,61 @@ it('rejects out-of-scope chatId or invalid arguments on telegram.read_messages b
   await expect(a.execute('telegram.read_messages', { chatId: id, limit: 25 })).rejects.toMatchObject({ category: 'VALIDATION' });
   await expect(a.execute('telegram.read_messages', { chatId: id, extra: true })).rejects.toMatchObject({ category: 'VALIDATION' });
   expect(fetchFn).not.toHaveBeenCalled();
+});
+
+it('excludes pinned and stored messages outside the rolling 24-hour window', async () => {
+  const expired = Math.floor(Date.now() / 1000) - 24 * 60 * 60 - 1;
+  const fetchFn = vi.fn(async () => ok({
+    ...chat,
+    pinned_message: { chat, message_id: 1, text: 'Old pin', date: expired },
+  }));
+  const messageSource = async () => [
+    { chatId: id, messageId: 2, senderName: 'An', text: 'Old row', date: expired },
+  ];
+  expect(await make(fetchFn, { messageSource }).execute('telegram.read_messages', { chatId: id }))
+    .toEqual({ messages: [] });
+});
+
+it('read_messages never calls getUpdates and merges messageSource with pinned_message cleanly', async () => {
+  const fetchFn = vi.fn(async (url: any) => {
+    if (String(url).endsWith('/getUpdates')) {
+      throw new Error('getUpdates must never be called by TelegramAdapter');
+    }
+    if (String(url).endsWith('/getChat')) {
+      return ok({
+        ...chat,
+        pinned_message: {
+          message_id: 10,
+          chat,
+          date: recentTelegramDate,
+          from: { id: 1001, first_name: 'Minh', last_name: 'Lead' },
+          text: 'Tin ghim nhóm',
+        },
+      });
+    }
+    return error(404);
+  });
+
+  const withoutSource = make(fetchFn);
+  expect(await withoutSource.execute('telegram.read_messages', { chatId: id })).toEqual({
+    messages: [
+      { id: '10', messageId: 10, chatId: id, senderName: 'Minh Lead', text: 'Tin ghim nhóm', date: recentTelegramDate },
+    ],
+  });
+  expect(fetchFn.mock.calls.some((c) => String(c[0]).endsWith('/getUpdates'))).toBe(false);
+
+  const messageSource = vi.fn(async () => [
+    { chatId: '-1009999999999', messageId: 12, senderName: 'Outsider', text: 'Sai chat', date: recentTelegramDate + 200 },
+    { chatId: id, messageId: 13, senderName: 'Lan QA', text: 'Báo lỗi thanh toán', date: recentTelegramDate + 300 },
+    { chatId: id, messageId: 14, senderName: 'An', text: `secret ${token}`, date: recentTelegramDate + 400 },
+  ]);
+  const withSource = make(fetchFn, { messageSource });
+  expect(await withSource.execute('telegram.read_messages', { chatId: id })).toEqual({
+    messages: [
+      { id: '13', messageId: 13, chatId: id, senderName: 'Lan QA', text: 'Báo lỗi thanh toán', date: recentTelegramDate + 300 },
+      { id: '10', messageId: 10, chatId: id, senderName: 'Minh Lead', text: 'Tin ghim nhóm', date: recentTelegramDate },
+    ],
+  });
+  expect(messageSource).toHaveBeenCalledTimes(1);
 });
 

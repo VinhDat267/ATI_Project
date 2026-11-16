@@ -15,6 +15,7 @@ import {
   MYSHEETS_SERVICE,
   MYSHEETS_TOOLS,
   NOTION_OAUTH_TOOLS,
+  TELEGRAM_OAUTH_TOOLS,
   type PersonalCalendarItem,
   type PersonalSpreadsheetItem,
 } from '@wap/tool-schemas';
@@ -706,7 +707,9 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
               : 'unconfigured';
           const serviceTools = isPersonalNotionOAuth
             ? [...ALL_TOOLS.filter((tool) => tool.service === 'notion'), ...NOTION_OAUTH_TOOLS].map((tool) => tool.name)
-            : ALL_TOOLS.filter((tool) => tool.service === id).map((tool) => tool.name);
+            : id === 'telegram' && personalConnected
+              ? [...ALL_TOOLS.filter((tool) => tool.service === 'telegram'), ...TELEGRAM_OAUTH_TOOLS].map((tool) => tool.name)
+              : ALL_TOOLS.filter((tool) => tool.service === id).map((tool) => tool.name);
 
           return {
             id,

@@ -554,4 +554,84 @@ describe('Calendar Digest Runner & ScheduleRunner integration on PostgreSQL 16',
     expect(formatted.text).toContain('📍 Phòng họp Tầng 3');
     expect(formatted.text).toContain('👥 4 người tham dự');
   });
+
+  it('blocks execution and pauses schedule when personal Telegram credentialId changes even if chatId remains in scope', async () => {
+    const mycalId = await seedConnections('telegram');
+    const oldTg = await credentials.getPersonalCredentials('telegram', owner.id);
+    expect(oldTg).not.toBeNull();
+
+    const convId = (await db.pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [owner.id])).rows[0].id as string;
+    const pinnedConfig: CalendarDigestConfig = {
+      version: 1,
+      source: 'mycalendar',
+      credentialId: mycalId,
+      email: 'owner.calendar@example.test',
+      calendars: [{ id: 'owner.calendar@example.test', summary: 'Lịch chính', primary: true }],
+      destination: {
+        service: 'telegram',
+        chatId: '-100123456789',
+        chatTitle: 'Nhóm Lịch',
+        credentialId: oldTg!.id,
+      },
+      windowHours: 24,
+      includeSummary: true,
+    };
+    const hash = computeCalendarDigestHash(pinnedConfig);
+    const sched = (
+      await db.pool.query(
+        `INSERT INTO schedules(user_id, conv_id, name, request, recurrence, services, status, next_run_at, kind, digest_config, digest_config_hash, digest_approved_at)
+         VALUES($1, $2, 'Lịch pin TG', 'Gửi lịch họp', $3::jsonb, $4, 'active', $5, 'calendar_digest', $6::jsonb, $7, now())
+         RETURNING *`,
+        [owner.id, convId, JSON.stringify(daily), ['mycalendar', 'telegram'], '2026-10-25T00:30:00.000Z', JSON.stringify(pinnedConfig), hash],
+      )
+    ).rows[0];
+
+    // Re-connect Telegram (new credential row id, same chatId in selectedChats)
+    await credentials.saveCredentials(
+      'telegram',
+      encryptCredentials(
+        {
+          telegramUserId: '777',
+          username: 'tester',
+          selectedChats: [{ chatId: '-100123456789', title: 'Nhóm Lịch', type: 'supergroup' }],
+        },
+        key,
+      ),
+      owner.id,
+    );
+
+    let telegramSent = false;
+    const runDigest = createCalendarDigestExecutor({
+      pool: db.pool,
+      encryptionKey: key,
+      timeZone: VN,
+      getAdapter: async (serviceName) => {
+        if (serviceName === 'telegram') {
+          telegramSent = true;
+        }
+        return { execute: async () => ({ events: [], coverage: { complete: true, returned: 0, totalAvailable: 0 } }) };
+      },
+    });
+
+    const r = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: VN,
+      now: () => now,
+      planRun: async () => {
+        throw new Error('must not be called');
+      },
+      runDigest,
+      recordState: (client, row, at) => service.recordState(client, row, at),
+    });
+    runners.push(r);
+
+    await r.tick();
+
+    expect(telegramSent).toBe(false);
+    const runRows = (await db.pool.query('SELECT status, error FROM schedule_runs WHERE schedule_id = $1', [sched.id])).rows;
+    expect(runRows[0]!.status).toBe('blocked');
+    const updatedSched = (await db.pool.query('SELECT status, pause_reason FROM schedules WHERE id = $1', [sched.id])).rows[0];
+    expect(updatedSched.status).toBe('paused');
+    expect(updatedSched.pause_reason).toContain('Telegram');
+  });
 });

@@ -513,4 +513,66 @@ describe('Calendar auto_digest schedule candidate & confirmation on PostgreSQL 1
       ]),
     );
   });
+
+  it('selects 1-of-N Telegram chat mentioned in request, pins destination.credentialId, requires clarification when omitted, and keeps legacy hashes unchanged', async () => {
+    const { createHash } = await import('node:crypto');
+    await seedMyCalendar(alice);
+    const tgCred = await credentials.saveCredentials(
+      'telegram',
+      encryptCredentials(
+        {
+          telegramUserId: '777001',
+          username: 'alice_tg',
+          selectedChats: [
+            { chatId: '777001', title: 'Telegram của tôi (Alice)', type: 'private' },
+            { chatId: '-100999', title: 'Nhóm Sản Phẩm', type: 'supergroup' },
+          ],
+        },
+        key,
+      ),
+      alice.id,
+    );
+
+    const matchedEval = await evaluateCalendarDigestCandidate({
+      pool: db.pool,
+      encryptionKey: key,
+      userId: alice.id,
+      services: ['mycalendar', 'telegram'],
+      request: 'Mỗi sáng 8h gửi lịch họp vào Nhóm Sản Phẩm trên Telegram',
+    });
+    expect(matchedEval.candidate.canAutoDigest).toBe(true);
+    expect(matchedEval.candidate.configPreview?.destinationId).toBe('-100999');
+    expect(matchedEval.candidate.configPreview?.destinationLabel).toBe('Nhóm Sản Phẩm');
+    expect((matchedEval.config?.destination as any).credentialId).toBe(tgCred.id);
+
+    const ambiguousEval = await evaluateCalendarDigestCandidate({
+      pool: db.pool,
+      encryptionKey: key,
+      userId: alice.id,
+      services: ['mycalendar', 'telegram'],
+      request: 'Gửi lịch họp sáng nay qua Telegram',
+    });
+    expect(ambiguousEval.candidate.canAutoDigest).toBe(false);
+    expect(ambiguousEval.candidate.disabledReason).toContain('nêu rõ');
+
+    // Legacy hash compatibility: config without destination.credentialId produces identical canonical SHA-256 bytes
+    const legacyConfig = {
+      version: 1 as const,
+      source: 'mycalendar' as const,
+      credentialId: 'cal-legacy-1',
+      email: 'alice@example.test',
+      calendars: [{ id: 'cal-1', summary: 'Work', primary: true }],
+      destination: { service: 'telegram' as const, chatId: '-100999', chatTitle: 'Nhóm Sản Phẩm' },
+      windowHours: 24,
+      includeSummary: true,
+    };
+    const expectedLegacyHash = createHash('sha256').update(JSON.stringify(legacyConfig)).digest('hex');
+    expect(computeCalendarDigestHash(legacyConfig)).toBe(expectedLegacyHash);
+    expect(
+      computeCalendarDigestHash({
+        ...legacyConfig,
+        destination: { ...legacyConfig.destination, credentialId: tgCred.id } as any,
+      }),
+    ).not.toBe(expectedLegacyHash);
+  });
 });
