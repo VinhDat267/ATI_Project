@@ -6,6 +6,7 @@ import {
   MemoryTelegramUpdateStore,
   projectTelegramUpdate,
   telegramStateHash,
+  type TelegramUpdateClient,
   type TelegramUpdateStore,
 } from './update-inbox.js';
 
@@ -42,9 +43,9 @@ function normalizeChatType(raw: unknown): TelegramChatType {
 }
 
 export interface TelegramMessageRetentionOptions {
-  allowedChatIds?: () => Promise<Set<string>> | Set<string>;
+  allowedChatIds?: (client?: TelegramUpdateClient) => Promise<Set<string>> | Set<string>;
   messageStore?: {
-    upsertMany(botKey: string, messages: TelegramChatMessage[], now: Date, client?: any): Promise<void>;
+    upsertMany(botKey: string, messages: TelegramChatMessage[], now: Date, client?: TelegramUpdateClient): Promise<void>;
     list?(botKey: string, chatId: string, limit: number, now?: Date): Promise<TelegramChatMessage[]>;
   };
 }
@@ -235,7 +236,7 @@ export class TelegramBotClient {
         if (!Array.isArray(result)) throw new TelegramBotError('server');
         rawCount = result.length;
         if (this.retention?.allowedChatIds && this.retention.messageStore && result.length > 0) {
-          const allowed = await this.retention.allowedChatIds();
+          const allowed = await this.retention.allowedChatIds(txClient);
           const msgs = extractAllowedTelegramMessages(result, allowed, this.config.botToken);
           if (msgs.length > 0) {
             await this.retention.messageStore.upsertMany(this.botKey, msgs, new Date(), txClient);

@@ -110,6 +110,12 @@ export async function reconcileScheduleRuns(pool: pg.Pool): Promise<void> {
        SET
          status = CASE WHEN r.delivery_started_at IS NOT NULL THEN 'needs_attention' ELSE 'interrupted' END,
          error = CASE
+           WHEN r.delivery_started_at IS NOT NULL AND r.dispatched_config_hash <> ''
+             AND r.dispatched_config @> '{"source":"mycalendar","version":1}'
+             AND jsonb_typeof(r.dispatched_config->'calendars') = 'array' THEN $2
+           WHEN r.delivery_started_at IS NOT NULL AND r.dispatched_config_hash <> ''
+             AND jsonb_typeof(r.dispatched_config->'githubUserId') = 'string'
+             AND jsonb_typeof(r.dispatched_config->'repos') = 'array' THEN $6
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'sheets_digest' THEN $3
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'trello_digest' THEN $4
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'telegram_digest' THEN $5
@@ -890,16 +896,19 @@ export class ScheduleRunner {
       if (outcome.state === 'blocked') {
         await this.messages.createMessage(started.convId, 'system', `Lỗi: ${outcome.pauseReason}`, { type: 'planning_error', ...replyTo }, client);
         await client.query("UPDATE schedule_runs SET status='blocked', error=$2, updated_at=now() WHERE id=$1", [runId, outcome.pauseReason]);
-        const paused = await this.pause(client, started.toPlan.scheduleId, outcome.pauseReason);
-        const change = await this.options.recordState(client, paused, this.now());
-        return { ended: outcome.pauseReason, changes: [change], assistantMessageId: undefined };
+        const changes: ScheduleChange[] = [];
+        if (schedule.status === 'active') {
+          const paused = await this.pause(client, schedule.id, outcome.pauseReason);
+          changes.push(await this.options.recordState(client, paused, this.now()));
+        }
+        return { ended: outcome.pauseReason, changes, assistantMessageId: undefined };
       }
 
       if (outcome.state === 'digest_failed') {
         await this.messages.createMessage(started.convId, 'system', `Lỗi: ${outcome.error}`, { type: 'planning_error', ...replyTo }, client);
         await client.query("UPDATE schedule_runs SET status='digest_failed', error=$2, updated_at=now() WHERE id=$1", [runId, outcome.error]);
         const changes: ScheduleChange[] = [];
-        if (await this.lastThreeDigestFailed(client, schedule.id)) {
+        if (schedule.status === 'active' && await this.lastThreeDigestFailed(client, schedule.id)) {
           const paused = await this.pause(client, schedule.id, DIGEST_FAILED_3X);
           changes.push(await this.options.recordState(client, paused, this.now()));
         }
@@ -943,6 +952,7 @@ export class ScheduleRunner {
       toPlan: RunToPlan;
       convId: string;
       messageId: string;
+      kind: ScheduleKind;
       recurrence: ScheduleRecurrence;
       digestConfig: GithubDigestConfig | null;
       digestConfigHash: string | null;
@@ -1014,9 +1024,9 @@ export class ScheduleRunner {
 
       if (outcome?.state === 'delivery_unknown' || (run.delivery_started_at && outcome?.state !== 'digest_sent')) {
         const defaultUnknownErr =
-          schedule.kind === 'trello_digest'
+          started.kind === 'trello_digest'
             ? TRELLO_DELIVERY_UNKNOWN
-            : schedule.kind === 'notion_digest'
+            : started.kind === 'notion_digest'
               ? NOTION_DELIVERY_UNKNOWN
               : GITHUB_DELIVERY_UNKNOWN;
         const unknownErr = outcome?.state === 'delivery_unknown' ? outcome.error : defaultUnknownErr;

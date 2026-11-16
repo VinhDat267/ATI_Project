@@ -1,14 +1,15 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import { once } from 'node:events';
 import { readFile, readdir } from 'node:fs/promises';
 import { encryptCredentials, GlobalRateLimiter, SlackAdapter, TelegramAdapter } from '@wap/tool-adapters';
-import type { CalendarDigestConfig } from '@wap/tool-schemas';
+import type { CalendarDigestConfig, ScheduleRecurrence } from '@wap/tool-schemas';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { computeCalendarDigestHash } from '../../src/services/schedules/calendar-digest-candidate.js';
 import { createCalendarDigestExecutor } from '../../src/services/schedules/calendar-digest-runner.js';
 import { reconcileScheduleRuns, ScheduleRunner } from '../../src/services/schedules/schedule-runner.js';
 import { ScheduleService } from '../../src/services/schedules/schedule-service.js';
+import { certifyScheduleFixture } from '../../src/services/slack/slack-schedule-origin.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 
 const key = '0123456789abcdef0123456789abcdef';
@@ -32,7 +33,11 @@ describe('Calendar delivery recovery with real HTTP and PostgreSQL', () => {
   });
   afterAll(async () => db?.close());
 
-  async function setup(destination: 'slack' | 'telegram' = 'slack', response: 'lost' | 'reject' | 'hold' | 'success' | 'server_error' | 'malformed' = 'lost') {
+  async function setup(
+    destination: 'slack' | 'telegram' = 'slack',
+    response: 'lost' | 'reject' | 'hold' | 'success' | 'server_error' | 'malformed' = 'lost',
+    oneTime = false,
+  ) {
     const posts: { url: string; body: any }[] = [];
     let received!: () => void;
     const requestReceived = new Promise<void>(resolve => { received = resolve; });
@@ -63,9 +68,13 @@ describe('Calendar delivery recovery with real HTTP and PostgreSQL', () => {
     const config: CalendarDigestConfig = { version: 1, source: 'mycalendar', credentialId: source.id, email: 'owner@example.test',
       calendars: [{ id: 'work@example.test', summary: 'Work' }], destination: destination === 'slack' ? { service: 'slack', channelId: 'C0123456789' }
         : { service: 'telegram', chatId: '123456789' }, windowHours: 24, includeSummary: false };
+    const recurrence: ScheduleRecurrence = oneTime
+      ? { type: 'once', date: '2026-11-02', time: '07:00' }
+      : { type: 'daily', time: '08:00' };
+    const nextRunAt = oneTime ? now : new Date('2026-11-03T01:00:00Z');
     const schedule = (await db.pool.query(`INSERT INTO schedules(user_id,conv_id,name,request,recurrence,services,status,next_run_at,kind,digest_config,digest_config_hash,digest_approved_at)
-      VALUES($1,$2,'Agenda','Send agenda','{"type":"daily","time":"08:00"}',$3,'active','2026-11-03T01:00:00Z','calendar_digest',$4,$5,now()) RETURNING *`,
-      [owner.id, convId, ['mycalendar', destination], JSON.stringify(config), computeCalendarDigestHash(config)])).rows[0];
+      VALUES($1,$2,'Agenda','Send agenda',$3,$4,'active',$5,'calendar_digest',$6,$7,now()) RETURNING *`,
+      [owner.id, convId, JSON.stringify(recurrence), ['mycalendar', destination], nextRunAt, JSON.stringify(config), computeCalendarDigestHash(config)])).rows[0];
     const limiter = () => new GlobalRateLimiter({ maxRequests: 1000, windowMs: 1 });
     const adapter = destination === 'slack'
       ? new SlackAdapter({ credentials: { botToken: 'fixture' }, allowedScope: { channels: ['C0123456789'] }, baseUrl, rateLimiter: limiter() })
@@ -73,15 +82,26 @@ describe('Calendar delivery recovery with real HTTP and PostgreSQL', () => {
     const getAdapter = async (name: string) => name === 'mycalendar' ? { execute: async () => ({ events: [] }) } : adapter;
     const executor = createCalendarDigestExecutor({ pool: db.pool, encryptionKey: key, timeZone: TZ, getAdapter });
     const makeRunner = (planTimeoutMs = 10_000, runDigest = executor) => {
-      const runner = new ScheduleRunner({ pool: db.pool, timeZone: TZ, planTimeoutMs, runDigest,
+      const runner = new ScheduleRunner({ pool: db.pool, timeZone: TZ, now: () => now, planTimeoutMs, runDigest,
         planRun: async () => { throw new Error('Calendar must not use the planner'); },
         recordState: (client, row, at) => service.recordState(client, row, at) });
       runners.push(runner); return runner;
     };
-    const run = await service.startRun({ scheduleId: schedule.id, trigger: 'manual', userId: owner.id, now });
+    let run;
+    if (oneTime) {
+      await makeRunner().tick();
+      [run] = await service.listRuns(owner.id, schedule.id, 1, now);
+      if (!run) throw new Error('The due one-time schedule did not create a run');
+    } else {
+      run = await service.startRun({ scheduleId: schedule.id, trigger: 'manual', userId: owner.id, now });
+    }
     const row = async () => (await db.pool.query('SELECT * FROM schedule_runs WHERE id=$1', [run.id])).rows[0];
     const replan = () => service.startRun({ runId: run.id, trigger: 'replan', userId: owner.id, now });
-    return { posts, requestReceived, schedule, run, row, replan, makeRunner, executor, beforeReply: (work: () => Promise<void>) => { beforeReply = work; } };
+    return {
+      posts, requestReceived, schedule, run, row, replan, makeRunner, executor,
+      beforeReply: (work: () => Promise<void>) => { beforeReply = work; },
+      setResponse: (next: typeof response) => { response = next; },
+    };
   }
 
   it.each(['slack', 'telegram'] as const)('does not offer replan after %s accepted POST but lost its response', async destination => {
@@ -93,6 +113,105 @@ describe('Calendar delivery recovery with real HTTP and PostgreSQL', () => {
     await expect(f.replan()).rejects.toMatchObject({ code: 'RUN_NOT_REPLANNABLE' });
     expect(f.posts).toHaveLength(1);
     expect((await f.row()).delivery).toBeNull();
+  });
+
+  it.each(['slack', 'telegram'] as const)('confirms the original %s destination after a schedule edit', async destination => {
+    const f = await setup(destination);
+    const claim = f.requestReceived.then(() => f.row());
+    await f.makeRunner().planNow(f.run.id);
+    expect(await claim).toMatchObject({
+      delivery_started_at: expect.any(Date),
+      dispatched_config: f.schedule.digest_config,
+      dispatched_config_hash: f.schedule.digest_config_hash,
+    });
+
+    const edited: CalendarDigestConfig = {
+      ...f.schedule.digest_config,
+      destination: { service: 'slack', channelId: 'C9876543210' },
+    };
+    await db.pool.query(
+      'UPDATE schedules SET version = version + 1, digest_config = $2, digest_config_hash = $3 WHERE id = $1',
+      [f.schedule.id, edited, computeCalendarDigestHash(edited)],
+    );
+
+    const result = await service.resolveRunDelivery({ userId: owner.id, runId: f.run.id, resolution: 'mark_sent', now });
+    expect(result.run.delivery).toMatchObject({
+      destinationService: destination,
+      channelId: destination === 'slack' ? 'C0123456789' : '123456789',
+    });
+    expect(f.posts).toHaveLength(1);
+  });
+
+  it('confirms an unknown Calendar delivery after the schedule switches to manual approval', async () => {
+    const f = await setup('telegram');
+    await f.makeRunner().planNow(f.run.id);
+    await db.pool.query(
+      "UPDATE schedules SET kind = 'plan', version = version + 1, digest_config = NULL, digest_config_hash = NULL, digest_approved_at = NULL WHERE id = $1",
+      [f.schedule.id],
+    );
+
+    await certifyScheduleFixture(db.pool, f.schedule.id);
+    const recovery = { userId: owner.id, runId: f.run.id, now };
+    await expect(service.resolveRunDelivery({ ...recovery, resolution: 'retry_new_run', confirmDuplicateRisk: true }))
+      .rejects.toMatchObject({ code: 'CONFIG_CHANGED_SINCE_RUN' });
+    const [listed] = await service.listRuns(owner.id, f.schedule.id, 1, now);
+    expect(listed).toMatchObject({ state: 'needs_attention', canRetryDelivery: false });
+
+    const resolved = await service.resolveRunDelivery({ ...recovery, resolution: 'mark_sent' });
+    expect(resolved.schedule).toMatchObject({ kind: 'plan', status: 'active', version: 2 });
+    expect(resolved.run).toMatchObject({
+      state: 'digest_sent',
+      deliveryResolution: 'confirmed_sent',
+      delivery: { destinationService: 'telegram', channelId: '123456789' },
+    });
+    expect(resolved.followUpRun).toBeNull();
+    expect(f.posts).toHaveLength(1);
+  });
+
+  it('sends an explicitly confirmed follow-up for a completed one-time Calendar digest', async () => {
+    const f = await setup('slack', 'lost', true);
+    expect(f.posts).toHaveLength(1);
+    expect(f.run).toMatchObject({ state: 'needs_attention', trigger: 'scheduled' });
+
+    const runner = f.makeRunner();
+    service = new ScheduleService({ pool: db.pool, timeZone: TZ, encryptionKey: key, runner });
+    const recovery = { userId: owner.id, runId: f.run.id, resolution: 'retry_new_run', now };
+    await expect(service.resolveRunDelivery(recovery)).rejects.toMatchObject({ code: 'DUPLICATE_RISK_CONFIRMATION_REQUIRED' });
+    await expect(service.startRun({ scheduleId: f.schedule.id, trigger: 'manual', userId: owner.id, now }))
+      .rejects.toMatchObject({ code: 'SCHEDULE_CLOSED' });
+    expect(f.run.canRetryDelivery).toBe(true);
+
+    f.setResponse('success');
+    const result = await service.resolveRunDelivery({ ...recovery, confirmDuplicateRisk: true });
+    expect(result.schedule).toMatchObject({ status: 'completed', version: 1, nextRuns: [] });
+    expect(result.followUpRun).toMatchObject({ state: 'planning', trigger: 'manual' });
+    expect(result.run.deliveryFollowupRunId).toBe(result.followUpRun?.id);
+    await vi.waitFor(async () => {
+      const followUp = (await db.pool.query('SELECT status, dispatched_config_hash FROM schedule_runs WHERE id = $1', [result.followUpRun!.id])).rows[0];
+      expect(followUp).toEqual({ status: 'digest_sent', dispatched_config_hash: f.schedule.digest_config_hash });
+    });
+    await expect(service.resolveRunDelivery({ ...recovery, confirmDuplicateRisk: true }))
+      .rejects.toMatchObject({ code: 'DELIVERY_ALREADY_RESOLVED' });
+    expect(f.posts).toHaveLength(2);
+  });
+
+  it('keeps a one-time Calendar schedule completed when the follow-up loses destination scope', async () => {
+    const f = await setup('slack', 'lost', true);
+    const runner = f.makeRunner();
+    service = new ScheduleService({ pool: db.pool, timeZone: TZ, encryptionKey: key, runner });
+    await db.pool.query("UPDATE service_credentials SET config = $1 WHERE service = 'slack'", [
+      encryptCredentials({ botToken: 'fixture', allowedScope: { channels: ['C9876543210'] } }, key),
+    ]);
+
+    const result = await service.resolveRunDelivery({
+      userId: owner.id, runId: f.run.id, resolution: 'retry_new_run', confirmDuplicateRisk: true, now,
+    });
+    await vi.waitFor(async () => {
+      const schedule = (await service.list(owner.id, now)).find(row => row.id === f.schedule.id);
+      expect(schedule).toMatchObject({ status: 'completed', version: 1, nextRuns: [], lastRun: { state: 'blocked' } });
+    });
+    expect(result.followUpRun).not.toBeNull();
+    expect(f.posts).toHaveLength(1);
   });
 
   it('keeps a definite authentication rejection recoverable', async () => {

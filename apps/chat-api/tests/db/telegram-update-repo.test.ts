@@ -156,6 +156,7 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
       ),
     });
 
+    const sentAt = Math.floor(Date.now() / 1000) - 60;
     let queue = [
       {
         update_id: 501,
@@ -163,7 +164,7 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
           message_id: 1,
           chat: { id: -100111, type: 'supergroup', title: 'Nhóm Allowlist' },
           from: { id: 777001, is_bot: false, first_name: 'An' },
-          date: 1794816000,
+          date: sentAt,
           text: 'Tin cần giữ lại',
         },
       },
@@ -173,7 +174,7 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
           message_id: 1,
           chat: { id: -100111, type: 'supergroup', title: 'Nhóm Allowlist' },
           from: { id: 777001, is_bot: false, first_name: 'An' },
-          date: 1794816005,
+          date: sentAt,
           text: 'Tin cần giữ lại (đã sửa)',
         },
       },
@@ -183,7 +184,7 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
           message_id: 2,
           chat: { id: -100111, type: 'supergroup', title: 'Nhóm Allowlist' },
           from: { id: 777001, is_bot: false, first_name: 'An' },
-          date: 1794816010,
+          date: sentAt + 10,
           text: `/start ati_${'f'.repeat(43)}`,
         },
       },
@@ -193,7 +194,7 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
           message_id: 3,
           chat: { id: -100111, type: 'supergroup', title: 'Nhóm Allowlist' },
           from: { id: 777001, is_bot: false, first_name: 'An' },
-          date: 1794816015,
+          date: sentAt + 15,
           text: `leak ${config.botToken}`,
         },
       },
@@ -203,7 +204,7 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
           message_id: 4,
           chat: { id: -100999, type: 'supergroup', title: 'Nhóm Đã Thu Hồi' },
           from: { id: 888002, is_bot: false, first_name: 'Outsider' },
-          date: 1794816020,
+          date: sentAt + 20,
           text: 'Tin không được phép lưu',
         },
       },
@@ -225,7 +226,10 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
       fetchFn,
       new TelegramUpdateRepo(db.pool),
       {
-        allowedChatIds: () => loadActiveTelegramChatAllowlist(db.pool, KEY),
+        allowedChatIds: (txClient) => {
+          if (!txClient) throw new Error('Allowlist must share the polling transaction');
+          return loadActiveTelegramChatAllowlist(txClient, KEY);
+        },
         messageStore: msgRepo,
       },
     );
@@ -241,7 +245,7 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
         messageId: 1,
         senderName: 'An',
         text: 'Tin cần giữ lại (đã sửa)',
-        date: 1794816005,
+        date: sentAt,
       },
     ]);
     expect(await msgRepo.list(client.botKey, '-100999', 10)).toEqual([]);
@@ -272,7 +276,19 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
       serviceFetchFn,
     }).getAdapterForService('telegram', { userId: member.id, phase: 'planning' });
 
-    const readRes = await adapter.execute('telegram.read_messages', { chatId: '-100111', limit: 10 });
+    await msgRepo.upsertMany(client.botKey, Array.from({ length: 110 }, (_, i) => ({
+      chatId: '-100111', messageId: i + 10, senderName: 'Other', text: 'Newer unrelated message', date: sentAt + 30,
+    })));
+    await msgRepo.upsertMany(client.botKey, [
+      { chatId: '-100111', messageId: 130, senderName: 'Other', text: 'ΟΣ', date: sentAt + 30 },
+    ]);
+    const unicodeRead = await adapter.execute('telegram.read_messages', {
+      chatId: '-100111', limit: 1, query: 'ος',
+    });
+    expect(unicodeRead.messages).toMatchObject([{ messageId: 130 }]);
+    const readRes = await adapter.execute('telegram.read_messages', {
+      chatId: '-100111', limit: 1, query: 'giu lai',
+    });
     expect(readRes.messages).toEqual([
       {
         id: '1',
@@ -280,7 +296,7 @@ describe('Durable Telegram update inbox on PostgreSQL', () => {
         chatId: '-100111',
         senderName: 'An',
         text: 'Tin cần giữ lại (đã sửa)',
-        date: 1794816005,
+        date: sentAt,
       },
     ]);
   });

@@ -54,7 +54,7 @@ import { TrelloTeamRepo } from './db/repositories/trello-team-repo.js';
 import { TelegramTeamRepo } from './db/repositories/telegram-team-repo.js';
 import { TelegramMessageRepo } from './db/repositories/telegram-message-repo.js';
 import { TelegramUpdateRepo } from './db/repositories/telegram-update-repo.js';
-import { loadActiveTelegramChatAllowlist, invalidateTelegramAllowlistCache } from './services/telegram/allowed-chats.js';
+import { loadActiveTelegramChatAllowlist } from './services/telegram/allowed-chats.js';
 import { TelegramBotClient } from './services/telegram/bot-client.js';
 import { createTelegramConnectionLookup } from './services/telegram/connection-reference.js';
 import { TelegramDigestRunner } from './services/schedules/telegram-digest-runner.js';
@@ -527,7 +527,7 @@ async function bootstrap() {
   const githubConnection = githubLookup ?? sandboxGitHubConnection;
 
   const telegramAvailable = Boolean(env.TELEGRAM_BOT && pool);
-  const telegramMessageRepo = telegramAvailable && pool ? new TelegramMessageRepo(pool) : undefined;
+  const telegramMessageRepo = pool ? new TelegramMessageRepo(pool) : undefined;
   const telegramBotClient = telegramAvailable && pool
     ? new TelegramBotClient(
         env.TELEGRAM_BOT!,
@@ -535,7 +535,7 @@ async function bootstrap() {
         new TelegramUpdateRepo(pool),
         telegramMessageRepo
           ? {
-              allowedChatIds: () => loadActiveTelegramChatAllowlist(pool, env.ENCRYPTION_KEY),
+              allowedChatIds: (client) => loadActiveTelegramChatAllowlist(client ?? pool, env.ENCRYPTION_KEY),
               messageStore: telegramMessageRepo,
             }
           : undefined,
@@ -1154,7 +1154,6 @@ async function bootstrap() {
       teamRepo: telegramTeamRepo,
       onConnectionChanged: (userId: string) => {
         realAdapterFactory.clearPersonal(userId, 'telegram');
-        if (pool) invalidateTelegramAllowlistCache(pool);
       },
     },
     telegramTeamRepo,
@@ -1201,6 +1200,10 @@ async function bootstrap() {
     : undefined;
   slackReceiptCleanupTimer?.unref?.();
 
+  const stopTelegramMessageCleanup = telegramMessageRepo?.startCleanup((error) => {
+    console.warn('[chat-api] Dọn inbox Telegram thất bại:', error instanceof Error ? error.message : error);
+  });
+
   const host = env.RUNTIME_MODE === 'sandbox' ? '127.0.0.1' : '0.0.0.0';
   app.listen(port, host, () => {
     console.log(`\x1b[32m[chat-api] ✓ Server đang lắng nghe tại http://${host}:${port}\x1b[0m`);
@@ -1214,6 +1217,7 @@ async function bootstrap() {
 
   const shutdown = async () => {
     schedules?.runner.stop();
+    stopTelegramMessageCleanup?.();
     if (slackReceiptCleanupTimer) clearInterval(slackReceiptCleanupTimer);
     await Promise.all([slackInvalidationRunner?.stop(), slackLifecycleRuntime?.stop(), slackFanoutRuntime?.stop(),slackAssistant?.runner?.stop()]);
     process.exit(0);

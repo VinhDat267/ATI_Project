@@ -189,7 +189,7 @@ describe('DEMO-01: 9-Service Receipt Metrics & Comprehensive Playbooks', () => {
     expect(screen.getByTestId('telegram-receipt-metrics')).toHaveTextContent('📨 Tin nhắn #701');
   });
 
-  function renderTelegramRead(messages: unknown[]) {
+  function renderTelegramRead(messages: unknown[], query?: string) {
     cleanup();
     const steps: ExecutionStepInfo[] = [
       {
@@ -204,7 +204,7 @@ describe('DEMO-01: 9-Service Receipt Metrics & Comprehensive Playbooks', () => {
       <ReceiptMoment
         request="Đọc tin nhắn nhóm"
         steps={steps}
-        planSteps={steps.map((s) => ({ id: s.id, tool: s.tool, description: s.description, args: {} }))}
+        planSteps={steps.map((s) => ({ id: s.id, tool: s.tool, description: s.description, args: { query } }))}
         services={NINE_SERVICES}
         destination={resourceDestination}
         onNewConversation={() => {}}
@@ -220,6 +220,11 @@ describe('DEMO-01: 9-Service Receipt Metrics & Comprehensive Playbooks', () => {
     ]);
     expect(screen.getByTestId('telegram-receipt-metrics')).toHaveTextContent('💬 2 tin nhắn');
     expect(screen.queryByTestId('telegram-read-empty-hint')).not.toBeInTheDocument();
+  });
+
+  it('explains that no messages matched a Telegram search', () => {
+    renderTelegramRead([], 'từ khóa');
+    expect(screen.getByTestId('telegram-read-empty-hint')).toHaveTextContent('Không tìm thấy tin nhắn khớp');
   });
 
   it('explains Privacy Mode when telegram.read_messages returns nothing', () => {

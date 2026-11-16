@@ -1,12 +1,15 @@
 import { createHash } from 'node:crypto';
+import type pg from 'pg';
 import type { TelegramChatMessage } from '@wap/tool-adapters';
 import { normalizeTelegramChatId, TELEGRAM_CHAT_ID_PATTERN } from '@wap/tool-schemas';
+
+export type TelegramUpdateClient = Pick<pg.PoolClient, 'query'>;
 
 export interface TelegramUpdateStore {
   poll(
     botKey: string,
     signal: AbortSignal,
-    fetchPage: (offset?: number, txClient?: any) => Promise<any[]>,
+    fetchPage: (offset?: number, txClient?: TelegramUpdateClient) => Promise<any[]>,
   ): Promise<any[]>;
 }
 

@@ -333,7 +333,7 @@ function SlackReceiptMetrics({ step }: { step: ExecutionStepInfo }) {
   );
 }
 
-function TelegramReceiptMetrics({ step }: { step: ExecutionStepInfo }) {
+function TelegramReceiptMetrics({ step, searched }: { step: ExecutionStepInfo; searched: boolean }) {
   if (step.status !== 'succeeded') return null;
   if (serviceId(step.tool) !== 'telegram') return null;
   const out = resultObject(step.output);
@@ -358,8 +358,9 @@ function TelegramReceiptMetrics({ step }: { step: ExecutionStepInfo }) {
       </div>
       {readMessages && readMessages.length === 0 && (
         <p data-testid="telegram-read-empty-hint" className="mt-1.5 text-xs text-[#6B7280] break-words">
-          Chưa có tin nhắn nào trong 24 giờ qua mà bot nhận được. Với nhóm, hãy tắt Privacy Mode của bot qua
-          @BotFather (/setprivacy → Disable) hoặc đặt bot làm quản trị viên, rồi nhắn thử một tin mới.
+          {searched
+            ? 'Không tìm thấy tin nhắn khớp trong 24 giờ qua.'
+            : 'Bot chưa nhận được tin nhắn nào trong 24 giờ qua. Với nhóm, hãy tắt Privacy Mode qua @BotFather (/setprivacy → Disable) hoặc đặt bot làm quản trị viên, rồi nhắn thử một tin mới.'}
         </p>
       )}
     </div>
@@ -478,6 +479,9 @@ function ReceiptCard({
   const hasLinks = Boolean(directUrl || meetUrl);
   const hasDetails = !step.tool.startsWith('myslack.');
   const showDuration = step.status === 'succeeded' && Boolean(step.duration);
+  const telegramQuery = step.tool === 'telegram.read_messages'
+    ? planSteps.find((item) => item.id === step.id)?.args.query
+    : undefined;
 
   return (
     <div
@@ -604,7 +608,7 @@ function ReceiptCard({
           <MyJiraReceiptMetrics step={step} />
           <GitHubReceiptMetrics step={step} />
           <SlackReceiptMetrics step={step} />
-          <TelegramReceiptMetrics step={step} />
+          <TelegramReceiptMetrics step={step} searched={Boolean(typeof telegramQuery === 'string' ? telegramQuery.trim() : telegramQuery)} />
           <CalendarReceiptMetrics step={step} />
           <GmailReceiptMetrics step={step} />
         </div>

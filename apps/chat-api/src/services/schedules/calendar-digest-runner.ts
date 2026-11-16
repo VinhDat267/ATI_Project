@@ -704,11 +704,18 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
       }
       signal.throwIfAborted();
       const marked = await options.pool.query(
-        `UPDATE schedule_runs r SET delivery_started_at=now(), updated_at=now()
+        `UPDATE schedule_runs r SET delivery_started_at=now(), updated_at=now(),
+             dispatched_config=COALESCE(r.dispatched_config, $4::jsonb),
+             dispatched_config_hash=COALESCE(r.dispatched_config_hash, $5)
          FROM schedules s WHERE r.id=$1 AND r.schedule_id=s.id AND s.id=$2
-           AND r.status='planning' AND r.delivery_started_at IS NULL
-           AND s.version=$3 AND s.status IN ('active', 'completed') RETURNING r.id`,
-        [run.runId, run.scheduleId, run.scheduleVersion],
+           AND r.status='planning' AND r.delivery_started_at IS NULL AND r.schedule_version=$3
+           AND s.version=$3 AND s.kind='calendar_digest' AND s.user_id=$6
+           AND s.digest_config=$4::jsonb AND s.digest_config_hash=$5
+           AND (s.status='active' OR (s.status='completed' AND s.recurrence->>'type'='once'))
+           AND (r.dispatched_config IS NULL OR r.dispatched_config=$4::jsonb)
+           AND (r.dispatched_config_hash IS NULL OR r.dispatched_config_hash=$5)
+         RETURNING r.id`,
+        [run.runId, run.scheduleId, run.scheduleVersion, JSON.stringify(config), expectedHash, run.userId],
       );
       if (!marked.rowCount) return { state: 'discarded' };
       deliveryStarted = true;

@@ -75,7 +75,52 @@ export function runState(row: RunRow, now: Date): ScheduleRunState {
 
 const iso = (value: Date | string) => new Date(value).toISOString();
 
-type DeliverySchedule = Pick<ScheduleRow, 'kind' | 'version' | 'digest_config'>;
+type DeliverySchedule = Pick<ScheduleRow, 'kind' | 'version' | 'status' | 'recurrence' | 'digest_config' | 'digest_config_hash'>;
+
+type CalendarOrGithubDigestKind = 'calendar_digest' | 'github_digest';
+
+export function calendarOrGithubDeliveryUnknownKind(
+  run: RunRow,
+  schedule?: Pick<ScheduleRow, 'kind'>,
+): CalendarOrGithubDigestKind | null {
+  if (
+    run.status !== 'needs_attention' ||
+    run.delivery_started_at == null ||
+    run.delivery_resolution != null ||
+    typeof run.error !== 'string'
+  ) {
+    return null;
+  }
+  const markerKind = run.error.includes(CALENDAR_DELIVERY_UNKNOWN)
+    ? 'calendar_digest'
+    : run.error.includes(GITHUB_DELIVERY_UNKNOWN)
+      ? 'github_digest'
+      : null;
+  if (!markerKind) return null;
+
+  const config = run.dispatched_config;
+  if (config && typeof config === 'object' && run.dispatched_config_hash) {
+    // Keep these shape checks aligned with startup reconciliation.
+    if ('source' in config && config.source === 'mycalendar' &&
+        'version' in config && config.version === 1 &&
+        'calendars' in config && Array.isArray(config.calendars)) {
+      return 'calendar_digest';
+    }
+    if ('githubUserId' in config && typeof config.githubUserId === 'string' &&
+        'repos' in config && Array.isArray(config.repos)) {
+      return 'github_digest';
+    }
+  }
+  return schedule?.kind === markerKind ? markerKind : null;
+}
+
+export function matchesDispatchedDigestConfig(run: RunRow, schedule: DeliverySchedule): boolean {
+  return run.schedule_version === schedule.version &&
+    schedule.digest_config != null &&
+    typeof schedule.digest_config === 'object' &&
+    Boolean(schedule.digest_config_hash) &&
+    (run.dispatched_config_hash == null || run.dispatched_config_hash === schedule.digest_config_hash);
+}
 
 export function isNotionDeliveryUnknown(run: RunRow, schedule?: DeliverySchedule): boolean {
   if (
@@ -114,6 +159,12 @@ export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): Sc
     deliveryResolvedAt: row.delivery_resolved_at ? iso(row.delivery_resolved_at) : null,
     deliveryFollowupRunId: row.delivery_followup_run_id ?? null,
   };
+  const unknownKind = calendarOrGithubDeliveryUnknownKind(row, schedule);
+  if (schedule && unknownKind) {
+    view.canRetryDelivery = schedule.kind === unknownKind &&
+      (schedule.status === 'active' || (schedule.status === 'completed' && schedule.recurrence.type === 'once')) &&
+      matchesDispatchedDigestConfig(row, schedule);
+  }
   return view;
 }
 

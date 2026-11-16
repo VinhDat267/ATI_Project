@@ -1,29 +1,14 @@
-import type pg from 'pg';
+import type { TelegramUpdateClient } from './update-inbox.js';
 import { decryptCredentials } from '@wap/tool-adapters';
 import { normalizeTelegramChatId, TELEGRAM_CHAT_ID_PATTERN } from '@wap/tool-schemas';
 
-const ALLOWLIST_CACHE_TTL_MS = 60_000;
-const allowlistCache = new WeakMap<pg.Pool, { chats: Set<string>; expiresAt: number }>();
-
-export function invalidateTelegramAllowlistCache(pool?: pg.Pool): void {
-  if (pool) {
-    allowlistCache.delete(pool);
-  }
-}
-
 export async function loadActiveTelegramChatAllowlist(
-  pool: pg.Pool,
+  db: TelegramUpdateClient,
   encryptionKey: string,
 ): Promise<Set<string>> {
-  const now = Date.now();
-  const cached = allowlistCache.get(pool);
-  if (cached && cached.expiresAt > now) {
-    return new Set(cached.chats);
-  }
-
-  const res = await pool.query<{ config: string }>(
+  const res = await db.query<{ config: string }>(
     `SELECT config FROM service_credentials
-     WHERE service = 'telegram' AND user_id IS NOT NULL AND status = 'active'`,
+     WHERE service = 'telegram' AND user_id IS NOT NULL AND workspace_id IS NULL AND status = 'active'`,
   );
 
   const chats = new Set<string>();
@@ -49,6 +34,5 @@ export async function loadActiveTelegramChatAllowlist(
     }
   }
 
-  allowlistCache.set(pool, { chats, expiresAt: now + ALLOWLIST_CACHE_TTL_MS });
-  return new Set(chats);
+  return chats;
 }

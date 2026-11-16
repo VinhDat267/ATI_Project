@@ -25,7 +25,6 @@ export class TelegramUpdateRepo implements TelegramUpdateStore {
       const now = Date.now();
       // Remove expired IDs before upserting: Telegram may reuse an ID after idle.
       await client.query('DELETE FROM telegram_update_inbox WHERE expires_at<=$1', [new Date(now)]);
-      await client.query('DELETE FROM telegram_chat_messages WHERE expires_at<=$1', [new Date(now)]);
       let next = offset;
       for (const update of batch) {
         if (!Number.isSafeInteger(update.update_id) || update.update_id < 0) throw new Error('Invalid Telegram update ID');

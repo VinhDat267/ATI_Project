@@ -10,6 +10,7 @@ import {
   createPersonalJiraAdapter,
   type PersonalJiraAdapterConfig,
   type JiraAccessTokenProvider,
+  type TelegramMessageFilter,
 } from '@wap/tool-adapters';
 import {
   isJiraG2AAllowedTool,
@@ -753,7 +754,7 @@ export class AdapterFactory {
     const messageStore = this.options.telegramMessageStore;
     const messageSource =
       botClient?.pollUpdates && botClient.botKey && messageStore
-        ? async (chatId: string, limit: number, signal?: AbortSignal) => {
+        ? async (chatId: string, limit: number, signal?: AbortSignal, matches?: TelegramMessageFilter) => {
             try {
               await botClient.pollUpdates!(signal ?? AbortSignal.timeout(10_000));
             } catch (err) {
@@ -764,7 +765,8 @@ export class AdapterFactory {
               }
               throw err;
             }
-            return messageStore.list(botClient.botKey!, chatId, limit);
+            signal?.throwIfAborted();
+            return messageStore.list(botClient.botKey!, chatId, limit, new Date(), matches, signal);
           }
         : undefined;
 

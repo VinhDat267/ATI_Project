@@ -1,4 +1,4 @@
-import { TELEGRAM_CHAT_ID_PATTERN, normalizeTelegramChatId } from '@wap/tool-schemas';
+import { TELEGRAM_CHAT_ID_PATTERN, TELEGRAM_MESSAGE_RETENTION_MS, normalizeTelegramChatId } from '@wap/tool-schemas';
 import { BaseAdapter, StepError, type BaseAdapterConfig, type ErrorCategory } from '../base-adapter.js';
 import { GlobalRateLimiter, waitWithSignal } from '../rate-limiter.js';
 
@@ -16,12 +16,14 @@ export interface TelegramChatMessage {
   date: number;
 }
 
+export type TelegramMessageFilter = (message: TelegramChatMessage) => boolean;
+
 export interface TelegramAdapterConfig extends BaseAdapterConfig {
   credentials: { botToken: string };
   baseUrl?: string;
   telegramUserId?: string;
   knownChats?: TelegramKnownChat[];
-  messageSource?: (chatId: string, limit: number, signal?: AbortSignal) => Promise<TelegramChatMessage[]>;
+  messageSource?: (chatId: string, limit: number, signal?: AbortSignal, matches?: TelegramMessageFilter) => Promise<TelegramChatMessage[]>;
   fetchFn?: typeof fetch;
   chatRateLimiter?: GlobalRateLimiter;
   groupRateLimiter?: GlobalRateLimiter;
@@ -168,15 +170,19 @@ export class TelegramAdapter extends BaseAdapter {
       };
 
       const rawQuery = typeof args.query === 'string' ? args.query.trim() : '';
-      const foldedQuery = rawQuery ? foldVietnamese(rawQuery) : '';
+      const foldedQuery = foldVietnamese(rawQuery);
+      const lowerQuery = rawQuery.toLocaleLowerCase();
+      const matches: TelegramMessageFilter | undefined = rawQuery
+        ? ({ text, senderName }) => [text, senderName].some(value =>
+          value.toLocaleLowerCase().includes(lowerQuery) || foldVietnamese(value).includes(foldedQuery))
+        : undefined;
       const limit = args.limit ?? 10;
 
       if (record(rawChat) && record(rawChat.pinned_message)) {
         addMessage(rawChat.pinned_message);
       }
       if (this.messageSource) {
-        const fetchLimit = rawQuery ? Math.max(limit * 10, 100) : limit;
-        const stored = await this.messageSource(id, fetchLimit, signal);
+        const stored = await this.messageSource(id, limit, signal, matches);
         for (const item of Array.isArray(stored) ? stored : []) {
           if (!item || !integer(item.messageId, 1) || !integer(item.date) || typeof item.chatId !== 'string' || typeof item.text !== 'string') {
             continue;
@@ -191,13 +197,9 @@ export class TelegramAdapter extends BaseAdapter {
         }
       }
 
+      const cutoff = Date.now() - TELEGRAM_MESSAGE_RETENTION_MS;
       const messages = [...byId.values()]
-        .filter(item => {
-          if (!rawQuery) return true;
-          if (item.text.toLocaleLowerCase().includes(rawQuery.toLocaleLowerCase())) return true;
-          if (item.senderName.toLocaleLowerCase().includes(rawQuery.toLocaleLowerCase())) return true;
-          return foldVietnamese(item.text).includes(foldedQuery) || foldVietnamese(item.senderName).includes(foldedQuery);
-        })
+        .filter(item => item.date * 1000 > cutoff && (!matches || matches(item)))
         .sort((a, b) => b.date - a.date || b.messageId - a.messageId)
         .slice(0, limit);
 

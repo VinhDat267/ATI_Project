@@ -16,14 +16,16 @@ function setup(responses: unknown[], options: Record<string, unknown> = {}) {
 }
 const validate = (raw: string, options: unknown) => (validator as any).validateAnswer(raw, options);
 describe('ANS-01 read answers', () => {
-  it('keeps the off prompt and search envelope byte-identical to the registered baseline', () => {
+  it('preserves plan mode and the search envelope when read answers are disabled', () => {
     const date = { now: new Date('2026-10-14T00:00:00Z'), timeZone: 'Asia/Ho_Chi_Minh' };
     const hash = (s: string) => createHash('sha256').update(s).digest('hex');
-    const offPrompt = buildSystemPrompt(ALL_TOOLS, date, { search: true, readAnswers: false });
+    const options = { search: true, readAnswers: false };
+    const offPrompt = buildSystemPrompt(ALL_TOOLS, date, options);
     expect(offPrompt).toBe(buildSystemPrompt(ALL_TOOLS, date, { search: true }));
-    // GitHub v3 + Notion v3 update tool schemas and add provider-specific rules.
-    expect(hash(offPrompt))
-      .toBe('f2e78729a244883cefc60091592040158df30bcd35f517c0d9abd7da86f57a64');
+    // Main's byte-for-byte baseline for the catalog without Telegram. Telegram rules have dedicated coverage.
+    const nonTelegramTools = ALL_TOOLS.filter((tool) => tool.service !== 'telegram');
+    expect(hash(buildSystemPrompt(nonTelegramTools, date, options)))
+      .toBe('7b1ab0a2fefd7dc90e997937f218c09329fcc414152ae950cc2d0380b34b0f7a');
     expect(hash(formatSearchResults([{ tool: 'slack.search_channels', args: { query: 'frontend' }, result: [] }])))
       .toBe('1edfb5917d31a91aa046dca5ea220a6c131deed29412fa206df107eb32ef9850');
   });

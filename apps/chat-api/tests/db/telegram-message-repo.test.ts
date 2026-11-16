@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
@@ -19,6 +19,56 @@ describe('TelegramMessageRepo on PostgreSQL', () => {
 
   afterAll(async () => {
     await db?.close();
+  });
+
+  it('searches every retained message before limiting results', async () => {
+    const now = new Date('2026-11-16T08:00:00Z');
+    const sentAt = Math.floor(now.getTime() / 1000) - 10 * 60;
+    const botKey = 'search-bot';
+    const chatId = '-1001234567890';
+    await repo.upsertMany(botKey, [
+      { chatId, messageId: 1, senderName: 'An', text: 'Đối soát 100%_xong', date: sentAt },
+      ...Array.from({ length: 200 }, (_, i) => ({
+        chatId, messageId: i + 2, senderName: 'An', text: 'Khong khop', date: sentAt + i + 1,
+      })),
+    ], now);
+
+    expect(await repo.list(botKey, chatId, 1, now, ({ text }) => text.includes('100%_xong')))
+      .toMatchObject([{ messageId: 1 }]);
+    expect(await repo.list(botKey, chatId, 1, now, ({ text }) => text.includes('100% xong'))).toEqual([]);
+  });
+
+  it('clears legacy expired rows in the background without polling Telegram', async () => {
+    const botKey = 'cleanup-bot';
+    const now = new Date();
+    const chatId = '-1001234567890';
+    await db.pool.query('INSERT INTO telegram_update_cursors(bot_key) VALUES ($1)', [botKey]);
+    await db.pool.query(
+      'INSERT INTO telegram_chat_messages VALUES ($1, $2, 1, $3, $4, $5, $6)',
+      [botKey, chatId, 'An', 'Old row', new Date(now.getTime() - 25 * 60 * 60_000), new Date(now.getTime() + 60_000)],
+    );
+    const purge = vi.spyOn(repo, 'purgeExpired');
+    const onError = vi.fn();
+    const stop = repo.startCleanup(onError, 50);
+    try {
+      expect(purge).toHaveBeenCalledOnce();
+      await purge.mock.results[0]?.value;
+      expect((await db.pool.query('SELECT * FROM telegram_chat_messages WHERE bot_key = $1', [botKey])).rows)
+        .toEqual([]);
+
+      await db.pool.query(
+        'INSERT INTO telegram_chat_messages VALUES ($1, $2, 2, $3, $4, $5, $6)',
+        [botKey, chatId, 'An', 'Expired row', new Date(now.getTime() - 25 * 60 * 60_000), now],
+      );
+      await vi.waitFor(async () => {
+        expect((await db.pool.query('SELECT * FROM telegram_chat_messages WHERE bot_key = $1', [botKey])).rows)
+          .toEqual([]);
+      });
+      expect(onError).not.toHaveBeenCalled();
+    } finally {
+      stop();
+      purge.mockRestore();
+    }
   });
 
   it('inserts, lists newest first, overwrites edited_message, filters/purges expired rows, and keeps migration idempotent', async () => {
@@ -53,7 +103,7 @@ describe('TelegramMessageRepo on PostgreSQL', () => {
       { chatId, messageId: 10, senderName: 'An', text: 'Tin cũ nhất', date: 1794815000 },
     ]);
 
-    // Edited message overwrites text & refreshes TTL
+    // Edits replace the text without resetting the original expiry.
     const tEdit = new Date(t0.getTime() + 12 * 60 * 60_000);
     await repo.upsertMany(
       botKey,
@@ -66,15 +116,19 @@ describe('TelegramMessageRepo on PostgreSQL', () => {
       { chatId, messageId: 11, senderName: 'Bình', text: 'Tin mới hơn', date: 1794815500 },
     ]);
 
-    // After 25h from t0, messages 11 and 13 expire while edited message 10 (refreshed at t0+12h -> expires at t0+36h) stays
-    const tAfter25h = new Date(t0.getTime() + 25 * 60 * 60_000);
-    expect(await repo.list(botKey, chatId, 10, tAfter25h)).toEqual([
-      { chatId, messageId: 10, senderName: 'An', text: 'Tin đã sửa', date: 1794815000 },
-    ]);
+    const expiry = new Date((1794815000 + 24 * 60 * 60) * 1000);
+    expect(await repo.list(botKey, chatId, 10, expiry)).toMatchObject([{ messageId: 13 }, { messageId: 11 }]);
 
-    expect(await repo.purgeExpired(tAfter25h)).toBe(3);
+    // A delayed update or an edit after expiry cannot resurrect the original message.
+    const tAfter25h = new Date(t0.getTime() + 25 * 60 * 60_000);
+    await repo.upsertMany(botKey, [
+      { chatId, messageId: 10, senderName: 'An', text: 'Late edit', date: 1794815000 },
+      { chatId, messageId: 20, senderName: 'An', text: 'Delayed update', date: 1794815000 },
+    ], tAfter25h);
+    expect(await repo.list(botKey, chatId, 10, tAfter25h)).toEqual([]);
+    await repo.purgeExpired(tAfter25h);
     expect(
       (await db.pool.query('SELECT message_id FROM telegram_chat_messages WHERE bot_key = $1', [botKey])).rows,
-    ).toEqual([{ message_id: '10' }]);
+    ).toEqual([]);
   });
 });

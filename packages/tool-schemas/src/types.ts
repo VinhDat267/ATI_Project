@@ -782,6 +782,8 @@ export interface ScheduleRunView {
   delivery?: SheetsDigestDelivery | CalendarDigestDelivery | GithubDigestDelivery | TelegramDigestDelivery | TrelloDigestDelivery | NotionDigestDelivery | null;
   deliveryStartedAt?: string | null;
   deliveryResolution?: ScheduleRunDeliveryResolution | null;
+  /** The current schedule and dispatched configuration permit a confirmed resend for this run. */
+  canRetryDelivery?: boolean;
   deliveryResolvedAt?: string | null;
   deliveryFollowupRunId?: string | null;
 }

@@ -34,9 +34,7 @@ import { MessageRepo } from '../../db/repositories/message-repo.js';
 import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
 import { calendarDigestCandidateMatches, computeCalendarDigestHash, evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js';
-import { isNotionDeliveryUnknown, runState, runView } from './run-state.js';
-import { CALENDAR_DELIVERY_UNKNOWN } from './calendar-digest-runner.js';
-import { GITHUB_DELIVERY_UNKNOWN } from './github-digest-runner.js';
+import { calendarOrGithubDeliveryUnknownKind, isNotionDeliveryUnknown, matchesDispatchedDigestConfig, runState, runView } from './run-state.js';
 import { nextOccurrence, nextRuns } from './next-occurrence.js';
 import { captureScheduleArtifact, guardScheduleArtifact, prelockScheduleArtifacts, registerScheduleFields, scheduleRegistry, scheduleSourceContext, tagScheduleContext } from '../slack/slack-schedule-lineage.js';
 import { messageOutputSelectors } from '../slack/slack-message-selectors.js';
@@ -2072,19 +2070,6 @@ export class ScheduleService {
       // Canonical lock order: c -> s -> u/wm -> r -> r.conv_id
       const schedule = await this.lockSchedule(client, meta.schedule_id, userId, scope);
       if (!schedule) throw new ScheduleNotFound();
-      if (
-        schedule.kind !== 'sheets_digest' &&
-        schedule.kind !== 'trello_digest' &&
-        schedule.kind !== 'telegram_digest' &&
-        schedule.kind !== 'notion_digest' &&
-        schedule.kind !== 'calendar_digest' &&
-        schedule.kind !== 'github_digest'
-      ) {
-        throw new ScheduleConflict(
-          'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
-          'Chỉ lượt chạy báo cáo tự động hỗ trợ xử lý trạng thái gửi không xác định.',
-        );
-      }
       if (schedule.status === 'cancelled') {
         throw new ScheduleConflict('SCHEDULE_CLOSED');
       }
@@ -2132,13 +2117,8 @@ export class ScheduleService {
         typeof run.error === 'string' &&
         run.error.trim().length > 0;
       const isNotionUnknown = isNotionDeliveryUnknown(run, schedule);
-      const isCalendarOrGithubUnknown =
-        run.status === 'needs_attention' &&
-        run.delivery_started_at != null &&
-        typeof run.error === 'string' &&
-        ((schedule.kind === 'calendar_digest' && run.error.includes(CALENDAR_DELIVERY_UNKNOWN)) ||
-          (schedule.kind === 'github_digest' && run.error.includes(GITHUB_DELIVERY_UNKNOWN)));
-      if (!isSheetsUnknown && !isTrelloOrTelegramUnknown && !isNotionUnknown && !isCalendarOrGithubUnknown) {
+      const unknownDigestKind = calendarOrGithubDeliveryUnknownKind(run, schedule);
+      if (!isSheetsUnknown && !isTrelloOrTelegramUnknown && !isNotionUnknown && !unknownDigestKind) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
           'Lượt chạy này không ở trạng thái chờ xác nhận kết quả gửi.',
@@ -2149,8 +2129,9 @@ export class ScheduleService {
       const targetConvId = run.conv_id ?? schedule.conv_id;
 
       if (resolution === 'mark_sent') {
+        const deliveryKind = unknownDigestKind ?? schedule.kind;
         let deliveryPayload: Record<string, unknown>;
-        if (schedule.kind === 'sheets_digest') {
+        if (deliveryKind === 'sheets_digest') {
           const prevDelivery =
             run.delivery && typeof run.delivery === 'object'
               ? (run.delivery as Partial<SheetsDigestDelivery>)
@@ -2237,7 +2218,7 @@ export class ScheduleService {
             },
           };
           deliveryPayload = delivery as unknown as Record<string, unknown>;
-        } else if (schedule.kind === 'trello_digest') {
+        } else if (deliveryKind === 'trello_digest') {
           const cfg =
             run.dispatched_config && typeof run.dispatched_config === 'object'
               ? (run.dispatched_config as unknown as TrelloDigestConfig)
@@ -2256,7 +2237,7 @@ export class ScheduleService {
             resolvedAtIso,
             resolvedBy: userId,
           });
-        } else if (schedule.kind === 'notion_digest') {
+        } else if (deliveryKind === 'notion_digest') {
           const cfg =
             run.dispatched_config && typeof run.dispatched_config === 'object'
               ? (run.dispatched_config as unknown as NotionDigestConfig)
@@ -2288,7 +2269,7 @@ export class ScheduleService {
             },
           };
           deliveryPayload = delivery as unknown as Record<string, unknown>;
-        } else if (schedule.kind === 'calendar_digest') {
+        } else if (deliveryKind === 'calendar_digest') {
           const cfg =
             run.dispatched_config && typeof run.dispatched_config === 'object'
               ? (run.dispatched_config as unknown as CalendarDigestConfig)
@@ -2334,7 +2315,7 @@ export class ScheduleService {
             },
           };
           deliveryPayload = delivery;
-        } else if (schedule.kind === 'github_digest') {
+        } else if (deliveryKind === 'github_digest') {
           const cfg =
             run.dispatched_config && typeof run.dispatched_config === 'object'
               ? (run.dispatched_config as unknown as GithubDigestConfig)
@@ -2448,6 +2429,9 @@ export class ScheduleService {
       }
 
       // Branch B: resolution === 'retry_new_run' with confirmDuplicateRisk === true
+      if (unknownDigestKind && schedule.kind !== unknownDigestKind) {
+        throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
+      }
       if (schedule.kind === 'sheets_digest') {
         await this.assertSheetsDigestCanResumeInTx(client, schedule);
         if (schedule.status !== 'active') {
@@ -2462,7 +2446,9 @@ export class ScheduleService {
             this.isReauthPauseReason(schedule) ? 'REAUTHORIZATION_REQUIRED' : 'SCHEDULE_PAUSED',
           );
         }
-        if (schedule.status !== 'active') {
+        const isCompletedOneTimeRecovery = schedule.status === 'completed' &&
+          schedule.recurrence.type === 'once' && unknownDigestKind !== null;
+        if (schedule.status !== 'active' && !isCompletedOneTimeRecovery) {
           throw new ScheduleConflict('SCHEDULE_CLOSED');
         }
         if (
@@ -2523,6 +2509,9 @@ export class ScheduleService {
           }
           await this.assertNotionSourceInTx(client, schedule);
         } else if (schedule.kind === 'calendar_digest' || schedule.kind === 'github_digest') {
+          if (!matchesDispatchedDigestConfig(run, schedule)) {
+            throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
+          }
           const credIds: string[] = [];
           if (schedule.kind === 'calendar_digest') {
             const cfg = schedule.digest_config as unknown as CalendarDigestConfig;
