@@ -14,6 +14,7 @@ import {
   JIRA_LLM_EGRESS_DISABLED_IN_G2A,
   MYJIRA_G2A_TOOLS,
   MYJIRA_SERVICE,
+  NOTION_OAUTH_TOOLS,
   type CalendarDigestCandidate,
   type GmailWriteSource,
   type PersonalSpreadsheetItem,
@@ -57,6 +58,8 @@ import type { JiraPolicyService } from './jira/jira-policy-service.js';
 import { validateJiraApprovalBinding } from './jira/jira-approval-guard.js';
 
 /** Drop server-owned fields from model plans and history sent back to the model. */
+const PERSONAL_NOTION_TOOL_NAMES = new Set(NOTION_OAUTH_TOOLS.map((tool) => tool.name));
+
 function withoutConnections(plan: PlanResponse): PlanResponse {
   const { connections: _ignored, ...rest } = plan;
   if (!Array.isArray(rest.steps)) return rest;
@@ -1370,158 +1373,173 @@ export class ChatService {
     }
 
     if (usesNotion) {
-      const notion = await this.notionConnection?.(userId);
-      const usesPersonalOnlyNotion = bound.steps.some(
-        (step) => step.tool === 'notion.get_page' || step.tool === 'notion.update_page',
-      );
-      if (notion?.status === 'reconnect_required') {
-        unavailableServices.push({ id: 'notion', name: 'Notion' });
-        reasons.push('Tài khoản của bạn chưa Kết nối Notion hoặc cần kết nối lại.');
-      } else if (!notion || notion.status === 'not_connected') {
+      const conv = conversationId && this.convRepo ? await this.convRepo.getConversation(conversationId) : null;
+      const isOrgConv = conv?.workspace_mode === 'organization' || Boolean(conv?.workspace_id);
+      const usesPersonalOnlyNotion = bound.steps.some((step) => PERSONAL_NOTION_TOOL_NAMES.has(step.tool));
+      if (isOrgConv) {
         if (usesPersonalOnlyNotion) {
           unavailableServices.push({ id: 'notion', name: 'Notion' });
-          reasons.push('Tài khoản của bạn chưa Kết nối Notion hoặc cần kết nối lại.');
+          reasons.push('Công cụ Notion cá nhân chỉ khả dụng ở Không gian cá nhân.');
         }
-      } else if (notion.status === 'needs_scope' || !notion.connection) {
-        return {
-          kind: 'refusal',
-          reason: 'Bạn chưa chọn database Notion nào được phép sử dụng.',
-          suggestion: 'Hãy chọn ít nhất một database Notion trong trang Kết nối dịch vụ.',
-          unavailableServices: [{ id: 'notion', name: 'Notion' }],
-        };
       } else {
-        const selectedDbs: Array<{ id: string; title: string; url?: string }> = Array.isArray(notion.selectedDatabases)
-          ? notion.selectedDatabases
-          : Array.isArray(notion.connection.databases)
-            ? notion.connection.databases
-            : [];
-        onNotionDatabases?.(selectedDbs);
-
-        const allowedDbSet = new Set<string>(
-          (notion.connection.databaseIds as string[]).map((id: string) => id.toLowerCase()),
-        );
-        const normNotion = (s: string) =>
-          s
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[đĐ]/g, 'd')
-            .toLowerCase()
-            .trim();
-        const allEntities = memory ? memory.getAll() : {};
-        const observedDbs = [
-          ...(Array.isArray(allEntities.database)
-            ? allEntities.database
-            : allEntities.database
-              ? [allEntities.database]
-              : []),
-          ...(Array.isArray((allEntities.__observed as any)?.database)
-            ? (allEntities.__observed as any).database
-            : []),
-        ];
-
-        const matchSelectedDatabase = (rawQuery: string): string | undefined => {
-          const trimmed = rawQuery.trim();
-          if (!trimmed) {
-            return notion.connection.databaseIds.length === 1
-              ? notion.connection.databaseIds[0]
-              : undefined;
+        const notion = await this.notionConnection?.(userId);
+        if (notion?.status === 'reconnect_required') {
+          unavailableServices.push({ id: 'notion', name: 'Notion' });
+          reasons.push('Tài khoản của bạn chưa Kết nối Notion hoặc cần kết nối lại.');
+        } else if (!notion || notion.status === 'not_connected') {
+          if (usesPersonalOnlyNotion) {
+            unavailableServices.push({ id: 'notion', name: 'Notion' });
+            reasons.push('Tài khoản của bạn chưa Kết nối Notion hoặc cần kết nối lại.');
           }
-          const extracted = extractNotionDatabaseId(trimmed);
-          if (extracted) return extracted;
-          const qNorm = normNotion(trimmed);
-          const byTitle = selectedDbs.find((d) => {
-            const tNorm = normNotion(d.title || '');
-            return Boolean(tNorm && (tNorm.includes(qNorm) || qNorm.includes(tNorm)));
-          });
-          if (byTitle) return byTitle.id;
-          const byObs = observedDbs.find((d: any) => {
-            const did = extractNotionDatabaseId(d?.id);
-            if (!did) return false;
-            const tNorm = normNotion(String(d?.title ?? d?.name ?? ''));
-            return Boolean(tNorm && (tNorm.includes(qNorm) || qNorm.includes(tNorm)));
-          });
-          if (byObs) return extractNotionDatabaseId(byObs.id) ?? undefined;
-          return undefined;
-        };
-
-        const stepDbMap = new Map<string, string>();
-        let forbiddenDbId: string | null = null;
-        for (const step of bound.steps) {
-          if (!step.tool.startsWith('notion.')) continue;
-          if (step.tool === 'notion.search_databases') {
-            const q = typeof step.args?.query === 'string' ? step.args.query : '';
-            const matched = matchSelectedDatabase(q);
-            if (matched) {
-              step.databaseId = matched;
-              stepDbMap.set(step.id, matched);
-            }
-            continue;
-          }
-          if (step.tool !== 'notion.query_database' && step.tool !== 'notion.create_page') {
-            continue;
-          }
-
-          let targetDbId: string | undefined;
-          const rawDbArg = step.args?.databaseId;
-          let isRefArg = false;
-          if (typeof rawDbArg === 'string') {
-            const trimmed = rawDbArg.trim();
-            if (trimmed.startsWith('$')) {
-              isRefArg = true;
-              const refStepId = trimmed.slice(1).split('.')[0]?.replace(/\[\d+\]$/, '');
-              targetDbId = refStepId && stepDbMap.has(refStepId) ? stepDbMap.get(refStepId) : undefined;
-            } else if (trimmed) {
-              targetDbId = matchSelectedDatabase(trimmed) ?? trimmed;
-            }
-          } else if (typeof rawDbArg === 'object' && rawDbArg !== null && '$ref' in rawDbArg) {
-            isRefArg = true;
-            const ref = (rawDbArg as any).$ref;
-            const refStepId =
-              typeof ref === 'string' ? ref.replace(/^\$/, '').split('.')[0]?.replace(/\[\d+\]$/, '') : undefined;
-            if (refStepId && stepDbMap.has(refStepId)) {
-              targetDbId = stepDbMap.get(refStepId);
-            }
-          }
-
-          if (!targetDbId && observedDbs.length === 1) {
-            const obsId = extractNotionDatabaseId(observedDbs[0]?.id);
-            if (obsId) targetDbId = obsId;
-          }
-          if (!targetDbId && notion.connection.databaseIds.length === 1) {
-            targetDbId = notion.connection.databaseIds[0];
-          }
-
-          if (targetDbId) {
-            step.databaseId = targetDbId;
-            stepDbMap.set(step.id, targetDbId);
-            if (!isRefArg) {
-              step.args = { ...(step.args ?? {}), databaseId: targetDbId };
-            }
-            if (!allowedDbSet.has(targetDbId.toLowerCase())) {
-              forbiddenDbId = targetDbId;
-              break;
-            }
-          }
-        }
-
-        if (forbiddenDbId) {
+        } else if (notion.status === 'needs_scope' || !notion.connection) {
           return {
             kind: 'refusal',
-            reason: `Database Notion (${forbiddenDbId}) không nằm trong phạm vi bạn đã chọn.`,
-            suggestion: 'Hãy chọn thêm database này trong trang Kết nối dịch vụ, rồi thử lại.',
+            reason: 'Bạn chưa chọn database Notion nào được phép sử dụng.',
+            suggestion: 'Hãy chọn ít nhất một database Notion trong trang Kết nối dịch vụ.',
             unavailableServices: [{ id: 'notion', name: 'Notion' }],
           };
-        }
+        } else {
+          const selectedDbs: Array<{ id: string; title: string; url?: string }> = Array.isArray(notion.selectedDatabases)
+            ? notion.selectedDatabases
+            : Array.isArray(notion.connection.databases)
+              ? notion.connection.databases
+              : [];
+          onNotionDatabases?.(selectedDbs);
 
-        notionConn = {
-          credentialId: notion.connection.credentialId,
-          workspaceId: notion.connection.workspaceId,
-          workspaceName: notion.connection.workspaceName,
-          botId: notion.connection.botId,
-          identityVersion: notion.connection.identityVersion,
-          databaseIds: [...notion.connection.databaseIds].sort(),
-          ...(selectedDbs.length > 0 ? { databases: selectedDbs } : {}),
-        };
+          const allowedDbSet = new Set<string>(
+            (notion.connection.databaseIds as string[]).map((id: string) => id.toLowerCase()),
+          );
+          const normNotion = (s: string) =>
+            s
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .replace(/[đĐ]/g, 'd')
+              .toLowerCase()
+              .trim();
+          const allEntities = memory ? memory.getAll() : {};
+          const observedDbs = [
+            ...(Array.isArray(allEntities.database)
+              ? allEntities.database
+              : allEntities.database
+                ? [allEntities.database]
+                : []),
+            ...(Array.isArray((allEntities.__observed as any)?.database)
+              ? (allEntities.__observed as any).database
+              : []),
+          ];
+
+          const matchSelectedDatabase = (rawQuery: string): string | undefined => {
+            const trimmed = rawQuery.trim();
+            if (!trimmed) {
+              return notion.connection.databaseIds.length === 1
+                ? notion.connection.databaseIds[0]
+                : undefined;
+            }
+            const extracted = extractNotionDatabaseId(trimmed);
+            if (extracted) return extracted;
+            const qNorm = normNotion(trimmed);
+            const byTitle = selectedDbs.find((d) => {
+              const tNorm = normNotion(d.title || '');
+              return Boolean(tNorm && (tNorm.includes(qNorm) || qNorm.includes(tNorm)));
+            });
+            if (byTitle) return byTitle.id;
+            const byObs = observedDbs.find((d: any) => {
+              const did = extractNotionDatabaseId(d?.id);
+              if (!did) return false;
+              const tNorm = normNotion(String(d?.title ?? d?.name ?? ''));
+              return Boolean(tNorm && (tNorm.includes(qNorm) || qNorm.includes(tNorm)));
+            });
+            if (byObs) return extractNotionDatabaseId(byObs.id) ?? undefined;
+            return undefined;
+          };
+
+          const stepDbMap = new Map<string, string>();
+          let forbiddenDbId: string | null = null;
+          for (const step of bound.steps) {
+            if (!step.tool.startsWith('notion.')) continue;
+            if (step.tool === 'notion.search_databases') {
+              const q = typeof step.args?.query === 'string' ? step.args.query : '';
+              const matched = matchSelectedDatabase(q);
+              if (matched) {
+                step.databaseId = matched;
+                stepDbMap.set(step.id, matched);
+              }
+              continue;
+            }
+            if (step.tool === 'notion.search_pages' && step.args?.databaseId === undefined) {
+              continue;
+            }
+            if (
+              step.tool !== 'notion.query_database' &&
+              step.tool !== 'notion.create_page' &&
+              step.tool !== 'notion.get_database' &&
+              step.tool !== 'notion.search_pages'
+            ) {
+              continue;
+            }
+
+            let targetDbId: string | undefined;
+            const rawDbArg = step.args?.databaseId;
+            let isRefArg = false;
+            if (typeof rawDbArg === 'string') {
+              const trimmed = rawDbArg.trim();
+              if (trimmed.startsWith('$')) {
+                isRefArg = true;
+                const refStepId = trimmed.slice(1).split('.')[0]?.replace(/\[\d+\]$/, '');
+                targetDbId = refStepId && stepDbMap.has(refStepId) ? stepDbMap.get(refStepId) : undefined;
+              } else if (trimmed) {
+                targetDbId = matchSelectedDatabase(trimmed) ?? trimmed;
+              }
+            } else if (typeof rawDbArg === 'object' && rawDbArg !== null && '$ref' in rawDbArg) {
+              isRefArg = true;
+              const ref = (rawDbArg as any).$ref;
+              const refStepId =
+                typeof ref === 'string' ? ref.replace(/^\$/, '').split('.')[0]?.replace(/\[\d+\]$/, '') : undefined;
+              if (refStepId && stepDbMap.has(refStepId)) {
+                targetDbId = stepDbMap.get(refStepId);
+              }
+            }
+
+            if (!targetDbId && observedDbs.length === 1) {
+              const obsId = extractNotionDatabaseId(observedDbs[0]?.id);
+              if (obsId) targetDbId = obsId;
+            }
+            if (!targetDbId && notion.connection.databaseIds.length === 1) {
+              targetDbId = notion.connection.databaseIds[0];
+            }
+
+            if (targetDbId) {
+              step.databaseId = targetDbId;
+              stepDbMap.set(step.id, targetDbId);
+              if (!isRefArg) {
+                step.args = { ...(step.args ?? {}), databaseId: targetDbId };
+              }
+              if (!allowedDbSet.has(targetDbId.toLowerCase())) {
+                forbiddenDbId = targetDbId;
+                break;
+              }
+            }
+          }
+
+          if (forbiddenDbId) {
+            return {
+              kind: 'refusal',
+              reason: `Database Notion (${forbiddenDbId}) không nằm trong phạm vi bạn đã chọn.`,
+              suggestion: 'Hãy chọn thêm database này trong trang Kết nối dịch vụ, rồi thử lại.',
+              unavailableServices: [{ id: 'notion', name: 'Notion' }],
+            };
+          }
+
+          notionConn = {
+            credentialId: notion.connection.credentialId,
+            workspaceId: notion.connection.workspaceId,
+            workspaceName: notion.connection.workspaceName,
+            botId: notion.connection.botId,
+            identityVersion: notion.connection.identityVersion,
+            databaseIds: [...notion.connection.databaseIds].sort(),
+            ...(selectedDbs.length > 0 ? { databases: selectedDbs } : {}),
+          };
+        }
       }
     }
 

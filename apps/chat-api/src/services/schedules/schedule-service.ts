@@ -22,6 +22,7 @@ import {
   type TrelloDigestConfig,
   type TrelloDigestCandidate,
   type NotionDigestConfig,
+  type NotionDigestDelivery,
   type NotionDigestCandidate,
 } from '@wap/tool-schemas';
 import { isSheetsDigestEmitV2Enabled } from '../../config/schedules-runtime.js';
@@ -1975,7 +1976,9 @@ export class ScheduleService {
           (typeof previous.error === 'string' &&
             (previous.error.includes('SHEETS_DELIVERY_UNKNOWN') ||
               previous.error.includes('TELEGRAM_DELIVERY_UNKNOWN') ||
-              previous.error.includes('TRELLO_DELIVERY_UNKNOWN'))) ||
+              previous.error.includes('TRELLO_DELIVERY_UNKNOWN') ||
+              previous.error.includes('NOTION_DELIVERY_UNKNOWN') ||
+              previous.error.includes('Chưa xác định bản tin Notion đã gửi hay chưa'))) ||
           !REPLANNABLE.has(prevState)
         ) {
           throw new ScheduleConflict('RUN_NOT_REPLANNABLE');
@@ -2066,7 +2069,8 @@ export class ScheduleService {
       if (
         schedule.kind !== 'sheets_digest' &&
         schedule.kind !== 'trello_digest' &&
-        schedule.kind !== 'telegram_digest'
+        schedule.kind !== 'telegram_digest' &&
+        schedule.kind !== 'notion_digest'
       ) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
@@ -2119,7 +2123,14 @@ export class ScheduleService {
         run.delivery_started_at != null &&
         typeof run.error === 'string' &&
         run.error.trim().length > 0;
-      if (!isSheetsUnknown && !isTrelloOrTelegramUnknown) {
+      const isNotionUnknown =
+        schedule.kind === 'notion_digest' &&
+        run.status === 'needs_attention' &&
+        run.delivery_started_at != null &&
+        typeof run.error === 'string' &&
+        (run.error.includes('NOTION_DELIVERY_UNKNOWN') ||
+          run.error.includes('Chưa xác định bản tin Notion đã gửi hay chưa'));
+      if (!isSheetsUnknown && !isTrelloOrTelegramUnknown && !isNotionUnknown) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
           'Lượt chạy này không ở trạng thái chờ xác nhận kết quả gửi.',
@@ -2237,6 +2248,38 @@ export class ScheduleService {
             resolvedAtIso,
             resolvedBy: userId,
           });
+        } else if (schedule.kind === 'notion_digest') {
+          const cfg =
+            run.dispatched_config && typeof run.dispatched_config === 'object'
+              ? (run.dispatched_config as unknown as NotionDigestConfig)
+              : schedule.version === run.schedule_version &&
+                  schedule.digest_config &&
+                  typeof schedule.digest_config === 'object'
+                ? (schedule.digest_config as NotionDigestConfig)
+                : null;
+          const prevDelivery =
+            run.delivery && typeof run.delivery === 'object'
+              ? (run.delivery as Partial<NotionDigestDelivery>)
+              : {};
+          const delivery: NotionDigestDelivery = {
+            channelId: prevDelivery.channelId ?? cfg?.channelId ?? 'unknown',
+            channelName: prevDelivery.channelName ?? cfg?.channelName ?? 'unknown',
+            ts: typeof prevDelivery.ts === 'string' && prevDelivery.ts.trim() ? prevDelivery.ts : null,
+            counts: prevDelivery.counts ?? {
+              databasesChecked: Array.isArray(cfg?.databases) ? cfg.databases.length : 0,
+              totalPages: 0,
+            },
+            ...(prevDelivery.truncated ? { truncated: true } : {}),
+            sentAt: typeof prevDelivery.sentAt === 'string' ? prevDelivery.sentAt : resolvedAtIso,
+            manualConfirmedAt: resolvedAtIso,
+            manualResolution: {
+              status: 'confirmed_sent',
+              resolvedAt: resolvedAtIso,
+              manualConfirmedAt: resolvedAtIso,
+              resolvedBy: userId,
+            },
+          };
+          deliveryPayload = delivery as unknown as Record<string, unknown>;
         } else {
           const cfg =
             run.dispatched_config && typeof run.dispatched_config === 'object'
@@ -2379,6 +2422,17 @@ export class ScheduleService {
             }
           }
           await this.assertTelegramDigestCanResumeInTx(client, schedule);
+        } else if (schedule.kind === 'notion_digest') {
+          const cfg = canonicalizeNotionDigestConfig(schedule.digest_config as NotionDigestConfig);
+          const expectedHash = computeNotionDigestConfigHash({
+            config: cfg,
+            recurrence: schedule.recurrence,
+            userId: schedule.user_id,
+          });
+          if (expectedHash !== schedule.digest_config_hash) {
+            throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
+          }
+          await this.assertNotionSourceInTx(client, schedule);
         }
       }
       const busy = await client.query(

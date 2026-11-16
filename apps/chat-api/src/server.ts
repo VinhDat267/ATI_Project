@@ -866,6 +866,7 @@ async function bootstrap() {
     telegramBotClient,
     notionRepo,
     notionTokens,
+    notionApiBaseUrl: env.NOTION_OAUTH?.apiBaseUrl,
     jiraTokens,
     jiraWorkspaceRepo: jiraWorkspaceRepo ?? undefined,
     jiraDispatchGuard,
@@ -975,6 +976,7 @@ async function bootstrap() {
     });
     notionDigestRunnerImpl = createNotionDigestRunner({
       pool,
+      timeZone: env.APP_TIME_ZONE,
       notionSources: notionDigestSources,
       getAdapter: (serviceName, context) => adapterFactory.getAdapterForService(serviceName, context),
     });

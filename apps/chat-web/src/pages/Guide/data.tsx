@@ -668,11 +668,11 @@ export const CAPABILITIES_DATA: Capability[] = [
         name: 'Notion',
         role: 'Không gian tài liệu, Database công việc & Biên bản họp',
         canDo: [
-          'Kết nối OAuth 2.0 1-Click và chuyển đổi linh hoạt giữa nhiều Workspace Notion',
-          'Tìm và truy vấn database theo từ khoá hoặc lọc theo cột trạng thái (Status / Select)',
-          'Đọc chi tiết toàn văn nội dung trang cùng đầy đủ thuộc tính (trạng thái, nhãn chọn, ô đánh dấu, ngày tháng, số liệu)',
-          'Tạo trang mới, nối thêm đoạn văn bản và cập nhật trạng thái hoặc thuộc tính trang',
-          'Lên lịch Bản tin Notion tự động (Auto-Digest) phân loại mục Quá hạn/Bị chặn gửi qua Telegram hoặc Slack'
+          'Kết nối OAuth 2.0 1-Click (tối đa 10 database trong Workspace cá nhân, tách biệt với Tổ chức) và chuyển đổi linh hoạt giữa nhiều Workspace Notion',
+          'Xem cấu trúc cột database, tìm trang xuyên database và truy vấn lọc theo trạng thái, khoảng ngày đến hạn hoặc thứ tự cập nhật',
+          'Đọc chi tiết toàn văn nội dung trang (kèm khối mã nguồn, callout, toggle, bảng, bình luận) và cảnh báo rõ khi kết quả chạm giới hạn tải/phân trang',
+          'Tạo trang mới, nối nội dung Markdown có cấu trúc, cập nhật thuộc tính (cả email/số điện thoại), đưa vào/khôi phục từ thùng rác và thêm bình luận trang',
+          'Lên lịch Bản tin Notion tự động (Auto-Digest) theo dõi Quá hạn/Bị chặn, Sắp đến hạn (48h), Chưa phân công và hỗ trợ xác nhận/gửi bù an toàn'
         ],
         cannotDo: [
           'Truy cập trang hoặc database nằm ngoài danh sách bạn đã cấp quyền',

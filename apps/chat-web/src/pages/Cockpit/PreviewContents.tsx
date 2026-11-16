@@ -765,7 +765,11 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
       : step.tool === 'notion.update_page' ? '✏️ Cập nhật thuộc tính trang'
       : step.tool === 'notion.append_text' || step.tool === 'notion.append_blocks' ? '📝 Nối thêm nội dung trang'
       : step.tool === 'notion.get_page' ? '📖 Đọc chi tiết & nội dung trang'
+      : step.tool === 'notion.get_database' ? '🗂️ Xem cấu trúc cột Database'
+      : step.tool === 'notion.search_pages' ? '🔎 Tìm kiếm trang Notion'
       : step.tool === 'notion.query_database' ? '🔎 Truy vấn Database Notion'
+      : step.tool === 'notion.list_comments' ? '💬 Đọc bình luận trang'
+      : step.tool === 'notion.add_comment' ? '💬 Thêm bình luận vào trang'
       : '📒 Thao tác Notion';
 
     const statusBadgeClass = (val: string) => {
@@ -861,7 +865,7 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
       )}
       {bodyText && (
         <div>
-          <span className="text-[11px] text-neutral-400 uppercase font-semibold">Nội dung văn bản trang:</span>
+          <span className="text-[11px] text-neutral-400 uppercase font-semibold">{step.tool === 'notion.add_comment' ? 'Nội dung bình luận:' : 'Nội dung văn bản trang:'}</span>
           <div className="text-xs text-neutral-800 bg-white p-3 rounded-lg border border-neutral-200 mt-1 whitespace-pre-wrap leading-relaxed">
             {bodyText}
           </div>

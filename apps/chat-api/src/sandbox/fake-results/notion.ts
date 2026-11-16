@@ -29,5 +29,38 @@ export const NOTION_FAKE: FakeService = {
       updatedProperties: Object.keys(args.properties ?? {}),
       ...(typeof args.archived === 'boolean' ? { archived: args.archived } : {}),
     }),
+    'notion.get_database': args => ({
+      id: args.databaseId || databaseId,
+      title: 'ATI Notes',
+      url: 'https://www.notion.so/' + databaseId.replaceAll('-', ''),
+      schema: [{ name: 'Name', type: 'title' }, { name: 'Status', type: 'status', options: ['Not started', 'In progress', 'Done'] }],
+    }),
+    'notion.search_pages': args => ({
+      pages: [{
+        id: pageId,
+        databaseId: args.databaseId || databaseId,
+        title: 'ATI Review',
+        url: pageUrl,
+      }],
+    }),
+    'notion.append_blocks': args => ({
+      pageId: args.pageId || pageId,
+      blockIds: ['33333333-4444-5555-6666-777777777777'],
+      blockCount: 1,
+      url: pageUrl,
+    }),
+    'notion.list_comments': args => ({
+      comments: [{
+        id: '55555555-6666-7777-8888-999999999999',
+        pageId: args.pageId || pageId,
+        author: 'Sandbox User',
+        text: 'Đã kiểm tra xong tài liệu.',
+      }],
+    }),
+    'notion.add_comment': args => ({
+      id: '55555555-6666-7777-8888-999999999999',
+      pageId: args.pageId || pageId,
+      url: pageUrl,
+    }),
   },
 };

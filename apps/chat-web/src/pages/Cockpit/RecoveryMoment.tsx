@@ -112,7 +112,7 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
   const spreadsheetCheckUrl = paused?.status === 'unknown' && ['mysheets.append_rows', 'mysheets.update_rows', 'mysheets.create_sheet', 'sheets.append_rows', 'sheets.update_rows', 'sheets.create_sheet'].includes(planStep?.tool ?? '')
     ? (typeof planStep?.args.spreadsheetId === 'string' && planStep.args.spreadsheetId ? `https://docs.google.com/spreadsheets/d/${encodeURIComponent(planStep.args.spreadsheetId)}/edit` : 'https://docs.google.com/spreadsheets') : undefined;
   const notionWorkspace = snapshot?.plan.connections?.notion?.workspaceName;
-  const notionCheckUrl = paused?.status === 'unknown' && ['notion.create_page', 'notion.update_page', 'notion.append_text', 'notion.append_blocks'].includes(planStep?.tool ?? '')
+  const notionCheckUrl = paused?.status === 'unknown' && ['notion.create_page', 'notion.update_page', 'notion.append_text', 'notion.append_blocks', 'notion.add_comment'].includes(planStep?.tool ?? '')
     ? 'https://www.notion.so' : undefined;
   const trelloUsername = snapshot?.plan.connections?.trello?.username;
   const trelloCheckUrl = moment === 8 && paused?.status === 'unknown' && Boolean(trelloUsername) && ['trello.create_card', 'trello.update_card', 'trello.add_member', 'trello.remove_member', 'trello.add_checklist', 'trello.update_checklist_item', 'trello.add_comment', 'trello.create_list', 'trello.set_card_due_complete'].includes(planStep?.tool ?? '')

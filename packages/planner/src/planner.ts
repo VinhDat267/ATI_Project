@@ -755,7 +755,16 @@ export class AIPlanner {
       const nextPageToken = typeof cursor === 'string' && cursorSchema?.type === 'string' &&
           cursor.length >= (cursorSchema.minLength ?? 1) && cursor.length <= (cursorSchema.maxLength ?? 2048) && !/[\r\n\x00]/.test(cursor)
         ? cursor : undefined;
-      return { tool: tool.name, args, result, ...(nextPageToken ? { nextPageToken } : {}) };
+      const truncated = raw && typeof raw === 'object' && !Array.isArray(raw) &&
+          (raw as Record<string, unknown>).truncated === true
+        ? true : undefined;
+      return {
+        tool: tool.name,
+        args,
+        result,
+        ...(nextPageToken ? { nextPageToken } : {}),
+        ...(truncated ? { truncated: true } : {}),
+      };
     } catch (err: any) {
       onGatherEvent?.({ tool: tool.name, status: 'completed', output: [] });
       return { tool: tool.name, args, error: String(err?.message ?? err).slice(0, 300) };

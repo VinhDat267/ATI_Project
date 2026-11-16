@@ -547,4 +547,49 @@ describe('NotionOAuthClient & extractNotionDatabaseId', () => {
       });
     }
   });
+
+  it('paginates POST /search with data_source filter, stops on repeated cursor, and deduplicates databases', async () => {
+    const db1 = '44444444-5555-6666-7777-888888888888';
+    const db2 = '55555555-6666-7777-8888-999999999999';
+    const bodies: any[] = [];
+    let call = 0;
+    const client = new NotionOAuthClient(cfg, async (_input, init) => {
+      bodies.push(JSON.parse(String(init?.body ?? '{}')));
+      call++;
+      if (call === 1) {
+        return new Response(
+          JSON.stringify({
+            object: 'list',
+            results: [
+              { object: 'data_source', parent: { type: 'database_id', database_id: db1 }, title: [{ plain_text: 'DB 1' }], url: 'https://www.notion.so/db1' },
+            ],
+            has_more: true,
+            next_cursor: 'cur-2',
+          }),
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          object: 'list',
+          results: [
+            { object: 'data_source', parent: { type: 'database_id', database_id: db1 }, title: [{ plain_text: 'DB 1 dup' }], url: 'https://www.notion.so/db1' },
+            { object: 'data_source', parent: { type: 'database_id', database_id: db2 }, title: [{ plain_text: 'DB 2' }], url: 'https://www.notion.so/db2' },
+          ],
+          has_more: true,
+          next_cursor: 'cur-2', // repeated cursor must terminate loop cleanly
+        }),
+      );
+    });
+
+    const res = await client.databases('ntn_tok', 'DB', AbortSignal.timeout(2000));
+    expect(bodies).toEqual([
+      { page_size: 20, filter: { property: 'object', value: 'data_source' }, query: 'DB' },
+      { page_size: 20, filter: { property: 'object', value: 'data_source' }, query: 'DB', start_cursor: 'cur-2' },
+    ]);
+    expect(res.databases).toEqual([
+      { id: db1, title: 'DB 1', url: 'https://www.notion.so/db1' },
+      { id: db2, title: 'DB 2', url: 'https://www.notion.so/db2' },
+    ]);
+    expect(res.hasMore).toBe(false);
+  });
 });

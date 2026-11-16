@@ -398,10 +398,12 @@ export async function getToolCatalogFor(
     }
   }
   const notionLookup =
-    options.notionConnection ??
-    (options.notionConnectionRepo
-      ? createNotionConnectionLookup({ repo: options.notionConnectionRepo })
-      : undefined);
+    options.workspaceMode !== 'organization'
+      ? (options.notionConnection ??
+        (options.notionConnectionRepo
+          ? createNotionConnectionLookup({ repo: options.notionConnectionRepo })
+          : undefined))
+      : undefined;
   if (notionLookup) {
     try {
       const notion = await notionLookup(options.userId);

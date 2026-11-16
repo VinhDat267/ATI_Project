@@ -111,6 +111,11 @@ describe('Notion OAuth tool catalog, ChatService plan binding, and AdapterFactor
       'notion.append_text',
       'notion.get_page',
       'notion.update_page',
+      'notion.get_database',
+      'notion.search_pages',
+      'notion.append_blocks',
+      'notion.list_comments',
+      'notion.add_comment',
     ]);
 
     // 4. ChatService binds connections.notion, resolves natural-language database title, and populates resourceLabels
@@ -466,5 +471,161 @@ describe('Notion OAuth tool catalog, ChatService plan binding, and AdapterFactor
     const bobAfter = await notionRepo.getActive(bob.id, bobSaved.id);
     expect(bobAfter?.status).toBe('active');
     expect(bobAfter?.config).toBeTruthy();
+  });
+
+  it('isolates Organization shared Notion credentials from member personal Notion OAuth connections across catalog, ChatService, and AdapterFactory', async () => {
+    const orgMember = await db.person('org_notion_member');
+    const orgId = '77777777-1111-2222-3333-444444444444';
+    const orgDb = '88888888-1111-2222-3333-444444444444';
+    const personalDb = '99999999-1111-2222-3333-444444444444';
+    const orgDs = 'aaaaaaaa-1111-2222-3333-444444444444';
+
+    await db.pool.query(
+      `INSERT INTO workspaces(id, name, invite_code, require_approval, created_by) VALUES($1, 'Org Workspace', 'NOTION-ORG-TEST-01', true, $2)`,
+      [orgId, orgMember.id],
+    );
+    await db.pool.query(
+      `INSERT INTO workspace_members(workspace_id, user_id, role, status) VALUES($1, $2, 'member', 'active')`,
+      [orgId, orgMember.id],
+    );
+    await credRepo.saveCredentials(
+      'notion',
+      encryptCredentials({ token: 'ntn_org_shared_token', allowedScope: { databases: [orgDb] } }, key),
+      null,
+      orgId,
+    );
+
+    // Give the member a broken personal Notion connection (reconnect_required / needs_scope)
+    await notionRepo.start({
+      userId: orgMember.id,
+      sessionId: orgMember.sid,
+      stateHash: NotionConnectionRepo.hash('s-org-mem'),
+      browserHash: NotionConnectionRepo.hash('b-org-mem'),
+    });
+    const consumed = (await notionRepo.consume({
+      userId: orgMember.id,
+      sessionId: orgMember.sid,
+      state: 's-org-mem',
+      browser: 'b-org-mem',
+    }))!;
+    await notionRepo.save(orgMember.id, consumed.id, {
+      appId: 'notion-app',
+      workspaceId: '12121212-3434-5656-7878-909090909090',
+      workspaceName: 'Member Personal WS',
+      actorId: '23232323-3434-5656-7878-909090909090',
+      botId: '34343434-3434-5656-7878-909090909090',
+      config: encryptCredentials({ accessToken: 'ntn_personal_tok', refreshToken: 'ntn_personal_ref', botId: '34343434-3434-5656-7878-909090909090' }, key),
+      scopes: [],
+    });
+
+    const lookup = createNotionConnectionLookup({ repo: notionRepo });
+    // Organization catalog exposes ONLY shared NOTION_TOOLS (never personal NOTION_OAUTH_TOOLS)
+    const orgCatalog = await getToolCatalogFor(credRepo, key, {
+      userId: orgMember.id,
+      workspaceMode: 'organization',
+      workspaceId: orgId,
+      gmailEnabled: false,
+      notionConnection: lookup,
+    });
+    expect(orgCatalog.filter((t) => t.service === 'notion').map((t) => t.name)).toEqual([
+      'notion.search_databases',
+      'notion.query_database',
+      'notion.create_page',
+      'notion.append_text',
+    ]);
+
+    const orgConv = (
+      await db.pool.query(
+        `INSERT INTO conversations(user_id, workspace_id, workspace_mode, title) VALUES($1, $2, 'organization', 'Org Notion Chat') RETURNING id`,
+        [orgMember.id, orgId],
+      )
+    ).rows[0].id as string;
+
+    const chatService = new ChatService({
+      msgRepo,
+      convRepo,
+      planRepo,
+      notionConnection: lookup,
+      eventEmitter: { emit: () => {} },
+      planner: { processMessage: async () => ({ kind: 'refusal', reason: 'unused' }), routeSchedule: () => ({ services: ['notion'], unavailable: [] }) },
+    });
+
+    // Org shared Notion tool plan succeeds even though member's personal Notion is in needs_scope!
+    const orgPlanAllowed = await (chatService as any).bindConnections(
+      {
+        kind: 'plan',
+        thinking: 'Org shared notion',
+        summary: 'Tạo trang trong workspace tổ chức',
+        warnings: [],
+        steps: [{ id: 's1', tool: 'notion.create_page', description: 'Tạo trang', args: { databaseId: orgDb, title: 'Org Page' }, dependsOn: [] }],
+      },
+      orgMember.id,
+      undefined,
+      undefined,
+      undefined,
+      orgId,
+      undefined,
+      undefined,
+      undefined,
+      orgConv,
+    );
+    expect(orgPlanAllowed.kind).toBe('plan');
+    expect(orgPlanAllowed.connections?.notion).toBeUndefined();
+
+    // Personal-only Notion tool (e.g. notion.append_blocks) is refused inside organization workspace
+    const personalToolInOrg = await (chatService as any).bindConnections(
+      {
+        kind: 'plan',
+        thinking: 'Personal notion tool in org',
+        summary: 'Nối block cá nhân',
+        warnings: [],
+        steps: [{ id: 's1', tool: 'notion.append_blocks', description: 'Nối block', args: { pageId: personalDb, content: 'Hi' }, dependsOn: [] }],
+      },
+      orgMember.id,
+      undefined,
+      undefined,
+      undefined,
+      orgId,
+      undefined,
+      undefined,
+      undefined,
+      orgConv,
+    );
+    expect(personalToolInOrg.kind).toBe('refusal');
+
+    // AdapterFactory in organization mode uses org token (ntn_org_shared_token), NOT personal NotionConnectionRepo!
+    const seenAuthHeaders: string[] = [];
+    const orgFetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      seenAuthHeaders.push(new Headers(init?.headers).get('Authorization') ?? '');
+      const url = String(input);
+      if (url.endsWith(`/databases/${orgDb}`)) {
+        return new Response(JSON.stringify({ object: 'database', id: orgDb, title: [{ plain_text: 'Org DB' }], url: 'https://www.notion.so/orgdb', data_sources: [{ id: orgDs }] }));
+      }
+      if (url.endsWith(`/data_sources/${orgDs}`)) {
+        return new Response(JSON.stringify({ object: 'data_source', id: orgDs, parent: { type: 'database_id', database_id: orgDb }, properties: { Name: { type: 'title' } } }));
+      }
+      return new Response(JSON.stringify({ object: 'list', results: [], has_more: false }));
+    }) as unknown as typeof fetch;
+
+    vi.stubGlobal('fetch', orgFetch);
+    try {
+      const factory = new AdapterFactory({
+        credentialRepo: credRepo,
+        encryptionKey: key,
+        notionRepo,
+        serviceFetchFn: orgFetch,
+      });
+      const orgAdapter = await factory.getAdapterForService('notion', {
+        userId: orgMember.id,
+        workspaceMode: 'organization',
+        workspaceId: orgId,
+        phase: 'execution',
+      });
+      await orgAdapter.execute('notion.query_database', { databaseId: orgDb });
+      expect(seenAuthHeaders.length).toBeGreaterThan(0);
+      expect(seenAuthHeaders.every((h) => h === 'Bearer ntn_org_shared_token')).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

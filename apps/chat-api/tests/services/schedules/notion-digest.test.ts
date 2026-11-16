@@ -7,6 +7,7 @@ import {
 import {
   analyzeNotionDigestPages,
   createNotionDigestRunner,
+  NOTION_DELIVERY_UNKNOWN,
 } from '../../../src/services/schedules/notion-digest-runner.js';
 import { summarizeSourceItems } from '../../../src/services/schedules/telegram-digest-runner.js';
 import { ScheduleService } from '../../../src/services/schedules/schedule-service.js';
@@ -149,6 +150,8 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
         done: 1,
         inProgress: 1,
         overdueOrBlocked: 1,
+        dueSoon: 0,
+        unassigned: 0,
         recentlyUpdated: 1,
       });
       expect(analysis.sortedPages.map((p) => p.page.id)).toEqual([
@@ -157,6 +160,59 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
         'p-done',
       ]);
       expect(analysis.sortedPages[1]?.isRecent24h).toBe(true);
+    });
+
+    it('tracks dueSoon (48h), unassigned active pages, end-of-range dates, timezone boundaries, and Telegram truncated footer', () => {
+      // 2026-11-10T00:30:00+07:00 = 2026-11-09T17:30:00.000Z
+      const nowMs = Date.parse('2026-11-09T17:30:00.000Z');
+      const analysis = analyzeNotionDigestPages(
+        [
+          {
+            databaseId: dbId1,
+            databaseTitle: 'Sprint',
+            id: 'p-soon',
+            title: 'Task đến hạn trong 24h',
+            url: 'https://www.notion.so/p-soon',
+            properties: { Status: 'Todo', Due: '2026-11-10', Assignee: '' },
+          },
+          {
+            databaseId: dbId1,
+            databaseTitle: 'Sprint',
+            id: 'p-range-ok',
+            title: 'Task đang chạy trong khoảng ngày',
+            url: 'https://www.notion.so/p-range-ok',
+            properties: { Status: 'In progress', Due: '2026-11-09 → 2026-11-15', Assignee: 'Minh' },
+          },
+          {
+            databaseId: dbId1,
+            databaseTitle: 'Sprint',
+            id: 'p-done-no-owner',
+            title: 'Task xong không tính chưa phân công',
+            url: 'https://www.notion.so/p-done-no-owner',
+            properties: { Status: 'Done', Due: '2026-11-01', Assignee: '' },
+          },
+        ],
+        nowMs,
+        'Asia/Ho_Chi_Minh',
+      );
+
+      expect(analysis.stats).toEqual({
+        total: 3,
+        done: 1,
+        inProgress: 1,
+        overdueOrBlocked: 0,
+        dueSoon: 1,
+        unassigned: 1,
+        recentlyUpdated: 0,
+      });
+
+      const truncatedTg = summarizeSourceItems('notion', {
+        databaseId: dbId1,
+        pages: [{ id: 'p1', title: 'Mục 1', properties: { Status: 'Open' } }],
+        truncated: true,
+      });
+      expect(truncatedTg.truncated).toBe(true);
+      expect(truncatedTg.lines.some((line) => line.includes('giới hạn 20 trang/database'))).toBe(true);
     });
   });
 
@@ -263,7 +319,7 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       });
 
       const pages = [{ id: 'page1', title: 'Trang Sprint', url: 'https://www.notion.so/page1' }];
-      const sendSlack = vi.fn(async () => ({ ts: '1700000000.009' }));
+      const sendSlack = vi.fn(async () => ({ ts: '1700000000.000009' }));
       const runNotionDigest = vi.fn(createNotionDigestRunner({
         pool: db.pool,
         notionSources: {
@@ -301,8 +357,8 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
       expect(runs[0]!.delivery).toEqual({
         channelId: 'C_DEV',
         channelName: 'dev',
-        ts: '1700000000.009',
-        counts: { databasesChecked: 1, totalPages: 1 },
+        ts: '1700000000.000009',
+        counts: { databasesChecked: 1, totalPages: 1, dueSoon: 0, unassigned: 0 },
       });
     });
 
@@ -406,7 +462,7 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
                   if (tool === 'slack.search_channels') return [{ id: 'C_DEV', name: 'dev' }];
                   if (tool === 'slack.send_message') {
                     slackSendCallsAfterCancel++;
-                    return { ts: '1700000099.009' };
+                    return { ts: '1700000099.000009' };
                   }
                 }),
               };
@@ -428,6 +484,223 @@ describe('Notion Automated Digest (Task 4: notion_digest & Telegram Notion enric
           lockedRun.release();
         }
       }
+    });
+
+    it('preserves truncation footer within 3500-char Slack budget and sets delivery.truncated', async () => {
+      const user = await db.person('NotionDigestTruncOwner');
+      const convRes = await db.pool.query(
+        "INSERT INTO conversations(user_id, status, title) VALUES($1, 'chatting', 'Lịch Notion Trunc') RETURNING id",
+        [user.id]
+      );
+      const convId = convRes.rows[0].id as string;
+
+      const notionBinding = await sourceFor(user.id);
+      const config = {
+        notionBinding,
+        credentialId: notionBinding.credentialId,
+        workspaceId: 'ws-notion-1',
+        workspaceName: 'ATI Notion',
+        botId: 'bot-notion-1',
+        identityVersion: 1,
+        databases: [{ id: dbId1, title: 'Kế hoạch Sprint' }],
+        channelId: 'C_DEV',
+        channelName: 'dev',
+      };
+      const configHash = computeNotionDigestConfigHash({ config, recurrence, userId: user.id });
+      const msgRes = await db.pool.query(
+        "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', 'Đề xuất lịch Notion', $2::jsonb) RETURNING id",
+        [
+          convId,
+          JSON.stringify({
+            type: 'schedule_proposal',
+            proposal: {
+              kind: 'schedule',
+              action: 'create',
+              name: 'Báo cáo Notion Trunc',
+              request: 'Mỗi sáng tổng hợp Sprint',
+              recurrence,
+              summary: 'Tạo lịch báo cáo Notion',
+            },
+            scheduleId: null,
+            baseVersion: null,
+            services: ['notion', 'slack'],
+            nextRuns: ['2026-11-03T01:30:00.000Z'],
+            previous: null,
+            digestCandidate: { canAutoDigest: true, config, configHash },
+          }),
+        ]
+      );
+      const service = new ScheduleService({ pool: db.pool, timeZone: 'Asia/Ho_Chi_Minh' });
+      const confirmed = await service.confirmProposal({
+        userId: user.id,
+        convId,
+        messageId: msgRes.rows[0].id as string,
+        now: new Date('2026-11-02T10:00:00.000Z'),
+        approvalMode: 'auto_digest',
+      });
+
+      const longPages = Array.from({ length: 20 }, (_, i) => ({
+        id: `page-long-${i}`,
+        title: `Trang dài số ${i} ` + 'A'.repeat(110),
+        url: `https://www.notion.so/page-long-${i}`,
+        properties: { Status: 'In Progress', Assignee: '' },
+      }));
+      let postedText = '';
+      const runner = new ScheduleRunner({
+        pool: db.pool,
+        timeZone: 'Asia/Ho_Chi_Minh',
+        now: () => new Date('2026-11-03T01:31:00.000Z'),
+        planRun: async () => {
+          throw new Error('Should not call planRun');
+        },
+        runNotionDigest: createNotionDigestRunner({
+          pool: db.pool,
+          notionSources: {
+            read: async () => ({
+              pages: longPages,
+              pagesByDatabase: new Map([[dbId1, longPages]]),
+              truncated: true,
+              truncatedByDatabase: new Map([[dbId1, true]]),
+              databases: [{ databaseId: dbId1, truncated: true }],
+            }),
+            withSource,
+          },
+          getAdapter: async () => ({
+            execute: async (tool: string, args: any) => {
+              if (tool === 'slack.search_channels') return [{ id: 'C_DEV', name: 'dev' }];
+              postedText = args.text;
+              return { ts: '1700000123.000001' };
+            },
+          }),
+        }),
+        recordState: (client, row, now) => service.recordState(client, row, now),
+      });
+
+      await runner.tick();
+      expect(postedText.length).toBeLessThanOrEqual(3500);
+      expect(postedText).toContain('giới hạn tải 20 trang/database mỗi lượt');
+
+      const runs = await service.listRuns(user.id, confirmed.schedule.id, 5, new Date('2026-11-03T01:32:00.000Z'));
+      expect(runs[0]?.state).toBe('digest_sent');
+      expect(runs[0]?.delivery).toMatchObject({
+        channelId: 'C_DEV',
+        ts: '1700000123.000001',
+        truncated: true,
+        counts: { databasesChecked: 1, totalPages: 20, unassigned: 20 },
+      });
+    });
+
+    it('quarantines malformed Slack receipt into NOTION_DELIVERY_UNKNOWN and resolves via mark_sent & retry_new_run', async () => {
+      const createBadTsSchedule = async (suffix: string) => {
+        const user = await db.person(`NotionRecovery_${suffix}`);
+        const convRes = await db.pool.query(
+          "INSERT INTO conversations(user_id, status, title) VALUES($1, 'chatting', 'Lịch Notion Recovery') RETURNING id",
+          [user.id]
+        );
+        const convId = convRes.rows[0].id as string;
+        const notionBinding = await sourceFor(user.id);
+        const config = {
+          notionBinding,
+          credentialId: notionBinding.credentialId,
+          workspaceId: 'ws-notion-1',
+          workspaceName: 'ATI Notion',
+          botId: 'bot-notion-1',
+          identityVersion: 1,
+          databases: [{ id: dbId1, title: 'Kế hoạch Sprint' }],
+          channelId: 'C_DEV',
+          channelName: 'dev',
+        };
+        const configHash = computeNotionDigestConfigHash({ config, recurrence, userId: user.id });
+        const msgRes = await db.pool.query(
+          "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', 'Đề xuất lịch Notion', $2::jsonb) RETURNING id",
+          [
+            convId,
+            JSON.stringify({
+              type: 'schedule_proposal',
+              proposal: {
+                kind: 'schedule',
+                action: 'create',
+                name: `Báo cáo Notion Recovery ${suffix}`,
+                request: 'Mỗi sáng tổng hợp Sprint',
+                recurrence,
+                summary: 'Tạo lịch báo cáo Notion',
+              },
+              scheduleId: null,
+              baseVersion: null,
+              services: ['notion', 'slack'],
+              nextRuns: ['2026-11-03T01:30:00.000Z'],
+              previous: null,
+              digestCandidate: { canAutoDigest: true, config, configHash },
+            }),
+          ]
+        );
+        const service = new ScheduleService({ pool: db.pool, timeZone: 'Asia/Ho_Chi_Minh' });
+        const confirmed = await service.confirmProposal({
+          userId: user.id,
+          convId,
+          messageId: msgRes.rows[0].id as string,
+          now: new Date('2026-11-02T10:00:00.000Z'),
+          approvalMode: 'auto_digest',
+        });
+
+        const runner = new ScheduleRunner({
+          pool: db.pool,
+          timeZone: 'Asia/Ho_Chi_Minh',
+          now: () => new Date('2026-11-03T01:31:00.000Z'),
+          planRun: async () => {
+            throw new Error('Should not call planRun');
+          },
+          runNotionDigest: createNotionDigestRunner({
+            pool: db.pool,
+            notionSources: {
+              read: async () => ({ pages: [], pagesByDatabase: new Map([[dbId1, []]]) }),
+              withSource,
+            },
+            getAdapter: async () => ({
+              execute: async (tool: string) =>
+                tool === 'slack.search_channels' ? [{ id: 'C_DEV', name: 'dev' }] : { ts: 'invalid-ts' },
+            }),
+          }),
+          recordState: (client, row, now) => service.recordState(client, row, now),
+        });
+        await runner.tick();
+        return { user, service, schedule: confirmed.schedule };
+      };
+
+      // Case A: mark_sent resolution + replan blocked on needs_attention
+      const caseA = await createBadTsSchedule('mark');
+      const runsA = await caseA.service.listRuns(caseA.user.id, caseA.schedule.id, 5, new Date('2026-11-03T01:32:00.000Z'));
+      expect(runsA[0]?.state).toBe('needs_attention');
+      expect(runsA[0]?.error).toBe(NOTION_DELIVERY_UNKNOWN);
+      await expect(
+        caseA.service.startRun({ runId: runsA[0]!.id, trigger: 'replan', userId: caseA.user.id, now: new Date('2026-11-03T01:33:00.000Z') })
+      ).rejects.toThrow();
+
+      const marked = await caseA.service.resolveRunDelivery({
+        userId: caseA.user.id,
+        runId: runsA[0]!.id,
+        resolution: 'mark_sent',
+        now: new Date('2026-11-03T01:34:00.000Z'),
+      });
+      expect(marked.run.state).toBe('digest_sent');
+      expect(marked.run.delivery).toMatchObject({
+        channelId: 'C_DEV',
+        channelName: 'dev',
+        manualResolution: { status: 'confirmed_sent' },
+      });
+
+      // Case B: retry_new_run creates a follow-up planning run
+      const caseB = await createBadTsSchedule('retry');
+      const runsB = await caseB.service.listRuns(caseB.user.id, caseB.schedule.id, 5, new Date('2026-11-03T01:32:00.000Z'));
+      const retried = await caseB.service.resolveRunDelivery({
+        userId: caseB.user.id,
+        runId: runsB[0]!.id,
+        resolution: 'retry_new_run',
+        confirmDuplicateRisk: true,
+        now: new Date('2026-11-03T01:34:00.000Z'),
+      });
+      expect(retried.followUpRun?.state).toBe('planning');
+      expect(retried.run.deliveryResolution).toBe('retried_new_run');
     });
   });
 });

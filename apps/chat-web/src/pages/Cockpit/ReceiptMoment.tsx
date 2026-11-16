@@ -159,8 +159,17 @@ function NotionReceiptMetrics({ step }: { step: ExecutionStepInfo }) {
   if (Array.isArray(out.blocks) && out.blocks.length > 0) {
     pills.push({ text: `Đọc ${out.blocks.length} khối nội dung` });
   }
+  if (Array.isArray(out.comments)) {
+    pills.push({ text: `Đọc ${out.comments.length} bình luận` });
+  }
+  if (step.tool === 'notion.add_comment' && typeof out.id === 'string') {
+    pills.push({ text: '💬 Đã đăng bình luận' }); // taste-skill-ignore
+  }
   if (Array.isArray(out.pages)) {
     pills.push({ text: `Khớp ${out.pages.length} trang` });
+  }
+  if (out.truncated === true) {
+    pills.push({ text: '⚠️ Dữ liệu chưa tải hết (chạm giới hạn phân trang)', warn: true }); // taste-skill-ignore
   }
   if (pills.length === 0) return null;
   return (

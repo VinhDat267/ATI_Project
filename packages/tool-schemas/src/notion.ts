@@ -14,6 +14,8 @@ const output = (properties: object, required: string[]) => ({ type: 'object', pr
 const page = output({ id: str, title: str, url: str, properties: { type: 'object', additionalProperties: str }, lastEditedTime: str }, ['id', 'title', 'url', 'properties']);
 const schemaColumn = output({ name: str, type: str, options: { type: 'array', items: str } }, ['name', 'type']);
 const pageBlock = output({ id: str, type: str, text: str, checked: { type: 'boolean' } }, ['id', 'type', 'text']);
+const searchPageItem = output({ id: str, databaseId: str, title: str, url: str, lastEditedTime: str }, ['id', 'databaseId', 'title', 'url']);
+const commentItem = output({ id: str, pageId: str, author: str, text: str, createdTime: str }, ['id', 'pageId', 'author', 'text']);
 
 export const NOTION_TOOLS: ToolDefinition[] = [
   { name: 'notion.search_databases', service: 'notion', sideEffect: 'read', riskLevel: 'low', discovers: 'database', listable: true,
@@ -21,11 +23,11 @@ export const NOTION_TOOLS: ToolDefinition[] = [
     inputSchema: input({ query: { ...str, maxLength: 2000 }, limit: { type: 'integer', minimum: 1, maximum: 10, default: 10 } }, ['query']),
     outputSchema: { type: 'array', items: output({ id: str, title: str, url: str }, ['id', 'title', 'url']) } },
   { name: 'notion.query_database', service: 'notion', sideEffect: 'read', riskLevel: 'low', discovers: 'page',
-    description: 'Đọc tối đa 20 page từ database đã tìm thấy có đúng một data source; query tùy chọn lọc theo tiêu đề hoặc trạng thái, status tùy chọn lọc theo cột Status/Select; trả kèm schema các cột của database và properties phẳng.',
-    inputSchema: input({ databaseId: resource('database'), query: { ...str, maxLength: 2000 }, status: { ...str, maxLength: 200 }, limit: { type: 'integer', minimum: 1, maximum: 20, default: 20 } }, ['databaseId']),
+    description: 'Đọc tối đa 20 page từ database đã tìm thấy có đúng một data source; query tùy chọn lọc theo tiêu đề, status lọc theo cột Status/Select, dateOnOrAfter/dateOnOrBefore lọc theo cột Date, sortDirection sắp xếp theo thời gian sửa gần nhất; trả kèm schema các cột của database và properties phẳng.',
+    inputSchema: input({ databaseId: resource('database'), query: { ...str, maxLength: 2000 }, status: { ...str, maxLength: 200 }, dateProperty: { type: 'string', maxLength: 200, description: 'Schema column name. Required for date filters when multiple date columns exist.' }, dateOnOrAfter: { ...str, maxLength: 64 }, dateOnOrBefore: { ...str, maxLength: 64 }, sortDirection: { type: 'string', enum: ['ascending', 'descending'] }, limit: { type: 'integer', minimum: 1, maximum: 20, default: 20 } }, ['databaseId']),
     outputSchema: output({ pages: { type: 'array', items: page }, schema: { type: 'array', items: schemaColumn }, truncated: { type: 'boolean' } }, ['pages']) },
   { name: 'notion.create_page', service: 'notion', sideEffect: 'write', riskLevel: 'medium',
-    description: 'Sau khi duyệt, tạo page trong database có đúng một data source; title tối đa 200 ký tự, content thuần tối đa 4000; properties hỗ trợ rich_text/select/status/multi_select/checkbox/date/url/number theo schema.',
+    description: 'Sau khi duyệt, tạo page trong database có đúng một data source; title tối đa 200 ký tự, content thuần tối đa 4000; properties hỗ trợ rich_text/select/status/multi_select/checkbox/date/url/number/email/phone_number theo schema.',
     inputSchema: input({ databaseId: resource('database'), title: { ...str, minLength: 1, maxLength: 200 }, content: { ...str, maxLength: 4000 },
       properties: { type: 'object', maxProperties: 100, additionalProperties: { ...str, maxLength: 2000 } } }, ['databaseId', 'title']),
     outputSchema: output({ id: str, url: str }, ['id', 'url']) },
@@ -41,9 +43,29 @@ export const NOTION_OAUTH_TOOLS: ToolDefinition[] = [
     inputSchema: input({ pageId: resource('page') }, ['pageId']),
     outputSchema: output({ id: str, title: str, url: str, properties: { type: 'object', additionalProperties: str }, content: str, blocks: { type: 'array', items: pageBlock }, lastEditedTime: str, truncated: { type: 'boolean' } }, ['id', 'title', 'url', 'properties', 'content', 'blocks']) },
   { name: 'notion.update_page', service: 'notion', sideEffect: 'write', riskLevel: 'medium',
-    description: 'Sau khi duyệt, cập nhật tiêu đề (title), các thuộc tính (properties: Status, Select, Multi-select, Checkbox, Date, Number, URL, Text) hoặc trạng thái lưu trữ (archived) của một trang Notion thuộc database trong allowlist.',
+    description: 'Sau khi duyệt, cập nhật tiêu đề (title), các thuộc tính (properties: Status, Select, Multi-select, Checkbox, Date, Number, URL, Email, Phone, Text) hoặc trạng thái đưa vào thùng rác (archived) của một trang Notion thuộc database trong allowlist.',
     inputSchema: input({ pageId: resource('page'), title: { ...str, minLength: 1, maxLength: 200 },
       properties: { type: 'object', maxProperties: 100, additionalProperties: { ...str, maxLength: 2000 } },
       archived: { type: 'boolean' } }, ['pageId']),
     outputSchema: output({ id: str, url: str, updatedProperties: { type: 'array', items: str }, archived: { type: 'boolean' } }, ['id', 'url']) },
+  { name: 'notion.get_database', service: 'notion', sideEffect: 'read', riskLevel: 'low',
+    description: 'Đọc tiêu đề và schema chi tiết các cột (tên cột, kiểu dữ liệu, danh sách tùy chọn Status/Select/Multi-select) của một database Notion thuộc allowlist.',
+    inputSchema: input({ databaseId: resource('database') }, ['databaseId']),
+    outputSchema: output({ id: str, title: str, url: str, schema: { type: 'array', items: schemaColumn } }, ['id', 'title', 'url', 'schema']) },
+  { name: 'notion.search_pages', service: 'notion', sideEffect: 'read', riskLevel: 'low', discovers: 'page',
+    description: 'Tìm kiếm nhanh các trang Notion theo từ khóa tiêu đề trên toàn bộ các database được phép (hoặc trong một databaseId cụ thể), tối đa 20 trang.',
+    inputSchema: input({ query: { ...str, maxLength: 2000 }, databaseId: resource('database'), limit: { type: 'integer', minimum: 1, maximum: 20, default: 10 } }, ['query']),
+    outputSchema: output({ pages: { type: 'array', items: searchPageItem }, truncated: { type: 'boolean' } }, ['pages']) },
+  { name: 'notion.append_blocks', service: 'notion', sideEffect: 'write', riskLevel: 'medium',
+    description: 'Sau khi duyệt, chuyển đổi nội dung Markdown có cấu trúc (tiêu đề #/##/###, checklist - [ ] / - [x], danh sách - / 1., trích dẫn >, callout > 💡, code block ```, dòng kẻ ---, đoạn văn) thành các khối Notion gốc và nối vào cuối trang thuộc database trong allowlist (tối đa 4000 ký tự, tối đa 50 khối).',
+    inputSchema: input({ pageId: resource('page'), content: { ...str, minLength: 1, maxLength: 4000 } }, ['pageId', 'content']),
+    outputSchema: output({ pageId: str, blockIds: { type: 'array', items: str }, blockCount: { type: 'integer' }, url: str }, ['pageId', 'blockIds', 'blockCount', 'url']) },
+  { name: 'notion.list_comments', service: 'notion', sideEffect: 'read', riskLevel: 'low',
+    description: 'Đọc danh sách bình luận thảo luận trên một trang Notion thuộc database trong allowlist (tối đa 20 bình luận).',
+    inputSchema: input({ pageId: resource('page'), limit: { type: 'integer', minimum: 1, maximum: 20, default: 10 } }, ['pageId']),
+    outputSchema: output({ comments: { type: 'array', items: commentItem }, truncated: { type: 'boolean' } }, ['comments']) },
+  { name: 'notion.add_comment', service: 'notion', sideEffect: 'write', riskLevel: 'medium',
+    description: 'Sau khi duyệt, đăng một bình luận mới (tối đa 2000 ký tự) vào trang Notion thuộc database trong allowlist.',
+    inputSchema: input({ pageId: resource('page'), text: { ...str, minLength: 1, maxLength: 2000 } }, ['pageId', 'text']),
+    outputSchema: output({ id: str, pageId: str, url: str, createdTime: str }, ['id', 'pageId', 'url']) },
 ];

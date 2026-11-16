@@ -778,6 +778,31 @@
       "titleField": "title",
       "previewStyle": "notion_page"
     },
+    "notion.get_database": {
+      "action": "Xem cấu trúc database",
+      "done": "Đã xem database",
+      "receipt": "Đã đọc cấu trúc database",
+      "kind": "Database",
+      "link": "Mở database",
+      "titleField": "title",
+      "previewStyle": "notion_page"
+    },
+    "notion.list_comments": {
+      "action": "Đọc bình luận",
+      "done": "Đã đọc bình luận",
+      "receipt": "Đã đọc bình luận trang",
+      "kind": "Trang",
+      "link": "Mở trang",
+      "previewStyle": "notion_page"
+    },
+    "notion.add_comment": {
+      "action": "Thêm bình luận",
+      "done": "Đã thêm bình luận",
+      "receipt": "Đã thêm bình luận",
+      "kind": "Bình luận",
+      "link": "Mở trang",
+      "previewStyle": "notion_page"
+    },
     "notion.query_database": {
       "action": "Truy vấn database",
       "done": "Đã truy vấn",
