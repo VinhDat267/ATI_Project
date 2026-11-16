@@ -22,6 +22,7 @@ export interface TelegramChatItem {
   type: 'private' | 'group' | 'supergroup' | 'channel';
   username?: string;
   member: boolean;
+  selected: boolean;
 }
 
 export interface TelegramStatusData {
@@ -36,8 +37,10 @@ export interface TelegramStatusData {
   username?: string;
   displayName?: string;
   chats: TelegramChatItem[];
-  selectedChats: TelegramChatItem[];
 }
+
+export const selectedTelegramChats = (chats: TelegramChatItem[]): TelegramChatItem[] =>
+  chats.filter((chat) => chat.selected);
 
 export interface TelegramConnectionProps {
   user: User | null;
@@ -72,11 +75,19 @@ export function TelegramConnection({
       if (mounted.current) {
         setData(res);
         setCandidateChats(res.chats ?? []);
-        setSelectedChatIds((res.selectedChats ?? []).map((c) => c.chatId));
+        setSelectedChatIds(selectedTelegramChats(res.chats ?? []).map((c) => c.chatId));
+      }
+      if (res.status === 'needs_scope' && (res.chats ?? []).length === 0) {
+        try {
+          const candidates = await apiClient.getTelegramCandidateChats();
+          if (mounted.current) setCandidateChats(candidates.chats ?? []);
+        } catch {
+          // User can still press "Làm mới danh sách" manually.
+        }
       }
     } catch {
       if (mounted.current && standalone) {
-        setData({ status: 'not_connected', chats: [], selectedChats: [] });
+        setData({ status: 'not_connected', chats: [] });
       }
     }
   };
@@ -156,11 +167,13 @@ export function TelegramConnection({
     setBusy(true);
     setError('');
     try {
-      const res = await apiClient.getTelegramChats();
+      const res = await apiClient.getTelegramCandidateChats();
       if (mounted.current) {
-        setCandidateChats(res.chats ?? []);
-        if (res.selectedChatIds?.length && selectedChatIds.length === 0) {
-          setSelectedChatIds(res.selectedChatIds);
+        const nextChats = res.chats ?? [];
+        setCandidateChats(nextChats);
+        if (selectedChatIds.length === 0) {
+          const preselected = selectedTelegramChats(nextChats).map((c) => c.chatId);
+          if (preselected.length > 0) setSelectedChatIds(preselected);
         }
       }
     } catch {
@@ -187,13 +200,14 @@ export function TelegramConnection({
     setError('');
     try {
       await apiClient.saveTelegramScope(selectedChatIds);
+      if (!mounted.current) return;
       setEditingScope(false);
       await fetchStatus();
       await refresh?.();
     } catch {
-      setError('Không thể lưu danh sách chat Telegram. Hãy thử lại.');
+      if (mounted.current) setError('Không thể lưu danh sách chat Telegram. Hãy thử lại.');
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   };
 
@@ -202,6 +216,7 @@ export function TelegramConnection({
   }
 
   const status = data?.status ?? 'not_connected';
+  const selectedChats = selectedTelegramChats(data?.chats ?? []);
   const showScopeEditor = status === 'needs_scope' || editingScope;
   const normalizedFilter = chatFilter.trim().toLocaleLowerCase();
   const visibleCandidateChats = normalizedFilter
@@ -267,11 +282,11 @@ export function TelegramConnection({
         ) : null}
       </div>
 
-      {status === 'connected' && data?.selectedChats && data.selectedChats.length > 0 && (
+      {status === 'connected' && selectedChats.length > 0 && (
         <div className="v3-space-y-2 border-t border-[#F3F4F6] pt-3">
-          <p className="text-xs text-[#6B7280]">Cuộc trò chuyện được phép dùng ({data.selectedChats.length}/10):</p>
+          <p className="text-xs text-[#6B7280]">Cuộc trò chuyện được phép dùng ({selectedChats.length}/10):</p>
           <div className="v3-space-y-1.5">
-            {data.selectedChats.map((chat) => (
+            {selectedChats.map((chat) => (
               <div
                 key={chat.chatId}
                 className="flex items-center justify-between p-2.5 bg-neutral-50 rounded-lg text-xs gap-2"
@@ -295,8 +310,8 @@ export function TelegramConnection({
                 type="button"
                 className={secondary}
                 onClick={() => {
-                  setCandidateChats(data.chats ?? data.selectedChats ?? []);
-                  setSelectedChatIds((data.selectedChats ?? []).map((c) => c.chatId));
+                  setCandidateChats(data?.chats ?? []);
+                  setSelectedChatIds(selectedChats.map((c) => c.chatId));
                   setChatFilter('');
                   setEditingScope(true);
                 }}
