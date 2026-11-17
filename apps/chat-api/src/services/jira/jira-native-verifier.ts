@@ -32,6 +32,8 @@ export interface NativeUserPermissionsResult {
   canBrowse: boolean;
   canCreateIssue: boolean;
   canAddComment: boolean;
+  canEditIssue?: boolean;
+  canTransitionIssue?: boolean;
   status?: 'granted' | 'denied' | 'unavailable';
   reason?: string;
 }
@@ -409,7 +411,7 @@ export class JiraNativeVerifier implements ExtendedNativeVerifier {
       Accept: 'application/json',
     };
 
-    const permissions = 'BROWSE_PROJECTS,CREATE_ISSUES,ADD_COMMENTS';
+    const permissions = 'BROWSE_PROJECTS,CREATE_ISSUES,ADD_COMMENTS,EDIT_ISSUES,TRANSITION_ISSUES';
     let url = `${baseUrl}/ex/jira/${encodeURIComponent(evidence.cloudId)}/rest/api/3/mypermissions?permissions=${permissions}`;
     if (evidence.projectId) {
       url += `&projectId=${encodeURIComponent(evidence.projectId)}`;
@@ -421,7 +423,7 @@ export class JiraNativeVerifier implements ExtendedNativeVerifier {
       signal: options?.signal,
     });
 
-    if (!res.ok) return { canBrowse: false, canCreateIssue: false, canAddComment: false, status: res.status === 401 || res.status === 403 ? 'denied' : 'unavailable' };
+    if (!res.ok) return { canBrowse: false, canCreateIssue: false, canAddComment: false, canEditIssue: false, canTransitionIssue: false, status: res.status === 401 || res.status === 403 ? 'denied' : 'unavailable' };
     const data = (await res.json()) as any;
     const resolvePerm = (permKey: string, aliasKey: string): boolean => {
       const candidate =
@@ -448,13 +450,15 @@ export class JiraNativeVerifier implements ExtendedNativeVerifier {
       canBrowse: resolvePerm('BROWSE_PROJECTS', 'canBrowse'),
       canCreateIssue: resolvePerm('CREATE_ISSUES', 'canCreateIssue'),
       canAddComment: resolvePerm('ADD_COMMENTS', 'canAddComment'),
+      canEditIssue: resolvePerm('EDIT_ISSUES', 'canEditIssue'),
+      canTransitionIssue: resolvePerm('TRANSITION_ISSUES', 'canTransitionIssue'),
       status: 'granted',
     };
     if (res.ok) this.putCached(cacheMeta.key, result, cacheMeta);
     return result;
     } catch (error) {
       if (options?.signal?.aborted) throw error;
-      return { canBrowse: false, canCreateIssue: false, canAddComment: false, status: 'unavailable' };
+      return { canBrowse: false, canCreateIssue: false, canAddComment: false, canEditIssue: false, canTransitionIssue: false, status: 'unavailable' };
     }
   }
 }

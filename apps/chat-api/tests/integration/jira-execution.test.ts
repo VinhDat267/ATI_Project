@@ -114,7 +114,19 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
         return;
       }
 
-      // 4. GET /issue/:issueKey
+      // 4. GET/POST /issue/:issueKey/transitions (must precede generic GET /issue/)
+      if (method === 'GET' && url.includes('/transitions')) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ transitions: [{ id: '31', name: 'In Progress', to: { name: 'In Progress' } }] }));
+        return;
+      }
+      if (method === 'POST' && url.includes('/transitions')) {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
+      // 4b. GET /issue/:issueKey
       if (method === 'GET' && url.includes('/issue/')) {
         if (url.includes('MOVED-99')) {
           // Moved issue to unapproved project
@@ -183,6 +195,13 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
       if (method === 'POST' && url.includes('/comment')) {
         res.writeHead(201, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ id: '20001' }));
+        return;
+      }
+
+      // 7. PUT /issue/:issueKey (update_issue)
+      if (method === 'PUT' && url.includes('/issue/')) {
+        res.writeHead(204);
+        res.end();
         return;
       }
 
@@ -458,7 +477,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     }
   });
 
-  it('rejects create_issue and add_comment write plans fail-closed in G2A with zero outbound writes', async () => {
+  it('executes create_issue, add_comment, update_issue, and transition_issue write plans when write:jira-work scope holds and rejects when write scope is missing', async () => {
     const f = await setupFixture();
     const { executionService } = createTestExecutionService(f);
 
@@ -477,21 +496,56 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
         args: { siteId: f.siteId1, issueKey: 'PROJ-50', body: 'Investigating now' },
         dependsOn: ['create_1'],
       },
+      {
+        id: 'update_1',
+        tool: 'myjira.update_issue',
+        description: 'Update priority',
+        args: { siteId: f.siteId1, issueKey: 'PROJ-50', priority: 'High' },
+        dependsOn: ['comment_1'],
+      },
+      {
+        id: 'transition_1',
+        tool: 'myjira.transition_issue',
+        description: 'Move issue to In Progress',
+        args: { siteId: f.siteId1, issueKey: 'PROJ-50', status: 'In Progress' },
+        dependsOn: ['update_1'],
+      },
     ];
 
     const siteSteps = {
       create_1: { siteId: f.siteId1, cloudId: f.cloudId1, sitePolicyVersion: 1, projectId: '10001', projectPolicyVersion: 1 },
       comment_1: { siteId: f.siteId1, cloudId: f.cloudId1, sitePolicyVersion: 1, projectId: '10001', projectPolicyVersion: 1 },
+      update_1: { siteId: f.siteId1, cloudId: f.cloudId1, sitePolicyVersion: 1, projectId: '10001', projectPolicyVersion: 1 },
+      transition_1: { siteId: f.siteId1, cloudId: f.cloudId1, sitePolicyVersion: 1, projectId: '10001', projectPolicyVersion: 1 },
     };
 
     const { plan } = await createApprovedPlan(f, steps, siteSteps);
     const approveRes = await executionService.approveAndStart(plan.id, f.userId);
-    expect(approveRes.success).toBe(false);
-    expect(approveRes.status).toBe(403);
-    expect(approveRes.error).toContain('JIRA_CAPABILITY_DISABLED_IN_G2A');
+    expect(approveRes.success).toBe(true);
 
+    let status = executionService.getExecutionStatus(plan.id);
+    for (let i = 0; i < 150 && (!status || status.status === 'executing'); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      status = executionService.getExecutionStatus(plan.id);
+    }
+
+    expect(status?.status).toBe('completed');
     const executedSteps = await stepRepo.listSteps(plan.id);
-    expect(executedSteps).toHaveLength(0);
+    expect(executedSteps).toHaveLength(4);
+    expect(executedSteps.every((s) => s.status === 'succeeded')).toBe(true);
+    const updateStep = executedSteps.find((s) => s.step_id === 'update_1');
+    expect(updateStep?.output_json?.updatedFields).toEqual(['priority']);
+
+    // Missing write:jira-work scope fails closed at approveAndStart
+    await pool.query(`UPDATE jira_grant_sites SET scopes = $1 WHERE grant_id = $2`, [
+      ['read:jira-work'],
+      f.grantId,
+    ]);
+    const { plan: blockedPlan } = await createApprovedPlan(f, [steps[0]!], { create_1: siteSteps.create_1 });
+    const blockedRes = await executionService.approveAndStart(blockedPlan.id, f.userId);
+    expect(blockedRes.success).toBe(false);
+    expect(blockedRes.status).toBe(403);
+    expect(blockedRes.error).toContain('JIRA_WRITE_SCOPE_REQUIRED');
   });
 
   it('moved issue recheck halts G2A get_issue execution if issue was moved to unapproved project', async () => {
@@ -619,7 +673,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     expect(step2.status).toBe('failed');
   });
 
-  it('persisted pre-cutover write plan is blocked from continueExecution and continueStep while allowing stop()', async () => {
+  it('marks ambiguous write failure (HTTP 500) as unknown/reconciliation_required without auto-retry and allows safe stop()', async () => {
     const f = await setupFixture();
     const { executionService } = createTestExecutionService(f);
 
@@ -627,7 +681,7 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
       {
         id: 'write_fail',
         tool: 'myjira.create_issue',
-        description: 'Pre-cutover write plan',
+        description: 'Write encountering server 500',
         args: { siteId: f.siteId1, projectKey: 'PROJ', summary: 'FAIL_WITH_UNKNOWN' },
         dependsOn: [],
       },
@@ -638,15 +692,21 @@ describe('Jira Execution & Receipt Integration (JIRA-08 Task 4)', () => {
     };
 
     const { plan } = await createApprovedPlan(f, steps, siteSteps);
-    await pool.query(`UPDATE plans SET status = 'partial', decided_at = clock_timestamp() WHERE id = $1`, [plan.id]);
+    await executionService.approveAndStart(plan.id, f.userId);
 
-    await expect(
-      executionService.continueExecution(plan.id, f.userId)
-    ).rejects.toThrow(/JIRA_CAPABILITY_DISABLED_IN_G2A/);
+    let status = executionService.getExecutionStatus(plan.id);
+    for (let i = 0; i < 150 && (!status || status.status === 'executing'); i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      status = executionService.getExecutionStatus(plan.id);
+    }
+
+    expect(['partial', 'reconciliation_required']).toContain(status?.status);
+    const stepRows = await stepRepo.listSteps(plan.id);
+    expect(stepRows[0]?.status).toBe('unknown');
 
     await expect(
       executionService.stop(plan.id, f.userId)
-    ).resolves.toBeDefined();
+    ).resolves.toMatchObject({ status: 'reconciliation_required', pausedStepId: 'write_fail' });
   });
 
   it('rejects legacy jira adapter fallback unconditionally across personal, legacy, and bound contexts', async () => {

@@ -1,10 +1,10 @@
 import type pg from 'pg';
 import {
-  getToolDefinition,
-  isJiraG2AAllowedTool,
-  JIRA_CAPABILITY_DISABLED_IN_G2A,
-  JIRA_CROSS_SERVICE_EGRESS_DENIED,
+  isJiraWriteTool,
+  isMyJiraTool,
   JIRA_LEGACY_SHARED_DISABLED,
+  JIRA_WRITE_SCOPE,
+  JIRA_WRITE_SCOPE_REQUIRED,
   validateJiraPlanConnection,
   validateJiraSourceRef,
   type JiraPlanConnection,
@@ -153,8 +153,8 @@ export class JiraPlanBinder {
     const identityVersion = accRow.identity_version;
 
     // 4. Check active OAuth grant
-    const grantRes = await this.pool.query<{ id: string; status: string }>(
-      `SELECT id, status
+    const grantRes = await this.pool.query<{ id: string; status: string; scopes: string[] | null }>(
+      `SELECT id, status, scopes
        FROM jira_oauth_grants
        WHERE account_id = $1 AND status = 'active'
        ORDER BY created_at DESC LIMIT 1`,
@@ -168,8 +168,9 @@ export class JiraPlanBinder {
       );
     }
     const grantId = grantRow.id;
+    const grantScopes = Array.isArray(grantRow.scopes) ? grantRow.scopes : [];
 
-    // 5. Enforce G2A read-only capability policy & cross-service write containment before binding
+    // 5. Reject legacy shared jira.* tools and unknown myjira tools
     for (const step of steps) {
       if (step.tool.startsWith('jira.')) {
         throw new JiraBindingError(
@@ -177,25 +178,12 @@ export class JiraPlanBinder {
           JIRA_LEGACY_SHARED_DISABLED
         );
       }
-      if (step.tool.startsWith('myjira.') && !isJiraG2AAllowedTool(step.tool)) {
+      if (step.tool.startsWith('myjira.') && !isMyJiraTool(step.tool)) {
         throw new JiraBindingError(
-          `Công cụ Jira '${step.tool}' chưa được mở trong giai đoạn G2A chỉ đọc (${JIRA_CAPABILITY_DISABLED_IN_G2A}).`,
-          JIRA_CAPABILITY_DISABLED_IN_G2A
+          `Công cụ Jira '${step.tool}' không hợp lệ hoặc không được hỗ trợ.`,
+          'INVALID_JIRA_TOOL'
         );
       }
-    }
-
-    const hasJiraStep = steps.some((s) => s.tool.startsWith('myjira.') || s.tool.startsWith('jira.'));
-    const hasExternalWriteStep = steps.some((s) => {
-      if (s.tool.startsWith('myjira.') || s.tool.startsWith('jira.')) return false;
-      const def = getToolDefinition(s.tool);
-      return def?.sideEffect === 'write';
-    });
-    if (hasJiraStep && hasExternalWriteStep) {
-      throw new JiraBindingError(
-        `Chính sách bảo mật G2A không cho phép kết hợp dữ liệu Jira với thao tác ghi sang dịch vụ khác (${JIRA_CROSS_SERVICE_EGRESS_DENIED}).`,
-        JIRA_CROSS_SERVICE_EGRESS_DENIED
-      );
     }
 
     // 6. Bind each Jira step
@@ -221,9 +209,10 @@ export class JiraPlanBinder {
         active: boolean;
         policy_version: number;
         grant_site_id: string | null;
+        grant_site_scopes: string[] | null;
       }>(
         `SELECT s.id AS site_id, s.cloud_id, s.active, s.policy_version,
-                gs.id AS grant_site_id
+                gs.id AS grant_site_id, gs.scopes AS grant_site_scopes
          FROM ati_workspace_jira_sites s
          LEFT JOIN jira_grant_sites gs ON gs.grant_id = $3 AND gs.cloud_id = s.cloud_id AND gs.product_type = 'jira'
          WHERE s.workspace_id = $1 AND s.id = $2`,
@@ -249,6 +238,20 @@ export class JiraPlanBinder {
           `Bạn chưa được cấp quyền truy cập Jira site '${siteId}'.`,
           'SITE_GRANT_MISSING'
         );
+      }
+
+      if (isJiraWriteTool(step.tool)) {
+        const siteScopes = Array.isArray(siteRow.grant_site_scopes) ? siteRow.grant_site_scopes : [];
+        const hasAnyScopes = grantScopes.length > 0 || siteScopes.length > 0;
+        const hasWriteScope =
+          grantScopes.includes(JIRA_WRITE_SCOPE) || siteScopes.includes(JIRA_WRITE_SCOPE);
+        if (hasAnyScopes && !hasWriteScope) {
+          throw new JiraBindingError(
+            `Kết nối Jira hiện tại chỉ có quyền đọc; chưa có quyền ghi (${JIRA_WRITE_SCOPE}).`,
+            JIRA_WRITE_SCOPE_REQUIRED,
+            'Hãy vào Cài đặt > Kết nối dịch vụ > Jira và bấm Cấp lại quyền ghi Jira để thực hiện thao tác này.'
+          );
+        }
       }
 
       const cloudId = siteRow.cloud_id;

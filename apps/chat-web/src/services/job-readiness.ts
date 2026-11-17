@@ -40,8 +40,8 @@ export const CORE_JOBS: CoreJob[] = [
   {
     id: 'PM-03',
     title: 'Báo cáo tiến độ Jira Sprint vào Slack',
-    description: 'Tổng hợp tiến độ Sprint trên Atlassian Jira và gửi báo cáo định kỳ vào Slack (duyệt từng lượt)',
-    outputDescription: 'Báo cáo Jira Sprint theo lịch, xác nhận từng lượt gửi Slack',
+    description: 'Tổng hợp tiến độ Sprint trên Atlassian Jira và gửi báo cáo định kỳ vào Slack (tự gửi bản tin Standup chỉ đọc hoặc duyệt từng lượt)',
+    outputDescription: 'Báo cáo Jira Sprint & blocker theo lịch (tự gửi bản tin hoặc xác nhận từng lượt Slack)',
     requiredServices: ['myjira', 'slack'],
     prompt: 'Tổng hợp tiến độ các ticket trong Sprint hiện tại của dự án Jira {{mã_dự_án}}, đối chiếu trạng thái và gửi bản tóm tắt vào kênh Slack #{{kênh_slack}}',
   },

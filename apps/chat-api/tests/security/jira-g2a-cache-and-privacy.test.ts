@@ -388,6 +388,16 @@ describe('JIRA-G2A 10-Field Cache Isolation & D09-LLM-OFF Privacy Controls (P1/P
       jiraBinder: new JiraPlanBinder({ pool }),
       jiraLlmEgressEnabled: true,
       slackWrites: {} as any,
+      trelloConnection: async () => ({
+        status: 'connected',
+        connection: {
+          credentialId: 'trello-cross-1',
+          memberId: 'mem_1',
+          username: 'trello-cross-user',
+          boardIds: ['board_1'],
+        },
+        selectedBoards: [{ id: 'board_1', name: 'Board 1' }],
+      }),
       planner: {
         processMessage: async () => ({
           kind: 'plan',
@@ -432,7 +442,7 @@ describe('JIRA-G2A 10-Field Cache Isolation & D09-LLM-OFF Privacy Controls (P1/P
       await new Promise((r) => setTimeout(r, 25));
     }
 
-    expect(eventsCross.some((e) => e.event === 'plan')).toBe(false);
-    expect(eventsCross.some((e) => e.event === 'refusal')).toBe(true);
+    expect(eventsCross.some((e) => e.event === 'refusal')).toBe(false);
+    expect(eventsCross.some((e) => e.event === 'plan_preview')).toBe(true);
   });
 });

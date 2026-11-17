@@ -485,8 +485,9 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
           </section>
           <section aria-label="Tài khoản Jira Cloud bạn kết nối" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3 mt-4">
             <h3 className="font-semibold text-[#111827]">Tài khoản Jira Cloud bạn kết nối</h3>
-            <p>Khi bạn kết nối Jira Cloud qua Atlassian OAuth 2.0 (3LO), Planora chỉ truy cập đúng các site và project mà bạn đã chọn cấp quyền trong Workspace hiện tại. Dữ liệu Jira đọc được (danh sách site, project, tiêu đề và mô tả issue) được gửi tới nhà cung cấp mô hình AI bên thứ ba đã cấu hình để lập kế hoạch hoặc trả lời.</p>
-            <p>Planora chỉ tạo issue hoặc thêm bình luận sau khi bạn xem trước đích ghi và bấm phê duyệt kế hoạch. Các bảng hội thoại, kế hoạch và bước thực thi vẫn giữ lại nội dung và tham số đã chạy kể cả sau khi bạn ngắt kết nối Jira.</p>
+            <p>Khi bạn kết nối Jira Cloud qua Atlassian OAuth 2.0 (3LO) trong Workspace Tổ chức (<code>read:me</code>, <code>read:jira-work</code>, <code>write:jira-work</code>, <code>offline_access</code>), Planora chỉ truy cập đúng các site và project mà quản trị viên cùng bạn đã chọn cấp quyền trong Workspace hiện tại.</p>
+            <p>Dữ liệu Jira đọc được (danh sách site, project, tiêu đề, mô tả, trạng thái và hạn xử lý của issue) được gửi tới nhà cung cấp mô hình AI bên thứ ba đã cấu hình để lập kế hoạch hoặc trả lời (trừ khi quản trị máy chủ tắt qua cấu hình <code>JIRA_LLM_EGRESS_ENABLED=off</code> hoặc bạn tắt tóm tắt AI trên lịch Bản tin Standup định kỳ).</p>
+            <p>Planora chỉ tạo issue, cập nhật thuộc tính, chuyển trạng thái tiến độ hoặc thêm bình luận sau khi bạn xem trước đích ghi và bấm phê duyệt kế hoạch. Các bảng hội thoại, kế hoạch và bước thực thi vẫn giữ lại nội dung và tham số đã chạy kể cả sau khi bạn ngắt kết nối Jira.</p>
             <p>Ngắt kết nối trên Planora chỉ xoá token cục bộ và phạm vi project đã lưu, không tự xoá lịch sử hội thoại đã lưu và không tự thu hồi grant phía Atlassian nếu bạn chưa thu hồi quyền trực tiếp trong trang cài đặt tài khoản Atlassian.</p>
           </section>
           <section aria-label="Tài khoản GitHub bạn kết nối" className="p-4 rounded-2xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-3 mt-4">

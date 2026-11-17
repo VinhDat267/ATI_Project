@@ -752,6 +752,17 @@ export function JiraConnection({
 
               {isConnected && (
                 <>
+                  {data?.hasWriteScope === false && (
+                    <button
+                      type="button"
+                      id="jira-upgrade-write-scope"
+                      onClick={handleAuthorizeSites}
+                      disabled={busy}
+                      className={buttonPrimary}
+                    >
+                      {busy ? 'Đang chuyển hướng…' : 'Cấp quyền ghi Jira'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     id="jira-sync-sites"
@@ -1458,15 +1469,35 @@ export function JiraConnection({
 
       {/* COCKPIT JIRA CONVERSATION CTA */}
       <div className="mt-5 pt-4 border-t border-[#E7E7E2] dark:border-[#374151] space-y-3">
-        <div
-          data-testid="jira-g2a-policy-banner"
-          className="p-3.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 text-xs text-amber-900 dark:text-amber-200"
-        >
-          <span className="font-semibold">Chế độ G2A Chỉ đọc &amp; Bảo vệ Dữ liệu (D09-LLM-OFF):</span>{' '}
-          Kết nối OAuth hiện chỉ yêu cầu quyền đọc (<code>read:me</code>, <code>read:jira-work</code>,{' '}
-          <code>offline_access</code>). Danh mục Site/Project và kết nối cá nhân hoạt động trực tiếp không qua LLM;
-          các thao tác ghi Jira, lịch tự động Jira và tổng hợp hội thoại qua mô hình AI bên ngoài đang tạm khoá trong giai đoạn G2A.
-        </div>
+        {data?.hasWriteScope === false ? (
+          <div
+            data-testid="jira-g2a-policy-banner"
+            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 text-xs text-amber-900 dark:text-amber-200"
+          >
+            <div>
+              <span className="font-semibold">Kết nối Jira hiện chỉ có quyền đọc (<code>read:jira-work</code>):</span>{' '}
+              Bạn vẫn có thể tra cứu dự án/issue và chạy Bản tin Standup Jira định kỳ. Để AI thực hiện tạo, cập nhật, bình luận hoặc chuyển trạng thái issue sau khi bạn duyệt, hãy bấm cấp bổ sung quyền{' '}
+              <code>write:jira-work</code>.
+            </div>
+            <button
+              type="button"
+              onClick={handleAuthorizeSites}
+              disabled={busy}
+              className={`${buttonPrimary} whitespace-nowrap`}
+            >
+              {busy ? 'Đang chuyển hướng…' : 'Cấp quyền ghi Jira'}
+            </button>
+          </div>
+        ) : (
+          <div
+            data-testid="jira-g2a-policy-banner"
+            className="p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/50 text-xs text-emerald-950 dark:text-emerald-200"
+          >
+            <span className="font-semibold">Quyền &amp; Kiểm soát An toàn Jira:</span>{' '}
+            OAuth 3LO cấp phạm vi <code>read:me</code>, <code>read:jira-work</code>,{' '}
+            <code>write:jira-work</code>, <code>offline_access</code> theo từng Workspace Tổ chức. Mọi thao tác tạo, cập nhật, bình luận và chuyển trạng thái issue luôn qua thẻ xem trước &amp; nút Phê duyệt của bạn; bản tin Standup định kỳ chỉ đọc dữ liệu an toàn theo phạm vi dự án đã chọn.
+          </div>
+        )}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl bg-neutral-50 dark:bg-[#1F2937]/30 border border-[#E7E7E2] dark:border-[#374151]">
           <div>
             <h5 className="font-semibold text-xs text-[#111827] dark:text-white">

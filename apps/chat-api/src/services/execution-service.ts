@@ -4,9 +4,8 @@ import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
 import { StepRunner, ExecutionController, isWriteTool, type StepState, type StepOutputs, type ExecuteStepOptions } from '@wap/executor';
 import {
-  isJiraG2AAllowedTool,
+  isMyJiraTool,
   JIRA_CAPABILITY_DISABLED_IN_G2A,
-  JIRA_CROSS_SERVICE_EGRESS_DENIED,
   JIRA_LEGACY_SHARED_DISABLED,
   type PlanStep,
 } from '@wap/tool-schemas';
@@ -104,11 +103,11 @@ export class ExecutionService {
     const steps: PlanStep[] = Array.isArray(planJson?.steps) ? planJson.steps : [];
     for (const step of steps) {
       const tool = typeof step?.tool === 'string' ? step.tool : '';
-      if (tool.startsWith('myjira.') && !isJiraG2AAllowedTool(tool)) {
+      if (tool.startsWith('myjira.') && !isMyJiraTool(tool)) {
         return {
           ok: false,
           code: JIRA_CAPABILITY_DISABLED_IN_G2A,
-          message: `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Tool '${tool}' is disabled in Jira G2A read-only rollout.`,
+          message: `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Unknown Jira tool '${tool}'.`,
         };
       }
       if (this.enforceJiraG2AContainment && tool.startsWith('jira.')) {
@@ -116,28 +115,6 @@ export class ExecutionService {
           ok: false,
           code: JIRA_LEGACY_SHARED_DISABLED,
           message: `${JIRA_LEGACY_SHARED_DISABLED}: Legacy shared Jira tool '${tool}' is disabled.`,
-        };
-      }
-    }
-
-    if (this.enforceJiraG2AContainment) {
-      const touchesJira =
-        Boolean(planJson?.connections?.myjira) ||
-        steps.some(
-          (s) =>
-            typeof s?.tool === 'string' &&
-            (s.tool.startsWith('myjira.') || s.tool.startsWith('jira.')),
-        ) ||
-        planJson?.reportEvidence?.kind === 'jira_progress' ||
-        (typeof planJson?.reportEvidence?.sourceTool === 'string' &&
-          (planJson.reportEvidence.sourceTool.startsWith('myjira.') ||
-            planJson.reportEvidence.sourceTool.startsWith('jira.')));
-      const hasAnyWrite = steps.some((s) => typeof s?.tool === 'string' && isWriteTool(s.tool));
-      if (touchesJira && hasAnyWrite) {
-        return {
-          ok: false,
-          code: JIRA_CROSS_SERVICE_EGRESS_DENIED,
-          message: `${JIRA_CROSS_SERVICE_EGRESS_DENIED}: Cross-service write plans derived from Jira data are disabled in G2A.`,
         };
       }
     }
@@ -312,6 +289,8 @@ export class ExecutionService {
       browse: true,
       createIssue: steps.some((s) => s.tool === 'myjira.create_issue'),
       addComment: steps.some((s) => s.tool === 'myjira.add_comment'),
+      editIssue: steps.some((s) => s.tool === 'myjira.update_issue'),
+      transitionIssue: steps.some((s) => s.tool === 'myjira.transition_issue'),
     };
 
     // Recheck Jira connection authority if present
@@ -531,6 +510,8 @@ export class ExecutionService {
           browse: true,
           createIssue: steps.some((s) => s.tool === 'myjira.create_issue'),
           addComment: steps.some((s) => s.tool === 'myjira.add_comment'),
+          editIssue: steps.some((s) => s.tool === 'myjira.update_issue'),
+          transitionIssue: steps.some((s) => s.tool === 'myjira.transition_issue'),
         };
         const recoveryCheck = await validateJiraApprovalBinding(pool, connections.myjira, {
           verifier: this.jiraNativeVerifier,

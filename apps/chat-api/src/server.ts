@@ -27,6 +27,12 @@ import { evaluateCalendarDigestCandidate } from './services/schedules/calendar-d
 import { createCalendarDigestExecutor } from './services/schedules/calendar-digest-runner.js';
 import { createGithubDigestRunner, type RunGithubDigest } from './services/schedules/github-digest-runner.js';
 import { createTrelloDigestRunner, buildTrelloAiPromptPayload, type RunTrelloDigest } from './services/schedules/trello-digest-runner.js';
+import {
+  createJiraDigestExecutor,
+  buildJiraAiPromptPayload,
+  type RunJiraDigestExecutorFn,
+} from './services/schedules/jira-digest-runner.js';
+import type { JiraConnectionLookupResult, JiraDigestProjectItem } from './services/schedules/jira-digest-candidate.js';
 import { NotionDigestSourceAuthority, NotionDigestSourceDenied } from './services/notion/digest-source-authority.js';
 import { createNotionDigestRunner, type RunNotionDigest } from './services/schedules/notion-digest-runner.js';
 import { AdapterFactory, PostgresSheetsAppendLeaseStore, type AdapterContext } from './services/adapter-factory.js';
@@ -281,6 +287,7 @@ async function bootstrap() {
   let digestRunnerImpl: RunGithubDigest | undefined;
   let trelloDigestRunnerImpl: RunTrelloDigest | undefined;
   let notionDigestRunnerImpl: RunNotionDigest | undefined;
+  let jiraDigestRunnerImpl: RunJiraDigestExecutorFn | undefined;
   const fetchOrgSheetsMetadata = async (input: {
     credentialId: string;
     allowedSpreadsheetIds: string[];
@@ -435,6 +442,10 @@ async function bootstrap() {
     runNotionDigest: (run, convId, signal) => {
       if (!notionDigestRunnerImpl) throw new Error('Notion digest runner is not ready');
       return notionDigestRunnerImpl(run, convId, signal);
+    },
+    runJiraDigest: (run, convId, signal) => {
+      if (!jiraDigestRunnerImpl) throw new Error('Jira digest runner is not ready');
+      return jiraDigestRunnerImpl(run, convId, signal);
     },
     executeDigestRun: (run, signal) => telegramDigestRunner.execute(run, signal),
     emit: (convId, event, payload) => sseManager.emitEvent(convId, event, payload),
@@ -623,6 +634,38 @@ async function bootstrap() {
   const jiraDispatchGuard = jiraAvailable && pool && jiraTokens && jiraLeaseManager
     ? new JiraDispatchGuard(pool, jiraLeaseManager, jiraTokens)
     : undefined;
+  const myjiraDigestConnection = jiraAvailable && jiraOAuthRepo && jiraWorkspaceRepo
+    ? async (userId: string, workspaceId?: string | null): Promise<JiraConnectionLookupResult | null> => {
+        if (!workspaceId) return { status: 'disconnected' };
+        const [account, grant, capabilities] = await Promise.all([
+          jiraOAuthRepo.getAccountByUserId(userId),
+          jiraOAuthRepo.getActiveGrantByUserId(userId),
+          jiraWorkspaceRepo.getCapabilities(workspaceId, userId).catch(() => null),
+        ]);
+        if (!account || account.status !== 'connected' || !grant || grant.status !== 'active' || !capabilities?.sites?.length) {
+          return { status: 'disconnected' };
+        }
+        const projects: JiraDigestProjectItem[] = [];
+        for (const site of capabilities.sites) {
+          for (const proj of site.projects ?? []) {
+            projects.push({
+              siteId: site.siteId,
+              siteName: (site as any).siteName ?? (site as any).name ?? site.siteId,
+              projectKey: proj.key,
+              ...(proj.name ? { projectName: proj.name } : {}),
+            });
+          }
+        }
+        if (projects.length === 0) return { status: 'disconnected' };
+        return {
+          status: 'connected',
+          workspaceId,
+          grantId: grant.id,
+          atlassianAccountId: account.atlassian_account_id,
+          projects,
+        };
+      }
+    : undefined;
   if (pool) {
     void scanAndPauseLegacyJiraSchedules(pool, { dryRun: true })
       .then((inv) => {
@@ -802,6 +845,7 @@ async function bootstrap() {
     jiraBinder,
     jiraHistorySanitizer,
     jiraPolicyService,
+    myjiraDigestConnection,
     jiraLlmEgressEnabled: env.JIRA_LLM_EGRESS_ENABLED,
     enforceJiraG2AContainment: !(env.RUNTIME_MODE === 'sandbox' && sandboxKeepsSharedJira()),
     reportEvidenceStore,
@@ -1005,6 +1049,52 @@ async function bootstrap() {
       timeZone: env.APP_TIME_ZONE,
       notionSources: notionDigestSources,
       getAdapter: (serviceName, context) => adapterFactory.getAdapterForService(serviceName, context),
+    });
+    jiraDigestRunnerImpl = createJiraDigestExecutor({
+      pool,
+      timeZone: env.APP_TIME_ZONE,
+      jiraConnection: myjiraDigestConnection,
+      telegramConnection,
+      getAdapter: (serviceName, context) => adapterFactory.getAdapterForService(serviceName, context),
+      summarizeDigest: async (
+        {
+          projects,
+          overdueIssues,
+          dueSoonIssues,
+          blockerOrHighIssues,
+          unassignedIssues,
+          completedIssues,
+          dueSoonHours,
+          completedWindowHours,
+          inProgressCount,
+          noDueOpenCount,
+        },
+        signal,
+      ) => {
+        if (
+          overdueIssues.length === 0 &&
+          dueSoonIssues.length === 0 &&
+          blockerOrHighIssues.length === 0 &&
+          unassignedIssues.length === 0 &&
+          completedIssues.length === 0
+        ) {
+          return null;
+        }
+        if (typeof provider?.generateText !== 'function') return null;
+        const { systemPrompt, userPrompt } = buildJiraAiPromptPayload({
+          projects,
+          overdueIssues,
+          dueSoonIssues,
+          blockerOrHighIssues,
+          unassignedIssues,
+          completedIssues,
+          dueSoonHours,
+          completedWindowHours,
+          inProgressCount,
+          noDueOpenCount,
+        });
+        return provider.generateText(systemPrompt, userPrompt, signal);
+      },
     });
   }
 

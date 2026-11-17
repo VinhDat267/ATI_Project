@@ -294,6 +294,20 @@ export function summarizeSourceItems(
       const authorTag = typeof item.author === 'string' && item.author.trim() ? ` (@${item.author.trim()})` : '';
       return `  - [${item.repo}#${item.number}] ${String(title)}${stateTag}${authorTag}`;
     }
+    if (service === 'myjira' && item && typeof item === 'object') {
+      const key = typeof item.key === 'string' && item.key.trim() ? `[${item.key.trim()}] ` : '';
+      const status = typeof item.status === 'string' && item.status.trim() ? ` [${item.status.trim()}]` : '';
+      const priority = typeof item.priority === 'string' && item.priority.trim() ? ` ⚡${item.priority.trim()}` : '';
+      const due = typeof item.dueDate === 'string' && item.dueDate.trim() ? ` (hạn: ${item.dueDate.trim()})` : '';
+      const overdueBadge =
+        typeof item.dueDate === 'string' &&
+        item.dueDate.trim() &&
+        !/^(done|closed|resolved|hoàn thành|đã xong)$/i.test(String(item.status ?? '').trim()) &&
+        Date.parse(item.dueDate) < nowMs
+          ? '🚨 '
+          : '';
+      return `  - ${overdueBadge}${key}${String(title)}${status}${priority}${due}`;
+    }
     const prefix = item?.number ? `#${item.number} ` : item?.key && item?.key !== title ? `${item.key}: ` : '';
     return `  - ${prefix}${String(title)}`;
   });
@@ -1036,10 +1050,16 @@ export class TelegramDigestRunner {
     signal.throwIfAborted();
     const { digestConfig, digestConfigHash, userId } = run;
 
-    // Legacy schedules remain unchanged. Reject the whole run before even
-    // reading another source: per-source errors deliberately allow partial delivery.
+    // Verify all sources against read-only allowlist & tenant rules before reading anything.
     const disabledSourceReason = Array.isArray(digestConfig?.sources)
-      ? digestConfig.sources.map(getDigestSourceDisabledReason).find((reason) => reason !== undefined)
+      ? digestConfig.sources
+          .map((src) =>
+            getDigestSourceDisabledReason(src, {
+              workspaceMode: run.workspaceMode,
+              workspaceId: run.workspaceId,
+            }),
+          )
+          .find((reason) => reason !== undefined)
       : undefined;
     if (disabledSourceReason) {
       return { status: 'blocked', error: disabledSourceReason };

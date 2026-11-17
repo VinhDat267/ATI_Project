@@ -3,9 +3,7 @@ import {
   JIRA_ISSUE_PATTERN,
   JIRA_SITE_ID_PATTERN,
   JIRA_CLOUD_ID_PATTERN,
-  JIRA_CAPABILITY_DISABLED_IN_G2A,
   MYJIRA_TOOLS,
-  isJiraG2AAllowedTool,
   type WorkspaceJiraCapabilitiesResponse,
 } from '@wap/tool-schemas';
 import { BaseAdapter, StepError, type BaseAdapterConfig } from '../base-adapter.js';
@@ -391,15 +389,6 @@ export class PersonalJiraAdapter extends BaseAdapter {
       if (!knownMyJiraTool) {
         throw fail('VALIDATION');
       }
-      if (!isJiraG2AAllowedTool(tool)) {
-        throw new StepError({
-          category: 'AUTH_ERROR',
-          statusCode: 403,
-          retryable: false,
-          message: `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Tool '${tool}' is disabled in Jira G2A read-only mode`,
-          details: { requestSent: false },
-        });
-      }
     }
 
     if (tool === 'myjira.list_sites') {
@@ -453,7 +442,11 @@ export class PersonalJiraAdapter extends BaseAdapter {
     }
 
     if (tool === 'myjira.search_issues') {
-      this.input(args, ['siteId', 'projectKey'], ['query', 'status', 'priority', 'issueType', 'limit']);
+      this.input(
+        args,
+        ['siteId', 'projectKey'],
+        ['query', 'status', 'priority', 'issueType', 'overdueOnly', 'dueWithinDays', 'unassignedOnly', 'limit']
+      );
       const site = this.resolveSite(args.siteId);
       const proj = this.resolveProject(site, args.projectKey);
       const limit = this.limit(args.limit, 50, 20);
@@ -461,6 +454,15 @@ export class PersonalJiraAdapter extends BaseAdapter {
       if (args.status !== undefined && !text(args.status, 1, 100)) throw fail('VALIDATION');
       if (args.priority !== undefined && !text(args.priority, 1, 100)) throw fail('VALIDATION');
       if (args.issueType !== undefined && !text(args.issueType, 1, 100)) throw fail('VALIDATION');
+      if (args.overdueOnly !== undefined && typeof args.overdueOnly !== 'boolean') throw fail('VALIDATION');
+      if (
+        args.dueWithinDays !== undefined &&
+        (typeof args.dueWithinDays !== 'number' || !Number.isInteger(args.dueWithinDays) || args.dueWithinDays < 0 || args.dueWithinDays > 30)
+      ) {
+        throw fail('VALIDATION');
+      }
+      if (args.unassignedOnly !== undefined && typeof args.unassignedOnly !== 'boolean') throw fail('VALIDATION');
+      if (args.overdueOnly === true && args.dueWithinDays !== undefined) throw fail('VALIDATION');
 
       const startedAt = Date.now();
       const baseBudgetMs = timeoutMs ?? this.defaultTimeoutMs;
@@ -477,10 +479,20 @@ export class PersonalJiraAdapter extends BaseAdapter {
       const directCandidate = isDirectKey
         ? await this.issueByKey(site, directKey, proj.key, { signal, timeoutMs: directRemainingMs })
         : null;
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const maxDueIso = args.dueWithinDays !== undefined
+        ? new Date(Date.now() + Number(args.dueWithinDays) * 86_400_000).toISOString().slice(0, 10)
+        : undefined;
+      const directDone = directCandidate
+        ? /^(done|closed|resolved|hoàn thành|đã xong)$/i.test(directCandidate.status.trim())
+        : false;
       const direct = directCandidate &&
         (args.status === undefined || directCandidate.status.toLowerCase() === args.status.trim().toLowerCase()) &&
         (args.priority === undefined || directCandidate.priority?.toLowerCase() === args.priority.trim().toLowerCase()) &&
-        (args.issueType === undefined || directCandidate.issueType?.toLowerCase() === args.issueType.trim().toLowerCase())
+        (args.issueType === undefined || directCandidate.issueType?.toLowerCase() === args.issueType.trim().toLowerCase()) &&
+        (args.unassignedOnly !== true || (directCandidate.assignee == null && !directDone)) &&
+        (args.overdueOnly !== true || (!directDone && typeof directCandidate.dueDate === 'string' && directCandidate.dueDate < todayIso)) &&
+        (maxDueIso === undefined || (!directDone && typeof directCandidate.dueDate === 'string' && directCandidate.dueDate >= todayIso && directCandidate.dueDate <= maxDueIso))
         ? directCandidate : null;
 
       let jql = 'project = "' + proj.key + '"';
@@ -488,7 +500,17 @@ export class PersonalJiraAdapter extends BaseAdapter {
       if (args.status !== undefined) jql += ' AND status = "' + escapeJqlString(args.status.trim()) + '"';
       if (args.priority !== undefined) jql += ' AND priority = "' + escapeJqlString(args.priority.trim()) + '"';
       if (args.issueType !== undefined) jql += ' AND issuetype = "' + escapeJqlString(args.issueType.trim()) + '"';
-      jql += ' ORDER BY updated DESC';
+      if (args.overdueOnly === true) jql += ' AND duedate < startOfDay()';
+      if (args.dueWithinDays !== undefined) {
+        jql += ` AND duedate >= startOfDay() AND duedate <= "+${Number(args.dueWithinDays)}d"`;
+      }
+      if (args.unassignedOnly === true) jql += ' AND assignee is EMPTY';
+      if (args.overdueOnly === true || args.dueWithinDays !== undefined || args.unassignedOnly === true) {
+        jql += ' AND resolution = Unresolved';
+      }
+      jql += (args.overdueOnly === true || args.dueWithinDays !== undefined)
+        ? ' ORDER BY duedate ASC, updated DESC'
+        : ' ORDER BY updated DESC';
 
       const collected: Array<ReturnType<PersonalJiraAdapter['issueRow']>> = [];
       const seenIds = new Set<string>();
@@ -989,14 +1011,16 @@ export class PersonalJiraAdapter extends BaseAdapter {
       const idn = this.identity(issue, site, currentProjectKey);
 
       const fields: Record<string, any> = {};
-      if (args.summary !== undefined) fields.summary = args.summary;
-      if (args.description !== undefined) fields.description = plainTextToAdf(args.description);
-      if (args.priority !== undefined) fields.priority = { name: args.priority };
+      const updatedFields: string[] = [];
+      if (args.summary !== undefined) { fields.summary = args.summary; updatedFields.push('summary'); }
+      if (args.description !== undefined) { fields.description = plainTextToAdf(args.description); updatedFields.push('description'); }
+      if (args.priority !== undefined) { fields.priority = { name: args.priority }; updatedFields.push('priority'); }
       if (args.assigneeAccountId !== undefined) {
         fields.assignee = args.assigneeAccountId === null ? null : { id: args.assigneeAccountId };
+        updatedFields.push('assigneeAccountId');
       }
-      if (args.labels !== undefined) fields.labels = args.labels;
-      if (args.dueDate !== undefined) fields.duedate = args.dueDate;
+      if (args.labels !== undefined) { fields.labels = args.labels; updatedFields.push('labels'); }
+      if (args.dueDate !== undefined) { fields.duedate = args.dueDate; updatedFields.push('dueDate'); }
 
       await this.transport.request(site.cloudId, '/issue/' + idn.key, true, {
         ...callOpts,
@@ -1009,6 +1033,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
         id: idn.id,
         key: idn.key,
         url: idn.url,
+        updatedFields,
       };
     }
 

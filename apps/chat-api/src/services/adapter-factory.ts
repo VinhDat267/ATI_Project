@@ -13,8 +13,7 @@ import {
   type TelegramMessageFilter,
 } from '@wap/tool-adapters';
 import {
-  isJiraG2AAllowedTool,
-  JIRA_CAPABILITY_DISABLED_IN_G2A,
+  isMyJiraTool,
   JIRA_LEGACY_SHARED_DISABLED,
   normalizeTelegramChatId,
   TELEGRAM_CHAT_ID_PATTERN,
@@ -924,10 +923,10 @@ export class AdapterFactory {
 
     return {
       execute: async (tool: string, args: Record<string, any>, callOpts?: any) => {
-        if (!isJiraG2AAllowedTool(tool)) {
+        if (!isMyJiraTool(tool)) {
           throw myjiraError(
-            'AUTH_ERROR',
-            `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Tool '${tool}' is disabled in Jira G2A read-only rollout.`
+            'VALIDATION',
+            `Unsupported Jira tool '${tool}'.`
           );
         }
         if (!this.options.jiraDispatchGuard) {
@@ -947,46 +946,76 @@ export class AdapterFactory {
 
           // Verify authority and acquire lease for candidate sites BEFORE invoking baseAdapter
           if (leaseManager && currentCapabilities.sites && currentCapabilities.sites.length > 0) {
-            for (const site of currentCapabilities.sites) {
-              const lease = await leaseManager.acquireLease({
-                userId,
-                workspaceId,
-                cloudId: site.cloudId,
-                ttlMs: callOpts?.timeoutMs ?? 15000,
-                signal: callOpts?.signal,
-              });
-              if (!primaryLeaseId) {
-                primaryLeaseId = lease.leaseId;
-              }
-              const workspaceVersion = (lease as any).workspaceVersion ?? bound?.workspaceVersion ?? (currentCapabilities as any)?.workspaceVersion ?? 1;
-              const sitePolicyVersion = (lease as any).sitePolicyVersion ?? (site as any)?.policyVersion ?? 1;
-              const siteSourceRef: JiraSourceRef = {
-                binding: {
-                  atiUserId: userId,
-                  jiraAccountId: lease.binding.jiraAccountId,
-                  atlassianAccountId: lease.binding.atlassianAccountId,
+            try {
+              for (const site of currentCapabilities.sites) {
+                const lease = await leaseManager.acquireLease({
+                  userId,
                   workspaceId,
-                  membershipVersion: lease.binding.membershipVersion,
-                  grantId: lease.binding.grantId,
-                  identityVersion: lease.binding.identityVersion,
-                },
-                workspaceId,
-                workspaceVersion,
-                siteId: site.siteId ?? (lease as any).siteId,
-                cloudId: site.cloudId,
-                sitePolicyVersion,
-                resourceType: 'site',
-                providerResourceId: site.cloudId,
-                revision: String(sitePolicyVersion),
-              };
-              validateJiraSourceRef(siteSourceRef);
-              siteLeaseMap.set(site.siteId, { lease, siteSourceRef });
-              allSourceRefs.push(siteSourceRef);
+                  cloudId: site.cloudId,
+                  ttlMs: callOpts?.timeoutMs ?? 15000,
+                  signal: callOpts?.signal,
+                });
+                if (!primaryLeaseId) {
+                  primaryLeaseId = lease.leaseId;
+                }
+                const workspaceVersion = (lease as any).workspaceVersion ?? bound?.workspaceVersion ?? (currentCapabilities as any)?.workspaceVersion ?? 1;
+                const sitePolicyVersion = (lease as any).sitePolicyVersion ?? (site as any)?.policyVersion ?? 1;
+                const siteSourceRef: JiraSourceRef = {
+                  binding: {
+                    atiUserId: userId,
+                    jiraAccountId: lease.binding.jiraAccountId,
+                    atlassianAccountId: lease.binding.atlassianAccountId,
+                    workspaceId,
+                    membershipVersion: lease.binding.membershipVersion,
+                    grantId: lease.binding.grantId,
+                    identityVersion: lease.binding.identityVersion,
+                  },
+                  workspaceId,
+                  workspaceVersion,
+                  siteId: site.siteId ?? (lease as any).siteId,
+                  cloudId: site.cloudId,
+                  sitePolicyVersion,
+                  resourceType: 'site',
+                  providerResourceId: site.cloudId,
+                  revision: String(sitePolicyVersion),
+                };
+                validateJiraSourceRef(siteSourceRef);
+                siteLeaseMap.set(site.siteId, { lease, siteSourceRef });
+                allSourceRefs.push(siteSourceRef);
+              }
+            } catch (acquireErr) {
+              if (typeof (leaseManager as any).releaseLease === 'function') {
+                for (const { lease } of siteLeaseMap.values()) {
+                  await (leaseManager as any).releaseLease(lease.leaseId).catch(() => {});
+                }
+              }
+              throw acquireErr;
             }
           }
 
           // Execute baseAdapter now that authority has been verified in PostgreSQL
-          const rawOutput = await baseAdapter.execute(tool, args, callOpts);
+          let rawOutput: any;
+          try {
+            rawOutput = await baseAdapter.execute(tool, args, callOpts);
+          } catch (execErr) {
+            if (leaseManager && typeof (leaseManager as any).releaseLease === 'function') {
+              for (const { lease } of siteLeaseMap.values()) {
+                await (leaseManager as any).releaseLease(lease.leaseId).catch(() => {});
+              }
+            }
+            throw execErr;
+          }
+
+          const keepPlanningLeases = context?.phase === 'planning';
+          const deferredPrimary = Boolean(primaryLeaseId && context?.stepLeaseMap && callOpts?.stepId);
+          if (!keepPlanningLeases && leaseManager && typeof (leaseManager as any).releaseLease === 'function') {
+            for (const { lease } of siteLeaseMap.values()) {
+              if (!deferredPrimary || lease.leaseId !== primaryLeaseId) {
+                await (leaseManager as any).releaseLease(lease.leaseId).catch(() => {});
+              }
+            }
+          }
+
           let list = Array.isArray(rawOutput) ? rawOutput : [];
           if (this.options.jiraWorkspaceRepo && currentCapabilities.sites) {
             const activeCloudIds = new Set(currentCapabilities.sites.map((s: any) => s.cloudId));

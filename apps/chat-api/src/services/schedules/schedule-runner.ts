@@ -1,6 +1,6 @@
 import {captureScheduleArtifact,guardScheduleArtifact,prelockScheduleArtifacts,registerScheduleFields,scheduleRegistry,scheduleSourceContext,tagScheduleContext} from '../slack/slack-schedule-lineage.js';
 import type pg from 'pg';
-import type { CalendarDigestConfig, GithubDigestConfig, NotionDigestConfig, ScheduleKind, ScheduleRecurrence, ScheduleRunMessageMetadata, TelegramDigestConfig, TrelloDigestConfig } from '@wap/tool-schemas';
+import type { CalendarDigestConfig, GithubDigestConfig, MyJiraDigestConfig, NotionDigestConfig, ScheduleKind, ScheduleRecurrence, ScheduleRunMessageMetadata, TelegramDigestConfig, TrelloDigestConfig } from '@wap/tool-schemas';
 import { MessageRepo } from '../../db/repositories/message-repo.js';
 import type { Queryable, ScheduleRow } from '../../db/repositories/schedule-repo.js';
 import type { DigestRunOutcome as CalendarDigestRunOutcome, RunCalendarDigest } from './calendar-digest-runner.js';
@@ -11,6 +11,13 @@ import type { ScheduleChange } from './schedule-service.js';
 import { SHEETS_DELIVERY_UNKNOWN, type SheetsDigestRunner } from './sheets-digest-runner.js';
 import type { DigestRunOutcome as GithubDigestRunOutcome, RunGithubDigest } from './github-digest-runner.js';
 import { GITHUB_DELIVERY_UNKNOWN } from './github-digest-runner.js';
+import {
+  JIRA_READ_UNAVAILABLE,
+  JIRA_READ_UNAVAILABLE_PREFIX,
+  MYJIRA_DELIVERY_UNKNOWN,
+  type MyJiraDigestRunOutcome,
+  type RunJiraDigestExecutorFn,
+} from './jira-digest-runner.js';
 import {
   TRELLO_DELIVERY_UNKNOWN,
   TRELLO_READ_UNAVAILABLE,
@@ -25,6 +32,7 @@ import { assertDigestScheduleLiveScopeAndAuth } from './digest-scope-guard.js';
 export interface RunToPlan {
   runId: string; scheduleId: string; scheduleVersion: number; userId: string;
   name: string; request: string; dueAt: Date; trigger: 'scheduled' | 'manual' | 'replan';
+  services?: string[];
   workspaceId?: string | null;
   workspaceMode?: 'legacy' | 'personal' | 'organization';
   timeZone?: string;
@@ -50,7 +58,7 @@ export interface ScheduleRunnerOptions {
   runGithubDigest?: RunGithubDigest;
   runTrelloDigest?: RunTrelloDigest;
   runNotionDigest?: RunNotionDigest;
-  runJiraDigest?: (input: any, signal: AbortSignal) => Promise<any>;
+  runJiraDigest?: RunJiraDigestExecutorFn;
   executeDigestRun?: ExecuteDigestRun;
   timeZone: string;
   encryptionKey?: string;
@@ -127,6 +135,7 @@ export async function reconcileScheduleRuns(pool: pg.Pool): Promise<void> {
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'telegram_digest' THEN $5
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'github_digest' THEN $6
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'notion_digest' THEN $7
+           WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'myjira_digest' THEN $8
            WHEN r.delivery_started_at IS NOT NULL THEN $2
            ELSE $1
          END,
@@ -142,6 +151,7 @@ export async function reconcileScheduleRuns(pool: pg.Pool): Promise<void> {
         TELEGRAM_DELIVERY_UNKNOWN,
         GITHUB_DELIVERY_UNKNOWN,
         NOTION_DELIVERY_UNKNOWN,
+        MYJIRA_DELIVERY_UNKNOWN,
       ],
     );
     for (const row of res.rows) {
@@ -425,6 +435,7 @@ export class ScheduleRunner {
         request: run.request,
         dueAt,
         trigger: run.trigger,
+        services: Array.isArray(run.services) ? run.services : [],
         workspaceId: run.workspace_id ?? null,
         workspaceMode: run.workspace_mode ?? 'legacy',
         timeZone,
@@ -960,10 +971,10 @@ export class ScheduleRunner {
       messageId: string;
       kind: ScheduleKind;
       recurrence: ScheduleRecurrence;
-      digestConfig: GithubDigestConfig | null;
+      digestConfig: GithubDigestConfig | MyJiraDigestConfig | null;
       digestConfigHash: string | null;
     },
-    overrideRunner?: RunGithubDigest | RunTrelloDigest | RunNotionDigest,
+    overrideRunner?: RunGithubDigest | RunTrelloDigest | RunNotionDigest | RunJiraDigestExecutorFn,
   ): Promise<void> {
     const { pool } = this.options;
     const controller = new AbortController();
@@ -974,10 +985,12 @@ export class ScheduleRunner {
       controller.abort();
     }, this.planTimeoutMs);
 
-    let outcome: GithubDigestRunOutcome | TrelloDigestRunOutcome | NotionDigestRunOutcome | null = null;
+    let outcome: GithubDigestRunOutcome | TrelloDigestRunOutcome | NotionDigestRunOutcome | MyJiraDigestRunOutcome | null = null;
     let failure: string | null = null;
     try {
-      const githubRunner = (overrideRunner ?? this.options.runGithubDigest ?? this.options.runDigest) as RunGithubDigest | undefined;
+      const githubRunner = (overrideRunner ?? this.options.runGithubDigest ?? this.options.runDigest) as
+        | ((run: any, convId: string, signal: AbortSignal) => Promise<any>)
+        | undefined;
       if (!githubRunner) throw new Error('Chưa nối digest runner');
       const aborted = new Promise<never>((_, reject) =>
         controller.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }),
@@ -1034,7 +1047,9 @@ export class ScheduleRunner {
             ? TRELLO_DELIVERY_UNKNOWN
             : started.kind === 'notion_digest'
               ? NOTION_DELIVERY_UNKNOWN
-              : GITHUB_DELIVERY_UNKNOWN;
+              : started.kind === 'myjira_digest'
+                ? MYJIRA_DELIVERY_UNKNOWN
+                : GITHUB_DELIVERY_UNKNOWN;
         const unknownErr = outcome?.state === 'delivery_unknown' ? outcome.error : defaultUnknownErr;
         await this.messages.createMessage(started.convId, 'system', `Lỗi: ${unknownErr}`, { type: 'planning_error', ...replyTo }, client);
         await client.query("UPDATE schedule_runs SET status='needs_attention', error=$2, updated_at=now() WHERE id=$1", [runId, unknownErr]);
@@ -1075,11 +1090,18 @@ export class ScheduleRunner {
       const errText = outcome?.state === 'digest_failed' ? outcome.error : failure ?? 'Không gửi được bản tin lúc này. Hãy thử lại.';
       const retryableTrelloOutage = started.kind === 'trello_digest' && outcome?.state === 'digest_failed' &&
         'failureCode' in outcome && outcome.failureCode === TRELLO_READ_UNAVAILABLE;
-      const storedError = retryableTrelloOutage ? TRELLO_READ_UNAVAILABLE_PREFIX + errText : errText;
+      const retryableJiraOutage = started.kind === 'myjira_digest' && outcome?.state === 'digest_failed' &&
+        'failureCode' in outcome && outcome.failureCode === JIRA_READ_UNAVAILABLE;
+      const retryableTransientOutage = retryableTrelloOutage || retryableJiraOutage;
+      const storedError = retryableJiraOutage
+        ? JIRA_READ_UNAVAILABLE_PREFIX + errText
+        : retryableTrelloOutage
+          ? TRELLO_READ_UNAVAILABLE_PREFIX + errText
+          : errText;
       await this.messages.createMessage(started.convId, 'system', `Lỗi: ${errText}`, { type: 'planning_error', ...replyTo }, client);
       await client.query("UPDATE schedule_runs SET status='digest_failed', error=$2, updated_at=now() WHERE id=$1", [runId, storedError]);
 
-      if (retryableTrelloOutage) {
+      if (retryableTransientOutage) {
         return { kind: 'error' as const, error: errText, changes };
       }
 
@@ -1091,7 +1113,8 @@ export class ScheduleRunner {
         schedule.status === 'active' &&
         recentRuns.rows.length === 3 &&
         recentRuns.rows.every((r) => r.status === 'digest_failed' &&
-          !(started.kind === 'trello_digest' && r.error?.startsWith(TRELLO_READ_UNAVAILABLE_PREFIX)))
+          !(started.kind === 'trello_digest' && r.error?.startsWith(TRELLO_READ_UNAVAILABLE_PREFIX)) &&
+          !(started.kind === 'myjira_digest' && r.error?.startsWith(JIRA_READ_UNAVAILABLE_PREFIX)))
       ) {
         const paused = await this.pause(client, schedule.id, GITHUB_DIGEST_FAILED_3X);
         changes.push(await this.options.recordState(client, paused, now));

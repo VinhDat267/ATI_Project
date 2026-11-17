@@ -154,7 +154,7 @@
         },
         {
           "id": "step_2",
-          "tool": "jira.create_issue",
+          "tool": "myjira.create_issue",
           "description": "Tạo đầu việc rà soát công nợ cuối tuần trên Dự án Jira OPS",
           "dependsOn": ["step_1"],
           "args": {

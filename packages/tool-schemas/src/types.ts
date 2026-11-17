@@ -736,6 +736,70 @@ export interface NotionDigestCandidate {
   configHash?: string;
 }
 
+export interface MyJiraDigestProjectRef {
+  siteId: string;
+  siteName: string;
+  projectKey: string;
+  projectName?: string;
+}
+
+export interface MyJiraDigestConfig {
+  workspaceId: string;
+  grantId: string;
+  atlassianAccountId: string;
+  projects: MyJiraDigestProjectRef[];
+  channelId: string;
+  channelName: string;
+  destination?: 'slack' | 'telegram';
+  telegramChatId?: string;
+  telegramChatTitle?: string;
+  telegramCredentialId?: string;
+  dueSoonHours?: number;
+  includeAiSummary?: boolean;
+}
+
+export interface MyJiraDigestCoverage {
+  perProjectFetchLimit: number;
+  perCategoryDisplayLimit: number;
+  scannedCount: number;
+  totalAvailable: 'UNKNOWN' | number;
+  isComplete: boolean;
+  truncated: boolean;
+}
+
+export interface MyJiraDigestDelivery {
+  destinationService?: 'slack' | 'telegram';
+  channelId: string;
+  channelName: string;
+  ts: string | null;
+  telegramChatId?: string;
+  telegramChatTitle?: string;
+  messageId?: number | null;
+  counts: {
+    projectsChecked: number;
+    totalIssues: number;
+    overdueIssues?: number;
+    dueSoonIssues?: number;
+    blockerOrHighIssues?: number;
+    unassignedIssues?: number;
+    inProgressIssues?: number;
+    doneIssues?: number;
+  };
+  coverage?: MyJiraDigestCoverage;
+  summaryIncluded?: boolean;
+  truncated?: boolean;
+  sentAt?: string;
+  manualConfirmedAt?: string;
+  manualResolution?: SheetsDigestManualResolution;
+}
+
+export interface MyJiraDigestCandidate {
+  canAutoDigest: boolean;
+  disabledReason?: string;
+  config?: MyJiraDigestConfig;
+  configHash?: string;
+}
+
 export interface ScheduleView {
   id: string; convId: string; version: number;
   name: string; request: string; recurrence: ScheduleRecurrence;
@@ -748,11 +812,12 @@ export interface ScheduleView {
   lastRun: ScheduleRunView | null;
   kind?: ScheduleKind;
   approvalMode?: ScheduleApprovalMode;
-  digestConfig?: SheetsDigestConfig | CalendarDigestConfig | GithubDigestConfig | TelegramDigestConfig | TrelloDigestConfig | NotionDigestConfig | null;
+  digestConfig?: SheetsDigestConfig | CalendarDigestConfig | GithubDigestConfig | TelegramDigestConfig | TrelloDigestConfig | NotionDigestConfig | MyJiraDigestConfig | null;
   digest?:
     | { config: GithubDigestConfig; approvedAt: string }
     | { config: TrelloDigestConfig; approvedAt: string }
     | { config: NotionDigestConfig; approvedAt: string }
+    | { config: MyJiraDigestConfig; approvedAt: string }
     | { config: Record<string, unknown>; approvedAt: string }
     | {
         chatId: string;
@@ -784,7 +849,7 @@ export interface ScheduleRunView {
   planStatus: string | null;
   /** A Vietnamese sentence for the user. */
   error: string | null;
-  delivery?: SheetsDigestDelivery | CalendarDigestDelivery | GithubDigestDelivery | TelegramDigestDelivery | TrelloDigestDelivery | NotionDigestDelivery | null;
+  delivery?: SheetsDigestDelivery | CalendarDigestDelivery | GithubDigestDelivery | TelegramDigestDelivery | TrelloDigestDelivery | NotionDigestDelivery | MyJiraDigestDelivery | null;
   deliveryStartedAt?: string | null;
   deliveryResolution?: ScheduleRunDeliveryResolution | null;
   /** The current schedule and dispatched configuration permit a confirmed resend for this run. */
@@ -809,6 +874,7 @@ export interface ScheduleProposalMetadata {
     | TelegramDigestCandidate
     | TrelloDigestCandidate
     | NotionDigestCandidate
+    | MyJiraDigestCandidate
     | { canAutoDigest: boolean; disabledReason?: string; config?: Record<string, unknown>; configHash?: string };
   reauthorize?: boolean;
   expiresAt?: string;

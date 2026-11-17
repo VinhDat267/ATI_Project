@@ -155,25 +155,23 @@ describe('JIRA-G2A Adapter Read-Only Policy & Search Coverage Contracts', () => 
       .rejects.toMatchObject({ category: 'AUTH_ERROR' });
   });
 
-  it('LOCK-02 (D02-A1): MYJIRA_SCOPES excludes write:jira-work in G2A', () => {
-    expect(MYJIRA_SCOPES).toEqual(['offline_access', 'read:me', 'read:jira-work']);
-    expect(MYJIRA_SCOPES).not.toContain('write:jira-work');
+  it('includes write:jira-work in MYJIRA_SCOPES for full read/write Jira automation', () => {
+    expect(MYJIRA_SCOPES).toEqual(['offline_access', 'read:me', 'read:jira-work', 'write:jira-work']);
   });
 
   it.each([
-    ['myjira.create_issue', { siteId: 'site_opaque_1', projectKey: 'ATI', summary: 'Blocked write' }],
-    ['myjira.add_comment', { siteId: 'site_opaque_1', issueKey: 'ATI-1', body: 'Blocked comment' }],
-    ['myjira.update_issue', { siteId: 'site_opaque_1', issueKey: 'ATI-1', priority: 'High' }],
-    ['myjira.transition_issue', { siteId: 'site_opaque_1', issueKey: 'ATI-1', status: 'Done' }],
-    ['myjira.search_users', { siteId: 'site_opaque_1', projectKey: 'ATI', query: 'alice' }],
-  ])('LOCK-04: PersonalJiraAdapter denies %s fail-closed before any HTTP call', async (tool, args) => {
+    ['myjira.create_issue', { siteId: 'unknown_site', projectKey: 'ATI', summary: 'Blocked write' }],
+    ['myjira.add_comment', { siteId: 'site_opaque_1', issueKey: 'OTHER-1', body: 'Blocked comment' }],
+    ['myjira.update_issue', { siteId: 'site_opaque_1', issueKey: 'OTHER-1', priority: 'High' }],
+    ['myjira.transition_issue', { siteId: 'site_opaque_1', issueKey: 'OTHER-1', status: 'Done' }],
+    ['myjira.search_users', { siteId: 'site_opaque_1', projectKey: 'OTHER', query: 'alice' }],
+  ])('PersonalJiraAdapter enforces site/project allowlist on %s before any HTTP call', async (tool, args) => {
     const adapter = makeAdapter();
     await expect(adapter.execute(tool, args)).rejects.toSatisfy((err: unknown) => {
       return (
         err instanceof StepError &&
         err.category === 'AUTH_ERROR' &&
-        err.retryable === false &&
-        err.message.includes('JIRA_CAPABILITY_DISABLED_IN_G2A')
+        err.retryable === false
       );
     });
     expect(requests).toEqual([]);

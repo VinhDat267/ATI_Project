@@ -13,6 +13,7 @@ import type {
 import type { ScheduleRow } from '../../db/repositories/schedule-repo.js';
 import { CALENDAR_DELIVERY_UNKNOWN } from './calendar-digest-runner.js';
 import { GITHUB_DELIVERY_UNKNOWN } from './github-digest-runner.js';
+import { JIRA_READ_UNAVAILABLE_PREFIX } from './jira-digest-runner.js';
 import { NOTION_DELIVERY_UNKNOWN } from './notion-digest-runner.js';
 import { TRELLO_READ_UNAVAILABLE_PREFIX } from './trello-digest-runner.js';
 
@@ -151,6 +152,9 @@ export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): Sc
   if (row.status === 'digest_failed' && error?.startsWith(TRELLO_READ_UNAVAILABLE_PREFIX)) {
     error = error.slice(TRELLO_READ_UNAVAILABLE_PREFIX.length);
   }
+  if (row.status === 'digest_failed' && error?.startsWith(JIRA_READ_UNAVAILABLE_PREFIX)) {
+    error = error.slice(JIRA_READ_UNAVAILABLE_PREFIX.length);
+  }
   const view: ScheduleRunView = {
     id: row.id, scheduleId: row.schedule_id, trigger: row.trigger,
     dueAt: iso(row.due_at), createdAt: iso(row.created_at),
@@ -167,6 +171,17 @@ export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): Sc
   const unknownKind = calendarOrGithubDeliveryUnknownKind(row, schedule);
   if (schedule && unknownKind) {
     view.canRetryDelivery = schedule.kind === unknownKind &&
+      (schedule.status === 'active' || (schedule.status === 'completed' && schedule.recurrence.type === 'once')) &&
+      matchesDispatchedDigestConfig(row, schedule);
+  } else if (
+    schedule?.kind === 'myjira_digest' &&
+    row.status === 'needs_attention' &&
+    row.delivery_started_at != null &&
+    row.delivery_resolution == null &&
+    typeof row.error === 'string' &&
+    row.error.trim().length > 0
+  ) {
+    view.canRetryDelivery =
       (schedule.status === 'active' || (schedule.status === 'completed' && schedule.recurrence.type === 'once')) &&
       matchesDispatchedDigestConfig(row, schedule);
   }

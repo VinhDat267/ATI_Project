@@ -13,6 +13,7 @@ import {
 import type { RunGithubDigest } from '../services/schedules/github-digest-runner.js';
 import type { RunTrelloDigest } from '../services/schedules/trello-digest-runner.js';
 import type { RunNotionDigest } from '../services/schedules/notion-digest-runner.js';
+import type { RunJiraDigestExecutorFn } from '../services/schedules/jira-digest-runner.js';
 
 export function isSheetsDigestEmitV2Enabled(options?: { emitV2?: boolean }): boolean {
   if (typeof options?.emitV2 === 'boolean') return options.emitV2;
@@ -35,6 +36,7 @@ export interface ScheduleRuntimeOptions {
   runGithubDigest?: RunGithubDigest;
   runTrelloDigest?: RunTrelloDigest;
   runNotionDigest?: RunNotionDigest;
+  runJiraDigest?: RunJiraDigestExecutorFn;
   verifyNotionSource?: import('../services/schedules/schedule-service.js').ScheduleServiceOptions['verifyNotionSource'];
   executeDigestRun?: ExecuteDigestRun;
   emit?: (convId: string, event: string, payload: unknown) => unknown;
@@ -95,6 +97,7 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
     runGithubDigest: options.runGithubDigest,
     runTrelloDigest: options.runTrelloDigest,
     runNotionDigest: options.runNotionDigest,
+    runJiraDigest: options.runJiraDigest,
     executeDigestRun: options.executeDigestRun,
     emit: options.emit,
     now: options.now,

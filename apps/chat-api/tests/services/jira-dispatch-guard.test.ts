@@ -275,6 +275,10 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
     };
 
     const completionOrder: string[] = [];
+    let markDispatchInsideLock!: () => void;
+    const dispatchInsideLock = new Promise<void>((resolve) => {
+      markDispatchInsideLock = resolve;
+    });
 
     // Client 1: Launch dispatch
     const dispatchPromise = guard
@@ -282,6 +286,7 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
         scope,
         { isWrite: false, tool: 'myjira.search_issues', timeoutMs: 5000 },
         async (token, signal) => {
+          markDispatchInsideLock();
           const res = await fetch(`${serverUrl}/read`, { signal, headers: { Authorization: `Bearer ${token}` } });
           const json = await res.json();
           completionOrder.push('dispatch_done');
@@ -293,8 +298,8 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
         return res;
       });
 
-    // Wait 30ms to guarantee dispatch transaction has claimed the row
-    await new Promise((r) => setTimeout(r, 30));
+    // Wait until Client 1 is inside dispatchFn (Step 4 PG FOR UPDATE lease lock held)
+    await dispatchInsideLock;
 
     // Client 2: Revoker worker attempts markRevoked on separate connection
     const client2Pool = ctx.createWorkerPool({ max: 1, applicationName: 'client2_revoker' });
@@ -323,7 +328,7 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
     expect(completionOrder.indexOf('dispatch_done')).toBeLessThan(completionOrder.indexOf('revoke_committed'));
   });
 
-  it('write dispatch: immediately rejects isWrite=true fail-closed in G2A with zero HTTP calls', async () => {
+  it('write dispatch: executes guarded write cleanly when write:jira-work scope exists and rejects with JIRA_WRITE_SCOPE_REQUIRED when missing', async () => {
     httpCallCount = 0;
     const f = await createFixture('write_disp_wins');
 
@@ -343,6 +348,28 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
       projectPolicyVersion: 1,
     };
 
+    const writeRes = await guard.executeGuardedDispatch(
+      scope,
+      { isWrite: true, tool: 'myjira.create_issue', timeoutMs: 5000 },
+      async (token, signal) => {
+        const res = await fetch(`${serverUrl}/write`, {
+          method: 'POST',
+          signal,
+          headers: { Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ issue: 'Create' }),
+        });
+        return res.json();
+      }
+    );
+    expect(writeRes).toEqual({ ok: true, callIndex: 1 });
+    expect(httpCallCount).toBe(1);
+
+    // Now strip write:jira-work scope from grant site and verify fail-closed zero outbound calls
+    await pool.query(
+      `UPDATE jira_grant_sites SET scopes = $1 WHERE grant_id = $2`,
+      [['read:jira-work'], f.grantId]
+    );
+
     await expect(
       guard.executeGuardedDispatch(
         scope,
@@ -352,16 +379,16 @@ describe('Jira Dispatch Guard & Revocation Linearization (JIRA-08 Task 3 Real Po
             method: 'POST',
             signal,
             headers: { Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ issue: 'Create' }),
+            body: JSON.stringify({ issue: 'ShouldNotReach' }),
           });
           return res.json();
         }
       )
     ).rejects.toMatchObject({
-      code: 'JIRA_CAPABILITY_DISABLED_IN_G2A',
+      code: 'JIRA_WRITE_SCOPE_REQUIRED',
     });
 
-    expect(httpCallCount).toBe(0);
+    expect(httpCallCount).toBe(1);
   });
 
   it('stalled HTTP respects deadline and abort signal, releasing lock cleanly', async () => {

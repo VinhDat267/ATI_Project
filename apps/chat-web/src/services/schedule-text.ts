@@ -62,6 +62,14 @@ export function runLabel(run: ScheduleRunView): string {
         if (typeof completed === 'number' && completed > 0) parts.push(`${completed} đã xong`);
         return `Đã gửi · ${parts.join(' · ')}`;
       }
+      if ('totalIssues' in counts) {
+        const parts = [`${counts.totalIssues} issue`];
+        if (typeof counts.overdueIssues === 'number' && counts.overdueIssues > 0) parts.push(`${counts.overdueIssues} quá hạn`);
+        if (typeof counts.dueSoonIssues === 'number' && counts.dueSoonIssues > 0) parts.push(`${counts.dueSoonIssues} sắp đến hạn`);
+        if (typeof counts.blockerOrHighIssues === 'number' && counts.blockerOrHighIssues > 0) parts.push(`${counts.blockerOrHighIssues} ưu tiên cao`);
+        if (typeof counts.unassignedIssues === 'number' && counts.unassignedIssues > 0) parts.push(`${counts.unassignedIssues} chưa gán`);
+        return `Đã gửi · ${parts.join(' · ')}`;
+      }
       const total =
         'totalPages' in counts
           ? counts.totalPages

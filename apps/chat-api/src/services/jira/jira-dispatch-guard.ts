@@ -1,5 +1,11 @@
 import type { Pool } from 'pg';
-import { isJiraG2AAllowedTool, JIRA_CAPABILITY_DISABLED_IN_G2A } from '@wap/tool-schemas';
+import {
+  isJiraWriteTool,
+  isMyJiraTool,
+  JIRA_CAPABILITY_DISABLED_IN_G2A,
+  JIRA_WRITE_SCOPE,
+  JIRA_WRITE_SCOPE_REQUIRED,
+} from '@wap/tool-schemas';
 import type { JiraLeaseManager } from './jira-lease-manager.js';
 
 export interface DispatchScope {
@@ -26,7 +32,15 @@ export interface GuardedDispatchOptions {
     verifyUserPermissions: (
       evidence: { actorId: string; workspaceId?: string; cloudId: string; projectId?: string },
       options?: { signal?: AbortSignal }
-    ) => Promise<{ canBrowse: boolean; canCreateIssue: boolean; canAddComment: boolean; status?: string; reason?: string }>;
+    ) => Promise<{
+      canBrowse: boolean;
+      canCreateIssue: boolean;
+      canAddComment: boolean;
+      canEditIssue?: boolean;
+      canTransitionIssue?: boolean;
+      status?: string;
+      reason?: string;
+    }>;
   };
   tool: string;
   deferRelease?: boolean;
@@ -62,12 +76,13 @@ export class JiraDispatchGuard {
     options: GuardedDispatchOptions,
     dispatchFn: (token: string, signal: AbortSignal) => Promise<T>
   ): Promise<T> {
-    if (options.isWrite || !isJiraG2AAllowedTool(options.tool)) {
+    if (!options?.tool || !isMyJiraTool(options.tool)) {
       throw new JiraDispatchError(
-        `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Jira writes and non-G2A capabilities are disabled in G2A read-only mode`,
+        `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Unknown or disallowed Jira tool identity '${String(options?.tool ?? '')}'`,
         JIRA_CAPABILITY_DISABLED_IN_G2A
       );
     }
+    const isWriteDispatch = options.isWrite || isJiraWriteTool(options.tool);
 
     if (!scope.userId || !scope.workspaceId || !scope.cloudId) {
       throw new JiraDispatchError(
@@ -122,68 +137,85 @@ export class JiraDispatchGuard {
       );
     }
 
-    // Verify lease binding against approved plan binding parameters
-    if (scope.expectedGrantId && lease.binding.grantId !== scope.expectedGrantId) {
-      throw new JiraDispatchError(
-        `Approved grant mismatch: expected ${scope.expectedGrantId}, got ${lease.binding.grantId}`,
-        'GRANT_MISMATCH'
-      );
-    }
-    if (scope.expectedAccountId && lease.binding.jiraAccountId !== scope.expectedAccountId) {
-      throw new JiraDispatchError(
-        `Approved account mismatch: expected ${scope.expectedAccountId}, got ${lease.binding.jiraAccountId}`,
-        'ACCOUNT_MISMATCH'
-      );
-    }
-    if (scope.expectedAtlassianAccountId && lease.binding.atlassianAccountId !== scope.expectedAtlassianAccountId) {
-      throw new JiraDispatchError(
-        `Approved Atlassian account mismatch: expected ${scope.expectedAtlassianAccountId}, got ${lease.binding.atlassianAccountId}`,
-        'ATLASSIAN_ACCOUNT_MISMATCH'
-      );
-    }
-    if (scope.expectedMembershipVersion !== undefined && lease.binding.membershipVersion !== scope.expectedMembershipVersion) {
-      throw new JiraDispatchError(
-        `Approved membership version mismatch: expected ${scope.expectedMembershipVersion}, got ${lease.binding.membershipVersion}`,
-        'MEMBERSHIP_VERSION_STALE'
-      );
-    }
-    if (scope.expectedIdentityVersion !== undefined && lease.binding.identityVersion !== scope.expectedIdentityVersion) {
-      throw new JiraDispatchError(
-        `Approved identity version mismatch: expected ${scope.expectedIdentityVersion}, got ${lease.binding.identityVersion}`,
-        'IDENTITY_VERSION_STALE'
-      );
-    }
+    try {
+      // Verify lease binding against approved plan binding parameters
+      if (scope.expectedGrantId && lease.binding.grantId !== scope.expectedGrantId) {
+        throw new JiraDispatchError(
+          `Approved grant mismatch: expected ${scope.expectedGrantId}, got ${lease.binding.grantId}`,
+          'GRANT_MISMATCH'
+        );
+      }
+      if (scope.expectedAccountId && lease.binding.jiraAccountId !== scope.expectedAccountId) {
+        throw new JiraDispatchError(
+          `Approved account mismatch: expected ${scope.expectedAccountId}, got ${lease.binding.jiraAccountId}`,
+          'ACCOUNT_MISMATCH'
+        );
+      }
+      if (scope.expectedAtlassianAccountId && lease.binding.atlassianAccountId !== scope.expectedAtlassianAccountId) {
+        throw new JiraDispatchError(
+          `Approved Atlassian account mismatch: expected ${scope.expectedAtlassianAccountId}, got ${lease.binding.atlassianAccountId}`,
+          'ATLASSIAN_ACCOUNT_MISMATCH'
+        );
+      }
+      if (scope.expectedMembershipVersion !== undefined && lease.binding.membershipVersion !== scope.expectedMembershipVersion) {
+        throw new JiraDispatchError(
+          `Approved membership version mismatch: expected ${scope.expectedMembershipVersion}, got ${lease.binding.membershipVersion}`,
+          'MEMBERSHIP_VERSION_STALE'
+        );
+      }
+      if (scope.expectedIdentityVersion !== undefined && lease.binding.identityVersion !== scope.expectedIdentityVersion) {
+        throw new JiraDispatchError(
+          `Approved identity version mismatch: expected ${scope.expectedIdentityVersion}, got ${lease.binding.identityVersion}`,
+          'IDENTITY_VERSION_STALE'
+        );
+      }
 
-    // Check native permissions if verifier is provided
-    if (options.verifier) {
-      const nativeRes = await options.verifier.verifyUserPermissions(
-        {
-          actorId: scope.userId,
-          workspaceId: scope.workspaceId,
-          cloudId: scope.cloudId,
-          projectId: scope.projectId,
-        },
-        { signal: options.signal }
-      );
-      if (nativeRes.status === 'denied' || !nativeRes.canBrowse) {
-        throw new JiraDispatchError(
-          `Native Jira permission denied: ${nativeRes.reason || 'User lacks BROWSE_PROJECTS'}`,
-          'PERMISSION_DENIED'
+      // Check native permissions if verifier is provided
+      if (options.verifier) {
+        const nativeRes = await options.verifier.verifyUserPermissions(
+          {
+            actorId: scope.userId,
+            workspaceId: scope.workspaceId,
+            cloudId: scope.cloudId,
+            projectId: scope.projectId,
+          },
+          { signal: options.signal }
         );
+        if (nativeRes.status === 'denied' || !nativeRes.canBrowse) {
+          throw new JiraDispatchError(
+            `Native Jira permission denied: ${nativeRes.reason || 'User lacks BROWSE_PROJECTS'}`,
+            'PERMISSION_DENIED'
+          );
+        }
+        const rawTool: string | undefined = options.tool;
+        if (rawTool === 'myjira.create_issue' && !nativeRes.canCreateIssue) {
+          throw new JiraDispatchError(
+            'Native Jira permission denied: User lacks CREATE_ISSUES permission',
+            'PERMISSION_DENIED'
+          );
+        }
+        if (rawTool === 'myjira.add_comment' && !nativeRes.canAddComment) {
+          throw new JiraDispatchError(
+            'Native Jira permission denied: User lacks ADD_COMMENTS permission',
+            'PERMISSION_DENIED'
+          );
+        }
+        if (rawTool === 'myjira.update_issue' && nativeRes.canEditIssue !== true) {
+          throw new JiraDispatchError(
+            'Native Jira permission denied: User lacks EDIT_ISSUES permission',
+            'PERMISSION_DENIED'
+          );
+        }
+        if (rawTool === 'myjira.transition_issue' && nativeRes.canTransitionIssue !== true) {
+          throw new JiraDispatchError(
+            'Native Jira permission denied: User lacks TRANSITION_ISSUES permission',
+            'PERMISSION_DENIED'
+          );
+        }
       }
-      const rawTool: string | undefined = options.tool;
-      if (rawTool === 'myjira.create_issue' && !nativeRes.canCreateIssue) {
-        throw new JiraDispatchError(
-          'Native Jira permission denied: User lacks CREATE_ISSUES permission',
-          'PERMISSION_DENIED'
-        );
-      }
-      if (rawTool === 'myjira.add_comment' && !nativeRes.canAddComment) {
-        throw new JiraDispatchError(
-          'Native Jira permission denied: User lacks ADD_COMMENTS permission',
-          'PERMISSION_DENIED'
-        );
-      }
+    } catch (preDispatchErr) {
+      await this.leaseManager.releaseLease(lease.leaseId).catch(() => {});
+      throw preDispatchErr;
     }
 
     // Step 3: Set up timeout and abort controller
@@ -324,8 +356,8 @@ export class JiraDispatchGuard {
 
       // 5. Lock approved grant row FOR SHARE
       const activeGrantId = scope.expectedGrantId ?? leaseInit.grant_id;
-      const grantRes = await client.query<{ status: string; account_id: string }>(
-        `SELECT status, account_id FROM jira_oauth_grants WHERE id = $1 FOR SHARE`,
+      const grantRes = await client.query<{ status: string; account_id: string; scopes: string[] | null }>(
+        `SELECT status, account_id, scopes FROM jira_oauth_grants WHERE id = $1 FOR SHARE`,
         [activeGrantId]
       );
       if (!grantRes.rows[0] || grantRes.rows[0].status !== 'active') {
@@ -333,14 +365,27 @@ export class JiraDispatchGuard {
       }
 
       // 6. Lock grant site access FOR SHARE
-      const grantSiteRes = await client.query<{ id: string }>(
-        `SELECT id FROM jira_grant_sites
+      const grantSiteRes = await client.query<{ id: string; scopes: string[] | null }>(
+        `SELECT id, scopes FROM jira_grant_sites
          WHERE grant_id = $1 AND cloud_id = $2 AND product_type = 'jira'
          FOR SHARE`,
         [activeGrantId, scope.cloudId]
       );
       if (!grantSiteRes.rows[0]) {
         throw new JiraDispatchError('Site access revoked from grant before dispatch', 'SITE_ACCESS_REVOKED');
+      }
+      if (isWriteDispatch) {
+        const grantScopes = Array.isArray(grantRes.rows[0].scopes) ? grantRes.rows[0].scopes : [];
+        const siteScopes = Array.isArray(grantSiteRes.rows[0].scopes) ? grantSiteRes.rows[0].scopes : [];
+        const hasAnyScopes = grantScopes.length > 0 || siteScopes.length > 0;
+        const hasWriteScope =
+          grantScopes.includes(JIRA_WRITE_SCOPE) || siteScopes.includes(JIRA_WRITE_SCOPE);
+        if (hasAnyScopes && !hasWriteScope) {
+          throw new JiraDispatchError(
+            `${JIRA_WRITE_SCOPE_REQUIRED}: Active grant lacks write:jira-work scope`,
+            JIRA_WRITE_SCOPE_REQUIRED
+          );
+        }
       }
 
       // 7. Lock site policy FOR SHARE

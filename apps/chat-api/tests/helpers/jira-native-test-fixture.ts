@@ -15,6 +15,8 @@ export interface UserPermissionSet {
   canBrowse: boolean;
   canCreateIssue: boolean;
   canAddComment: boolean;
+  canEditIssue?: boolean;
+  canTransitionIssue?: boolean;
 }
 
 export interface JiraNativeSiteConfig {
@@ -259,7 +261,7 @@ export async function createJiraNativeTestFixture(): Promise<JiraNativeTestFixtu
           };
         }
 
-        // User permissions (BROWSE_PROJECTS, CREATE_ISSUES, ADD_COMMENTS)
+        // User permissions (BROWSE_PROJECTS, CREATE_ISSUES, ADD_COMMENTS, EDIT_ISSUES, TRANSITION_ISSUES)
         const projectId = query.projectId;
         const projectKey = query.projectKey;
         const lookupKey = projectId ?? projectKey ?? 'global';
@@ -270,6 +272,8 @@ export async function createJiraNativeTestFixture(): Promise<JiraNativeTestFixtu
             canBrowse: true,
             canCreateIssue: true,
             canAddComment: true,
+            canEditIssue: true,
+            canTransitionIssue: true,
           };
 
         if (requestedPerms.length === 0 || requestedPerms.includes('BROWSE_PROJECTS')) {
@@ -302,6 +306,28 @@ export async function createJiraNativeTestFixture(): Promise<JiraNativeTestFixtu
             type: 'PROJECT',
             description: 'Ability to add comments to issues.',
             havePermission: userPerms.canAddComment,
+          };
+        }
+
+        if (requestedPerms.length === 0 || requestedPerms.includes('EDIT_ISSUES')) {
+          permissionsObj['EDIT_ISSUES'] = {
+            id: '12',
+            key: 'EDIT_ISSUES',
+            name: 'Edit Issues',
+            type: 'PROJECT',
+            description: 'Ability to edit issues in projects.',
+            havePermission: userPerms.canEditIssue ?? userPerms.canCreateIssue ?? true,
+          };
+        }
+
+        if (requestedPerms.length === 0 || requestedPerms.includes('TRANSITION_ISSUES')) {
+          permissionsObj['TRANSITION_ISSUES'] = {
+            id: '46',
+            key: 'TRANSITION_ISSUES',
+            name: 'Transition Issues',
+            type: 'PROJECT',
+            description: 'Ability to transition issues in projects.',
+            havePermission: userPerms.canTransitionIssue ?? userPerms.canEditIssue ?? userPerms.canCreateIssue ?? true,
           };
         }
 

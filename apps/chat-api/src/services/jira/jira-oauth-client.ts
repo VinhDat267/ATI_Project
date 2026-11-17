@@ -168,7 +168,7 @@ export class JiraOAuthClient {
       'scope',
       options.mode === 'identity'
         ? 'read:me offline_access'
-        : 'read:me read:jira-work offline_access'
+        : 'read:me read:jira-work write:jira-work offline_access'
     );
     url.searchParams.set('redirect_uri', this.config.redirectUri);
     url.searchParams.set('state', options.state);
