@@ -332,7 +332,7 @@ export class CalendarTriggerService {
 
   private issuePlanHash(approvalHash: string, target: string) {
     const id = randomUUID();
-    const expiresAt = new Date(this.clock().getTime() + APPROVAL_TTL_MS);
+    const expiresAt = new Date(Date.now() + APPROVAL_TTL_MS);
     const payload = `${id}.${expiresAt.getTime()}`;
     const signature = createHmac('sha256', this.approvalSecret)
       .update(`calendar-trigger-preview:${target}:${payload}:${approvalHash}`).digest('hex');
@@ -349,7 +349,7 @@ export class CalendarTriggerService {
     if (extra !== undefined || !id || !isUuid(id) || !expiry || !/^\d{13}$/.test(expiry) ||
         !signature || !/^[0-9a-f]{64}$/.test(signature)) throw this.approvalRequired();
     const expiresAt = new Date(Number(expiry));
-    if (expiresAt.getTime() <= this.clock().getTime()) throw this.approvalRequired();
+    if (expiresAt.getTime() <= Date.now()) throw this.approvalRequired();
     const expected = createHmac('sha256', this.approvalSecret)
       .update(`calendar-trigger-preview:${target}:${id}.${expiry}:${approvalHash}`).digest('hex');
     if (!timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(signature, 'hex'))) throw this.approvalRequired();
@@ -411,9 +411,14 @@ export class CalendarTriggerService {
   async createTrigger(userId: string, input: TriggerConfig & { planHash?: unknown }): Promise<CalendarEventTriggerDto> {
     const { trigger, credentialId, approvalHash } = await this.prepareConfig(userId, input);
     const approval = this.verifyPlanHash(input.planHash, approvalHash, 'create');
+    // Consumption and cleanup use the same per-nonce lock. Check expiry after acquiring it.
     const inserted = await this.pool.query<TriggerRow>(
-      `WITH consumed AS (
-         INSERT INTO calendar_trigger_consumed_previews (id, expires_at) VALUES ($9, $10)
+      `WITH preview_lock AS MATERIALIZED (
+         SELECT pg_advisory_xact_lock(hashtext('calendar-trigger-preview'), hashtext($9::uuid::text)),
+                $10::timestamptz AS expires_at
+       ), consumed AS (
+         INSERT INTO calendar_trigger_consumed_previews (id, expires_at)
+         SELECT $9::uuid, expires_at FROM preview_lock WHERE expires_at > clock_timestamp()
          ON CONFLICT DO NOTHING RETURNING id
        ) INSERT INTO calendar_event_triggers(
          user_id, name, trigger_type, credential_id, calendar_ids, lead_minutes, destination, approved_config_hash, status
@@ -473,9 +478,13 @@ export class CalendarTriggerService {
       `WITH eligible AS (
          SELECT id FROM calendar_event_triggers WHERE id = $1 AND user_id = $2 AND version = $11
          FOR UPDATE
+       ), preview_lock AS MATERIALIZED (
+         SELECT pg_advisory_xact_lock(hashtext('calendar-trigger-preview'), hashtext($12::uuid::text)),
+                $13::timestamptz AS expires_at
+         FROM eligible WHERE $12::uuid IS NOT NULL
        ), consumed AS (
          INSERT INTO calendar_trigger_consumed_previews (id, expires_at)
-         SELECT $12::uuid, $13::timestamptz FROM eligible WHERE $12::uuid IS NOT NULL
+         SELECT $12::uuid, expires_at FROM preview_lock WHERE expires_at > clock_timestamp()
          ON CONFLICT DO NOTHING RETURNING id
        ) UPDATE calendar_event_triggers t
        SET name = $3, lead_minutes = $4, calendar_ids = $5::jsonb, credential_id = $6, destination = $7::jsonb,
@@ -949,7 +958,11 @@ export class CalendarTriggerService {
 
   async evaluateAllActiveTriggers(signal?: AbortSignal): Promise<{ evaluated: number; notificationsSent: number }> {
     await this.pool.query(
-      `WITH expired_previews AS (DELETE FROM calendar_trigger_consumed_previews WHERE expires_at <= $1),
+      `WITH expired_previews AS (
+           DELETE FROM calendar_trigger_consumed_previews
+           WHERE CASE WHEN expires_at <= clock_timestamp()
+             THEN pg_try_advisory_xact_lock(hashtext('calendar-trigger-preview'), hashtext(id::text)) ELSE false END
+         ),
             expired_channels AS (DELETE FROM calendar_trigger_watch_channels WHERE expires_at <= $1)
        UPDATE calendar_trigger_dispatches SET delivery_status = 'needs_attention'
        WHERE delivery_status = 'pending' AND created_at <= now() - interval '5 minutes'`,

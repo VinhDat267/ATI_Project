@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { encryptCredentials } from '@wap/tool-adapters';
 import { createApp } from '../../src/app.js';
@@ -233,6 +233,47 @@ describe('/api/connections/mycalendar/triggers & webhook routes on PostgreSQL 16
       .set('Authorization', bearer(alice));
     expect(delRes.status).toBe(200);
     expect(delRes.body.deleted).toBe(true);
+  });
+
+  it('rejects a preview that expires while its nonce waits for the PostgreSQL lock', async () => {
+    const { triggerService } = makeTestApp();
+    const draft = {
+      name: 'Nhắc họp đang chờ xác nhận',
+      triggerType: 'pre_meeting_reminder' as const,
+      calendarIds: ['alice@example.test'],
+      destination: { service: 'slack', channelId: 'C_ALLOWED_1' },
+    };
+    const ordinary = await triggerService.previewTrigger(alice.id, draft);
+    const ttlMs = Date.parse(ordinary.expiresAt) - Date.now();
+    const dateNow = vi.spyOn(Date, 'now').mockReturnValue(Date.now() - ttlMs + 2_000);
+    let preview;
+    try {
+      preview = await triggerService.previewTrigger(alice.id, draft);
+    } finally {
+      dateNow.mockRestore();
+    }
+    const nonce = preview.planHash.split('.')[0];
+    const lockHolder = await db.pool.connect();
+    try {
+      await lockHolder.query('BEGIN');
+      await lockHolder.query("SELECT pg_advisory_xact_lock(hashtext('calendar-trigger-preview'), hashtext($1))", [nonce]);
+      const result = triggerService.createTrigger(alice.id, { ...draft, planHash: preview.planHash })
+        .then((trigger) => ({ trigger }), (error) => ({ error }));
+      await vi.waitFor(async () => {
+        const { rows } = await lockHolder.query(
+          `SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND NOT granted
+            AND objid = (hashtext($1)::bigint & 4294967295)::oid) AS waiting`, [nonce],
+        );
+        expect(rows[0].waiting).toBe(true);
+      }, { timeout: 1_500, interval: 20 });
+      await lockHolder.query('SELECT pg_sleep(GREATEST(0, extract(epoch FROM ($1::timestamptz - clock_timestamp()))) + 0.05)', [preview.expiresAt]);
+      await lockHolder.query('COMMIT');
+      expect(await result).toMatchObject({ error: { code: 'CALENDAR_TRIGGER_APPROVAL_REQUIRED' } });
+      expect(await triggerService.listTriggers(alice.id)).toEqual([]);
+    } finally {
+      await lockHolder.query('ROLLBACK');
+      lockHolder.release();
+    }
   });
 
   it('blocks legacy triggers and requires a fresh approval when the source connection changes', async () => {
