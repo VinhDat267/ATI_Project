@@ -169,7 +169,10 @@ export interface IngestionResult {
 export interface ChatPlanner {
   processMessage(input: ProcessMessageInput): Promise<PlannerResponse>;
   /** The services a schedule's task needs, among those the member can use. */
-  routeSchedule(request: string, actor: { userId: string }): RoutedIntent | Promise<RoutedIntent>;
+  routeSchedule(
+    request: string,
+    actor: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization'; jiraContext?: boolean }
+  ): RoutedIntent | Promise<RoutedIntent>;
 }
 
 export interface ChatServiceOptions {
@@ -1594,10 +1597,10 @@ export class ChatService {
    */
   private async prepareProposal(
     rawProposal: ScheduleResponse,
-    actor: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' },
+    actor: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization'; jiraContext?: boolean },
     schedule: ScheduleView | null,
     userTexts: string[],
-    conv?: { workspace_mode?: string | null; workspace_id?: string | null } | null
+    conv?: { workspace_mode?: string | null; workspace_id?: string | null; jira_context?: boolean | null } | null
   ): Promise<PlannerResponse | ScheduleProposalMetadata> {
     if (!this.schedules) throw new Error('Schedules are off');
     const proposal: ScheduleResponse = {
@@ -1614,10 +1617,12 @@ export class ChatService {
           workspace_mode: actor.workspaceMode ?? 'legacy',
           workspace_id: actor.workspaceId ?? null,
         });
+    const jiraContext = conv ? conv.jira_context === true : actor.jiraContext === true;
     const scheduleActor = {
       userId: actor.userId,
       workspaceId: trustedScope.workspaceId,
       workspaceMode: trustedScope.workspaceMode,
+      ...(jiraContext ? { jiraContext: true } : {}),
     };
     let services: string[];
     if (proposal.action === 'create' || proposal.action === 'update') {
@@ -1675,6 +1680,9 @@ export class ChatService {
         services,
         recurrence,
         jiraConnection: this.myjiraDigestConnection,
+        includeAiSummary: current?.kind === 'myjira_digest'
+          ? (current.digestConfig as { includeAiSummary?: boolean } | null)?.includeAiSummary === true
+          : undefined,
         telegramConnection: this.telegramConnection,
         getAdapter: this.getAdapter,
       });

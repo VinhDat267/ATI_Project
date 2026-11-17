@@ -393,7 +393,9 @@ export function evaluateTelegramDigestCandidate(
   if (WRITE_INTENT_PATTERNS.some((re) => re.test(foldedRequest))) {
     return {
       canAutoDigest: false,
-      disabledReason: 'Lịch chạy có thao tác ghi hoặc thay đổi dữ liệu trên dịch vụ khác nên cần duyệt thủ công từng lượt.',
+      disabledReason: nonTelegramServices.includes('myjira')
+        ? 'Lịch có Jira chỉ hỗ trợ bản tin chỉ đọc gửi tới Telegram. Hãy bỏ thao tác ghi hoặc thay đổi dữ liệu khỏi lịch.'
+        : 'Lịch chạy có thao tác ghi hoặc thay đổi dữ liệu trên dịch vụ khác nên cần duyệt thủ công từng lượt.',
     };
   }
 

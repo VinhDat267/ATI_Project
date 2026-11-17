@@ -59,13 +59,31 @@ export function validateSchemaValue(value: unknown, schema: Record<string, any>,
     if (!Array.isArray(value) || value.some(address => !normalizedRecipient(address))) return `${path} must contain literal bare email addresses; references and templates are forbidden`;
     if (value.length < (schema.minItems ?? 0) || value.length > (schema.maxItems ?? 20)) return `${path} recipient count is out of range`;
   }
+  const allowedTypes = Array.isArray(schema.type) ? schema.type : schema.type ? [schema.type] : [];
   if (isObject(value) && ('$ref' in value || '$template' in value)) {
     const key = '$ref' in value ? '$ref' : '$template';
-    if (schema.type !== 'string' || Object.keys(value).length !== 1 ||
+    if (!allowedTypes.includes('string') || Object.keys(value).length !== 1 ||
       typeof value[key] !== 'string' || !value[key].trim()) {
-      return `${path} must be a ${schema.type || 'valid'} value or a single non-empty ${key} string`;
+      return `${path} must be a ${allowedTypes.join(' | ') || 'valid'} value or a single non-empty ${key} string`;
     }
     return null;
+  }
+
+  if (Array.isArray(schema.type)) {
+    if (allowedTypes.length === 0) return null;
+    if (typeof value === 'string' && allowedTypes.includes('string')) {
+      const length = Array.from(value).length;
+      if (typeof schema.minLength === 'number' && length < schema.minLength) return `${path} is shorter than minLength`;
+      if (typeof schema.maxLength === 'number' && length > schema.maxLength) return `${path} exceeds maxLength`;
+      if (typeof schema.pattern === 'string' && !new RegExp(schema.pattern).test(value)) return `${path} does not match pattern ${schema.pattern}`;
+    }
+    const branchErrors: string[] = [];
+    for (const singleType of allowedTypes) {
+      const err = validateSchemaValue(value, { ...schema, type: singleType }, path);
+      if (err === null) return null;
+      branchErrors.push(err);
+    }
+    return branchErrors.length === 1 ? branchErrors[0]! : `${path} must match type ${allowedTypes.join(' | ')}`;
   }
 
   if (schema.type === 'object') {

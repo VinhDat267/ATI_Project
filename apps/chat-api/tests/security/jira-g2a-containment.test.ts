@@ -246,7 +246,7 @@ describe('JIRA-G2A Six-Layer Server-Side Write & Legacy Containment', () => {
     expect(bodyServices.some((s: any) => s.id === 'jira' || s.service === 'jira')).toBe(false);
   });
 
-  it('LOCK-02 (Write Scope): JiraOAuthClient requests read:me, read:jira-work, write:jira-work, offline_access', () => {
+  it('LOCK-02 (Write Scope): JiraOAuthClient requests read:me, read:jira-work, read:jira-user, write:jira-work, offline_access', () => {
     const oauthClient = new JiraOAuthClient({
       clientId: 'client-g2a',
       clientSecret: 'secret-g2a',
@@ -259,6 +259,7 @@ describe('JIRA-G2A Six-Layer Server-Side Write & Legacy Containment', () => {
     const scopes = (sitesAuthUrl.searchParams.get('scope') ?? '').split(/\s+/).filter(Boolean);
     expect(scopes).toContain('read:me');
     expect(scopes).toContain('read:jira-work');
+    expect(scopes).toContain('read:jira-user');
     expect(scopes).toContain('write:jira-work');
     expect(scopes).toContain('offline_access');
   });

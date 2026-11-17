@@ -326,13 +326,14 @@ describe('Jira Read-Only Standup Digest (Phase 3)', () => {
         projects: [{ siteId, siteName: 'Acme Jira', projectKey: 'ATI', projectName: 'ATI Platform' }],
       });
 
+      const routeScheduleSpy = vi.fn(async () => ({ services: ['myjira', 'slack'], unavailable: [] }));
       const chatService = new ChatService({
         msgRepo,
         convRepo,
         planRepo,
         jiraLlmEgressEnabled: true,
         planner: {
-          routeSchedule: vi.fn(async () => ({ services: ['myjira', 'slack'], unavailable: [] })),
+          routeSchedule: routeScheduleSpy,
           processMessage: vi.fn(),
         } as any,
         eventEmitter: { emit: () => {} },
@@ -361,12 +362,29 @@ describe('Jira Read-Only Standup Digest (Phase 3)', () => {
       );
       await prepared.write();
 
+      expect(routeScheduleSpy).toHaveBeenCalledWith(
+        'Mỗi sáng 8h30 tổng hợp tiến độ và blocker Jira dự án ATI gửi vào kênh #standup-eng',
+        expect.objectContaining({
+          userId,
+          workspaceId,
+          workspaceMode: 'organization',
+          jiraContext: true,
+        }),
+      );
+
       const msgs = await msgRepo.listMessages(convId);
       const proposalMsg = msgs[msgs.length - 1]!;
       expect(proposalMsg.metadata?.type).toBe('schedule_proposal');
       expect((proposalMsg.metadata as any).digestCandidate?.canAutoDigest).toBe(true);
 
       const confirmedAt = new Date('2026-11-16T01:00:00Z');
+      for (const approvalMode of [undefined, 'manual'] as const) {
+        await expect(scheduleService.confirmProposal({
+          userId, convId, messageId: proposalMsg.id, now: confirmedAt,
+          scope: { workspaceMode: 'organization', workspaceId }, approvalMode,
+        })).rejects.toMatchObject({ code: 'DIGEST_NOT_ELIGIBLE', message: expect.stringContaining('tự gửi bản tin') });
+      }
+      expect((await pool.query('SELECT id FROM schedules WHERE conv_id = $1', [convId])).rows).toEqual([]);
       const change = await scheduleService.confirmProposal({
         userId,
         convId,
@@ -374,7 +392,7 @@ describe('Jira Read-Only Standup Digest (Phase 3)', () => {
         now: confirmedAt,
         scope: { workspaceMode: 'organization', workspaceId },
         approvalMode: 'auto_digest',
-        includeAiSummary: true,
+        includeAiSummary: false,
       });
 
       expect(change.schedule.kind).toBe('myjira_digest');
@@ -383,11 +401,63 @@ describe('Jira Read-Only Standup Digest (Phase 3)', () => {
 
       const scope = { workspaceMode: 'organization' as const, workspaceId };
       const scheduleId = change.schedule.id;
-      const approved = await scheduleRepo.ownedSchedule(scheduleId, userId, pool, false, scope);
-      if (!approved || !isValidJiraDigestConfig(approved.digest_config)) {
+      const original = await scheduleRepo.ownedSchedule(scheduleId, userId, pool, false, scope);
+      if (!original || !isValidJiraDigestConfig(original.digest_config)) {
         throw new Error('The confirmed Jira digest configuration was not saved');
       }
+      expect(original.digest_config.includeAiSummary).toBe(false);
+      const update = {
+        ...proposalMsg.metadata!.proposal!,
+        action: 'update',
+        name: 'Bản tin Jira cập nhật',
+      };
+      const updatePreview = await (chatService as any).prepareProposal(
+        update, { userId, ...scope, jiraContext: true }, change.schedule, [],
+      );
+      expect(updatePreview.digestCandidate?.config?.includeAiSummary).toBe(false);
+
+      // An older client can confirm without an explicit AI preference.
+      const previousPreviewMessage = await msgRepo.createMessage(convId, 'assistant', 'Cập nhật bản tin Jira', {
+        ...updatePreview,
+        digestCandidate: {
+          ...updatePreview.digestCandidate,
+          config: { ...updatePreview.digestCandidate.config, includeAiSummary: undefined },
+        },
+      });
+      const updated = await scheduleService.confirmProposal({
+        userId, convId, messageId: previousPreviewMessage.id, now: confirmedAt, scope, approvalMode: 'auto_digest',
+      });
+      expect(updated.schedule.digestConfig).toMatchObject({ includeAiSummary: false });
+
+      const optInPreview = await (chatService as any).prepareProposal(
+        { ...update, name: 'Bản tin Jira kèm AI' }, { userId, ...scope, jiraContext: true }, updated.schedule, [],
+      );
+      const optInMessage = await msgRepo.createMessage(convId, 'assistant', 'Bật tóm tắt AI cho bản tin Jira', optInPreview);
+      await scheduleService.confirmProposal({
+        userId, convId, messageId: optInMessage.id, now: confirmedAt, scope, approvalMode: 'auto_digest', includeAiSummary: true,
+      });
+      const approved = await scheduleRepo.ownedSchedule(scheduleId, userId, pool, false, scope);
+      if (!approved || !isValidJiraDigestConfig(approved.digest_config)) {
+        throw new Error('The updated Jira digest configuration was not saved');
+      }
       const approvedConfig = approved.digest_config;
+      expect(approvedConfig.includeAiSummary).toBe(true);
+      const updateMessage = await msgRepo.createMessage(convId, 'assistant', 'Cập nhật bản tin Jira', {
+        ...proposalMsg.metadata!,
+        proposal: {
+          ...proposalMsg.metadata!.proposal!,
+          action: 'update',
+          recurrence: { type: 'daily', time: '09:00' },
+        },
+        scheduleId,
+        baseVersion: approved.version,
+      });
+      await expect(scheduleService.confirmProposal({
+        userId, convId, messageId: updateMessage.id, now: confirmedAt, scope, approvalMode: 'manual',
+      })).rejects.toMatchObject({ code: 'DIGEST_NOT_ELIGIBLE', message: expect.stringContaining('tự gửi bản tin') });
+      expect(await scheduleRepo.ownedSchedule(scheduleId, userId, pool, false, scope)).toMatchObject({
+        kind: 'myjira_digest', version: approved.version, digest_config_hash: approved.digest_config_hash,
+      });
 
       // Run 1: Execute via createJiraDigestExecutor + ScheduleRunner (hallucinated AI number falls back cleanly!)
       let clockNow = new Date('2026-11-16T01:35:00Z');

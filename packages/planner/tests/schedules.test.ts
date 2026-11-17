@@ -48,6 +48,20 @@ describe('SCHED-02 planner', () => {
         expect(hash(p.prompt())).toBe(baseline(mode, readAnswers));
       });
 
+    it('qualifies digests for scheduling while keeping action selection separate', async () => {
+      const { scheduleRules } = await import('../src/prompts/schedule-rules.js');
+      const rules = scheduleRules().split('\n');
+      const createRule = rules.find((line) => line.startsWith('1. '));
+      const digest = rules.find((line) => line.startsWith('6. '));
+      const action = rules.find((line) => line.startsWith('7. '));
+      expect(createRule).toContain('A new workflow');
+      expect(digest).toContain('Slack or Telegram');
+      expect(digest).toContain('rule 7');
+      expect(digest).not.toContain('"action": "create"');
+      expect(action).toContain('"action": "create"');
+      expect(action).toContain('"action": "update"');
+    });
+
     it.each(MODES)('adds the schedule rules once when schedules are on (%s)', async (mode) => {
       const { scheduleRules } = await import('../src/prompts/schedule-rules.js');
       for (const readAnswers of [false, true]) {
