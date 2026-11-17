@@ -18,6 +18,7 @@ import {
   normalizeTelegramChatId,
   TELEGRAM_CHAT_ID_PATTERN,
   type AllowedScope,
+  type JiraDigestSourceBinding,
   type PlanConnections,
   type SheetsAppendLeaseStore,
   type WorkspaceJiraCapabilitiesResponse,
@@ -47,6 +48,8 @@ export interface AdapterContext {
   phase: 'planning' | 'execution';
   /** Required when phase is 'execution' and the service is personal: the connection the plan was previewed with. */
   connections?: PlanConnections;
+  /** Approved Jira identity for a scheduled, project-scoped read. */
+  jiraDigestBinding?: JiraDigestSourceBinding;
   actorId?: string;
   conversationId?: string;
   planId?: string;
@@ -893,14 +896,22 @@ export class AdapterFactory {
     if (!workspaceId) throw myjiraError('AUTH_ERROR', 'Jira cá nhân yêu cầu không gian làm việc.');
 
     const bound = context?.connections?.myjira;
+    const digestBinding = context?.jiraDigestBinding;
+    if (
+      digestBinding &&
+      (bound || context.phase !== 'execution' || context.workspaceMode !== 'organization' ||
+        !digestBinding.grantId || !digestBinding.atlassianAccountId)
+    ) {
+      throw myjiraError('AUTH_ERROR', 'Kết nối Jira của bản tin không hợp lệ.');
+    }
     if (context.phase === 'execution') {
-      if (!bound) {
+      if (!bound && !digestBinding) {
         throw myjiraError('AUTH_ERROR', 'Kế hoạch không có kết nối Jira cá nhân được gắn kết.');
       }
-      if (bound.atiUserId !== userId) {
+      if (bound && bound.atiUserId !== userId) {
         throw myjiraError('AUTH_ERROR', 'Người thực thi không khớp với kết nối Jira được duyệt.');
       }
-      if (bound.workspaceId !== workspaceId) {
+      if (bound && bound.workspaceId !== workspaceId) {
         throw myjiraError('AUTH_ERROR', 'Không gian làm việc không khớp với kết nối Jira được duyệt.');
       }
     }
@@ -912,14 +923,16 @@ export class AdapterFactory {
       capabilities = { workspaceId, sites: [] };
     }
 
-    const baseAdapter = (this.options.createPersonalJiraAdapter ?? createPersonalJiraAdapter)({
+    const adapterConfig: PersonalJiraAdapterConfig = {
       userId,
       workspaceId,
       capabilities,
       tokens: this.options.jiraTokens ?? { getAccessToken: async () => '' },
       apiBaseUrl: this.options.jiraApiBaseUrl,
       fetchFn: this.options.serviceFetchFn,
-    });
+    };
+    const createAdapter = this.options.createPersonalJiraAdapter ?? createPersonalJiraAdapter;
+    const baseAdapter = digestBinding ? null : createAdapter(adapterConfig);
 
     return {
       execute: async (tool: string, args: Record<string, any>, callOpts?: any) => {
@@ -929,11 +942,14 @@ export class AdapterFactory {
             `Unsupported Jira tool '${tool}'.`
           );
         }
+        if (digestBinding && tool !== 'myjira.search_issues') {
+          throw myjiraError('VALIDATION', 'Bản tin Jira chỉ hỗ trợ đọc issue trong dự án đã duyệt.');
+        }
         if (!this.options.jiraDispatchGuard) {
           throw myjiraError('AUTH_ERROR', 'JIRA_DISPATCH_GUARD_REQUIRED: Missing Jira dispatch guard.');
         }
 
-        if (tool === 'myjira.list_sites') {
+        if (tool === 'myjira.list_sites' && baseAdapter) {
           let currentCapabilities = capabilities;
           if (this.options.jiraWorkspaceRepo) {
             currentCapabilities = await this.options.jiraWorkspaceRepo.getCapabilities(workspaceId, userId);
@@ -1078,6 +1094,9 @@ export class AdapterFactory {
             }
           }
         }
+        if (digestBinding && (!args?.siteId || !args?.projectKey || !projectId)) {
+          throw myjiraError('AUTH_ERROR', 'Dự án Jira trong bản tin không còn trong phạm vi cho phép.');
+        }
 
         const scope: DispatchScope = {
           userId,
@@ -1087,9 +1106,9 @@ export class AdapterFactory {
           sitePolicyVersion: siteStep?.sitePolicyVersion ?? (targetSite as any)?.policyVersion ?? 1,
           projectId,
           projectPolicyVersion,
-          expectedGrantId: bound?.grantId,
+          expectedGrantId: bound?.grantId ?? digestBinding?.grantId,
           expectedAccountId: bound?.jiraAccountId,
-          expectedAtlassianAccountId: bound?.atlassianAccountId,
+          expectedAtlassianAccountId: bound?.atlassianAccountId ?? digestBinding?.atlassianAccountId,
           expectedMembershipVersion: bound?.membershipVersion,
           expectedIdentityVersion: bound?.identityVersion,
           expectedWorkspaceVersion: bound?.workspaceVersion,
@@ -1098,20 +1117,50 @@ export class AdapterFactory {
         const isWrite = isWriteTool(tool);
         const timeoutMs = callOpts?.timeoutMs ?? (isWrite ? 30000 : 15000);
 
-        const rawOutput = await this.options.jiraDispatchGuard.executeGuardedDispatch(
+        const dispatchGuard = this.options.jiraDispatchGuard;
+        const digestDeadline = digestBinding ? AbortSignal.timeout(timeoutMs) : undefined;
+        const callSignal = digestDeadline && callOpts?.signal
+          ? AbortSignal.any([digestDeadline, callOpts.signal])
+          : digestDeadline ?? callOpts?.signal;
+        const dispatch = (forceRefreshToken = false) => dispatchGuard.executeGuardedDispatch(
           scope,
           {
             isWrite,
             timeoutMs,
-            signal: callOpts?.signal,
+            signal: callSignal,
             verifier: this.options.jiraNativeVerifier,
             tool,
             deferRelease: Boolean(context?.connections?.myjira),
+            ...(digestBinding ? { digestRead: { forceRefreshToken } } : {}),
           },
           async (token, signal) => {
-            return baseAdapter.execute(tool, args, { ...callOpts, signal });
+            // Scheduled reads use the token acquired by the guard before it locks the approved grant.
+            const adapter = baseAdapter ?? createAdapter({
+              ...adapterConfig,
+              tokens: {
+                getAccessToken: async (request) => {
+                  if (typeof request === 'object' && request?.forceRefresh) {
+                    throw new StepError({
+                      category: 'AUTH_ERROR',
+                      statusCode: 401,
+                      message: 'Jira rejected the access token for the approved digest.',
+                      details: { jiraDigestTokenRefreshRequired: true },
+                    });
+                  }
+                  return token;
+                },
+              },
+            });
+            return adapter.execute(tool, args, { ...callOpts, signal });
           }
         );
+        const rawOutput = await dispatch().catch((error: unknown) => {
+          if (digestBinding && error instanceof StepError && error.details?.jiraDigestTokenRefreshRequired) {
+            // Reacquire the approved identity and refresh before taking dispatch locks again.
+            return dispatch(true);
+          }
+          throw error;
+        });
 
         const leaseId = (rawOutput as any)?._leaseId;
         if (leaseId && context?.stepLeaseMap && callOpts?.stepId) {

@@ -6,7 +6,8 @@ import {
   JIRA_WRITE_SCOPE,
   JIRA_WRITE_SCOPE_REQUIRED,
 } from '@wap/tool-schemas';
-import type { JiraLeaseManager } from './jira-lease-manager.js';
+import { JiraLeaseDeniedError, type JiraLeaseManager } from './jira-lease-manager.js';
+import { JiraTokenManagerError, type GetAccessTokenOptions } from './jira-token-manager.js';
 
 export interface DispatchScope {
   userId: string;
@@ -44,6 +45,7 @@ export interface GuardedDispatchOptions {
   };
   tool: string;
   deferRelease?: boolean;
+  digestRead?: { forceRefreshToken: boolean };
 }
 
 export class JiraDispatchError extends Error {
@@ -61,7 +63,7 @@ export class JiraDispatchError extends Error {
 }
 
 export interface JiraDispatchTokenManager {
-  getAccessToken(userId: string, options?: { signal?: AbortSignal }): Promise<string>;
+  getAccessToken(userId: string, options?: GetAccessTokenOptions): Promise<string>;
 }
 
 export class JiraDispatchGuard {
@@ -83,6 +85,9 @@ export class JiraDispatchGuard {
       );
     }
     const isWriteDispatch = options.isWrite || isJiraWriteTool(options.tool);
+    if (options.digestRead && (isWriteDispatch || !scope.expectedGrantId || !scope.expectedAtlassianAccountId)) {
+      throw new JiraDispatchError('Jira digest requires an approved read-only connection', 'INVALID_SCOPE');
+    }
 
     if (!scope.userId || !scope.workspaceId || !scope.cloudId) {
       throw new JiraDispatchError(
@@ -98,15 +103,22 @@ export class JiraDispatchGuard {
     // Step 1: Token acquisition outside any DB lock (may perform network I/O or token refresh)
     let token: string;
     try {
-      token = await this.tokenManager.getAccessToken(scope.userId, { signal: options.signal });
+      token = await this.tokenManager.getAccessToken(scope.userId, {
+        signal: options.signal,
+        ...(options.digestRead ? {
+          forceRefresh: options.digestRead.forceRefreshToken,
+          expectedGrantId: scope.expectedGrantId,
+          expectedAtlassianAccountId: scope.expectedAtlassianAccountId,
+        } : {}),
+      });
       if (!token) {
         throw new Error('Empty access token returned');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       throw new JiraDispatchError(
-        `Failed to obtain Jira access token: ${err?.message ?? String(err)}`,
+        `Failed to obtain Jira access token: ${err instanceof Error ? err.message : String(err)}`,
         'TOKEN_UNAVAILABLE',
-        { cause: err }
+        { cause: err, category: err instanceof JiraTokenManagerError ? 'AUTH_ERROR' : 'SERVER_ERROR' }
       );
     }
 
@@ -129,11 +141,12 @@ export class JiraDispatchGuard {
         ttlMs: leaseTtl,
         signal: options.signal,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const denied = err instanceof JiraLeaseDeniedError || err instanceof JiraTokenManagerError;
       throw new JiraDispatchError(
-        `Failed to acquire authorization lease: ${err?.message ?? String(err)}`,
+        `Failed to acquire authorization lease: ${err instanceof Error ? err.message : String(err)}`,
         'LEASE_DENIED',
-        { cause: err }
+        { cause: err, category: denied ? 'AUTH_ERROR' : 'SERVER_ERROR' }
       );
     }
 
@@ -181,6 +194,13 @@ export class JiraDispatchGuard {
           },
           { signal: options.signal }
         );
+        if (nativeRes.status === 'unavailable') {
+          throw new JiraDispatchError(
+            'Native Jira permissions are temporarily unavailable',
+            'NATIVE_VERIFIER_UNAVAILABLE',
+            { category: 'SERVER_ERROR' }
+          );
+        }
         if (nativeRes.status === 'denied' || !nativeRes.canBrowse) {
           throw new JiraDispatchError(
             `Native Jira permission denied: ${nativeRes.reason || 'User lacks BROWSE_PROJECTS'}`,

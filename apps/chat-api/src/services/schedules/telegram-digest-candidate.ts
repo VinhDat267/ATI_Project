@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { JIRA_CAPABILITY_DISABLED_IN_G2A } from '@wap/tool-schemas';
 import type {
   GmailDigestBinding,
+  JiraDigestSourceBinding,
   NotionDigestSourceBinding,
   ScheduleResponse,
   TelegramDigestCandidate,
@@ -11,6 +12,7 @@ import type {
 import type { TelegramConnectionLookupResult } from '../telegram/connection-reference.js';
 import type { GitHubConnectionLookupResult } from '../github/connection-reference.js';
 import type { JiraConnectionLookupResult } from './jira-digest-candidate.js';
+import { isUuid } from '../../db/repositories/uuid.js';
 import {
   DEFAULT_GMAIL_DIGEST_QUERY,
   isValidGmailDigestBinding,
@@ -121,6 +123,13 @@ export function getDigestSourceDisabledReason(
   return undefined;
 }
 
+export function isJiraDigestSourceBinding(value: unknown): value is JiraDigestSourceBinding {
+  if (!value || typeof value !== 'object') return false;
+  const { grantId, atlassianAccountId } = value as Partial<JiraDigestSourceBinding>;
+  return typeof grantId === 'string' && isUuid(grantId) &&
+    typeof atlassianAccountId === 'string' && atlassianAccountId.trim().length > 0;
+}
+
 function foldVietnamese(input: string): string {
   return input
     .normalize('NFD')
@@ -181,6 +190,7 @@ export function computeTelegramDigestConfigHash(config: TelegramDigestConfig): s
           }
         : {}),
       ...(s.notionBinding !== undefined ? { notionBinding: s.notionBinding } : {}),
+      ...(s.jiraBinding !== undefined ? { jiraBinding: s.jiraBinding } : {}),
     })),
     recurrence: config.recurrence,
     timeZone: config.timeZone,
@@ -516,13 +526,17 @@ export function evaluateTelegramDigestCandidate(
           disabledReason: 'Bản tin Jira qua Telegram chỉ khả dụng trong Workspace Tổ chức.',
         };
       }
-      const projects = input.jiraLookup?.status === 'connected' ? input.jiraLookup.projects : undefined;
-      if (!projects?.length) {
+      const jira = input.jiraLookup;
+      if (
+        jira?.status !== 'connected' || jira.workspaceId !== input.workspaceId ||
+        !isJiraDigestSourceBinding(jira) || !jira.projects?.length
+      ) {
         return {
           canAutoDigest: false,
           disabledReason: 'Hãy kết nối Jira OAuth 3LO và chọn ít nhất 1 dự án trong Workspace trước khi bật Tự gửi.',
         };
       }
+      const { projects, grantId, atlassianAccountId } = jira;
       const lowerReq = requestText.toLowerCase();
       const matched = projects.filter(
         (p) =>
@@ -534,6 +548,7 @@ export function evaluateTelegramDigestCandidate(
           ...source,
           args: { siteId: proj.siteId, projectKey: proj.projectKey, query: '' },
           label: `${source.label} (${proj.projectKey})`,
+          jiraBinding: { grantId, atlassianAccountId },
         });
       }
     } else if (service === 'notion' && input.notionBinding) {

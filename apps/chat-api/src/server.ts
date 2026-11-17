@@ -76,6 +76,7 @@ import { NotionTokenManager } from './services/notion/token-manager.js';
 import { createNotionConnectionLookup } from './services/notion/connection-reference.js';
 import { JiraOAuthClient } from './services/jira/jira-oauth-client.js';
 import { JiraOAuthRepo } from './db/repositories/jira-oauth-repo.js';
+import { WorkspaceRepoError } from './db/repositories/workspace/errors.js';
 import { JiraTokenManager } from './services/jira/jira-token-manager.js';
 import { JiraNativeVerifier } from './services/jira/jira-native-verifier.js';
 import { JiraPolicyService } from './services/jira/jira-policy-service.js';
@@ -324,6 +325,11 @@ async function bootstrap() {
   };
   const schedules = createScheduleRuntime({
     enabled: env.SCHEDULES_ENABLED,
+    jiraLlmEgressEnabled: env.JIRA_LLM_EGRESS_ENABLED,
+    jiraConnection: async (userId, workspaceId) => {
+      if (!env.JIRA_LLM_EGRESS_ENABLED) return { status: 'disconnected' };
+      return (await myjiraDigestConnection?.(userId, workspaceId)) ?? null;
+    },
     pool: pool && userRepo ? pool : null,
     timeZone: env.APP_TIME_ZONE,
     encryptionKey: env.ENCRYPTION_KEY,
@@ -637,13 +643,21 @@ async function bootstrap() {
   const myjiraDigestConnection = jiraAvailable && jiraOAuthRepo && jiraWorkspaceRepo
     ? async (userId: string, workspaceId?: string | null): Promise<JiraConnectionLookupResult | null> => {
         if (!workspaceId) return { status: 'disconnected' };
-        const [account, grant, capabilities] = await Promise.all([
+        const [account, grant] = await Promise.all([
           jiraOAuthRepo.getAccountByUserId(userId),
           jiraOAuthRepo.getActiveGrantByUserId(userId),
-          jiraWorkspaceRepo.getCapabilities(workspaceId, userId).catch(() => null),
         ]);
-        if (!account || account.status !== 'connected' || !grant || grant.status !== 'active' || !capabilities?.sites?.length) {
+        if (!account || account.status !== 'connected' || !grant || grant.status !== 'active') {
           return { status: 'disconnected' };
+        }
+        let capabilities;
+        try {
+          capabilities = await jiraWorkspaceRepo.getCapabilities(workspaceId, userId);
+        } catch (error) {
+          if (error instanceof WorkspaceRepoError && [401, 403, 404].includes(error.statusCode)) {
+            return { status: 'disconnected' };
+          }
+          return { status: 'unavailable' };
         }
         const projects: JiraDigestProjectItem[] = [];
         for (const site of capabilities.sites) {

@@ -1,7 +1,7 @@
 import type pg from 'pg';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { RunCalendarDigest } from '../services/schedules/calendar-digest-runner.js';
-import { ScheduleService } from '../services/schedules/schedule-service.js';
+import { ScheduleService, type ScheduleServiceOptions } from '../services/schedules/schedule-service.js';
 import type { FetchOrgSheetsMetadataFn } from '../services/schedules/sheets-digest-candidate.js';
 import { ScheduleRunner, reconcileScheduleRuns, type ExecuteDigestRun, type PlanRun } from '../services/schedules/schedule-runner.js';
 import {
@@ -37,7 +37,9 @@ export interface ScheduleRuntimeOptions {
   runTrelloDigest?: RunTrelloDigest;
   runNotionDigest?: RunNotionDigest;
   runJiraDigest?: RunJiraDigestExecutorFn;
-  verifyNotionSource?: import('../services/schedules/schedule-service.js').ScheduleServiceOptions['verifyNotionSource'];
+  jiraLlmEgressEnabled?: boolean;
+  verifyNotionSource?: ScheduleServiceOptions['verifyNotionSource'];
+  jiraConnection?: ScheduleServiceOptions['jiraConnection'];
   executeDigestRun?: ExecuteDigestRun;
   emit?: (convId: string, event: string, payload: unknown) => unknown;
   now?: () => Date;
@@ -65,6 +67,7 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
     runner: { planNow: (runId) => runner.planNow(runId) },
     credentialRepo: options.credentialRepo,
     verifyNotionSource: options.verifyNotionSource,
+    jiraConnection: options.jiraConnection,
     encryptionKey: options.encryptionKey,
     gmailOAuthClientId: options.gmailOAuthClientId,
     mysheetsEnabled: options.mysheetsEnabled,
@@ -98,6 +101,7 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
     runTrelloDigest: options.runTrelloDigest,
     runNotionDigest: options.runNotionDigest,
     runJiraDigest: options.runJiraDigest,
+    jiraLlmEgressEnabled: options.jiraLlmEgressEnabled ?? false,
     executeDigestRun: options.executeDigestRun,
     emit: options.emit,
     now: options.now,

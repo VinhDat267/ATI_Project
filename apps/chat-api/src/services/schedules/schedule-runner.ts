@@ -1,6 +1,6 @@
 import {captureScheduleArtifact,guardScheduleArtifact,prelockScheduleArtifacts,registerScheduleFields,scheduleRegistry,scheduleSourceContext,tagScheduleContext} from '../slack/slack-schedule-lineage.js';
 import type pg from 'pg';
-import type { CalendarDigestConfig, GithubDigestConfig, MyJiraDigestConfig, NotionDigestConfig, ScheduleKind, ScheduleRecurrence, ScheduleRunMessageMetadata, TelegramDigestConfig, TrelloDigestConfig } from '@wap/tool-schemas';
+import { JIRA_LLM_EGRESS_DISABLED_IN_G2A, type CalendarDigestConfig, type GithubDigestConfig, type MyJiraDigestConfig, type NotionDigestConfig, type ScheduleKind, type ScheduleRecurrence, type ScheduleRunMessageMetadata, type TelegramDigestConfig, type TrelloDigestConfig } from '@wap/tool-schemas';
 import { MessageRepo } from '../../db/repositories/message-repo.js';
 import type { Queryable, ScheduleRow } from '../../db/repositories/schedule-repo.js';
 import type { DigestRunOutcome as CalendarDigestRunOutcome, RunCalendarDigest } from './calendar-digest-runner.js';
@@ -59,6 +59,7 @@ export interface ScheduleRunnerOptions {
   runTrelloDigest?: RunTrelloDigest;
   runNotionDigest?: RunNotionDigest;
   runJiraDigest?: RunJiraDigestExecutorFn;
+  jiraLlmEgressEnabled?: boolean;
   executeDigestRun?: ExecuteDigestRun;
   timeZone: string;
   encryptionKey?: string;
@@ -130,6 +131,11 @@ export async function reconcileScheduleRuns(pool: pg.Pool): Promise<void> {
            WHEN r.delivery_started_at IS NOT NULL AND r.dispatched_config_hash <> ''
              AND jsonb_typeof(r.dispatched_config->'githubUserId') = 'string'
              AND jsonb_typeof(r.dispatched_config->'repos') = 'array' THEN $6
+           WHEN r.delivery_started_at IS NOT NULL AND r.dispatched_config_hash <> ''
+             AND jsonb_typeof(r.dispatched_config->'workspaceId') = 'string'
+             AND jsonb_typeof(r.dispatched_config->'grantId') = 'string'
+             AND jsonb_typeof(r.dispatched_config->'atlassianAccountId') = 'string'
+             AND jsonb_typeof(r.dispatched_config->'projects') = 'array' THEN $8
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'sheets_digest' THEN $3
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'trello_digest' THEN $4
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'telegram_digest' THEN $5
@@ -485,17 +491,33 @@ export class ScheduleRunner {
       started.kind === 'telegram_digest';
 
     if (isDigestSchedule) {
-      const liveGuard = await assertDigestScheduleLiveScopeAndAuth({
+      const telegramSources = started.kind === 'telegram_digest'
+        ? (started.digestConfig as TelegramDigestConfig | null)?.sources
+        : undefined;
+      const hasTelegramJiraSource = started.kind === 'telegram_digest' && (
+        started.toPlan.services?.includes('myjira') ||
+        (Array.isArray(telegramSources) && telegramSources.some((source) =>
+          source?.service === 'myjira' ||
+          (typeof source?.tool === 'string' && source.tool.startsWith('myjira.')),
+        ))
+      );
+      const jiraEgressBlocked = this.options.jiraLlmEgressEnabled === false &&
+        (started.kind === 'myjira_digest' || hasTelegramJiraSource);
+      const liveGuard = jiraEgressBlocked ? undefined : await assertDigestScheduleLiveScopeAndAuth({
         pool,
         scheduleId: started.toPlan.scheduleId,
         claimedWorkspaceId: started.toPlan.workspaceId,
         encryptionKey: this.options.encryptionKey,
         gmailOAuthClientId: this.options.gmailOAuthClientId,
       });
-      started.toPlan.workspaceId = liveGuard.trustedWorkspaceId;
-      started.toPlan.workspaceMode = liveGuard.trustedWorkspaceMode as RunToPlan['workspaceMode'];
-      if (!liveGuard.allowed) {
-        const blockReason = liveGuard.pauseReason ?? BLOCKED;
+      if (liveGuard) {
+        started.toPlan.workspaceId = liveGuard.trustedWorkspaceId;
+        started.toPlan.workspaceMode = liveGuard.trustedWorkspaceMode as RunToPlan['workspaceMode'];
+      }
+      if (jiraEgressBlocked || liveGuard?.allowed === false) {
+        const blockReason = jiraEgressBlocked
+          ? JIRA_LLM_EGRESS_DISABLED_IN_G2A + ': Bản tin Jira đang bị tắt bởi cấu hình máy chủ.'
+          : liveGuard?.pauseReason ?? BLOCKED;
         const now = this.now();
         const blockedChanges = await inTransaction(pool, async (client) => {
           const changes: ScheduleChange[] = [];
@@ -516,7 +538,7 @@ export class ScheduleRunner {
             "UPDATE schedule_runs SET status='blocked', error=$2, updated_at=now() WHERE id=$1",
             [runId, blockReason],
           );
-          if (schedule.status === 'active') {
+          if (schedule.status === 'active' && schedule.version === started.toPlan.scheduleVersion) {
             const paused = await this.pause(client, schedule.id, blockReason);
             changes.push(await this.options.recordState(client, paused, now));
           }
@@ -1031,6 +1053,8 @@ export class ScheduleRunner {
 
       const replyTo = { replyToMessageId: started.messageId };
       const changes: ScheduleChange[] = [];
+      const canPauseSchedule = schedule.status === 'active' &&
+        (started.kind !== 'myjira_digest' || schedule.version === started.toPlan.scheduleVersion);
 
       if (outcome?.state === 'discarded') {
         if (run.delivery_started_at != null) {
@@ -1065,7 +1089,7 @@ export class ScheduleRunner {
       if (outcome?.state === 'blocked') {
         await this.messages.createMessage(started.convId, 'system', `Lỗi: ${outcome.error}`, { type: 'planning_error', ...replyTo }, client);
         await client.query("UPDATE schedule_runs SET status='blocked', error=$2, updated_at=now() WHERE id=$1", [runId, outcome.error]);
-        if (schedule.status === 'active') {
+        if (canPauseSchedule) {
           const paused = await this.pause(client, schedule.id, outcome.pauseReason);
           changes.push(await this.options.recordState(client, paused, now));
         }
@@ -1110,7 +1134,7 @@ export class ScheduleRunner {
         [schedule.id],
       );
       if (
-        schedule.status === 'active' &&
+        canPauseSchedule &&
         recentRuns.rows.length === 3 &&
         recentRuns.rows.every((r) => r.status === 'digest_failed' &&
           !(started.kind === 'trello_digest' && r.error?.startsWith(TRELLO_READ_UNAVAILABLE_PREFIX)) &&

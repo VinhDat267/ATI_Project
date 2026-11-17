@@ -20,6 +20,7 @@ import {
   buildTelegramDigestSourceArgs,
   computeTelegramDigestConfigHash,
   getDigestSourceDisabledReason,
+  isJiraDigestSourceBinding,
   READ_DIGEST_SOURCE_MAP,
 } from './telegram-digest-candidate.js';
 import {
@@ -844,12 +845,14 @@ export class TelegramDigestRunner {
           return { kind: 'outcome', outcome: { status: 'discarded' } };
         }
 
-        // Re-verify live workspace/member/Telegram/Gmail scope using the SAME transaction client (never pool!).
+        // Re-verify live workspace and source authority using the same transaction client.
+        const lockJiraAuthority = run.digestConfig?.sources.some((source) => source.service === 'myjira');
         const pinnedCtx = await buildPinnedTelegramAdapterContext({
           pool: txQueryable,
           scheduleId: run.scheduleId,
           encryptionKey: this.options.encryptionKey,
           gmailOAuthClientId: this.options.gmailOAuthClientId,
+          lockTelegramJiraAuthority: lockJiraAuthority,
         });
         if (
           !pinnedCtx.allowed ||
@@ -863,7 +866,8 @@ export class TelegramDigestRunner {
             kind: 'outcome',
             outcome: {
               status: 'blocked',
-              error: 'Kết nối hoặc phạm vi Telegram của lịch chạy không còn hợp lệ.',
+              error: (lockJiraAuthority ? pinnedCtx.pauseReason : undefined) ??
+                'Kết nối hoặc phạm vi Telegram của lịch chạy không còn hợp lệ.',
               pauseSchedule: true,
             },
           };
@@ -1081,6 +1085,20 @@ export class TelegramDigestRunner {
       };
     }
 
+    const jiraSources = digestConfig.sources.filter((source) => source?.service === 'myjira');
+    const hasJiraSources = jiraSources.length > 0;
+    if (
+      hasJiraSources &&
+      (typeof (this.options.pool as pg.Pool | null | undefined)?.connect !== 'function' ||
+        jiraSources.some((source) => !isJiraDigestSourceBinding(source.jiraBinding)))
+    ) {
+      return {
+        status: 'blocked',
+        error: 'Nguồn Jira trong bản tin Telegram thiếu kết nối OAuth đã duyệt. Hãy xác nhận lại lịch.',
+        pauseSchedule: true,
+      };
+    }
+
     const notionBinding = approvedTelegramNotionBinding(digestConfig);
     if (
       telegramNotionSource(digestConfig) &&
@@ -1137,8 +1155,13 @@ export class TelegramDigestRunner {
         scheduleId: run.scheduleId,
         encryptionKey: this.options.encryptionKey,
         gmailOAuthClientId: this.options.gmailOAuthClientId,
+        expectedTelegramDigestConfigHash: hasJiraSources ? digestConfigHash : undefined,
       });
-      if (!preGuard.allowed) {
+      if (
+        !preGuard.allowed ||
+        (hasJiraSources &&
+          (preGuard.trustedWorkspaceId !== run.workspaceId || preGuard.trustedWorkspaceMode !== run.workspaceMode))
+      ) {
         return {
           status: 'blocked',
           error: preGuard.pauseReason ?? 'Kết nối hoặc phạm vi lịch chạy không còn hợp lệ.',
@@ -1251,26 +1274,22 @@ export class TelegramDigestRunner {
     for (const source of digestConfig.sources) {
       signal.throwIfAborted();
       try {
-        const sourceAdapterContext: AdapterContext =
-          source.service === 'gmail' && gmailBinding
-            ? {
-                userId,
-                phase: 'execution',
-                workspaceMode: run.workspaceMode,
-                workspaceId: run.workspaceId,
-                connections: {
-                  gmail: {
-                    credentialId: gmailBinding.credentialId,
-                    email: gmailBinding.email,
-                  },
-                },
-              }
-            : {
-                userId,
-                phase: 'planning',
-                workspaceMode: run.workspaceMode,
-                workspaceId: run.workspaceId,
-              };
+        const sourceAdapterContext: AdapterContext = {
+          userId,
+          phase: 'planning',
+          workspaceMode: run.workspaceMode,
+          workspaceId: run.workspaceId,
+        };
+        if (source.service === 'gmail' && gmailBinding) {
+          sourceAdapterContext.phase = 'execution';
+          sourceAdapterContext.connections = {
+            gmail: { credentialId: gmailBinding.credentialId, email: gmailBinding.email },
+          };
+        } else if (source.service === 'myjira') {
+          sourceAdapterContext.phase = 'execution';
+          sourceAdapterContext.jiraDigestBinding = source.jiraBinding;
+          sourceAdapterContext.signal = signal;
+        }
         const adapter =
           source.service === 'notion'
             ? null

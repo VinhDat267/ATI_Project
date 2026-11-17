@@ -203,7 +203,12 @@ export async function evaluateJiraDigestCandidate(
 
   let matchedChannel: { id: string; name: string } | null = null;
   try {
-    const slackAdapter = await input.getAdapter?.('slack', { userId, phase: 'planning' });
+    const slackAdapter = await input.getAdapter?.('slack', {
+      userId,
+      phase: 'planning',
+      workspaceId: jiraConn.workspaceId,
+      workspaceMode: 'organization',
+    });
     if (slackAdapter && typeof slackAdapter.execute === 'function') {
       const channels = await slackAdapter.execute('slack.search_channels', { query: channelQuery });
       if (Array.isArray(channels) && channels.length > 0) {

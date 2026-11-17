@@ -590,6 +590,11 @@ export interface NotionDigestSourceBinding {
   databases: Array<{ databaseId: string; dataSourceId: string; title: string }>;
 }
 
+export interface JiraDigestSourceBinding {
+  grantId: string;
+  atlassianAccountId: string;
+}
+
 export interface TelegramDigestSource {
   service: string;
   tool: string;
@@ -597,6 +602,7 @@ export interface TelegramDigestSource {
   label: string;
   binding?: GmailDigestBinding;
   notionBinding?: NotionDigestSourceBinding;
+  jiraBinding?: JiraDigestSourceBinding;
 }
 
 export interface TelegramDigestConfig {

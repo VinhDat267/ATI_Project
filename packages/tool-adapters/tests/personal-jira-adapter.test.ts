@@ -647,6 +647,36 @@ describe('PersonalJiraAdapter', () => {
     });
   });
 
+  describe.each([
+    ['myjira.add_comment', { body: 'Approved comment' }],
+    ['myjira.transition_issue', { status: 'Done' }],
+    ['myjira.update_issue', { priority: 'High' }],
+  ] as const)('%s issue write target', (tool, args) => {
+    it.each([
+      { reason: 'the issue moved to another selected project', key: 'CORE-7', project: { id: '10001', key: 'CORE' } },
+      { reason: 'the issue key changed in the selected project', key: 'ATI-43', project },
+      { reason: 'the returned project key changed', key: 'ATI-42', project: { id: '10000', key: 'CORE' } },
+      { reason: 'the returned project ID changed', key: 'ATI-42', project: { id: '19999', key: 'ATI' } },
+      { reason: 'the response lacks a project ID', key: 'ATI-42', project: { key: 'ATI' } },
+    ])('rejects before writing when $reason', async ({ key, project: currentProject }) => {
+      reply = ({ url }) => {
+        if (url.includes('/issue/ATI-42?fields=project')) {
+          return { body: { id: '10042', key, fields: { project: currentProject, status: { name: 'Open' } } } };
+        }
+        if (url.endsWith('/transitions')) {
+          return { body: { transitions: [{ id: '31', name: 'Done', to: { name: 'Done' } }] } };
+        }
+        return { status: 200, body: { id: '777' } };
+      };
+
+      await expect(make().execute(tool, { siteId: 'opaque_1', issueKey: 'ATI-42', ...args })).rejects.toMatchObject({
+        category: 'AUTH_ERROR',
+        details: { requestSent: false },
+      });
+      expect(seen.map(({ method }) => method)).toEqual(['GET']);
+    });
+  });
+
   describe('Business-ready tools: get_issue, search_users, transition_issue, update_issue, and enriched filters', () => {
     it('supports status, priority, and issueType filters in myjira.search_issues and returns enriched fields', async () => {
       reply = () => ({
@@ -792,9 +822,6 @@ describe('PersonalJiraAdapter', () => {
       reply = ({ url }) => {
         if (url.includes('/user/assignable/search')) {
           return { body: [{ accountId: 'acc-9', displayName: 'Minh Nguyen' }] };
-        }
-        if (url.endsWith('/issue/ATI-42?fields=project,status')) {
-          return { body: { id: '10042', key: 'ATI-42', fields: { project, status: { name: 'To Do' } } } };
         }
         if (url.endsWith('/issue/ATI-42/transitions')) {
           return { body: { transitions: [{ id: '31', name: 'Start Progress', to: { name: 'In Progress' } }] } };

@@ -1,6 +1,7 @@
 import type {
   CalendarDigestDelivery,
   GithubDigestDelivery,
+  MyJiraDigestDelivery,
   NotionDigestDelivery,
   ScheduleRunDeliveryResolution,
   ScheduleRunState,
@@ -13,7 +14,8 @@ import type {
 import type { ScheduleRow } from '../../db/repositories/schedule-repo.js';
 import { CALENDAR_DELIVERY_UNKNOWN } from './calendar-digest-runner.js';
 import { GITHUB_DELIVERY_UNKNOWN } from './github-digest-runner.js';
-import { JIRA_READ_UNAVAILABLE_PREFIX } from './jira-digest-runner.js';
+import type { JiraDigestConfig } from './jira-digest-candidate.js';
+import { isValidJiraDigestConfig, JIRA_READ_UNAVAILABLE_PREFIX, MYJIRA_DELIVERY_UNKNOWN } from './jira-digest-runner.js';
 import { NOTION_DELIVERY_UNKNOWN } from './notion-digest-runner.js';
 import { TRELLO_READ_UNAVAILABLE_PREFIX } from './trello-digest-runner.js';
 
@@ -36,6 +38,7 @@ export interface RunRow {
     | TelegramDigestDelivery
     | TrelloDigestDelivery
     | NotionDigestDelivery
+    | MyJiraDigestDelivery
     | null;
   dispatched_config?: SheetsDigestConfig | Record<string, unknown> | null;
   dispatched_config_hash?: string | null;
@@ -124,6 +127,21 @@ export function matchesDispatchedDigestConfig(run: RunRow, schedule: DeliverySch
     (run.dispatched_config_hash == null || run.dispatched_config_hash === schedule.digest_config_hash);
 }
 
+export function getJiraDeliveryUnknown(run: RunRow): { config: JiraDigestConfig | null } | null {
+  if (
+    run.status !== 'needs_attention' ||
+    run.delivery_started_at == null ||
+    run.delivery_resolution != null
+  ) {
+    return null;
+  }
+  const config = run.dispatched_config_hash && isValidJiraDigestConfig(run.dispatched_config)
+    ? run.dispatched_config
+    : null;
+  // Older runs may have recorded the Jira error without saving a dispatch snapshot.
+  return config || run.error?.includes(MYJIRA_DELIVERY_UNKNOWN) ? { config } : null;
+}
+
 export function isNotionDeliveryUnknown(run: RunRow, schedule?: DeliverySchedule): boolean {
   if (
     schedule?.kind !== 'notion_digest' ||
@@ -148,7 +166,9 @@ export function isNotionDeliveryUnknown(run: RunRow, schedule?: DeliverySchedule
 }
 
 export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): ScheduleRunView {
-  let error = isNotionDeliveryUnknown(row, schedule) ? NOTION_DELIVERY_UNKNOWN : row.error;
+  const jiraUnknown = getJiraDeliveryUnknown(row);
+  let error = jiraUnknown ? MYJIRA_DELIVERY_UNKNOWN
+    : isNotionDeliveryUnknown(row, schedule) ? NOTION_DELIVERY_UNKNOWN : row.error;
   if (row.status === 'digest_failed' && error?.startsWith(TRELLO_READ_UNAVAILABLE_PREFIX)) {
     error = error.slice(TRELLO_READ_UNAVAILABLE_PREFIX.length);
   }
@@ -169,19 +189,11 @@ export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): Sc
     deliveryFollowupRunId: row.delivery_followup_run_id ?? null,
   };
   const unknownKind = calendarOrGithubDeliveryUnknownKind(row, schedule);
-  if (schedule && unknownKind) {
-    view.canRetryDelivery = schedule.kind === unknownKind &&
-      (schedule.status === 'active' || (schedule.status === 'completed' && schedule.recurrence.type === 'once')) &&
+  if (schedule && jiraUnknown) {
+    view.canRetryDelivery = schedule.kind === 'myjira_digest' && schedule.status === 'active' &&
       matchesDispatchedDigestConfig(row, schedule);
-  } else if (
-    schedule?.kind === 'myjira_digest' &&
-    row.status === 'needs_attention' &&
-    row.delivery_started_at != null &&
-    row.delivery_resolution == null &&
-    typeof row.error === 'string' &&
-    row.error.trim().length > 0
-  ) {
-    view.canRetryDelivery =
+  } else if (schedule && unknownKind) {
+    view.canRetryDelivery = schedule.kind === unknownKind &&
       (schedule.status === 'active' || (schedule.status === 'completed' && schedule.recurrence.type === 'once')) &&
       matchesDispatchedDigestConfig(row, schedule);
   }

@@ -16,9 +16,10 @@ import { ConversationRepo } from '../../../src/db/repositories/conversation-repo
 import { PlanRepo } from '../../../src/db/repositories/plan-repo.js';
 import { ScheduleRepo } from '../../../src/db/repositories/schedule-repo.js';
 import { ScheduleService } from '../../../src/services/schedules/schedule-service.js';
-import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
+import { reconcileScheduleRuns, ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
 import {
   createJiraDigestExecutor,
+  isValidJiraDigestConfig,
   JIRA_READ_UNAVAILABLE,
   MYJIRA_DELIVERY_UNKNOWN,
 } from '../../../src/services/schedules/jira-digest-runner.js';
@@ -38,7 +39,7 @@ import {
 describe('Jira Read-Only Standup Digest (Phase 3)', () => {
   const recurrence = { type: 'daily' as const, time: '08:30' };
 
-  it('approves read-only myjira -> slack digest candidate when connected and channel matched', async () => {
+  it('discovers the Slack channel in the Jira organization when building the candidate', async () => {
     const candidate = await evaluateJiraDigestCandidate({
       userId: 'user-1',
       workspaceId: 'ws-1',
@@ -52,8 +53,13 @@ describe('Jira Read-Only Standup Digest (Phase 3)', () => {
         atlassianAccountId: 'acc-1',
         projects: [{ siteId: 'site-1', siteName: 'Acme Jira', projectKey: 'ATI', projectName: 'ATI Platform' }],
       }),
-      getAdapter: async () => ({
-        execute: vi.fn(async () => [{ id: 'C12345', name: 'standup' }]),
+      getAdapter: async (_service, context) => ({
+        execute: async () => [{
+          id: context?.workspaceId === 'ws-1' && context?.workspaceMode === 'organization' && context?.phase === 'planning'
+            ? 'C12345'
+            : 'CLEGACY',
+          name: 'standup',
+        }],
       }),
     });
 
@@ -375,18 +381,33 @@ describe('Jira Read-Only Standup Digest (Phase 3)', () => {
       expect(change.schedule.approvalMode).toBe('auto_digest');
       expect((change.schedule.digest as any)?.config?.projects?.[0]?.projectKey).toBe('ATI');
 
+      const scope = { workspaceMode: 'organization' as const, workspaceId };
+      const scheduleId = change.schedule.id;
+      const approved = await scheduleRepo.ownedSchedule(scheduleId, userId, pool, false, scope);
+      if (!approved || !isValidJiraDigestConfig(approved.digest_config)) {
+        throw new Error('The confirmed Jira digest configuration was not saved');
+      }
+      const approvedConfig = approved.digest_config;
+
       // Run 1: Execute via createJiraDigestExecutor + ScheduleRunner (hallucinated AI number falls back cleanly!)
       let clockNow = new Date('2026-11-16T01:35:00Z');
-      let slackMode: 'ok' | 'unknown' = 'ok';
+      let slackMode: 'ok' | 'unknown' | 'reject' = 'ok';
+      let jiraAdapterContext: unknown;
       const slackSentTexts: string[] = [];
+      const startedDispatches: Array<{
+        delivery_started_at: Date | null;
+        dispatched_config: JiraDigestConfig | null;
+        dispatched_config_hash: string | null;
+      }> = [];
       const executor = createJiraDigestExecutor({
         pool,
         timeZone: 'Asia/Ho_Chi_Minh',
         now: () => clockNow,
         jiraConnection: liveJiraConnection,
         summarizeDigest: async () => 'Có 9999 issue đang lỗi nặng 100% toàn bộ dự án.',
-        getAdapter: async (svc) => {
+        getAdapter: async (svc, context) => {
           if (svc === 'myjira') {
+            jiraAdapterContext = context;
             return {
               execute: async () => ({
                 issues: [
@@ -413,8 +434,17 @@ describe('Jira Read-Only Standup Digest (Phase 3)', () => {
           return {
             execute: async (_tool: string, args: any) => {
               slackSentTexts.push(args.text);
+              const dispatch = await pool.query(
+                `SELECT delivery_started_at, dispatched_config, dispatched_config_hash
+                   FROM schedule_runs WHERE schedule_id = $1 AND status = 'planning'`,
+                [scheduleId],
+              );
+              startedDispatches.push(dispatch.rows[0]);
               if (slackMode === 'unknown') {
                 throw new Error('ECONNRESET after TCP write');
+              }
+              if (slackMode === 'reject') {
+                throw Object.assign(new Error('Slack credential rejected before send'), { details: { requestSent: false } });
               }
               return { ts: '1763343300.000100' };
             },
@@ -422,17 +452,18 @@ describe('Jira Read-Only Standup Digest (Phase 3)', () => {
         },
       });
 
-      const runner = new ScheduleRunner({
+      const makeRunner = (runJiraDigest = executor) => new ScheduleRunner({
         pool,
         timeZone: 'Asia/Ho_Chi_Minh',
         now: () => clockNow,
         planRun: async () => {
           throw new Error('planRun must not be called for auto_digest');
         },
-        runJiraDigest: executor,
+        runJiraDigest,
         recordState: (client, row, now) => scheduleService.recordState(client, row, now),
       });
 
+      const runner = makeRunner();
       await runner.tick();
       const runs1 = await scheduleService.listRuns(userId, change.schedule.id, 10, clockNow, {
         workspaceMode: 'organization',
@@ -442,6 +473,13 @@ describe('Jira Read-Only Standup Digest (Phase 3)', () => {
       expect((runs1[0]?.delivery as any)?.ts).toBe('1763343300.000100');
       expect(slackSentTexts[0]).toContain('ATI-1');
       expect(slackSentTexts[0]).not.toContain('9999');
+      expect.soft(jiraAdapterContext).toMatchObject({
+        userId,
+        phase: 'execution',
+        workspaceId,
+        workspaceMode: 'organization',
+        jiraDigestBinding: { grantId, atlassianAccountId },
+      });
 
       // Run 2: Simulate ambiguous delivery error -> needs_attention + manual resolveRunDelivery('mark_sent')
       slackMode = 'unknown';
@@ -455,6 +493,55 @@ describe('Jira Read-Only Standup Digest (Phase 3)', () => {
       expect(unknownRun.state).toBe('needs_attention');
       expect(unknownRun.error).toBe(MYJIRA_DELIVERY_UNKNOWN);
       expect(unknownRun.canRetryDelivery).toBe(true);
+      expect.soft(startedDispatches[1]).toMatchObject({
+        delivery_started_at: expect.any(Date),
+        dispatched_config: approvedConfig,
+        dispatched_config_hash: approved.digest_config_hash,
+      });
+      await expect(scheduleService.startRun({
+        userId, runId: unknownRun.id, trigger: 'replan', now: clockNow, scope,
+      })).rejects.toMatchObject({ code: 'RUN_NOT_REPLANNABLE' });
+
+      const legacyRun = (
+        await pool.query<{ id: string }>(
+          `INSERT INTO schedule_runs (schedule_id, schedule_version, trigger, due_at, status, error, delivery_started_at)
+           VALUES ($1, $2, 'manual', $3, 'needs_attention', $4, now()) RETURNING id`,
+          [scheduleId, approved.version, clockNow, MYJIRA_DELIVERY_UNKNOWN],
+        )
+      ).rows[0]!;
+      const editedConfig = { ...approvedConfig, channelId: 'CNEW', channelName: 'new-channel' };
+      const editedHash = computeJiraDigestConfigHash({ config: editedConfig, recurrence, userId });
+      await pool.query(
+        'UPDATE schedules SET digest_config = $2, digest_config_hash = $3 WHERE id = $1',
+        [scheduleId, editedConfig, editedHash],
+      );
+      await expect(scheduleService.resolveRunDelivery({
+        userId, runId: unknownRun.id, resolution: 'retry_new_run', confirmDuplicateRisk: true, now: clockNow, scope,
+      })).rejects.toMatchObject({ code: 'CONFIG_CHANGED_SINCE_RUN' });
+      await pool.query(
+        'UPDATE schedules SET digest_config = $2, digest_config_hash = $3 WHERE id = $1',
+        [scheduleId, approvedConfig, approved.digest_config_hash],
+      );
+
+      const staleRun = await scheduleService.startRun({
+        userId, scheduleId, trigger: 'manual', now: clockNow, scope,
+      });
+      await makeRunner(async (started) => {
+        expect(started.scheduleVersion).toBe(approved.version);
+        await pool.query(
+          'UPDATE schedules SET version = version + 1, digest_config = $2, digest_config_hash = $3 WHERE id = $1',
+          [scheduleId, editedConfig, editedHash],
+        );
+        return {
+          state: 'blocked', error: 'Old Jira connection was revoked', pauseReason: 'Old Jira connection was revoked',
+        };
+      }).planNow(staleRun.id);
+      expect(await scheduleRepo.ownedSchedule(scheduleId, userId, pool, false, scope)).toMatchObject({
+        status: 'active', version: approved.version + 1, digest_config_hash: editedHash,
+      });
+      expect(await scheduleRepo.run(staleRun.id)).toMatchObject({
+        status: 'blocked', error: 'Old Jira connection was revoked',
+      });
 
       const resolved = await scheduleService.resolveRunDelivery({
         userId,
@@ -465,6 +552,58 @@ describe('Jira Read-Only Standup Digest (Phase 3)', () => {
       });
       expect(resolved.run.state).toBe('digest_sent');
       expect(resolved.run.deliveryResolution).toBe('confirmed_sent');
+      expect.soft(resolved.run.delivery).toMatchObject({
+        destinationService: 'slack', channelId: 'C12345', channelName: 'standup-eng',
+      });
+      const legacyResolved = await scheduleService.resolveRunDelivery({
+        userId, runId: legacyRun.id, resolution: 'mark_sent', now: clockNow, scope,
+      });
+      expect(legacyResolved.run.delivery).toMatchObject({ channelId: 'unknown', channelName: 'unknown' });
+
+      slackMode = 'reject';
+      clockNow = new Date('2026-11-18T01:35:00Z');
+      await runner.tick();
+      const rejected = (
+        await pool.query(
+          `SELECT status, delivery_started_at, dispatched_config, dispatched_config_hash FROM schedule_runs
+           WHERE schedule_id = $1 AND trigger = 'scheduled' ORDER BY due_at DESC LIMIT 1`,
+          [scheduleId],
+        )
+      ).rows[0];
+      expect.soft(startedDispatches[2]).toMatchObject({
+        delivery_started_at: expect.any(Date),
+        dispatched_config: editedConfig,
+        dispatched_config_hash: editedHash,
+      });
+      expect(rejected).toEqual({
+        status: 'digest_failed', delivery_started_at: null, dispatched_config: null, dispatched_config_hash: null,
+      });
+
+      // Dispatch without saving the outcome to model a worker closing before it commits.
+      slackMode = 'unknown';
+      const crashRun = await scheduleService.startRun({
+        userId, scheduleId, trigger: 'manual', now: clockNow, scope,
+      });
+      const crashInput: Parameters<typeof executor>[0] = {
+        runId: crashRun.id,
+        scheduleId,
+        scheduleVersion: approved.version + 1,
+        userId,
+        name: change.schedule.name,
+        request: change.schedule.request,
+        dueAt: clockNow,
+        trigger: 'manual',
+        workspaceId,
+        workspaceMode: 'organization',
+        recurrence,
+        digestConfig: editedConfig,
+        digestConfigHash: editedHash,
+      };
+      const crashOutcomes = await Promise.all([
+        executor(crashInput, convId, new AbortController().signal),
+        executor(crashInput, convId, new AbortController().signal),
+      ]);
+      expect(crashOutcomes.map(({ state }) => state).sort()).toEqual(['delivery_unknown', 'discarded']);
 
       // Pause then revoke project and confirm resume fails closed with REAUTHORIZATION_REQUIRED
       const schedBeforePause = await scheduleService.list(userId, clockNow, {
@@ -493,6 +632,29 @@ describe('Jira Read-Only Standup Digest (Phase 3)', () => {
           scope: { workspaceMode: 'organization', workspaceId },
         }),
       ).rejects.toMatchObject({ code: 'REAUTHORIZATION_REQUIRED' });
+
+      await pool.query(
+        `UPDATE schedules SET kind = 'plan', version = version + 1, digest_config = NULL,
+           digest_config_hash = NULL, digest_approved_at = NULL WHERE id = $1`,
+        [scheduleId],
+      );
+      await reconcileScheduleRuns(pool);
+      const crashRecovered = (await scheduleService.listRuns(userId, scheduleId, 10, clockNow, scope))
+        .find((run) => run.id === crashRun.id);
+      expect.soft(crashRecovered).toMatchObject({
+        state: 'needs_attention', error: MYJIRA_DELIVERY_UNKNOWN, canRetryDelivery: false,
+      });
+      await expect.soft(scheduleService.resolveRunDelivery({
+        userId, runId: crashRun.id, resolution: 'retry_new_run', confirmDuplicateRisk: true, now: clockNow, scope,
+      })).rejects.toMatchObject({ code: 'CONFIG_CHANGED_SINCE_RUN' });
+      const confirmedAfterRestart = await scheduleService.resolveRunDelivery({
+        userId, runId: crashRun.id, resolution: 'mark_sent', now: clockNow, scope,
+      });
+      expect(confirmedAfterRestart.run).toMatchObject({
+        state: 'digest_sent',
+        delivery: { destinationService: 'slack', channelId: 'CNEW', channelName: 'new-channel' },
+      });
+      expect(slackSentTexts).toHaveLength(4);
     } finally {
       await ctx.cleanup();
     }

@@ -7,7 +7,7 @@ import {
   validateTelegramDigestGmailConfig,
   type GmailBindingGuardCode,
 } from './gmail-digest-binding.js';
-import { computeTelegramDigestConfigHash } from './telegram-digest-candidate.js';
+import { computeTelegramDigestConfigHash, isJiraDigestSourceBinding } from './telegram-digest-candidate.js';
 
 type Queryable = pg.Pool | Pick<pg.Pool, 'query'>;
 
@@ -22,6 +22,7 @@ export type DigestScopeGuardCode =
   | 'DIGEST_SCOPE_NOT_CONFIGURED'
   | 'DIGEST_SCOPE_REVOKED'
   | 'DIGEST_GMAIL_LEGACY_UNBOUND'
+  | 'DIGEST_JIRA_BINDING_INVALID'
   | GmailBindingGuardCode;
 
 export interface DigestScopeGuardInput {
@@ -30,6 +31,8 @@ export interface DigestScopeGuardInput {
   claimedWorkspaceId?: string | null;
   encryptionKey?: string;
   gmailOAuthClientId?: string;
+  expectedTelegramDigestConfigHash?: string;
+  lockTelegramJiraAuthority?: boolean;
 }
 
 export interface DigestScopeGuardResult {
@@ -49,6 +52,7 @@ export type PinnedTelegramContextCode =
 export interface PinnedTelegramAdapterContextResult {
   allowed: boolean;
   code?: PinnedTelegramContextCode;
+  pauseReason?: string;
   credentialId?: string;
   chatId?: string;
   telegramUserId?: string;
@@ -182,6 +186,18 @@ export async function assertDigestScheduleLiveScopeAndAuth(
   const trustedWorkspaceId = row.workspace_id ?? null;
   const trustedWorkspaceMode = row.workspace_mode ?? 'personal';
   const cfg = (row.digest_config ?? {}) as Record<string, unknown>;
+
+  if (
+    input.expectedTelegramDigestConfigHash !== undefined &&
+    (row.kind !== 'telegram_digest' || row.digest_config_hash !== input.expectedTelegramDigestConfigHash)
+  ) {
+    return deny(
+      'DIGEST_JIRA_BINDING_INVALID',
+      'Cấu hình bản tin Telegram đã thay đổi. Hãy xác nhận lại lịch.',
+      trustedWorkspaceId,
+      trustedWorkspaceMode,
+    );
+  }
 
   if (row.user_status !== 'active') {
     return deny('DIGEST_USER_INACTIVE', 'Tài khoản không còn hoạt động.', trustedWorkspaceId, trustedWorkspaceMode);
@@ -400,10 +416,10 @@ export async function assertDigestScheduleLiveScopeAndAuth(
       }
     }
     const cfgSources = Array.isArray(cfg.sources) ? (cfg.sources as Array<Record<string, unknown>>) : [];
-    const usesMyJira =
-      (Array.isArray(row.services) && row.services.includes('myjira')) ||
-      cfgSources.some((s) => s?.service === 'myjira');
-    if (usesMyJira) {
+    const jiraSources = cfgSources.filter((s) =>
+      s?.service === 'myjira' || (typeof s?.tool === 'string' && s.tool.startsWith('myjira.')),
+    );
+    if (row.services?.includes('myjira') || jiraSources.length) {
       if (trustedWorkspaceMode !== 'organization' || !trustedWorkspaceId) {
         return deny(
           'DIGEST_CROSS_TENANT_SCOPE_MISMATCH',
@@ -414,7 +430,11 @@ export async function assertDigestScheduleLiveScopeAndAuth(
       }
       const atiMem = (
         await pool.query<{ status: string }>(
-          'SELECT status FROM ati_workspace_memberships WHERE workspace_id = $1 AND user_id = $2',
+          `SELECT m.status FROM ati_workspace_memberships m
+           JOIN ati_workspaces w ON w.id = m.workspace_id AND w.status = 'active'
+           JOIN workspace_members wm ON wm.workspace_id = m.workspace_id AND wm.user_id = m.user_id
+           WHERE m.workspace_id = $1 AND m.user_id = $2 AND wm.status = 'active'
+           ${input.lockTelegramJiraAuthority ? 'FOR SHARE OF w, wm, m NOWAIT' : ''}`,
           [trustedWorkspaceId, row.user_id],
         )
       ).rows[0];
@@ -426,34 +446,55 @@ export async function assertDigestScheduleLiveScopeAndAuth(
           trustedWorkspaceMode,
         );
       }
-      const myjiraSources = cfgSources.filter((s) => s?.service === 'myjira');
-      if (myjiraSources.length === 0) {
+      const binding = jiraSources[0]?.jiraBinding;
+      if (
+        !isJiraDigestSourceBinding(binding) ||
+        jiraSources.some(({ service, tool, jiraBinding }) =>
+          service !== 'myjira' || tool !== 'myjira.search_issues' ||
+          !isJiraDigestSourceBinding(jiraBinding) || jiraBinding.grantId !== binding.grantId ||
+          jiraBinding.atlassianAccountId !== binding.atlassianAccountId,
+        )
+      ) {
         return deny(
-          'DIGEST_SCOPE_NOT_CONFIGURED',
-          'Cấu hình nguồn Jira trong bản tin Telegram chưa đầy đủ.',
+          'DIGEST_JIRA_BINDING_INVALID',
+          'Nguồn Jira trong bản tin Telegram thiếu kết nối OAuth đã duyệt. Hãy xác nhận lại lịch.',
           trustedWorkspaceId,
           trustedWorkspaceMode,
         );
       }
-      const grantRows = await pool.query<{ id: string }>(
-        `SELECT g.id
+      let expectedHash: string | null = null;
+      try {
+        expectedHash = computeTelegramDigestConfigHash(cfg as unknown as TelegramDigestConfig);
+      } catch {
+        // Invalid stored digest configuration.
+      }
+      if (!expectedHash || row.digest_config_hash !== expectedHash) {
+        return deny(
+          'DIGEST_JIRA_BINDING_INVALID',
+          'Chữ ký toàn vẹn cấu hình nguồn Jira không hợp lệ. Hãy xác nhận lại lịch.',
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        );
+      }
+      const grantRows = await pool.query<{ id: string; atlassian_account_id: string }>(
+        `SELECT g.id, a.atlassian_account_id
          FROM jira_oauth_grants g
          JOIN jira_accounts a ON a.id = g.account_id
          WHERE a.user_id = $1 AND a.status = 'connected' AND g.status = 'active'
          ORDER BY g.created_at DESC
-         LIMIT 1`,
+         LIMIT 1 ${input.lockTelegramJiraAuthority ? 'FOR SHARE OF a, g NOWAIT' : ''}`,
         [row.user_id],
       );
-      const activeGrantId = grantRows.rows[0]?.id;
-      if (!activeGrantId) {
+      const grant = grantRows.rows[0];
+      if (grant?.id !== binding.grantId || grant.atlassian_account_id !== binding.atlassianAccountId) {
         return deny(
           'DIGEST_CREDENTIAL_INACTIVE',
-          'Kết nối OAuth Jira đã hết hạn hoặc bị thu hồi.',
+          'Kết nối OAuth Jira đã thay đổi, hết hạn hoặc bị thu hồi. Hãy xác nhận lại lịch.',
           trustedWorkspaceId,
           trustedWorkspaceMode,
         );
       }
-      for (const src of myjiraSources) {
+      for (const src of jiraSources) {
         const sArgs = (src.args ?? {}) as Record<string, unknown>;
         const sId = typeof sArgs.siteId === 'string' ? sArgs.siteId : '';
         const pKey = typeof sArgs.projectKey === 'string' ? sArgs.projectKey : '';
@@ -471,8 +512,9 @@ export async function assertDigestScheduleLiveScopeAndAuth(
            JOIN ati_workspace_jira_projects p ON p.site_id = s.id AND p.workspace_id = s.workspace_id
            JOIN jira_grant_sites gs ON gs.cloud_id = s.cloud_id AND gs.grant_id = $2 AND gs.product_type = 'jira'
            WHERE s.workspace_id = $1 AND s.id = $3 AND s.active = true
-             AND upper(p.project_key) = upper($4) AND p.selected = true`,
-          [trustedWorkspaceId, activeGrantId, sId, pKey],
+             AND upper(p.project_key) = upper($4) AND p.selected = true
+           ${input.lockTelegramJiraAuthority ? 'FOR SHARE OF s, gs, p NOWAIT' : ''}`,
+          [trustedWorkspaceId, binding.grantId, sId, pKey],
         );
         if (!okProj.rowCount) {
           return deny(
@@ -500,15 +542,17 @@ export async function buildPinnedTelegramAdapterContext(input: {
   scheduleId: string;
   encryptionKey: string;
   gmailOAuthClientId?: string;
+  lockTelegramJiraAuthority?: boolean;
 }): Promise<PinnedTelegramAdapterContextResult> {
   const guard = await assertDigestScheduleLiveScopeAndAuth({
     pool: input.pool,
     scheduleId: input.scheduleId,
     encryptionKey: input.encryptionKey,
     gmailOAuthClientId: input.gmailOAuthClientId,
+    lockTelegramJiraAuthority: input.lockTelegramJiraAuthority,
   });
   const base = { trustedWorkspaceId: guard.trustedWorkspaceId, trustedWorkspaceMode: guard.trustedWorkspaceMode };
-  if (!guard.allowed) return { allowed: false, code: guard.code, ...base };
+  if (!guard.allowed) return { allowed: false, code: guard.code, pauseReason: guard.pauseReason, ...base };
 
   const row = await loadScheduleRow(input.pool, input.scheduleId);
   const cfg = (row?.digest_config ?? {}) as Record<string, unknown>;

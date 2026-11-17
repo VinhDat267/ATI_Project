@@ -155,8 +155,8 @@ describe('JIRA-G2A Adapter Read-Only Policy & Search Coverage Contracts', () => 
       .rejects.toMatchObject({ category: 'AUTH_ERROR' });
   });
 
-  it('includes write:jira-work in MYJIRA_SCOPES for full read/write Jira automation', () => {
-    expect(MYJIRA_SCOPES).toEqual(['offline_access', 'read:me', 'read:jira-work', 'write:jira-work']);
+  it('includes work and user scopes in MYJIRA_SCOPES for Jira automation', () => {
+    expect(MYJIRA_SCOPES).toEqual(['offline_access', 'read:me', 'read:jira-work', 'read:jira-user', 'write:jira-work']);
   });
 
   it.each([

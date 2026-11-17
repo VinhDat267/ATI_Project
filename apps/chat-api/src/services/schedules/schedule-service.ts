@@ -34,7 +34,7 @@ import { MessageRepo } from '../../db/repositories/message-repo.js';
 import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
 import { calendarDigestCandidateMatches, computeCalendarDigestHash, evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js';
-import { calendarOrGithubDeliveryUnknownKind, isNotionDeliveryUnknown, matchesDispatchedDigestConfig, runState, runView } from './run-state.js';
+import { calendarOrGithubDeliveryUnknownKind, getJiraDeliveryUnknown, isNotionDeliveryUnknown, matchesDispatchedDigestConfig, runState, runView } from './run-state.js';
 import { nextOccurrence, nextRuns } from './next-occurrence.js';
 import { captureScheduleArtifact, guardScheduleArtifact, prelockScheduleArtifacts, registerScheduleFields, scheduleRegistry, scheduleSourceContext, tagScheduleContext } from '../slack/slack-schedule-lineage.js';
 import { messageOutputSelectors } from '../slack/slack-message-selectors.js';
@@ -73,7 +73,8 @@ import {
 } from './digest-scope-guard.js';
 import { approvedSlackNotionBinding, canonicalizeNotionDigestConfig, computeNotionDigestConfigHash } from './notion-digest-candidate.js';
 import { canonicalizeJiraDigestConfig, computeJiraDigestConfigHash, type JiraDigestCandidate, type JiraDigestConfig } from './jira-digest-candidate.js';
-import { buildConfirmedJiraDigestDelivery } from './jira-digest-runner.js';
+import type { EvaluateJiraDigestInput } from './jira-digest-candidate.js';
+import { buildConfirmedJiraDigestDelivery, isValidJiraDigestConfig } from './jira-digest-runner.js';
 
 export const SCHEDULE_CONFLICTS = {
   STALE_PROPOSAL: 'Đề xuất này đã cũ. Hãy xem đề xuất mới nhất.',
@@ -158,6 +159,7 @@ type Fields = Pick<ScheduleRow, 'name' | 'request' | 'recurrence' | 'services' |
 };
 
 export interface ScheduleServiceOptions {
+  jiraConnection?: EvaluateJiraDigestInput['jiraConnection'];
   pool: pg.Pool;
   timeZone: string;
   /** Plans a run in the background; the scheduler (SCHED-01) or nothing in tests. */
@@ -418,8 +420,7 @@ export class ScheduleService {
         Boolean(rawJiraCandidateConfig) &&
         Array.isArray(rawJiraCandidateConfig.projects);
       const isReadOnlyTelegramJiraDigestConfirm =
-        !metadata.reauthorize &&
-        approvalMode === 'auto_digest' &&
+        (approvalMode === 'auto_digest' || (metadata.reauthorize === true && approvalMode === undefined)) &&
         (metadata.digestCandidate as any)?.canAutoDigest === true &&
         Boolean(rawJiraCandidateConfig) &&
         Array.isArray(rawJiraCandidateConfig.sources) &&
@@ -1505,7 +1506,7 @@ export class ScheduleService {
       const needsGmail =
         snap.services.includes('gmail') ||
         Boolean(prevTgConfig?.sources?.some((s) => s.service === 'gmail'));
-      const [telegramLookup, gmailBinding, githubLookup] = await Promise.all([
+      const [telegramLookup, gmailBinding, githubLookup, jiraLookup] = await Promise.all([
         this.loadLiveTelegramLookup(this.options.pool, userId),
         needsGmail
           ? loadGmailDigestBinding(
@@ -1517,6 +1518,9 @@ export class ScheduleService {
           : Promise.resolve(null),
         snap.services.includes('github')
           ? this.loadLiveGithubLookup(this.options.pool, userId)
+          : Promise.resolve(null),
+        snap.services.includes('myjira') && trustedScope.workspaceMode === 'organization'
+          ? this.options.jiraConnection?.(userId, trustedScope.workspaceId)
           : Promise.resolve(null),
       ]);
       const effectiveIncludeAi =
@@ -1546,6 +1550,9 @@ export class ScheduleService {
         timeZone: this.options.timeZone,
         telegramLookup,
         githubLookup,
+        jiraLookup,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
         gmailBinding,
         existingDigest: prevTgConfig,
         reauthorizeGmailQuery,
@@ -2326,13 +2333,14 @@ export class ScheduleService {
         typeof run.error === 'string' &&
         run.error.includes('SHEETS_DELIVERY_UNKNOWN');
       const isTrelloOrTelegramUnknown =
-        (schedule.kind === 'trello_digest' || schedule.kind === 'telegram_digest' || schedule.kind === 'myjira_digest') &&
+        (schedule.kind === 'trello_digest' || schedule.kind === 'telegram_digest') &&
         run.status === 'needs_attention' &&
         run.delivery_started_at != null &&
         typeof run.error === 'string' &&
         run.error.trim().length > 0;
       const isNotionUnknown = isNotionDeliveryUnknown(run, schedule);
-      const unknownDigestKind = calendarOrGithubDeliveryUnknownKind(run, schedule);
+      const jiraUnknown = getJiraDeliveryUnknown(run);
+      const unknownDigestKind = jiraUnknown ? 'myjira_digest' : calendarOrGithubDeliveryUnknownKind(run, schedule);
       if (!isSheetsUnknown && !isTrelloOrTelegramUnknown && !isNotionUnknown && !unknownDigestKind) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
@@ -2453,14 +2461,12 @@ export class ScheduleService {
             resolvedBy: userId,
           });
         } else if (deliveryKind === 'myjira_digest') {
-          const cfg =
-            run.dispatched_config && typeof run.dispatched_config === 'object'
-              ? (run.dispatched_config as unknown as JiraDigestConfig)
-              : schedule.version === run.schedule_version &&
-                  schedule.digest_config &&
-                  typeof schedule.digest_config === 'object'
-                ? (schedule.digest_config as unknown as JiraDigestConfig)
-                : null;
+          const cfg = jiraUnknown?.config ??
+            (schedule.kind === 'myjira_digest' &&
+              matchesDispatchedDigestConfig(run, schedule) &&
+              isValidJiraDigestConfig(schedule.digest_config)
+              ? schedule.digest_config
+              : null);
           const prevDelivery =
             run.delivery && typeof run.delivery === 'object'
               ? (run.delivery as unknown as Record<string, unknown>)
@@ -2681,7 +2687,7 @@ export class ScheduleService {
           );
         }
         const isCompletedOneTimeRecovery = schedule.status === 'completed' &&
-          schedule.recurrence.type === 'once' && unknownDigestKind !== null;
+          schedule.recurrence.type === 'once' && unknownDigestKind !== null && !jiraUnknown;
         if (schedule.status !== 'active' && !isCompletedOneTimeRecovery) {
           throw new ScheduleConflict('SCHEDULE_CLOSED');
         }
@@ -2732,6 +2738,9 @@ export class ScheduleService {
           }
           await this.assertTelegramDigestCanResumeInTx(client, schedule);
         } else if (schedule.kind === 'myjira_digest') {
+          if (!matchesDispatchedDigestConfig(run, schedule)) {
+            throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
+          }
           const cfg = canonicalizeJiraDigestConfig(schedule.digest_config as unknown as JiraDigestConfig);
           const expectedHash = computeJiraDigestConfigHash({
             config: cfg,

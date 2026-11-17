@@ -5,6 +5,7 @@ import type {
   ScheduleRecurrence,
 } from '@wap/tool-schemas';
 import { isUuid } from '../../db/repositories/uuid.js';
+import { WorkspaceRepoError } from '../../db/repositories/workspace/errors.js';
 import { assertDigestScheduleLiveScopeAndAuth } from './digest-scope-guard.js';
 import {
   computeJiraDigestConfigHash,
@@ -381,14 +382,8 @@ function buildDeterministicJiraSummary(counts: {
   return `Trong mẫu quét hiện tại có ${counts.overdue} issue quá hạn, ${counts.dueSoon} issue sắp đến hạn (${counts.dueSoonHours}h), ${counts.blockerOrHigh} issue ưu tiên cao/bị chặn và ${counts.unassigned} issue chưa có người phụ trách; ${counts.completed} issue hoàn thành trong ${formatWindowLabel(counts.completedWindowHours)}.`;
 }
 
-function isRetryableJiraReadError(error: unknown): boolean {
-  if (error instanceof DOMException && error.name === 'TimeoutError') return true;
-  if (!error || typeof error !== 'object' || !('category' in error)) return false;
-  const cat = (error as { category?: unknown }).category;
-  return cat === 'NETWORK' || cat === 'SERVER_ERROR' || cat === 'RATE_LIMIT';
-}
-
 function isJiraReadAuthError(error: unknown): boolean {
+  if (error instanceof WorkspaceRepoError) return [401, 403, 404].includes(error.statusCode);
   if (!error || typeof error !== 'object' || !('category' in error)) return false;
   const cat = (error as { category?: unknown }).category;
   return cat === 'AUTH_ERROR' || cat === 'PERMISSION_DENIED';
@@ -419,10 +414,14 @@ function jiraReadUnavailable(): MyJiraDigestRunOutcome {
   return { state: 'digest_failed', error: JIRA_TEMPORARILY_UNAVAILABLE, failureCode: JIRA_READ_UNAVAILABLE };
 }
 
-function isValidJiraDigestConfig(cfg: unknown): cfg is JiraDigestConfig {
+export function isValidJiraDigestConfig(cfg: unknown): cfg is JiraDigestConfig {
   if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) return false;
   const c = cfg as JiraDigestConfig;
-  if (!c.workspaceId || !c.grantId || !c.atlassianAccountId) return false;
+  if (
+    typeof c.workspaceId !== 'string' || !c.workspaceId ||
+    typeof c.grantId !== 'string' || !c.grantId ||
+    typeof c.atlassianAccountId !== 'string' || !c.atlassianAccountId
+  ) return false;
   if (!Array.isArray(c.projects) || c.projects.length === 0) return false;
   if (!c.projects.every((p) => p && typeof p.siteId === 'string' && p.siteId && typeof p.projectKey === 'string' && p.projectKey)) {
     return false;
@@ -477,20 +476,25 @@ async function claimJiraDigestDelivery(
   config: JiraDigestConfig,
   signal: AbortSignal,
 ): Promise<'claimed' | 'discarded' | 'blocked_auth'> {
+  const dispatchedConfig = JSON.stringify(config);
   if (typeof pool.connect !== 'function') {
     const marked = await pool.query(
       `UPDATE schedule_runs r
-          SET delivery_started_at = clock_timestamp(), updated_at = now()
+          SET delivery_started_at = clock_timestamp(), updated_at = now(),
+              dispatched_config = $4::jsonb, dispatched_config_hash = $5
          FROM schedules s
         WHERE r.id = $1
           AND r.schedule_id = s.id
           AND s.id = $2
+          AND r.schedule_version = $3
           AND r.status = 'planning'
           AND r.delivery_started_at IS NULL
           AND s.version = $3
           AND s.status IN ('active', 'completed')
+          AND (r.dispatched_config IS NULL OR r.dispatched_config = $4::jsonb)
+          AND (r.dispatched_config_hash IS NULL OR r.dispatched_config_hash = $5)
         RETURNING r.id`,
-      [run.runId, run.scheduleId, run.scheduleVersion],
+      [run.runId, run.scheduleId, run.scheduleVersion, dispatchedConfig, run.digestConfigHash],
     );
     return marked.rowCount ? 'claimed' : 'discarded';
   }
@@ -503,8 +507,8 @@ async function claimJiraDigestDelivery(
       `SELECT s.* FROM schedules s
        JOIN conversations c ON c.id = s.conv_id
        JOIN users u ON u.id = s.user_id AND u.status = 'active'
-       WHERE s.id = $1 FOR UPDATE OF c, s`,
-      [run.scheduleId],
+       WHERE s.id = $1 AND s.digest_config = $2::jsonb FOR UPDATE OF c, s`,
+      [run.scheduleId, dispatchedConfig],
     );
     const schedule = scheduleRes.rows[0];
     const currentRun = (
@@ -552,10 +556,13 @@ async function claimJiraDigestDelivery(
 
     const marked = await client.query(
       `UPDATE schedule_runs
-       SET delivery_started_at = clock_timestamp(), updated_at = now()
-       WHERE id = $1 AND status = 'planning' AND delivery_started_at IS NULL
+       SET delivery_started_at = clock_timestamp(), updated_at = now(),
+           dispatched_config = $3::jsonb, dispatched_config_hash = $4
+       WHERE id = $1 AND schedule_version = $2 AND status = 'planning' AND delivery_started_at IS NULL
+         AND (dispatched_config IS NULL OR dispatched_config = $3::jsonb)
+         AND (dispatched_config_hash IS NULL OR dispatched_config_hash = $4)
        RETURNING id`,
-      [run.runId],
+      [run.runId, run.scheduleVersion, dispatchedConfig, run.digestConfigHash],
     );
     await client.query('COMMIT');
     return marked.rowCount ? 'claimed' : 'discarded';
@@ -565,6 +572,15 @@ async function claimJiraDigestDelivery(
   } finally {
     client.release();
   }
+}
+
+async function clearJiraDigestDelivery(pool: pg.Pool, runId: string): Promise<void> {
+  await pool.query(
+    `UPDATE schedule_runs SET delivery_started_at = NULL, dispatched_config = NULL,
+       dispatched_config_hash = NULL, updated_at = now()
+     WHERE id = $1 AND status = 'planning'`,
+    [runId],
+  );
 }
 
 export function buildConfirmedJiraDigestDelivery(input: {
@@ -743,14 +759,15 @@ export function createJiraDigestExecutor(options: CreateJiraDigestExecutorOption
     try {
       jiraAdapter = await options.getAdapter('myjira', {
         userId: run.userId,
-        phase: 'planning',
+        phase: 'execution',
         workspaceId: config.workspaceId,
         workspaceMode: 'organization',
+        jiraDigestBinding: { grantId: config.grantId, atlassianAccountId: config.atlassianAccountId },
         signal,
       });
     } catch (err) {
       signal.throwIfAborted();
-      if (isRetryableJiraReadError(err)) return jiraReadUnavailable();
+      if (!isJiraReadAuthError(err)) return jiraReadUnavailable();
       const msg = err instanceof Error ? err.message : 'Kết nối Jira không khả dụng.';
       return { state: 'blocked', error: msg, pauseReason: msg };
     }
@@ -837,7 +854,6 @@ export function createJiraDigestExecutor(options: CreateJiraDigestExecutorOption
         }
       } catch (err) {
         signal.throwIfAborted();
-        if (isRetryableJiraReadError(err)) return jiraReadUnavailable();
         if (isJiraReadAuthError(err)) {
           const msg = 'Quyền đọc Jira cho dự án đã bị thu hồi hoặc hết hạn.';
           return { state: 'blocked', error: msg, pauseReason: msg };
@@ -1090,10 +1106,7 @@ export function createJiraDigestExecutor(options: CreateJiraDigestExecutorOption
           return { state: 'delivery_unknown', error: MYJIRA_DELIVERY_UNKNOWN };
         }
         if (deliveryStarted) {
-          await options.pool.query(
-            "UPDATE schedule_runs SET delivery_started_at = NULL WHERE id = $1 AND status = 'planning'",
-            [run.runId],
-          );
+          await clearJiraDigestDelivery(options.pool, run.runId);
         }
         return {
           state: 'digest_failed',
@@ -1128,10 +1141,7 @@ export function createJiraDigestExecutor(options: CreateJiraDigestExecutorOption
         return { state: 'delivery_unknown', error: MYJIRA_DELIVERY_UNKNOWN };
       }
       if (deliveryStarted) {
-        await options.pool.query(
-          "UPDATE schedule_runs SET delivery_started_at = NULL WHERE id = $1 AND status = 'planning'",
-          [run.runId],
-        );
+        await clearJiraDigestDelivery(options.pool, run.runId);
       }
       return {
         state: 'digest_failed',
