@@ -326,13 +326,14 @@ describe('Jira Read-Only Standup Digest (Phase 3)', () => {
         projects: [{ siteId, siteName: 'Acme Jira', projectKey: 'ATI', projectName: 'ATI Platform' }],
       });
 
+      const routeScheduleSpy = vi.fn(async () => ({ services: ['myjira', 'slack'], unavailable: [] }));
       const chatService = new ChatService({
         msgRepo,
         convRepo,
         planRepo,
         jiraLlmEgressEnabled: true,
         planner: {
-          routeSchedule: vi.fn(async () => ({ services: ['myjira', 'slack'], unavailable: [] })),
+          routeSchedule: routeScheduleSpy,
           processMessage: vi.fn(),
         } as any,
         eventEmitter: { emit: () => {} },
@@ -360,6 +361,16 @@ describe('Jira Read-Only Standup Digest (Phase 3)', () => {
         ['Mỗi sáng 8h30 tổng hợp tiến độ và blocker Jira dự án ATI gửi vào kênh #standup-eng'],
       );
       await prepared.write();
+
+      expect(routeScheduleSpy).toHaveBeenCalledWith(
+        'Mỗi sáng 8h30 tổng hợp tiến độ và blocker Jira dự án ATI gửi vào kênh #standup-eng',
+        expect.objectContaining({
+          userId,
+          workspaceId,
+          workspaceMode: 'organization',
+          jiraContext: true,
+        }),
+      );
 
       const msgs = await msgRepo.listMessages(convId);
       const proposalMsg = msgs[msgs.length - 1]!;

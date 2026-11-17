@@ -870,5 +870,37 @@ describe('PersonalJiraAdapter', () => {
         updatedFields: ['priority', 'dueDate'],
       });
     });
+
+    it('fails fast with AUTH_ERROR on HTTP 401 scope mismatch without triggering forceRefresh loop', async () => {
+      reply = () => ({
+        status: 401,
+        body: { code: 401, message: 'Unauthorized; scope does not match' },
+      });
+
+      const refreshFlags: boolean[] = [];
+      const customAdapter = make({
+        tokens: {
+          getAccessToken: async (_userIdOrOpts?: any, opts?: any) => {
+            const o = typeof _userIdOrOpts === 'object' ? _userIdOrOpts : opts;
+            refreshFlags.push(Boolean(o?.forceRefresh));
+            return 'tok-missing-scope';
+          },
+        },
+      });
+
+      await expect(
+        customAdapter.execute('myjira.search_users', {
+          siteId: 'opaque_1',
+          projectKey: 'ATI',
+          query: 'Nguyen',
+        })
+      ).rejects.toMatchObject({
+        category: 'AUTH_ERROR',
+        statusCode: 401,
+        message: expect.stringContaining('read:jira-user'),
+      });
+      expect(refreshFlags).toEqual([false]);
+      expect(seen).toHaveLength(1);
+    });
   });
 });

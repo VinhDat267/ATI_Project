@@ -179,6 +179,24 @@ export class PersonalJiraHttpTransport {
       }
 
       if (response.status === 401) {
+        const rawMsg =
+          typeof value?.message === 'string'
+            ? value.message
+            : Array.isArray(value?.errorMessages)
+              ? value.errorMessages.join('; ')
+              : typeof value?.error_description === 'string'
+                ? value.error_description
+                : '';
+        const wwwAuth = response.headers?.get?.('www-authenticate') ?? '';
+        if (/scope\s+does\s+not\s+match|insufficient_scope/i.test(`${rawMsg} ${wwwAuth}`)) {
+          throw createJiraStepError(
+            'AUTH_ERROR',
+            401,
+            'Jira OAuth token lacks required scope (such as read:jira-user or write:jira-work); reconnect or re-authorize Jira.',
+            false,
+            nonWritingDetails
+          );
+        }
         if (!refreshed) {
           refreshed = true;
           forceRefresh = true;

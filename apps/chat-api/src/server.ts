@@ -818,7 +818,7 @@ async function bootstrap() {
       }),
     routeSchedule: async (
       request: string,
-      actor: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' }
+      actor: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization'; jiraContext?: boolean }
     ) => (await plannerFor(actor)).routeSchedule(request),
   };
 
