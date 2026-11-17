@@ -123,7 +123,7 @@ describe('Digest Slack credential isolation by workspace', () => {
     { scenario: 'personal Slack credential', hasPersonal: true, replace: null, expectedToken: 'xoxb-personal', state: 'digest_sent' },
     { scenario: 'legacy fallback', hasPersonal: false, replace: null, expectedToken: 'xoxb-legacy', state: 'digest_sent' },
     { scenario: 'changed credential during Calendar read', hasPersonal: true, replace: 'read', expectedToken: null, state: 'digest_failed' },
-    { scenario: 'changed credential during throttling', hasPersonal: true, replace: 'throttle', expectedToken: null, state: 'discarded' },
+    { scenario: 'changed credential during throttling', hasPersonal: true, replace: 'throttle', expectedToken: null, state: 'digest_failed' },
   ])('uses the validated Slack bot in a personal Calendar digest with $scenario', async ({ hasPersonal, replace, expectedToken, state }) => {
     const channel = 'C01PERSON01';
     const encrypted = (botToken: string) => encryptCredentials({ botToken, allowedScope: { channels: [channel] } }, KEY);

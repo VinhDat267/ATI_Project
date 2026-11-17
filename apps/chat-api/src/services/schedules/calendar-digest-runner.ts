@@ -751,6 +751,19 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
             expectedCredential?.id ?? null, expectedCredential?.config ?? null],
         );
         if (!marked.rowCount) {
+          if (expectedCredential) {
+            const liveCredential = await options.pool.query(
+              "SELECT 1 FROM service_credentials WHERE id=$1 AND config=$2 AND status='active'",
+              [expectedCredential.id, expectedCredential.config],
+            );
+            if (!liveCredential.rowCount) {
+              throw new StepError({
+                category: 'VALIDATION',
+                message: 'Kết nối hoặc phạm vi kênh Slack vừa thay đổi.',
+                details: { requestSent: false },
+              });
+            }
+          }
           discarded = true;
           throw new Error('Calendar digest delivery was not claimed');
         }
