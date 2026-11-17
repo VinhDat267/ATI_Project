@@ -34,7 +34,7 @@ import { MessageRepo } from '../../db/repositories/message-repo.js';
 import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
 import { calendarDigestCandidateMatches, computeCalendarDigestHash, evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js';
-import { calendarOrGithubDeliveryUnknownKind, isNotionDeliveryUnknown, matchesDispatchedDigestConfig, runState, runView } from './run-state.js';
+import { calendarOrGithubDeliveryUnknownKind, getJiraDeliveryUnknown, isNotionDeliveryUnknown, matchesDispatchedDigestConfig, runState, runView } from './run-state.js';
 import { nextOccurrence, nextRuns } from './next-occurrence.js';
 import { captureScheduleArtifact, guardScheduleArtifact, prelockScheduleArtifacts, registerScheduleFields, scheduleRegistry, scheduleSourceContext, tagScheduleContext } from '../slack/slack-schedule-lineage.js';
 import { messageOutputSelectors } from '../slack/slack-message-selectors.js';
@@ -73,6 +73,8 @@ import {
 } from './digest-scope-guard.js';
 import { approvedSlackNotionBinding, canonicalizeNotionDigestConfig, computeNotionDigestConfigHash } from './notion-digest-candidate.js';
 import { canonicalizeJiraDigestConfig, computeJiraDigestConfigHash, type JiraDigestCandidate, type JiraDigestConfig } from './jira-digest-candidate.js';
+import type { EvaluateJiraDigestInput } from './jira-digest-candidate.js';
+import { buildConfirmedJiraDigestDelivery, isValidJiraDigestConfig } from './jira-digest-runner.js';
 
 export const SCHEDULE_CONFLICTS = {
   STALE_PROPOSAL: 'Đề xuất này đã cũ. Hãy xem đề xuất mới nhất.',
@@ -157,6 +159,7 @@ type Fields = Pick<ScheduleRow, 'name' | 'request' | 'recurrence' | 'services' |
 };
 
 export interface ScheduleServiceOptions {
+  jiraConnection?: EvaluateJiraDigestInput['jiraConnection'];
   pool: pg.Pool;
   timeZone: string;
   /** Plans a run in the background; the scheduler (SCHED-01) or nothing in tests. */
@@ -416,10 +419,25 @@ export class ScheduleService {
         (metadata.digestCandidate as any)?.canAutoDigest === true &&
         Boolean(rawJiraCandidateConfig) &&
         Array.isArray(rawJiraCandidateConfig.projects);
+      const isReadOnlyTelegramJiraDigestConfirm =
+        (approvalMode === 'auto_digest' || (metadata.reauthorize === true && approvalMode === undefined)) &&
+        (metadata.digestCandidate as any)?.canAutoDigest === true &&
+        Boolean(rawJiraCandidateConfig) &&
+        Array.isArray(rawJiraCandidateConfig.sources) &&
+        scope?.workspaceMode === 'organization' &&
+        Boolean(scope?.workspaceId);
+      const isAuthorizedOrgManualMyJiraConfirm =
+        !metadata.reauthorize &&
+        (!approvalMode || approvalMode === 'manual') &&
+        scope?.workspaceMode === 'organization' &&
+        Boolean(scope?.workspaceId) &&
+        !metadata.services?.includes('jira');
       if (
         (metadata.services?.some((s) => s === 'myjira' || s.startsWith('myjira')) ||
           metadata.proposal?.request?.toLowerCase().includes('myjira')) &&
-        !isReadOnlyJiraDigestConfirm
+        !isReadOnlyJiraDigestConfirm &&
+        !isReadOnlyTelegramJiraDigestConfirm &&
+        !isAuthorizedOrgManualMyJiraConfirm
       ) {
         throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE', 'Lịch tự động không hỗ trợ Jira cá nhân (myjira).');
       }
@@ -507,6 +525,8 @@ export class ScheduleService {
         Boolean(candidateConfig) && Array.isArray(candidateConfig.boards);
       const hasNotionDigestCandidate =
         Boolean(candidateConfig) && Array.isArray(candidateConfig.databases);
+      const hasMyJiraDigestCandidate =
+        Boolean(candidateConfig) && Array.isArray(candidateConfig.projects);
       const candidateHasTelegramSources = Boolean(
         candidateConfig && typeof candidateConfig === 'object' && 'sources' in candidateConfig,
       );
@@ -520,10 +540,12 @@ export class ScheduleService {
             !hasGithubDigestCandidate &&
             !hasTrelloDigestCandidate &&
             !hasNotionDigestCandidate &&
+            !hasMyJiraDigestCandidate &&
             existing?.kind !== 'telegram_digest' &&
             existing?.kind !== 'github_digest' &&
             existing?.kind !== 'trello_digest' &&
             existing?.kind !== 'notion_digest' &&
+            existing?.kind !== 'myjira_digest' &&
             existing?.kind !== 'sheets_digest' &&
             (metadata.services.includes('mycalendar') ||
               (metadata.services.includes('calendar') && !metadata.services.includes('github')))));
@@ -534,10 +556,12 @@ export class ScheduleService {
           !hasGithubDigestCandidate &&
           !hasTrelloDigestCandidate &&
           !hasNotionDigestCandidate &&
+          !hasMyJiraDigestCandidate &&
           existing?.kind !== 'telegram_digest' &&
           existing?.kind !== 'github_digest' &&
           existing?.kind !== 'trello_digest' &&
           existing?.kind !== 'notion_digest' &&
+          existing?.kind !== 'myjira_digest' &&
           existing?.kind !== 'calendar_digest' &&
           (metadata.services.includes('mysheets') || metadata.services.includes('sheets')));
       const isGithubSchedule =
@@ -571,6 +595,18 @@ export class ScheduleService {
           (!candidateHasTelegramSources &&
             !metadata.services.includes('telegram') &&
             (metadata.services.includes('notion') || existing?.kind === 'notion_digest')));
+      const isMyJiraSchedule =
+        !metadata.reauthorize &&
+        !isCalendarSchedule &&
+        !isSheetsSchedule &&
+        !isGithubSchedule &&
+        !isTrelloSchedule &&
+        !isNotionSchedule &&
+        (hasMyJiraDigestCandidate ||
+          (existing?.kind === 'myjira_digest' && !candidateHasTelegramSources) ||
+          (!candidateHasTelegramSources &&
+            !metadata.services.includes('telegram') &&
+            (metadata.services.includes('myjira') || existing?.kind === 'myjira_digest')));
       const isTelegramSchedule =
         (!metadata.reauthorize || existing?.kind === 'telegram_digest') &&
         !isCalendarSchedule &&
@@ -578,11 +614,12 @@ export class ScheduleService {
         !isGithubSchedule &&
         !isTrelloSchedule &&
         !isNotionSchedule &&
+        !isMyJiraSchedule &&
         (metadata.services.includes('telegram') ||
           existing?.kind === 'telegram_digest' ||
           candidateHasTelegramSources);
       let digestFields: {
-        kind: 'plan' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest' | 'trello_digest' | 'notion_digest';
+        kind: 'plan' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest' | 'trello_digest' | 'notion_digest' | 'myjira_digest';
         digestConfig: unknown | null;
         digestConfigHash: string | null;
         digestApprovedAt: Date | null;
@@ -848,9 +885,17 @@ export class ScheduleService {
           if (!jiraCandidate?.canAutoDigest || !jiraCandidate.config) {
             throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED', jiraCandidate?.disabledReason);
           }
+          if (wsMode !== 'organization' || !wsId || jiraCandidate.config.workspaceId !== wsId) {
+            throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE', 'Bản tin Jira chỉ hỗ trợ trong Workspace Tổ chức hợp lệ.');
+          }
+          await this.assertJiraDigestConfigInTx(client, userId, wsId, jiraCandidate.config);
           await this.ensureRoom(client, userId, { workspaceMode: wsMode, workspaceId: wsId });
           const next = this.next({ recurrence: proposal.recurrence! }, now);
-          const config = canonicalizeJiraDigestConfig(jiraCandidate.config);
+          const effectiveRaw: JiraDigestConfig =
+            typeof includeAiSummary === 'boolean'
+              ? { ...jiraCandidate.config, includeAiSummary }
+              : jiraCandidate.config;
+          const config = canonicalizeJiraDigestConfig(effectiveRaw);
           const configHash = computeJiraDigestConfigHash({
             config,
             recurrence: proposal.recurrence!,
@@ -919,6 +964,12 @@ export class ScheduleService {
           throw new ScheduleConflict('SCHEDULE_CLOSED');
         }
         await this.assertTelegramDigestCanResumeInTx(client, existing);
+      }
+      if (proposal.action === 'resume' && existing.kind === 'myjira_digest') {
+        if (existing.status === 'cancelled' || existing.status === 'completed') {
+          throw new ScheduleConflict('SCHEDULE_CLOSED');
+        }
+        await this.assertMyJiraDigestCanResumeInTx(client, existing);
       }
       const fields = this.transition(existing, proposal.action, proposal, persistedServices, now);
       if (!fields) {
@@ -1137,6 +1188,52 @@ export class ScheduleService {
             }
             digestUpdate = {
               kind: 'notion_digest',
+              config,
+              configHash,
+              approvedAt: now,
+            };
+          }
+        }
+        return this.recordState(client, await this.saveFields(client, existing.id, fields, messageId, segments, digestUpdate), now);
+      }
+      if (proposal.action === 'update' && isMyJiraSchedule) {
+        let digestUpdate:
+          | { kind: 'plan' }
+          | { kind: 'myjira_digest'; config: JiraDigestConfig; configHash: string; approvedAt: Date }
+          | undefined;
+        if (approvalMode === 'manual') {
+          if (existing.kind === 'myjira_digest') {
+            digestUpdate = { kind: 'plan' };
+          }
+        } else if (approvalMode === 'auto_digest' || existing.kind === 'myjira_digest') {
+          const jiraCandidate = metadata.digestCandidate as JiraDigestCandidate | undefined;
+          const candidateConfig = jiraCandidate?.canAutoDigest && jiraCandidate.config
+            ? jiraCandidate.config
+            : existing.kind === 'myjira_digest' && proposal.request === existing.request
+              ? (existing.digest_config as JiraDigestConfig | undefined)
+              : undefined;
+          if (!candidateConfig) {
+            if (approvalMode === 'auto_digest') {
+              throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED', jiraCandidate?.disabledReason);
+            }
+            digestUpdate = { kind: 'plan' };
+          } else {
+            if (wsMode !== 'organization' || !wsId || candidateConfig.workspaceId !== wsId) {
+              throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE', 'Bản tin Jira chỉ hỗ trợ trong Workspace Tổ chức hợp lệ.');
+            }
+            const nextRawConfig: JiraDigestConfig =
+              typeof includeAiSummary === 'boolean'
+                ? { ...candidateConfig, includeAiSummary }
+                : candidateConfig;
+            await this.assertJiraDigestConfigInTx(client, userId, wsId, nextRawConfig);
+            const config = canonicalizeJiraDigestConfig(nextRawConfig);
+            const configHash = computeJiraDigestConfigHash({
+              config,
+              recurrence: fields.recurrence,
+              userId,
+            });
+            digestUpdate = {
+              kind: 'myjira_digest',
               config,
               configHash,
               approvedAt: now,
@@ -1409,7 +1506,7 @@ export class ScheduleService {
       const needsGmail =
         snap.services.includes('gmail') ||
         Boolean(prevTgConfig?.sources?.some((s) => s.service === 'gmail'));
-      const [telegramLookup, gmailBinding, githubLookup] = await Promise.all([
+      const [telegramLookup, gmailBinding, githubLookup, jiraLookup] = await Promise.all([
         this.loadLiveTelegramLookup(this.options.pool, userId),
         needsGmail
           ? loadGmailDigestBinding(
@@ -1421,6 +1518,9 @@ export class ScheduleService {
           : Promise.resolve(null),
         snap.services.includes('github')
           ? this.loadLiveGithubLookup(this.options.pool, userId)
+          : Promise.resolve(null),
+        snap.services.includes('myjira') && trustedScope.workspaceMode === 'organization'
+          ? this.options.jiraConnection?.(userId, trustedScope.workspaceId)
           : Promise.resolve(null),
       ]);
       const effectiveIncludeAi =
@@ -1450,6 +1550,9 @@ export class ScheduleService {
         timeZone: this.options.timeZone,
         telegramLookup,
         githubLookup,
+        jiraLookup,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
         gmailBinding,
         existingDigest: prevTgConfig,
         reauthorizeGmailQuery,
@@ -1922,6 +2025,119 @@ export class ScheduleService {
           throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
         }
       }
+    } else if (Array.isArray(row.services) && row.services.includes('myjira')) {
+      let expectedHash: string | null = null;
+      try {
+        expectedHash = computeTelegramDigestConfigHash(row.digest_config as TelegramDigestConfig);
+      } catch {
+        expectedHash = null;
+      }
+      if (!row.digest_config_hash || !expectedHash || expectedHash !== row.digest_config_hash) {
+        throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+      }
+      const guard = await assertDigestScheduleLiveScopeAndAuth({
+        pool: client,
+        scheduleId: row.id,
+      });
+      if (!guard.allowed) {
+        throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', guard.pauseReason);
+      }
+    }
+  }
+
+  private async assertJiraDigestConfigInTx(
+    client: pg.PoolClient,
+    userId: string,
+    workspaceId: string,
+    config: JiraDigestConfig,
+  ): Promise<void> {
+    if (!config.workspaceId || config.workspaceId !== workspaceId) {
+      throw new ScheduleConflict('DIGEST_PREVIEW_CHANGED', 'Bản tin Jira tham chiếu workspace không khớp.');
+    }
+    const atiMem = await client.query<{ status: string }>(
+      `SELECT am.status
+       FROM ati_workspace_memberships am
+       JOIN workspace_members wm ON wm.workspace_id = am.workspace_id AND wm.user_id = am.user_id
+       WHERE am.workspace_id = $1 AND am.user_id = $2`,
+      [workspaceId, userId],
+    );
+    if (atiMem.rows[0]?.status !== 'active') {
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', 'Thành viên không còn quyền Jira trong không gian làm việc.');
+    }
+    if (!isUuid(config.grantId)) {
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', 'Kết nối OAuth Jira không còn hiệu lực.');
+    }
+    const grantRes = await client.query<{ id: string }>(
+      `SELECT g.id
+       FROM jira_oauth_grants g
+       JOIN jira_accounts a ON a.id = g.account_id
+       WHERE g.id = $1 AND a.user_id = $2 AND a.status = 'connected'
+         AND a.atlassian_account_id = $3 AND g.status = 'active'`,
+      [config.grantId, userId, config.atlassianAccountId],
+    );
+    if (!grantRes.rowCount) {
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', 'Kết nối OAuth Jira không còn hiệu lực.');
+    }
+    if (!Array.isArray(config.projects) || config.projects.length === 0) {
+      throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+    }
+    for (const proj of config.projects) {
+      if (!isUuid(proj.siteId)) {
+        throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', 'Dự án Jira trong lịch không còn được cấp quyền.');
+      }
+      const okProj = await client.query<{ id: string }>(
+        `SELECT p.id
+         FROM ati_workspace_jira_sites s
+         JOIN ati_workspace_jira_projects p ON p.site_id = s.id AND p.workspace_id = s.workspace_id
+         JOIN jira_grant_sites gs ON gs.cloud_id = s.cloud_id AND gs.grant_id = $2 AND gs.product_type = 'jira'
+         WHERE s.workspace_id = $1 AND s.id = $3 AND s.active = true
+           AND upper(p.project_key) = upper($4) AND p.selected = true`,
+        [workspaceId, config.grantId, proj.siteId, proj.projectKey],
+      );
+      if (!okProj.rowCount) {
+        throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', 'Dự án Jira trong lịch không còn được cấp quyền.');
+      }
+    }
+    if (config.telegramChatId && config.telegramCredentialId) {
+      if (!isUuid(config.telegramCredentialId)) {
+        throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+      }
+      const cred = await client.query<{ status: string }>(
+        `SELECT status FROM service_credentials
+         WHERE id = $1 AND user_id = $2 AND service = 'telegram' AND workspace_id IS NULL`,
+        [config.telegramCredentialId, userId],
+      );
+      if (cred.rows[0]?.status !== 'active') {
+        throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+      }
+    }
+  }
+
+  private async assertMyJiraDigestCanResumeInTx(client: pg.PoolClient, row: ScheduleRow): Promise<void> {
+    if (row.kind !== 'myjira_digest') return;
+    const cfg = row.digest_config as JiraDigestConfig | null;
+    if (!cfg || !row.workspace_id || row.workspace_mode !== 'organization') {
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+    }
+    let expectedHash: string | null = null;
+    try {
+      expectedHash = computeJiraDigestConfigHash({
+        config: cfg,
+        recurrence: row.recurrence,
+        userId: row.user_id,
+      });
+    } catch {
+      expectedHash = null;
+    }
+    if (!row.digest_config_hash || !expectedHash || expectedHash !== row.digest_config_hash) {
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+    }
+    const guard = await assertDigestScheduleLiveScopeAndAuth({
+      pool: client,
+      scheduleId: row.id,
+    });
+    if (!guard.allowed) {
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', guard.pauseReason);
     }
   }
 
@@ -1942,6 +2158,12 @@ export class ScheduleService {
           throw new ScheduleConflict('SCHEDULE_CLOSED');
         }
         await this.assertTelegramDigestCanResumeInTx(client, row);
+      }
+      if (input.action === 'resume' && row.kind === 'myjira_digest') {
+        if (row.status === 'cancelled' || row.status === 'completed') {
+          throw new ScheduleConflict('SCHEDULE_CLOSED');
+        }
+        await this.assertMyJiraDigestCanResumeInTx(client, row);
       }
       const fields = this.transition(row, input.action, null, null, input.now);
       if (!fields) return this.unchanged(client, row, input.now);
@@ -2117,7 +2339,8 @@ export class ScheduleService {
         typeof run.error === 'string' &&
         run.error.trim().length > 0;
       const isNotionUnknown = isNotionDeliveryUnknown(run, schedule);
-      const unknownDigestKind = calendarOrGithubDeliveryUnknownKind(run, schedule);
+      const jiraUnknown = getJiraDeliveryUnknown(run);
+      const unknownDigestKind = jiraUnknown ? 'myjira_digest' : calendarOrGithubDeliveryUnknownKind(run, schedule);
       if (!isSheetsUnknown && !isTrelloOrTelegramUnknown && !isNotionUnknown && !unknownDigestKind) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
@@ -2232,6 +2455,23 @@ export class ScheduleService {
               ? (run.delivery as unknown as Record<string, unknown>)
               : {};
           deliveryPayload = buildConfirmedTrelloDigestDelivery({
+            config: cfg,
+            previousDelivery: prevDelivery,
+            resolvedAtIso,
+            resolvedBy: userId,
+          });
+        } else if (deliveryKind === 'myjira_digest') {
+          const cfg = jiraUnknown?.config ??
+            (schedule.kind === 'myjira_digest' &&
+              matchesDispatchedDigestConfig(run, schedule) &&
+              isValidJiraDigestConfig(schedule.digest_config)
+              ? schedule.digest_config
+              : null);
+          const prevDelivery =
+            run.delivery && typeof run.delivery === 'object'
+              ? (run.delivery as unknown as Record<string, unknown>)
+              : {};
+          deliveryPayload = buildConfirmedJiraDigestDelivery({
             config: cfg,
             previousDelivery: prevDelivery,
             resolvedAtIso,
@@ -2447,7 +2687,7 @@ export class ScheduleService {
           );
         }
         const isCompletedOneTimeRecovery = schedule.status === 'completed' &&
-          schedule.recurrence.type === 'once' && unknownDigestKind !== null;
+          schedule.recurrence.type === 'once' && unknownDigestKind !== null && !jiraUnknown;
         if (schedule.status !== 'active' && !isCompletedOneTimeRecovery) {
           throw new ScheduleConflict('SCHEDULE_CLOSED');
         }
@@ -2497,6 +2737,20 @@ export class ScheduleService {
             }
           }
           await this.assertTelegramDigestCanResumeInTx(client, schedule);
+        } else if (schedule.kind === 'myjira_digest') {
+          if (!matchesDispatchedDigestConfig(run, schedule)) {
+            throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
+          }
+          const cfg = canonicalizeJiraDigestConfig(schedule.digest_config as unknown as JiraDigestConfig);
+          const expectedHash = computeJiraDigestConfigHash({
+            config: cfg,
+            recurrence: schedule.recurrence,
+            userId: schedule.user_id,
+          });
+          if (expectedHash !== schedule.digest_config_hash) {
+            throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
+          }
+          await this.assertMyJiraDigestCanResumeInTx(client, schedule);
         } else if (schedule.kind === 'notion_digest') {
           const cfg = canonicalizeNotionDigestConfig(schedule.digest_config as NotionDigestConfig);
           const expectedHash = computeNotionDigestConfigHash({

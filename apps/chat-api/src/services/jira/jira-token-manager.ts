@@ -28,6 +28,8 @@ export interface JiraTokenManagerOptions {
 export interface GetAccessTokenOptions {
   signal?: AbortSignal;
   forceRefresh?: boolean;
+  expectedGrantId?: string;
+  expectedAtlassianAccountId?: string;
 }
 
 export class JiraTokenManager {
@@ -120,6 +122,7 @@ export class JiraTokenManager {
     // 1. Check current grant status from PostgreSQL
     const statusRes = await this.pool.query<{
       account_id: string;
+      atlassian_account_id: string;
       account_status: string;
       identity_version: number;
       grant_id: string | null;
@@ -135,6 +138,7 @@ export class JiraTokenManager {
     }>(
       `SELECT
          a.id AS account_id,
+         a.atlassian_account_id,
          a.status AS account_status,
          a.identity_version,
          g.id AS grant_id,
@@ -172,6 +176,12 @@ export class JiraTokenManager {
     }
 
     const grantId = row.grant_id;
+    if (
+      (options?.expectedGrantId !== undefined && grantId !== options.expectedGrantId) ||
+      (options?.expectedAtlassianAccountId !== undefined && row.atlassian_account_id !== options.expectedAtlassianAccountId)
+    ) {
+      throw new JiraTokenManagerError('GRANT_MISMATCH', 'Approved Jira connection has changed');
+    }
     if (!grantId || row.grant_status === 'revoked') {
       throw new JiraTokenManagerError('GRANT_REVOKED', 'Jira grant is revoked or not found', 403);
     }

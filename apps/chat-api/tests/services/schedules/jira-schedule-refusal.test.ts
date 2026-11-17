@@ -78,7 +78,7 @@ describe('JIRA-08 Task 6: Schedule Refusal and Production Opt-In Gates', () => {
   // =========================================================================
   // 1. Refuse Schedule Proposal with myjira
   // =========================================================================
-  it('rejects new schedule proposals containing myjira', async () => {
+  it('refuses new schedule proposals containing myjira when D09-LLM-OFF or outside organization workspace', async () => {
     const msgRepo = new MessageRepo(pool);
     const convRepo = new ConversationRepo(pool);
     const planRepo = new PlanRepo(pool);
@@ -92,7 +92,7 @@ describe('JIRA-08 Task 6: Schedule Refusal and Production Opt-In Gates', () => {
       processMessage: vi.fn(),
     };
 
-    const chatService = new ChatService({
+    const chatServiceOff = new ChatService({
       msgRepo,
       convRepo,
       planRepo,
@@ -113,38 +113,58 @@ describe('JIRA-08 Task 6: Schedule Refusal and Production Opt-In Gates', () => {
       summary: 'Tạo ticket myjira hàng ngày',
     };
 
-    // Call prepareResponse directly through handleUserMessage or prepareResponse
     const memory = { toJSON: () => ({}) } as any;
-    const actor = { userId, workspaceId, workspaceMode: 'organization' as const };
-    const prepared = await (chatService as any).prepareResponse(
+    const preparedOff = await (chatServiceOff as any).prepareResponse(
       { conversationId: convId, userId, correlation: {} },
       proposal,
       memory,
       ['Mỗi ngày lúc 9h sáng tạo ticket myjira trong project GRD']
     );
+    await preparedOff.write();
 
-    // Write the prepared response
-    await prepared.write();
+    const messagesOff = await msgRepo.listMessages(convId);
+    const lastMsgOff = messagesOff[messagesOff.length - 1];
+    expect(lastMsgOff).toBeDefined();
+    expect(lastMsgOff!.role).toBe('assistant');
+    expect(lastMsgOff!.content).toContain('JIRA_LLM_EGRESS_DISABLED_IN_G2A');
+    expect(lastMsgOff!.metadata).toMatchObject({ type: 'refusal' });
 
-    // The message saved in DB must be a refusal, NOT a schedule_proposal
-    const messages = await msgRepo.listMessages(convId);
-    const lastMsg = messages[messages.length - 1];
-    expect(lastMsg).toBeDefined();
-    expect(lastMsg!.role).toBe('assistant');
-    expect(lastMsg!.content).toContain('Từ chối yêu cầu: Tính năng lịch tự động chưa hỗ trợ tích hợp Jira cá nhân (myjira).');
-    expect(lastMsg!.metadata).toMatchObject({
-      type: 'refusal',
+    // Even when LLM egress is enabled, myjira schedules are refused in personal workspace
+    const personalConvRes = await pool.query<{ id: string }>(
+      `INSERT INTO conversations (user_id, workspace_mode, title, status)
+       VALUES ($1, 'personal', 'Personal MyJira Conv', 'chatting')
+       RETURNING id`,
+      [userId]
+    );
+    const personalConvId = personalConvRes.rows[0]!.id;
+    const chatServiceOn = new ChatService({
+      msgRepo,
+      convRepo,
+      planRepo,
+      jiraLlmEgressEnabled: true,
+      planner: mockPlanner as any,
+      eventEmitter: { emit: () => {} },
+      schedules: { repo: scheduleRepo, timeZone: 'Asia/Ho_Chi_Minh' },
     });
+    const preparedPersonal = await (chatServiceOn as any).prepareResponse(
+      { conversationId: personalConvId, userId, correlation: {} },
+      proposal,
+      memory,
+      ['Mỗi ngày lúc 9h sáng tạo ticket myjira trong project GRD']
+    );
+    await preparedPersonal.write();
+    const msgsPersonal = await msgRepo.listMessages(personalConvId);
+    expect(msgsPersonal[msgsPersonal.length - 1]?.metadata).toMatchObject({ type: 'refusal' });
+    expect(msgsPersonal[msgsPersonal.length - 1]?.content).toContain('Workspace Tổ chức');
   });
 
   // =========================================================================
-  // 2. Refuse Confirming Schedule Proposal with myjira
+  // 2. Refuse Confirming Unsafe or Personal-Scope myjira Schedule Proposals
   // =========================================================================
-  it('rejects confirmation of any proposal that contains myjira', async () => {
+  it('rejects confirmation of myjira proposals outside organization workspace or unverified auto_digest', async () => {
     const msgRepo = new MessageRepo(pool);
     const scheduleService = new ScheduleService({ pool, timeZone: 'Asia/Ho_Chi_Minh' });
 
-    // Seed a malicious or synthetic schedule proposal containing myjira
     const proposalMeta: ScheduleProposalMetadata = {
       type: 'schedule_proposal',
       proposal: {
@@ -171,6 +191,27 @@ describe('JIRA-08 Task 6: Schedule Refusal and Production Opt-In Gates', () => {
         messageId: msg.id,
         now: new Date(),
         scope: { workspaceMode: 'organization', workspaceId },
+        approvalMode: 'auto_digest',
+      })
+    ).rejects.toThrow(/Lịch tự động không hỗ trợ Jira cá nhân \(myjira\)/i);
+
+    const personalConvRes = await pool.query<{ id: string }>(
+      `INSERT INTO conversations (user_id, workspace_mode, title, status)
+       VALUES ($1, 'personal', 'Personal Confirm Refuse', 'chatting')
+       RETURNING id`,
+      [userId]
+    );
+    const pConvId = personalConvRes.rows[0]!.id;
+    const pMsg = await msgRepo.createMessage(pConvId, 'assistant', 'Personal MyJira Spoof', proposalMeta as any);
+
+    await expect(
+      scheduleService.confirmProposal({
+        userId,
+        convId: pConvId,
+        messageId: pMsg.id,
+        now: new Date(),
+        scope: { workspaceMode: 'personal', workspaceId: null },
+        approvalMode: 'manual',
       })
     ).rejects.toThrow(/Lịch tự động không hỗ trợ Jira cá nhân \(myjira\)/i);
   });
@@ -303,7 +344,7 @@ describe('JIRA-08 Task 6: Schedule Refusal and Production Opt-In Gates', () => {
   // 5. Read-Only Inventory Check for Existing Jira Schedules
   // =========================================================================
   it('executes read-only inventory query for legacy Jira schedules without mutation', async () => {
-    const inventoryQuery = `SELECT id, name, user_id, status, services, workspace_id, workspace_mode, created_at FROM schedules WHERE 'jira' = ANY(services) OR 'myjira' = ANY(services);`;
+    const inventoryQuery = `SELECT id, name, user_id, status, services, workspace_id, workspace_mode, created_at FROM schedules WHERE 'jira' = ANY(services);`;
     const res = await pool.query(inventoryQuery);
     expect(res.rows).toBeInstanceOf(Array);
     // Verified 0 rows exist currently in test/clean environment

@@ -302,10 +302,11 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
   ) {
     throw new Error('JIRA_LLM_EGRESS_ENABLED must be on or off');
   }
-  const JIRA_LLM_EGRESS_ENABLED =
-    env.JIRA_LLM_EGRESS_ENABLED === 'on' ||
-    env.JIRA_LLM_EGRESS_ENABLED === 'true' ||
-    env.JIRA_LLM_EGRESS_ENABLED === '1';
+  const JIRA_LLM_EGRESS_ENABLED = env.JIRA_LLM_EGRESS_ENABLED
+    ? env.JIRA_LLM_EGRESS_ENABLED === 'on' ||
+      env.JIRA_LLM_EGRESS_ENABLED === 'true' ||
+      env.JIRA_LLM_EGRESS_ENABLED === '1'
+    : MYJIRA_ENABLED;
   if (isLive && MYJIRA_ENABLED) {
     const required = ['JIRA_OAUTH_CLIENT_ID', 'JIRA_OAUTH_CLIENT_SECRET', 'JIRA_OAUTH_REDIRECT_URI'];
     const missing = required.find((f) => !env[f]?.trim());
@@ -325,6 +326,7 @@ export function validateEnv(env: Record<string, string | undefined> = process.en
     ...(GITHUB_OAUTH ? [{ field: 'GITHUB_OAUTH_REDIRECT_URI', url: GITHUB_OAUTH.redirectUri }] : []),
     ...(TELEGRAM_BOT ? [{ field: 'TELEGRAM_WEB_CALLBACK_URL', url: TELEGRAM_BOT.callbackUrl }] : []),
     ...(NOTION_OAUTH ? [{ field: 'NOTION_OAUTH_REDIRECT_URI', url: NOTION_OAUTH.redirectUri }] : []),
+    ...(JIRA_OAUTH?.mode === 'live' ? [{ field: 'JIRA_OAUTH_REDIRECT_URI', url: JIRA_OAUTH.redirectUri }] : []),
   ];
   if (explicitWebUrls.length > 1) {
     const canonicalOrigin = (rawUrl: string) => {

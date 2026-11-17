@@ -1,6 +1,6 @@
 import { decryptCredentials } from '@wap/tool-adapters';
 import { hasGoogleCredentialOrigin } from './gmail/credential-origin.js';
-import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYJIRA_G2A_TOOLS, MYJIRA_TOOLS, MYSHEETS_TOOLS, NOTION_TOOLS, NOTION_OAUTH_TOOLS, TELEGRAM_TOOLS, TELEGRAM_OAUTH_TOOLS, TRELLO_TOOLS, TRELLO_OAUTH_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
+import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, GITHUB_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYJIRA_TOOLS, MYSHEETS_TOOLS, NOTION_TOOLS, NOTION_OAUTH_TOOLS, TELEGRAM_TOOLS, TELEGRAM_OAUTH_TOOLS, TRELLO_TOOLS, TRELLO_OAUTH_TOOLS, SERVICE_REGISTRY, type AllowedScope, type ServiceDefinition, type ToolDefinition } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { NotionConnectionRepo } from '../db/repositories/notion-connection-repo.js';
 import { createNotionConnectionLookup } from './notion/connection-reference.js';
@@ -423,7 +423,7 @@ export async function getToolCatalogFor(
           myjira?.connectionState === 'connected' ||
           myjira?.connected === true;
         if (isConnected && Array.isArray(myjira.sites) && myjira.sites.length > 0) {
-          catalog = [...catalog, ...MYJIRA_G2A_TOOLS];
+          catalog = [...catalog, ...MYJIRA_TOOLS];
         }
       } catch {
         // ignore
@@ -432,13 +432,11 @@ export async function getToolCatalogFor(
       try {
         const caps = await options.jiraWorkspaceRepo.getCapabilities(options.workspaceId, options.userId);
         if (caps && Array.isArray(caps.sites) && caps.sites.length > 0) {
-          catalog = [...catalog, ...MYJIRA_G2A_TOOLS];
+          catalog = [...catalog, ...MYJIRA_TOOLS];
         }
       } catch {
         // stale or unauthorized workspace does not add tools
       }
-    } else if (options.workspaceId) {
-      catalog = [...catalog, ...MYJIRA_G2A_TOOLS];
     }
   }
   return catalog;

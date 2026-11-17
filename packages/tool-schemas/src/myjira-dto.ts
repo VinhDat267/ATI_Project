@@ -34,6 +34,8 @@ export interface JiraConnectionStatusResponse {
   jiraAccountId: string | null;
   atlassianAccountId: string | null;
   displayName?: string;
+  scopes?: string[];
+  hasWriteScope?: boolean;
   sites: Array<{ cloudId: string; name: string; url: string; lastVerifiedAt?: string }>;
 }
 

@@ -110,10 +110,26 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
 
   // A message sent before "Cuộc hội thoại mới" gets its ID belongs to that conversation (FE-03b).
   const newConversation = useRef<Promise<string | null> | null>(null);
-  const createWorkspaceConversation = () =>
-    getActiveWorkspaceId() !== 'personal' && services.some((s) => s.id === 'myjira')
+  const createWorkspaceConversation = async () => {
+    if (getActiveWorkspaceId() === 'personal') return apiClient.createConversation();
+    let availableServices = services;
+    if (availableServices.length === 0) {
+      try {
+        const data = await apiClient.getServices();
+        if (Array.isArray(data?.services)) {
+          availableServices = data.services;
+          setServices(availableServices);
+          setCanConfigureServices(data.canConfigure === true);
+          setServicesError(null);
+        }
+      } catch {
+        // Proceed with standard conversation creation if service discovery fails
+      }
+    }
+    return availableServices.some((s) => s.id === 'myjira')
       ? apiClient.createConversation(undefined, { jiraContext: true })
       : apiClient.createConversation();
+  };
   const handleNewConversation = async () => {
     if (newConversation.current) return;
     const previous = useChatStore.getState();

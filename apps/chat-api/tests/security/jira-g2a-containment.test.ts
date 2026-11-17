@@ -50,11 +50,12 @@ describe('JIRA-G2A Six-Layer Server-Side Write & Legacy Containment', () => {
   });
 
   it.each([
-    ['myjira', 'myjira.search_issues', false],
-    ['myjira', 'myjira.search_issues', true],
-    ['jira', 'jira.search_issues', true],
-    ['github', 'myjira.search_issues', true],
-  ])('P1-01: blocks the entire digest before reads or delivery for %s / %s (mixed=%s)', async (service, tool, mixed) => {
+    ['jira', 'jira.search_issues', true, {}, 'organization', 'ws-1', 'JIRA_CAPABILITY_DISABLED_IN_G2A'],
+    ['github', 'myjira.search_issues', true, { siteId: 'site', projectKey: 'ATI' }, 'organization', 'ws-1', 'JIRA_SOURCE_MISMATCH'],
+    ['myjira', 'myjira.search_issues', false, { siteId: 'site', projectKey: 'ATI' }, 'personal', null, 'JIRA_WORKSPACE_REQUIRED'],
+    ['myjira', 'myjira.search_issues', true, { siteId: 'site', projectKey: 'ATI' }, 'personal', null, 'JIRA_WORKSPACE_REQUIRED'],
+    ['myjira', 'myjira.search_issues', false, { query: '' }, 'organization', 'ws-1', 'JIRA_SCOPE_REQUIRED'],
+  ])('P1-01: blocks unsafe/legacy Jira digest source %s / %s (mixed=%s, mode=%s) before reads or delivery', async (service, tool, mixed, args, workspaceMode, wsId, expectedCode) => {
     const getPersonalCredentials = vi.fn(async () => ({ id: 'tg-g2a', status: 'active',
       config: encryptCredentials({ telegramUserId: '777888999', selectedChats: [{ chatId: '-100555666777' }] }, encryptionKey),
     }));
@@ -66,14 +67,15 @@ describe('JIRA-G2A Six-Layer Server-Side Write & Legacy Containment', () => {
     const config: any = { credentialId: 'tg-g2a', telegramUserId: '777888999', chatId: '-100555666777', chatTitle: 'Test group',
       recurrence: { type: 'daily', hour: 9, minute: 0 },
       sources: [...(mixed ? [{ service: 'github', tool: 'github.search_issues', args: { repo: 'test/repo' }, label: 'GitHub' }] : []),
-        { service, tool, args: { siteId: 'site', projectKey: 'ATI' }, label: 'Jira' }],
+        { service, tool, args, label: 'Jira' }],
     };
     const runner = new TelegramDigestRunner({ credentialRepo: { getPersonalCredentials } as any, encryptionKey,
       adapterFactory: { getAdapterForService }, summarizeWithAi, botClient: { getChatMember: async () => true }, timeZone: 'Asia/Bangkok' });
     const result = await runner.execute({ runId: randomUUID(), scheduleId: randomUUID(), scheduleVersion: 1,
-      userId: 'synthetic', name: 'Legacy digest', request: 'Digest', dueAt: new Date(), trigger: 'scheduled',
+      userId: 'synthetic', name: 'Guard digest', request: 'Digest', dueAt: new Date(), trigger: 'scheduled',
+      workspaceMode: workspaceMode as any, workspaceId: wsId,
       digestConfig: config, digestConfigHash: computeTelegramDigestConfigHash(config) }, new AbortController().signal);
-    expect(result).toMatchObject({ status: 'blocked', error: expect.stringContaining('JIRA_CAPABILITY_DISABLED_IN_G2A') });
+    expect(result).toMatchObject({ status: 'blocked', error: expect.stringContaining(expectedCode) });
     expect((result as any).pauseSchedule).not.toBe(true);
     expect(getPersonalCredentials).not.toHaveBeenCalled();
     expect(getAdapterForService).not.toHaveBeenCalled();
@@ -195,8 +197,13 @@ describe('JIRA-G2A Six-Layer Server-Side Write & Legacy Containment', () => {
     expect(callerCatalog.filter((t) => t.name.startsWith('myjira.')).map((t) => t.name)).toEqual([
       'myjira.list_sites',
       'myjira.search_projects',
-      'myjira.get_issue',
       'myjira.search_issues',
+      'myjira.create_issue',
+      'myjira.add_comment',
+      'myjira.get_issue',
+      'myjira.search_users',
+      'myjira.transition_issue',
+      'myjira.update_issue',
     ]);
   });
 
@@ -239,7 +246,7 @@ describe('JIRA-G2A Six-Layer Server-Side Write & Legacy Containment', () => {
     expect(bodyServices.some((s: any) => s.id === 'jira' || s.service === 'jira')).toBe(false);
   });
 
-  it('LOCK-02 (D02-A1): JiraOAuthClient requests read-only scopes without write:jira-work', () => {
+  it('LOCK-02 (Write Scope): JiraOAuthClient requests read:me, read:jira-work, write:jira-work, offline_access', () => {
     const oauthClient = new JiraOAuthClient({
       clientId: 'client-g2a',
       clientSecret: 'secret-g2a',
@@ -252,11 +259,11 @@ describe('JIRA-G2A Six-Layer Server-Side Write & Legacy Containment', () => {
     const scopes = (sitesAuthUrl.searchParams.get('scope') ?? '').split(/\s+/).filter(Boolean);
     expect(scopes).toContain('read:me');
     expect(scopes).toContain('read:jira-work');
+    expect(scopes).toContain('write:jira-work');
     expect(scopes).toContain('offline_access');
-    expect(scopes).not.toContain('write:jira-work');
   });
 
-  it('Layer 2: JiraPlanBinder & validateJiraApprovalBinding reject all non-G2A myjira.* tools', async () => {
+  it('Layer 2: JiraPlanBinder & validateJiraApprovalBinding require write:jira-work for myjira write tools and reject legacy jira.*', async () => {
     const binder = new JiraPlanBinder({
       pool,
       lookupIssue: async () => ({ projectKey: 'ATI', numericProjectId: '10000' }),
@@ -269,29 +276,27 @@ describe('JIRA-G2A Six-Layer Server-Side Write & Legacy Containment', () => {
       jira_context: true,
     };
 
-    for (const forbiddenTool of [
+    for (const writeTool of [
       'myjira.create_issue',
       'myjira.add_comment',
       'myjira.update_issue',
       'myjira.transition_issue',
-      'myjira.search_users',
     ]) {
       await expect(
         binder.bindPlan(userId, conv, [
           {
             id: 's1',
-            tool: forbiddenTool,
-            description: 'Forbidden in G2A',
-            args: { siteId, projectKey: 'ATI', issueKey: 'ATI-1', summary: 'x', body: 'x', status: 'Done', priority: 'High' },
+            tool: writeTool,
+            description: 'Write requires write:jira-work scope',
+            args: { siteId, projectKey: 'ATI', issueKey: 'ATI-1', summary: 'x', body: 'x', targetStatus: 'Done', priority: 'High' },
             dependsOn: [],
           } as any,
         ])
       ).rejects.toMatchObject({
-        code: 'JIRA_CAPABILITY_DISABLED_IN_G2A',
+        code: 'JIRA_WRITE_SCOPE_REQUIRED',
       });
     }
 
-    // Even if a pre-G2A persisted plan asks approval guard for createIssue/addComment permission, approval guard denies it!
     const validReadBinding = await binder.bindPlan(userId, conv, [
       {
         id: 's1',
@@ -303,7 +308,7 @@ describe('JIRA-G2A Six-Layer Server-Side Write & Legacy Containment', () => {
     ]);
 
     const approvalCheck = await validateJiraApprovalBinding(pool, validReadBinding, {
-      requiredPermissions: { createIssue: true },
+      requiredPermissions: { createIssue: true, editIssue: true },
     });
 
     expect(approvalCheck).toMatchObject({
@@ -311,7 +316,7 @@ describe('JIRA-G2A Six-Layer Server-Side Write & Legacy Containment', () => {
       category: 'denied',
     });
     if (!approvalCheck.valid) {
-      expect(approvalCheck.reason).toContain('JIRA_CAPABILITY_DISABLED_IN_G2A');
+      expect(approvalCheck.reason).toContain('JIRA_WRITE_SCOPE_REQUIRED');
     }
   });
 
@@ -369,7 +374,7 @@ describe('JIRA-G2A Six-Layer Server-Side Write & Legacy Containment', () => {
     expect(approveRes).toMatchObject({ success: false, status: 403 });
     expect(approveRes.error).toMatch(/JIRA_LEGACY_SHARED_DISABLED|JIRA_CAPABILITY_DISABLED_IN_G2A/);
 
-    // 2. Persisted partial / reconciliation_required myjira.create_issue plan cannot continue or retry, ONLY stop()
+    // 2. Persisted myjira.create_issue plan without write:jira-work blocks retryStep & continueExecution while allowing stop()
     const myjiraPlanJson = {
       summary: 'Persisted myjira write',
       steps: [
@@ -382,6 +387,21 @@ describe('JIRA-G2A Six-Layer Server-Side Write & Legacy Containment', () => {
           requiresConfirmation: true,
         },
       ],
+      connections: {
+        myjira: {
+          atiUserId: userId,
+          jiraAccountId: accountId,
+          atlassianAccountId,
+          workspaceId,
+          membershipVersion: 1,
+          grantId,
+          identityVersion: 1,
+          workspaceVersion: 1,
+          siteSteps: {
+            step_w1: { siteId, cloudId, sitePolicyVersion: 1, projectId: '10000', projectPolicyVersion: 1 },
+          },
+        },
+      },
     };
     const myjiraPlanText = JSON.stringify(myjiraPlanJson);
     const myjiraWritePlan = await planRepo.createPlan({
@@ -402,15 +422,11 @@ describe('JIRA-G2A Six-Layer Server-Side Write & Legacy Containment', () => {
     await pool.query(`UPDATE plans SET status = 'partial', decided_at = now() WHERE id = $1`, [myjiraWritePlan.id]);
     await stepRepo.updateStepStatus(stepRow.id, 'failed', null, { message: 'Previous error' });
 
-    await expect(execService.continueExecution(myjiraWritePlan.id, userId)).rejects.toThrow(
-      /JIRA_CAPABILITY_DISABLED_IN_G2A/
-    );
-
     await expect(execService.retryStep(myjiraWritePlan.id, 'step_w1', userId)).rejects.toThrow(
-      /JIRA_CAPABILITY_DISABLED_IN_G2A/
+      /JIRA_WRITE_SCOPE_REQUIRED/
     );
 
-    // stop() on partial plan MUST still succeed so users can cancel legacy plans
+    // stop() on partial plan MUST still succeed so users can cancel partial plans
     const stopRes = await execService.stop(myjiraWritePlan.id, userId);
     expect(stopRes).toMatchObject({ status: 'stopped' });
   });
@@ -505,27 +521,31 @@ describe('JIRA-G2A Six-Layer Server-Side Write & Legacy Containment', () => {
         async () => ({ leaked: true })
       )
     ).rejects.toMatchObject({
-      code: 'JIRA_CAPABILITY_DISABLED_IN_G2A',
+      code: 'JIRA_WRITE_SCOPE_REQUIRED',
     });
   });
 
-  it('LOCK-04: scanAndPauseLegacyJiraSchedules({ dryRun: true }) reports Jira/myjira schedules with ZERO persistent DB mutations', async () => {
+  it('LOCK-04: scanAndPauseLegacyJiraSchedules({ dryRun: true }) reports only legacy jira schedules and leaves myjira schedules active', async () => {
     const convRepo = new ConversationRepo(pool);
-    const schedConv = await convRepo.createConversation(userId);
-    const schedId = randomUUID();
+    const schedConv1 = await convRepo.createConversation(userId);
+    const schedConv2 = await convRepo.createConversation(userId);
+    const legacySchedId = randomUUID();
+    const myjiraSchedId = randomUUID();
     await pool.query(
       `INSERT INTO schedules (id, user_id, conv_id, name, request, recurrence, services, status, version, next_run_at)
-       VALUES ($1, $2, $3, 'Legacy MyJira Digest', 'Tóm tắt myjira.search_issues mỗi sáng', '{"kind":"daily","hour":9,"minute":0}'::jsonb, ARRAY['myjira','slack'], 'active', 1, now() + interval '1 day')`,
-      [schedId, userId, schedConv.id]
+       VALUES ($1, $2, $3, 'Legacy Jira Digest', 'Tóm tắt jira.search_issues mỗi sáng', '{"kind":"daily","hour":9,"minute":0}'::jsonb, ARRAY['jira','slack'], 'active', 1, now() + interval '1 day'),
+              ($4, $2, $5, 'Modern MyJira Digest', 'Tóm tắt myjira.search_issues mỗi sáng', '{"kind":"daily","hour":9,"minute":0}'::jsonb, ARRAY['myjira','slack'], 'active', 1, now() + interval '1 day')`,
+      [legacySchedId, userId, schedConv1.id, myjiraSchedId, schedConv2.id]
     );
 
     const inv = await scanAndPauseLegacyJiraSchedules(pool, { dryRun: true });
     expect(inv.dryRun).toBe(true);
-    expect(inv.pausedSchedules.some((s) => s.id === schedId)).toBe(true);
+    expect(inv.pausedSchedules.some((s) => s.id === legacySchedId)).toBe(true);
+    expect(inv.pausedSchedules.some((s) => s.id === myjiraSchedId)).toBe(false);
 
     const checkRow = await pool.query<{ status: string }>(
       `SELECT status FROM schedules WHERE id = $1`,
-      [schedId]
+      [legacySchedId]
     );
     expect(checkRow.rows[0]?.status).toBe('active');
   });

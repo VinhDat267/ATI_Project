@@ -260,7 +260,7 @@ describe('JIRA-04 End-to-End Acceptance Gates Suite (Task 7)', () => {
       const authUrl2 = new URL(startRes2.body.authUrl);
       const scopesParam = authUrl2.searchParams.get('scope') ?? '';
       expect(scopesParam).toContain('read:jira-work');
-      expect(scopesParam).not.toContain('write:jira-work');
+      expect(scopesParam).toContain('write:jira-work');
       expect(scopesParam).toContain('read:me');
 
       const cookie2 = extractBrowserCookie(startRes2);

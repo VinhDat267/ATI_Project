@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { JIRA_CAPABILITY_DISABLED_IN_G2A } from '@wap/tool-schemas';
 import type {
   GmailDigestBinding,
+  JiraDigestSourceBinding,
   NotionDigestSourceBinding,
   ScheduleResponse,
   TelegramDigestCandidate,
@@ -10,6 +11,8 @@ import type {
 } from '@wap/tool-schemas';
 import type { TelegramConnectionLookupResult } from '../telegram/connection-reference.js';
 import type { GitHubConnectionLookupResult } from '../github/connection-reference.js';
+import type { JiraConnectionLookupResult } from './jira-digest-candidate.js';
+import { isUuid } from '../../db/repositories/uuid.js';
 import {
   DEFAULT_GMAIL_DIGEST_QUERY,
   isValidGmailDigestBinding,
@@ -91,17 +94,40 @@ export const READ_DIGEST_SOURCE_MAP: Record<string, TelegramDigestSource> = {
   },
 };
 
-// Runtime source restrictions live alongside the source catalog, not in the
-// generic runner. Check both identities so mismatched persisted inputs fail closed.
+// Legacy shared Jira stays permanently retired. myjira is allowed only inside organization workspace digests.
 const DISABLED_READ_DIGEST_SERVICES: ReadonlyMap<string, string> = new Map([
-  ['jira', `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Scheduled Jira digests are disabled in G2A.`],
-  ['myjira', `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Scheduled Jira digests are disabled in G2A.`],
+  ['jira', `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Scheduled legacy Jira digests are permanently disabled.`],
 ]);
 
-export function getDigestSourceDisabledReason(source: { service?: string; tool?: string } | null | undefined): string | undefined {
+export function getDigestSourceDisabledReason(
+  source: { service?: string; tool?: string; args?: Record<string, unknown> } | null | undefined,
+  context?: { workspaceMode?: string | null; workspaceId?: string | null },
+): string | undefined {
   const service = typeof source?.service === 'string' ? source.service : '';
   const toolService = typeof source?.tool === 'string' ? source.tool.split('.')[0] ?? '' : '';
-  return DISABLED_READ_DIGEST_SERVICES.get(service) ?? DISABLED_READ_DIGEST_SERVICES.get(toolService);
+  const disabled = DISABLED_READ_DIGEST_SERVICES.get(service) ?? DISABLED_READ_DIGEST_SERVICES.get(toolService);
+  if (disabled) return disabled;
+  if ((service === 'myjira' || toolService === 'myjira') && service !== toolService) {
+    return 'JIRA_SOURCE_MISMATCH: Công cụ myjira không khớp với dịch vụ nguồn.';
+  }
+  if (service === 'myjira' || toolService === 'myjira') {
+    if (context?.workspaceMode !== 'organization' || !context?.workspaceId || !String(context.workspaceId).trim()) {
+      return 'JIRA_WORKSPACE_REQUIRED: Nguồn Jira trong bản tin Telegram chỉ khả dụng trong Workspace Tổ chức.';
+    }
+    const siteId = typeof source?.args?.siteId === 'string' ? source.args.siteId.trim() : '';
+    const projectKey = typeof source?.args?.projectKey === 'string' ? source.args.projectKey.trim() : '';
+    if (!siteId || !projectKey) {
+      return 'JIRA_SCOPE_REQUIRED: Nguồn Jira trong bản tin Telegram phải chỉ rõ siteId và projectKey được phép.';
+    }
+  }
+  return undefined;
+}
+
+export function isJiraDigestSourceBinding(value: unknown): value is JiraDigestSourceBinding {
+  if (!value || typeof value !== 'object') return false;
+  const { grantId, atlassianAccountId } = value as Partial<JiraDigestSourceBinding>;
+  return typeof grantId === 'string' && isUuid(grantId) &&
+    typeof atlassianAccountId === 'string' && atlassianAccountId.trim().length > 0;
 }
 
 function foldVietnamese(input: string): string {
@@ -114,9 +140,10 @@ function foldVietnamese(input: string): string {
 }
 
 const WRITE_INTENT_PATTERNS: RegExp[] = [
-  /\b(?:tao|them|xoa|dong|luu tru|chuyen|cap nhat|sua)\s+(?:the|card|board|bang|danh sach|list)\b/i,
-  /\b(?:create|add|delete|close|archive|move|update)\s+(?:card|issue|event|row|page|email)\b/i,
-  /\b(?:tao|dong|xoa|cap nhat)\s+(?:issue|su kien|lich|trang|page|task)\b/i,
+  /\b(?:tao|them|xoa|dong|luu tru|chuyen|cap nhat|sua)\s+(?:the|card|board|bang|danh sach|list|ticket|bug)\b/i,
+  /\b(?:create|add|delete|close|archive|move|update|transition)\s+(?:card|issue|ticket|event|row|page|email)\b/i,
+  /\b(?:tao|dong|xoa|cap nhat|sua)\s+(?:issue|su kien|lich|trang|page|task)\b/i,
+  /\b(?:chuyen\s+trang\s+thai|them\s+binh\s+luan|add\s+comment|gan\s+(?:nguoi|issue|ticket))\b/i,
   /\b(?:them|ghi|xoa|cap nhat)\s+(?:dong|hang|row|bang tinh|sheet)\b/i,
   /\b(?:gui|tra loi|chuyen tiep|xoa)\s+(?:email|mail|thu)\b/i,
 ];
@@ -163,6 +190,7 @@ export function computeTelegramDigestConfigHash(config: TelegramDigestConfig): s
           }
         : {}),
       ...(s.notionBinding !== undefined ? { notionBinding: s.notionBinding } : {}),
+      ...(s.jiraBinding !== undefined ? { jiraBinding: s.jiraBinding } : {}),
     })),
     recurrence: config.recurrence,
     timeZone: config.timeZone,
@@ -315,6 +343,9 @@ export interface EvaluateTelegramDigestInput {
   timeZone: string;
   telegramLookup?: TelegramConnectionLookupResult | null;
   githubLookup?: Pick<GitHubConnectionLookupResult, 'status' | 'connection'> | null;
+  jiraLookup?: JiraConnectionLookupResult | null;
+  workspaceMode?: 'legacy' | 'personal' | 'organization';
+  workspaceId?: string | null;
   gmailBinding?: GmailDigestBinding | null;
   existingDigest?: TelegramDigestConfig | null;
   gmailUserTexts?: readonly string[];
@@ -488,6 +519,38 @@ export function evaluateTelegramDigestCandidate(
           oauthClientId: input.gmailBinding.oauthClientId,
         },
       });
+    } else if (service === 'myjira') {
+      if (input.workspaceMode !== 'organization' || !input.workspaceId) {
+        return {
+          canAutoDigest: false,
+          disabledReason: 'Bản tin Jira qua Telegram chỉ khả dụng trong Workspace Tổ chức.',
+        };
+      }
+      const jira = input.jiraLookup;
+      if (
+        jira?.status !== 'connected' || jira.workspaceId !== input.workspaceId ||
+        !isJiraDigestSourceBinding(jira) || !jira.projects?.length
+      ) {
+        return {
+          canAutoDigest: false,
+          disabledReason: 'Hãy kết nối Jira OAuth 3LO và chọn ít nhất 1 dự án trong Workspace trước khi bật Tự gửi.',
+        };
+      }
+      const { projects, grantId, atlassianAccountId } = jira;
+      const lowerReq = requestText.toLowerCase();
+      const matched = projects.filter(
+        (p) =>
+          new RegExp(`(?:^|[^a-z0-9_])${p.projectKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^a-z0-9_])`, 'i').test(requestText) ||
+          (p.projectName && lowerReq.includes(p.projectName.toLowerCase())),
+      );
+      for (const proj of (matched.length > 0 ? matched : projects).slice(0, 5)) {
+        sources.push({
+          ...source,
+          args: { siteId: proj.siteId, projectKey: proj.projectKey, query: '' },
+          label: `${source.label} (${proj.projectKey})`,
+          jiraBinding: { grantId, atlassianAccountId },
+        });
+      }
     } else if (service === 'notion' && input.notionBinding) {
       sources.push({
         ...source, notionBinding: input.notionBinding,

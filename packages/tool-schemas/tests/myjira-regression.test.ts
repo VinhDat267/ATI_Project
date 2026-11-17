@@ -58,6 +58,8 @@ describe('Catalog and Registry Invariants (Flag-Off Isolation)', () => {
       'offline_access',
       'read:me',
       'read:jira-work',
+      'read:jira-user',
+      'write:jira-work',
     ]);
     expect(MYJIRA_SERVICE.scopeKey).toBe('sites');
     expect(MYJIRA_SERVICE.scopeLabel).toBe('Jira sites của bạn');

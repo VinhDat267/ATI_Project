@@ -27,7 +27,7 @@ describe('XSVC-INTEGRATION-V2 Task D: Combined ScheduleRunRecovery, Sheets Appen
     useChatStore.getState().reset();
   });
 
-  it('1. enforces paused-schedule retry restrictions inside Cockpit ScheduleRunRecovery for both SHEETS_DELIVERY_UNKNOWN and TRELLO_DELIVERY_UNKNOWN while still allowing mark_sent', async () => {
+  it('1. blocks retry for paused Sheets, Trello, and Jira runs while allowing mark_sent', async () => {
     vi.spyOn(useSchedulesHook, 'useSchedulesEnabled').mockReturnValue(true);
 
     const pausedCases: Array<{
@@ -68,6 +68,42 @@ describe('XSVC-INTEGRATION-V2 Task D: Combined ScheduleRunRecovery, Sheets Appen
           deliveryResolution: null,
           deliveryResolvedAt: null,
           deliveryFollowupRunId: null,
+        },
+      },
+      {
+        label: 'paused myjira_digest run with uncertain delivery',
+        schedule: {
+          id: 'sched-paused-jira-1',
+          convId: 'conv-sched-jira-1',
+          version: 2,
+          name: 'Báo cáo Jira sáng',
+          request: 'Tổng hợp dự án ATI gửi Slack',
+          recurrence: { type: 'daily', time: '08:30' },
+          services: ['myjira', 'slack'],
+          status: 'paused',
+          pauseReason: 'Lịch đang tạm dừng.',
+          nextRuns: [],
+          lastRun: null,
+          kind: 'myjira_digest',
+          approvalMode: 'auto_digest',
+        },
+        run: {
+          id: 'run-paused-jira-1',
+          scheduleId: 'sched-paused-jira-1',
+          trigger: 'scheduled',
+          dueAt: '2026-11-10T01:30:00.000Z',
+          createdAt: '2026-11-10T01:30:02.000Z',
+          state: 'needs_attention',
+          missedCount: 0,
+          convId: 'conv-run-paused-jira-1',
+          planId: null,
+          planStatus: null,
+          error: 'Không rõ bản tin Jira đã gửi hay chưa (hệ thống mất kết nối hoặc hết thời gian chờ sau khi bắt đầu gửi). Hãy kiểm tra kênh đích rồi xác nhận ở nút bên dưới trước khi chạy bù.',
+          deliveryStartedAt: '2026-11-10T01:30:05.000Z',
+          deliveryResolution: null,
+          deliveryResolvedAt: null,
+          deliveryFollowupRunId: null,
+          canRetryDelivery: false,
         },
       },
       {

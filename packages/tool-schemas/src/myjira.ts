@@ -8,8 +8,12 @@ export const MYJIRA_SCOPES = [
   'offline_access',
   'read:me',
   'read:jira-work',
+  'read:jira-user',
+  'write:jira-work',
 ] as const;
 
+export const JIRA_WRITE_SCOPE = 'write:jira-work' as const;
+export const JIRA_WRITE_SCOPE_REQUIRED = 'JIRA_WRITE_SCOPE_REQUIRED' as const;
 export const JIRA_CAPABILITY_DISABLED_IN_G2A = 'JIRA_CAPABILITY_DISABLED_IN_G2A' as const;
 export const JIRA_LEGACY_SHARED_DISABLED = 'JIRA_LEGACY_SHARED_DISABLED' as const;
 export const JIRA_CROSS_SERVICE_EGRESS_DENIED = 'JIRA_CROSS_SERVICE_EGRESS_DENIED' as const;
@@ -37,9 +41,19 @@ export interface JiraSearchCoverage {
 }
 
 const JIRA_G2A_ALLOWED_TOOL_SET: ReadonlySet<string> = new Set<string>(JIRA_G2A_ALLOWED_TOOLS);
+const JIRA_WRITE_TOOLS = new Set<string>([
+  'myjira.create_issue',
+  'myjira.add_comment',
+  'myjira.transition_issue',
+  'myjira.update_issue',
+]);
 
 export function isJiraG2AAllowedTool(tool: string): tool is JiraG2AAllowedToolName {
   return JIRA_G2A_ALLOWED_TOOL_SET.has(tool);
+}
+
+export function isJiraWriteTool(tool: string): boolean {
+  return JIRA_WRITE_TOOLS.has(tool);
 }
 
 export function isAnyJiraTool(tool: string): boolean {
@@ -194,6 +208,20 @@ export const MYJIRA_TOOLS: ToolDefinition[] = [
           minLength: 1,
           maxLength: 100,
           description: 'Lọc theo loại issue (ví dụ: Bug, Task, Story)',
+        },
+        overdueOnly: {
+          type: 'boolean',
+          description: 'Chỉ trả về các issue chưa hoàn thành và đã quá hạn (dueDate < hôm nay)',
+        },
+        dueWithinDays: {
+          type: 'integer',
+          minimum: 0,
+          maximum: 30,
+          description: 'Chỉ trả về các issue chưa hoàn thành sắp đến hạn trong N ngày tới (0-30)',
+        },
+        unassignedOnly: {
+          type: 'boolean',
+          description: 'Chỉ trả về các issue chưa hoàn thành và chưa có người phụ trách',
         },
         limit: {
           type: 'integer',
@@ -636,10 +664,18 @@ export const MYJIRA_TOOLS: ToolDefinition[] = [
         id: { type: 'string' },
         key: { type: 'string' },
         url: { type: 'string' },
+        updatedFields: {
+          type: 'array',
+          items: { type: 'string' },
+        },
       },
     },
   },
 ];
+
+export function isMyJiraTool(tool: string): boolean {
+  return MYJIRA_TOOLS.some((t) => t.name === tool);
+}
 
 export const MYJIRA_CORE_TOOLS: ToolDefinition[] = MYJIRA_TOOLS.slice(0, 5);
 

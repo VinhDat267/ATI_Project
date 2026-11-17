@@ -39,6 +39,8 @@ describe('myjira tool schemas', () => {
       'offline_access',
       'read:me',
       'read:jira-work',
+      'read:jira-user',
+      'write:jira-work',
     ]);
 
     expect(JIRA_SITE_ID_PATTERN.test('site-123_abc')).toBe(true);

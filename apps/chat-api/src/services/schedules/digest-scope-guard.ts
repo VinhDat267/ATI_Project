@@ -7,7 +7,7 @@ import {
   validateTelegramDigestGmailConfig,
   type GmailBindingGuardCode,
 } from './gmail-digest-binding.js';
-import { computeTelegramDigestConfigHash } from './telegram-digest-candidate.js';
+import { computeTelegramDigestConfigHash, isJiraDigestSourceBinding } from './telegram-digest-candidate.js';
 
 type Queryable = pg.Pool | Pick<pg.Pool, 'query'>;
 
@@ -22,6 +22,7 @@ export type DigestScopeGuardCode =
   | 'DIGEST_SCOPE_NOT_CONFIGURED'
   | 'DIGEST_SCOPE_REVOKED'
   | 'DIGEST_GMAIL_LEGACY_UNBOUND'
+  | 'DIGEST_JIRA_BINDING_INVALID'
   | GmailBindingGuardCode;
 
 export interface DigestScopeGuardInput {
@@ -30,6 +31,8 @@ export interface DigestScopeGuardInput {
   claimedWorkspaceId?: string | null;
   encryptionKey?: string;
   gmailOAuthClientId?: string;
+  expectedTelegramDigestConfigHash?: string;
+  lockTelegramJiraAuthority?: boolean;
 }
 
 export interface DigestScopeGuardResult {
@@ -49,6 +52,7 @@ export type PinnedTelegramContextCode =
 export interface PinnedTelegramAdapterContextResult {
   allowed: boolean;
   code?: PinnedTelegramContextCode;
+  pauseReason?: string;
   credentialId?: string;
   chatId?: string;
   telegramUserId?: string;
@@ -183,6 +187,18 @@ export async function assertDigestScheduleLiveScopeAndAuth(
   const trustedWorkspaceMode = row.workspace_mode ?? 'personal';
   const cfg = (row.digest_config ?? {}) as Record<string, unknown>;
 
+  if (
+    input.expectedTelegramDigestConfigHash !== undefined &&
+    (row.kind !== 'telegram_digest' || row.digest_config_hash !== input.expectedTelegramDigestConfigHash)
+  ) {
+    return deny(
+      'DIGEST_JIRA_BINDING_INVALID',
+      'Cấu hình bản tin Telegram đã thay đổi. Hãy xác nhận lại lịch.',
+      trustedWorkspaceId,
+      trustedWorkspaceMode,
+    );
+  }
+
   if (row.user_status !== 'active') {
     return deny('DIGEST_USER_INACTIVE', 'Tài khoản không còn hoạt động.', trustedWorkspaceId, trustedWorkspaceMode);
   }
@@ -226,12 +242,96 @@ export async function assertDigestScheduleLiveScopeAndAuth(
     const checked = await validatePinnedPersonalCredential(pool, cfg.credentialId, primaryService, row.user_id);
     if (!checked.ok) return deny(checked.code, checked.reason, trustedWorkspaceId, trustedWorkspaceMode);
   }
-  // github_digest pins its Telegram destination credential (GithubDigestConfig.telegramCredentialId).
+  // github_digest and myjira_digest pin their Telegram destination credential (`telegramCredentialId`).
   // A Telegram destination without that pin must not fall back to whatever connection is live.
-  const telegramPinRequired = row.kind === 'github_digest' && typeof cfg.telegramChatId === 'string' && cfg.telegramChatId.trim() !== '';
+  const telegramPinRequired =
+    (row.kind === 'github_digest' || row.kind === 'myjira_digest') &&
+    typeof cfg.telegramChatId === 'string' &&
+    cfg.telegramChatId.trim() !== '';
   if (telegramPinRequired || (cfg.telegramCredentialId !== undefined && cfg.telegramCredentialId !== null)) {
     const checked = await validatePinnedPersonalCredential(pool, cfg.telegramCredentialId, 'telegram', row.user_id);
     if (!checked.ok) return deny(checked.code, checked.reason, trustedWorkspaceId, trustedWorkspaceMode);
+  }
+
+  if (row.kind === 'myjira_digest') {
+    if (trustedWorkspaceMode !== 'organization' || !trustedWorkspaceId) {
+      return deny(
+        'DIGEST_CROSS_TENANT_SCOPE_MISMATCH',
+        'Bản tin Jira chỉ hỗ trợ trong Workspace Tổ chức.',
+        trustedWorkspaceId,
+        trustedWorkspaceMode,
+      );
+    }
+    const atiMem = (
+      await pool.query<{ status: string }>(
+        'SELECT status FROM ati_workspace_memberships WHERE workspace_id = $1 AND user_id = $2',
+        [trustedWorkspaceId, row.user_id],
+      )
+    ).rows[0];
+    if (!atiMem || atiMem.status !== 'active') {
+      return deny(
+        'DIGEST_WORKSPACE_MEMBER_REVOKED',
+        'Thành viên không còn quyền Jira trong không gian làm việc này.',
+        trustedWorkspaceId,
+        trustedWorkspaceMode,
+      );
+    }
+    const grantId = typeof cfg.grantId === 'string' ? cfg.grantId.trim() : '';
+    const atlassianAccountId = typeof cfg.atlassianAccountId === 'string' ? cfg.atlassianAccountId.trim() : '';
+    const projects = Array.isArray(cfg.projects) ? cfg.projects : [];
+    if (!grantId || !isUuid(grantId) || !atlassianAccountId || projects.length === 0) {
+      return deny(
+        'DIGEST_CREDENTIAL_INVALID',
+        'Cấu hình kết nối hoặc dự án Jira trong lịch không hợp lệ.',
+        trustedWorkspaceId,
+        trustedWorkspaceMode,
+      );
+    }
+    const grantRes = await pool.query<{ id: string }>(
+      `SELECT g.id
+       FROM jira_oauth_grants g
+       JOIN jira_accounts a ON a.id = g.account_id
+       WHERE g.id = $1 AND a.user_id = $2 AND a.status = 'connected'
+         AND a.atlassian_account_id = $3 AND g.status = 'active'`,
+      [grantId, row.user_id, atlassianAccountId],
+    );
+    if (!grantRes.rowCount) {
+      return deny(
+        'DIGEST_CREDENTIAL_INACTIVE',
+        'Kết nối OAuth Jira đã thay đổi hoặc hết hạn. Hãy xác nhận lại lịch.',
+        trustedWorkspaceId,
+        trustedWorkspaceMode,
+      );
+    }
+    for (const proj of projects as Array<Record<string, unknown>>) {
+      const siteId = typeof proj?.siteId === 'string' ? proj.siteId : '';
+      const projectKey = typeof proj?.projectKey === 'string' ? proj.projectKey : '';
+      if (!siteId || !isUuid(siteId) || !projectKey) {
+        return deny(
+          'DIGEST_SCOPE_REVOKED',
+          'Dự án Jira được cấu hình trong bản tin không hợp lệ.',
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        );
+      }
+      const allowedProj = await pool.query<{ id: string }>(
+        `SELECT p.id
+         FROM ati_workspace_jira_sites s
+         JOIN ati_workspace_jira_projects p ON p.site_id = s.id AND p.workspace_id = s.workspace_id
+         JOIN jira_grant_sites gs ON gs.cloud_id = s.cloud_id AND gs.grant_id = $2 AND gs.product_type = 'jira'
+         WHERE s.workspace_id = $1 AND s.id = $3 AND s.active = true
+           AND upper(p.project_key) = upper($4) AND p.selected = true`,
+        [trustedWorkspaceId, grantId, siteId, projectKey],
+      );
+      if (!allowedProj.rowCount) {
+        return deny(
+          'DIGEST_SCOPE_REVOKED',
+          'Chủ lịch không còn quyền truy cập đầy đủ các dự án Jira trong bản tin.',
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        );
+      }
+    }
   }
 
   if (row.kind === 'github_digest' && trustedWorkspaceMode === 'organization' && trustedWorkspaceId) {
@@ -315,6 +415,117 @@ export async function assertDigestScheduleLiveScopeAndAuth(
         );
       }
     }
+    const cfgSources = Array.isArray(cfg.sources) ? (cfg.sources as Array<Record<string, unknown>>) : [];
+    const jiraSources = cfgSources.filter((s) =>
+      s?.service === 'myjira' || (typeof s?.tool === 'string' && s.tool.startsWith('myjira.')),
+    );
+    if (row.services?.includes('myjira') || jiraSources.length) {
+      if (trustedWorkspaceMode !== 'organization' || !trustedWorkspaceId) {
+        return deny(
+          'DIGEST_CROSS_TENANT_SCOPE_MISMATCH',
+          'Nguồn Jira trong bản tin Telegram chỉ khả dụng trong Workspace Tổ chức.',
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        );
+      }
+      const atiMem = (
+        await pool.query<{ status: string }>(
+          `SELECT m.status FROM ati_workspace_memberships m
+           JOIN ati_workspaces w ON w.id = m.workspace_id AND w.status = 'active'
+           JOIN workspace_members wm ON wm.workspace_id = m.workspace_id AND wm.user_id = m.user_id
+           WHERE m.workspace_id = $1 AND m.user_id = $2 AND wm.status = 'active'
+           ${input.lockTelegramJiraAuthority ? 'FOR SHARE OF w, wm, m NOWAIT' : ''}`,
+          [trustedWorkspaceId, row.user_id],
+        )
+      ).rows[0];
+      if (!atiMem || atiMem.status !== 'active') {
+        return deny(
+          'DIGEST_WORKSPACE_MEMBER_REVOKED',
+          'Thành viên không còn quyền Jira trong không gian làm việc này.',
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        );
+      }
+      const binding = jiraSources[0]?.jiraBinding;
+      if (
+        !isJiraDigestSourceBinding(binding) ||
+        jiraSources.some(({ service, tool, jiraBinding }) =>
+          service !== 'myjira' || tool !== 'myjira.search_issues' ||
+          !isJiraDigestSourceBinding(jiraBinding) || jiraBinding.grantId !== binding.grantId ||
+          jiraBinding.atlassianAccountId !== binding.atlassianAccountId,
+        )
+      ) {
+        return deny(
+          'DIGEST_JIRA_BINDING_INVALID',
+          'Nguồn Jira trong bản tin Telegram thiếu kết nối OAuth đã duyệt. Hãy xác nhận lại lịch.',
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        );
+      }
+      let expectedHash: string | null = null;
+      try {
+        expectedHash = computeTelegramDigestConfigHash(cfg as unknown as TelegramDigestConfig);
+      } catch {
+        // Invalid stored digest configuration.
+      }
+      if (!expectedHash || row.digest_config_hash !== expectedHash) {
+        return deny(
+          'DIGEST_JIRA_BINDING_INVALID',
+          'Chữ ký toàn vẹn cấu hình nguồn Jira không hợp lệ. Hãy xác nhận lại lịch.',
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        );
+      }
+      const grantRows = await pool.query<{ id: string; atlassian_account_id: string }>(
+        `SELECT g.id, a.atlassian_account_id
+         FROM jira_oauth_grants g
+         JOIN jira_accounts a ON a.id = g.account_id
+         WHERE a.user_id = $1 AND a.status = 'connected' AND g.status = 'active'
+         ORDER BY g.created_at DESC
+         LIMIT 1 ${input.lockTelegramJiraAuthority ? 'FOR SHARE OF a, g NOWAIT' : ''}`,
+        [row.user_id],
+      );
+      const grant = grantRows.rows[0];
+      if (grant?.id !== binding.grantId || grant.atlassian_account_id !== binding.atlassianAccountId) {
+        return deny(
+          'DIGEST_CREDENTIAL_INACTIVE',
+          'Kết nối OAuth Jira đã thay đổi, hết hạn hoặc bị thu hồi. Hãy xác nhận lại lịch.',
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        );
+      }
+      for (const src of jiraSources) {
+        const sArgs = (src.args ?? {}) as Record<string, unknown>;
+        const sId = typeof sArgs.siteId === 'string' ? sArgs.siteId : '';
+        const pKey = typeof sArgs.projectKey === 'string' ? sArgs.projectKey : '';
+        if (!sId || !isUuid(sId) || !pKey) {
+          return deny(
+            'DIGEST_SCOPE_REVOKED',
+            'Nguồn dự án Jira trong lịch không hợp lệ hoặc thiếu phạm vi site/project.',
+            trustedWorkspaceId,
+            trustedWorkspaceMode,
+          );
+        }
+        const okProj = await pool.query<{ id: string }>(
+          `SELECT p.id
+           FROM ati_workspace_jira_sites s
+           JOIN ati_workspace_jira_projects p ON p.site_id = s.id AND p.workspace_id = s.workspace_id
+           JOIN jira_grant_sites gs ON gs.cloud_id = s.cloud_id AND gs.grant_id = $2 AND gs.product_type = 'jira'
+           WHERE s.workspace_id = $1 AND s.id = $3 AND s.active = true
+             AND upper(p.project_key) = upper($4) AND p.selected = true
+           ${input.lockTelegramJiraAuthority ? 'FOR SHARE OF s, gs, p NOWAIT' : ''}`,
+          [trustedWorkspaceId, binding.grantId, sId, pKey],
+        );
+        if (!okProj.rowCount) {
+          return deny(
+            'DIGEST_SCOPE_REVOKED',
+            'Chủ lịch không còn quyền truy cập đầy đủ dự án Jira trong bản tin Telegram.',
+            trustedWorkspaceId,
+            trustedWorkspaceMode,
+          );
+        }
+      }
+    }
   }
 
   return { allowed: true, trustedWorkspaceId, trustedWorkspaceMode };
@@ -331,15 +542,17 @@ export async function buildPinnedTelegramAdapterContext(input: {
   scheduleId: string;
   encryptionKey: string;
   gmailOAuthClientId?: string;
+  lockTelegramJiraAuthority?: boolean;
 }): Promise<PinnedTelegramAdapterContextResult> {
   const guard = await assertDigestScheduleLiveScopeAndAuth({
     pool: input.pool,
     scheduleId: input.scheduleId,
     encryptionKey: input.encryptionKey,
     gmailOAuthClientId: input.gmailOAuthClientId,
+    lockTelegramJiraAuthority: input.lockTelegramJiraAuthority,
   });
   const base = { trustedWorkspaceId: guard.trustedWorkspaceId, trustedWorkspaceMode: guard.trustedWorkspaceMode };
-  if (!guard.allowed) return { allowed: false, code: guard.code, ...base };
+  if (!guard.allowed) return { allowed: false, code: guard.code, pauseReason: guard.pauseReason, ...base };
 
   const row = await loadScheduleRow(input.pool, input.scheduleId);
   const cfg = (row?.digest_config ?? {}) as Record<string, unknown>;

@@ -539,8 +539,8 @@ export class JiraOAuthRepo {
       };
     }
 
-    const grantRes = await this.pool.query<{ id: string; status: string }>(
-      `SELECT id, status FROM jira_oauth_grants
+    const grantRes = await this.pool.query<{ id: string; status: string; scopes: string[] | null }>(
+      `SELECT id, status, scopes FROM jira_oauth_grants
        WHERE account_id = $1
        ORDER BY
          CASE
@@ -561,6 +561,8 @@ export class JiraOAuthRepo {
         jiraAccountId: account.id,
         atlassianAccountId: account.atlassian_account_id,
         displayName: account.display_name ?? undefined,
+        scopes: [],
+        hasWriteScope: false,
         sites: [],
       };
     }
@@ -569,9 +571,10 @@ export class JiraOAuthRepo {
       cloud_id: string;
       site_name: string;
       site_url: string;
+      scopes: string[] | null;
       last_verified_at: Date;
     }>(
-      `SELECT cloud_id, site_name, site_url, last_verified_at
+      `SELECT cloud_id, site_name, site_url, scopes, last_verified_at
        FROM jira_grant_sites
        WHERE grant_id = $1
        ORDER BY site_name ASC`,
@@ -584,6 +587,14 @@ export class JiraOAuthRepo {
       url: r.site_url,
       lastVerifiedAt: r.last_verified_at ? new Date(r.last_verified_at).toISOString() : undefined,
     }));
+
+    const effectiveScopes = Array.from(
+      new Set([
+        ...(Array.isArray(grant.scopes) ? grant.scopes : []),
+        ...sitesRes.rows.flatMap((r) => (Array.isArray(r.scopes) ? r.scopes : [])),
+      ])
+    ).sort();
+    const hasWriteScope = effectiveScopes.includes('write:jira-work');
 
     let connectionState: JiraConnectionState;
     if (grant.status === 'reconnect_required') {
@@ -602,6 +613,8 @@ export class JiraOAuthRepo {
       jiraAccountId: account.id,
       atlassianAccountId: account.atlassian_account_id,
       displayName: account.display_name ?? undefined,
+      scopes: effectiveScopes,
+      hasWriteScope,
       sites,
     };
   }

@@ -164,12 +164,20 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
     if (locked.current) return;
     locked.current = true; setBusy(true); setError('');
     try {
-      const result = isGithubCandidate || isTrelloCandidate || isNotionCandidate || isJiraCandidate
+      const result = isGithubCandidate || isTrelloCandidate || isNotionCandidate
         ? await apiClient.confirmSchedule(
             convId,
             message.id,
             !manage && approvalMode === 'auto_digest' ? { approvalMode: 'auto_digest' } : undefined
           )
+        : isJiraCandidate
+          ? await apiClient.confirmSchedule(
+              convId,
+              message.id,
+              !manage && approvalMode === 'auto_digest'
+                ? { approvalMode: 'auto_digest', includeAiSummary }
+                : undefined
+            )
         : isCalendarCandidate
           ? isEligible
             ? await apiClient.confirmSchedule(convId, message.id, approvalMode)
@@ -529,13 +537,35 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                 <div className="v3-space-y-1 min-w-0">
                   <p className="font-semibold text-[#111827]">Tự gửi bản tin Standup &amp; Blocker Jira, không cần duyệt lại</p>
                   {canAutoDigest && digestCandidate?.config ? (
-                    <p className="text-xs text-[#4B5563] break-words">
-                      {`Dự án Jira: ${Array.isArray(digestCandidate.config.projects) ? digestCandidate.config.projects.map((p: any) => typeof p === 'string' ? p : `${p?.siteName ? `${p.siteName} · ` : ''}${p?.projectKey ?? p?.projectName ?? ''}`).join(', ') : ''} · ${
-                        digestCandidate.config.telegramChatId || digestCandidate.config.telegramChatTitle
-                          ? `Telegram: ${digestCandidate.config.telegramChatTitle || digestCandidate.config.telegramChatId}`
-                          : `Kênh Slack: #${String(digestCandidate.config.channelName ?? '').replace(/^#/, '')}`
-                      } · Nội dung: Blocker/High Priority, Đang xử lý (In Progress), Mới hoàn thành (+ tóm tắt AI)`}
-                    </p>
+                    <div className="v3-space-y-1.5">
+                      <p className="text-xs text-[#4B5563] break-words">
+                        {`Dự án Jira: ${Array.isArray(digestCandidate.config.projects) ? digestCandidate.config.projects.map((p: any) => typeof p === 'string' ? p : `${p?.siteName ? `${p.siteName} · ` : ''}${p?.projectKey ?? p?.projectName ?? ''}`).join(', ') : ''} · ${
+                          digestCandidate.config.telegramChatId || digestCandidate.config.telegramChatTitle
+                            ? `Telegram: ${digestCandidate.config.telegramChatTitle || digestCandidate.config.telegramChatId}`
+                            : `Kênh Slack: #${String(digestCandidate.config.channelName ?? '').replace(/^#/, '')}`
+                        } · Nội dung: Quá hạn, sắp đến hạn (${digestCandidate.config.dueSoonHours ?? 48}h), Ưu tiên cao/Chặn, Chưa gán người phụ trách, Hoàn thành`}
+                      </p>
+                      {approvalMode === 'auto_digest' && (
+                        <label
+                          className="flex items-start gap-2 pt-1 cursor-pointer text-xs text-[#111827]"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            data-testid="checkbox-jira-include-ai-summary"
+                            type="checkbox"
+                            checked={includeAiSummary}
+                            onChange={(e) => setIncludeAiSummary(e.target.checked)}
+                            className="mt-0.5 rounded border-neutral-300 text-[#FF5701] focus:ring-[#FF5701]"
+                          />
+                          <span>
+                            <span className="font-semibold">Tóm tắt bằng AI bên thứ ba:</span>{' '}
+                            {includeAiSummary
+                              ? 'Gửi tiêu đề và số liệu issue tới mô hình AI đã cấu hình để viết nhận xét điểm nghẽn (tối đa 2 câu).'
+                              : 'Chỉ gửi báo cáo KPI thống kê từ máy chủ Planora — không gửi nội dung issue cho AI bên thứ ba.'}
+                          </span>
+                        </label>
+                      )}
+                    </div>
                   ) : (
                     <p className="text-xs text-[#6B7280] break-words">
                       {digestCandidate?.disabledReason || 'Chỉ bật được khi lịch chỉ đọc công việc Jira và gửi báo cáo vào 1 kênh Slack hoặc nhóm Telegram đã chọn.'}

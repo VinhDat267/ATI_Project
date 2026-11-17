@@ -1,6 +1,7 @@
 import type pg from 'pg';
 import {
-  JIRA_CAPABILITY_DISABLED_IN_G2A,
+  JIRA_WRITE_SCOPE,
+  JIRA_WRITE_SCOPE_REQUIRED,
   validateJiraPlanConnection,
   type JiraPlanConnection,
 } from '@wap/tool-schemas';
@@ -20,12 +21,22 @@ export interface JiraApprovalValidationOptions {
     verifyUserPermissions: (
       evidence: { actorId: string; workspaceId?: string; cloudId: string; projectId?: string },
       options?: { signal?: AbortSignal }
-    ) => Promise<{ canBrowse: boolean; canCreateIssue: boolean; canAddComment: boolean; status?: string; reason?: string }>;
+    ) => Promise<{
+      canBrowse: boolean;
+      canCreateIssue: boolean;
+      canAddComment: boolean;
+      canEditIssue?: boolean;
+      canTransitionIssue?: boolean;
+      status?: string;
+      reason?: string;
+    }>;
   };
   requiredPermissions?: {
     browse?: boolean;
     createIssue?: boolean;
     addComment?: boolean;
+    editIssue?: boolean;
+    transitionIssue?: boolean;
   };
 }
 
@@ -40,15 +51,6 @@ export async function validateJiraApprovalBinding(
       category: 'unavailable',
       status: 503,
       reason: 'Validation aborted by caller',
-    };
-  }
-
-  if (options?.requiredPermissions?.createIssue || options?.requiredPermissions?.addComment) {
-    return {
-      valid: false,
-      category: 'denied',
-      status: 403,
-      reason: `${JIRA_CAPABILITY_DISABLED_IN_G2A}: Jira write approvals are disabled in G2A read-only mode`,
     };
   }
 
@@ -174,8 +176,8 @@ export async function validateJiraApprovalBinding(
     }
 
     // 4. Check active OAuth grant
-    const grantRes = await pool.query<{ id: string; status: string }>(
-      `SELECT id, status
+    const grantRes = await pool.query<{ id: string; status: string; scopes: string[] | null }>(
+      `SELECT id, status, scopes
        FROM jira_oauth_grants
        WHERE id = $1 AND account_id = $2`,
       [grantId, jiraAccountId]
@@ -189,6 +191,13 @@ export async function validateJiraApprovalBinding(
         reason: 'OAuth grant is revoked or inactive',
       };
     }
+    const grantScopes = Array.isArray(grantRow.scopes) ? grantRow.scopes : [];
+    const writeRequired = Boolean(
+      options?.requiredPermissions?.createIssue ||
+        options?.requiredPermissions?.addComment ||
+        options?.requiredPermissions?.editIssue ||
+        options?.requiredPermissions?.transitionIssue
+    );
 
     // 5. Check each site and project in siteSteps
     for (const [stepId, scope] of Object.entries(siteSteps)) {
@@ -207,9 +216,10 @@ export async function validateJiraApprovalBinding(
         active: boolean;
         policy_version: number;
         grant_site_id: string | null;
+        grant_site_scopes: string[] | null;
       }>(
         `SELECT s.id, s.cloud_id, s.active, s.policy_version,
-                gs.id AS grant_site_id
+                gs.id AS grant_site_id, gs.scopes AS grant_site_scopes
          FROM ati_workspace_jira_sites s
          LEFT JOIN jira_grant_sites gs ON gs.grant_id = $3 AND gs.cloud_id = s.cloud_id AND gs.product_type = 'jira'
          WHERE s.id = $1 AND s.workspace_id = $2`,
@@ -239,6 +249,20 @@ export async function validateJiraApprovalBinding(
           status: 403,
           reason: `Site access revoked from grant: ${scope.siteId}`,
         };
+      }
+      if (writeRequired) {
+        const siteScopes = Array.isArray(siteRow.grant_site_scopes) ? siteRow.grant_site_scopes : [];
+        const hasAnyScopes = grantScopes.length > 0 || siteScopes.length > 0;
+        const hasWriteScope =
+          grantScopes.includes(JIRA_WRITE_SCOPE) || siteScopes.includes(JIRA_WRITE_SCOPE);
+        if (hasAnyScopes && !hasWriteScope) {
+          return {
+            valid: false,
+            category: 'denied',
+            status: 403,
+            reason: `${JIRA_WRITE_SCOPE_REQUIRED}: Grant lacks write:jira-work scope`,
+          };
+        }
       }
       if (siteRow.cloud_id !== scope.cloudId) {
         return {
@@ -330,6 +354,22 @@ export async function validateJiraApprovalBinding(
             category: 'denied',
             status: 403,
             reason: 'Native Jira permission denied: User lacks ADD_COMMENTS permission',
+          };
+        }
+        if (options.requiredPermissions?.editIssue && nativeRes.canEditIssue !== true) {
+          return {
+            valid: false,
+            category: 'denied',
+            status: 403,
+            reason: 'Native Jira permission denied: User lacks EDIT_ISSUES permission',
+          };
+        }
+        if (options.requiredPermissions?.transitionIssue && nativeRes.canTransitionIssue !== true) {
+          return {
+            valid: false,
+            category: 'denied',
+            status: 403,
+            reason: 'Native Jira permission denied: User lacks TRANSITION_ISSUES permission',
           };
         }
       }

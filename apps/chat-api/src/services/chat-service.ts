@@ -9,10 +9,9 @@ import type { ScheduleRepo } from '../db/repositories/schedule-repo.js';
 import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
 import { WorkingMemory, unroutable, relevantGroundingUserTexts, routeIntent, type ChatMessage, type ProcessMessageInput, type RoutedIntent, type ReportArtifactStore } from '@wap/planner';
 import {
-  JIRA_CROSS_SERVICE_EGRESS_DENIED,
   JIRA_LEGACY_SHARED_DISABLED,
   JIRA_LLM_EGRESS_DISABLED_IN_G2A,
-  MYJIRA_G2A_TOOLS,
+  MYJIRA_TOOLS,
   MYJIRA_SERVICE,
   NOTION_OAUTH_TOOLS,
   type CalendarDigestCandidate,
@@ -416,23 +415,6 @@ export class ChatService {
       return {
         kind: 'refusal',
         reason: `${JIRA_LEGACY_SHARED_DISABLED}: Dịch vụ Jira dùng chung (jira) đã ngừng hoạt động; hãy dùng kết nối Jira OAuth cá nhân (myjira).`,
-        unavailableServices: [{ id: 'myjira', name: 'Jira' }],
-      };
-    }
-
-    const touchesJira =
-      usesMyJira ||
-      (this.enforceJiraG2AContainment && usesLegacyJira) ||
-      bound.reportEvidence?.kind === 'jira_progress' ||
-      (typeof bound.reportEvidence?.sourceTool === 'string' &&
-        (bound.reportEvidence.sourceTool.startsWith('myjira.') ||
-          bound.reportEvidence.sourceTool.startsWith('jira.')));
-    const hasAnyWriteStep = bound.steps.some((step) => isWriteTool(step.tool));
-    if (!sandboxKeepsSharedJira() && touchesJira && hasAnyWriteStep) {
-      return {
-        kind: 'refusal',
-        reason: `${JIRA_CROSS_SERVICE_EGRESS_DENIED}: Theo chính sách quyền riêng tư giai đoạn G2A (LOCK-03), dữ liệu Jira không được phép ghi hoặc chuyển tiếp sang dịch vụ bên ngoài.`,
-        suggestion: 'Chỉ thực hiện tra cứu đọc trực tiếp trên Jira mà không kết hợp bước ghi sang dịch vụ khác.',
         unavailableServices: [{ id: 'myjira', name: 'Jira' }],
       };
     }
@@ -1649,6 +1631,19 @@ export class ChatService {
     const hasMyJiraService =
       services.some((s) => s === 'myjira' || s.startsWith('myjira')) ||
       Boolean(proposal.request?.toLowerCase().includes('myjira'));
+    if (hasMyJiraService && !this.jiraLlmEgressEnabled) {
+      return {
+        kind: 'refusal',
+        reason: 'JIRA_LLM_EGRESS_DISABLED_IN_G2A: Lịch tích hợp Jira đang bị tắt bởi cấu hình máy chủ (JIRA_LLM_EGRESS_ENABLED=off).',
+      };
+    }
+    if (hasMyJiraService && (actor.workspaceMode !== 'organization' || !actor.workspaceId)) {
+      return {
+        kind: 'refusal',
+        reason: 'Lịch tích hợp Jira cá nhân (myjira) chỉ khả dụng trong Workspace Tổ chức.',
+      };
+    }
+    const uniqueServices = [...new Set(services)];
     const canEvaluateMyJiraDigest =
       hasMyJiraService &&
       actor.workspaceMode === 'organization' &&
@@ -1656,20 +1651,15 @@ export class ChatService {
       Boolean(this.myjiraDigestConnection) &&
       Boolean(proposal.request) &&
       Boolean(proposal.recurrence) &&
-      services.some((s) => s !== 'myjira' && !s.startsWith('myjira'));
-    if (hasMyJiraService && !canEvaluateMyJiraDigest) {
-      return {
-        kind: 'refusal',
-        reason: 'Tính năng lịch tự động chưa hỗ trợ tích hợp Jira cá nhân (myjira).',
-      };
-    }
+      uniqueServices.length === 2 &&
+      (uniqueServices.includes('slack') || uniqueServices.includes('telegram'));
     if (!sandboxKeepsSharedJira() && (services.includes('jira') || (!hasMyJiraService && /\bjira\b/i.test(proposal.request ?? '')))) {
       return {
         kind: 'refusal',
         reason:
           actor.workspaceMode === 'personal'
             ? 'Dịch vụ Jira chung (jira) không khả dụng ở không gian cá nhân; lịch không thể sử dụng Jira.'
-            : 'Dịch vụ Jira dùng chung (jira) đã ngừng hoạt động; lịch tự động không thể sử dụng Jira trong giai đoạn G2A.',
+            : 'Dịch vụ Jira dùng chung (jira) đã ngừng hoạt động; lịch tự động không thể sử dụng Jira.',
       };
     }
     const recurrence = proposal.action === 'resume' ? schedule!.recurrence : proposal.recurrence;
@@ -1688,14 +1678,6 @@ export class ChatService {
         telegramConnection: this.telegramConnection,
         getAdapter: this.getAdapter,
       });
-      if (!evaluatedJiraDigest.canAutoDigest) {
-        return {
-          kind: 'refusal',
-          reason:
-            evaluatedJiraDigest.disabledReason ??
-            'Tính năng lịch tự động chưa hỗ trợ tích hợp Jira cá nhân (myjira).',
-        };
-      }
       digestCandidate = evaluatedJiraDigest as unknown as ScheduleProposalMetadata['digestCandidate'];
       return {
         type: 'schedule_proposal',
@@ -1708,7 +1690,6 @@ export class ChatService {
         digestCandidate,
       };
     }
-    const uniqueServices = [...new Set(services)];
     const isCalendarDigestProposal =
       (uniqueServices.includes('mycalendar') || uniqueServices.includes('calendar')) &&
       uniqueServices.length === 2 &&
@@ -1802,6 +1783,13 @@ export class ChatService {
           trustedScope.workspaceMode !== 'organization' && proposal.request && tgLookup?.status === 'connected'
         ? await this.notionDigestSources?.prepare(actor.userId, proposal.request, AbortSignal.timeout(10_000)).catch(() => undefined)
         : undefined;
+      const myjiraLookup =
+        services.includes('myjira') &&
+        trustedScope.workspaceMode === 'organization' &&
+        trustedScope.workspaceId &&
+        this.myjiraDigestConnection
+          ? await this.myjiraDigestConnection(actor.userId, trustedScope.workspaceId).catch(() => null)
+          : null;
       digestCandidate = evaluateTelegramDigestCandidate({
         proposal,
         services,
@@ -1809,6 +1797,9 @@ export class ChatService {
         telegramLookup: tgLookup,
         notionBinding,
         githubLookup: ghLookup,
+        jiraLookup: myjiraLookup,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
         gmailBinding,
         gmailUserTexts: userTexts,
         existingDigest: current?.kind === 'telegram_digest' ? current.digestConfig as TelegramDigestConfig : null,
@@ -2275,7 +2266,7 @@ export class ChatService {
     const isJiraTurn =
       (this.enforceJiraG2AContainment || !sandboxKeepsSharedJira()) &&
       (Boolean(conv?.jira_context) || /\bmyjira\b/i.test(content) ||
-        routeIntent(content, MYJIRA_G2A_TOOLS, [MYJIRA_SERVICE]).services.includes('myjira'));
+        routeIntent(content, MYJIRA_TOOLS, [MYJIRA_SERVICE]).services.includes('myjira'));
     if (isJiraTurn && !this.jiraLlmEgressEnabled) {
       const refusal: PlannerResponse = {
         kind: 'refusal',
@@ -2415,11 +2406,22 @@ export class ChatService {
     if (!actor.userId || (actor.workspaceMode === 'organization' && !actor.workspaceId)) {
       throw new Error('Scheduler execution requires valid actor and workspace');
     }
-    if (!sandboxKeepsSharedJira() && ((run as any).services?.includes('jira') || /\bjira\b/i.test(run.request ?? ''))) {
+    const runServices: string[] | undefined = Array.isArray((run as any).services) ? (run as any).services : undefined;
+    const convForRun = this.convRepo ? await this.convRepo.getConversation(convId).catch(() => null) : null;
+    const usesOrgMyJira =
+      actor.workspaceMode === 'organization' &&
+      Boolean(actor.workspaceId) &&
+      (runServices?.some((s) => s === 'myjira' || s.startsWith('myjira')) ||
+        (!runServices?.includes('jira') &&
+          (Boolean(convForRun?.jira_context) || /\bmyjira\b/i.test(run.request ?? ''))));
+    if (usesOrgMyJira && !this.jiraLlmEgressEnabled) {
+      throw new Error('JIRA_LLM_EGRESS_DISABLED_IN_G2A: Scheduled Jira execution requires JIRA_LLM_EGRESS_ENABLED=on.');
+    }
+    if (!sandboxKeepsSharedJira() && (runServices?.includes('jira') || (!usesOrgMyJira && /\bjira\b/i.test(run.request ?? '')))) {
       throw new Error(
         actor.workspaceMode === 'personal'
           ? 'Dịch vụ Jira chung (jira) không khả dụng ở không gian cá nhân.'
-          : 'Scheduled runs do not support legacy shared Jira (jira) in G2A.'
+          : 'Scheduled runs do not support legacy shared Jira (jira).'
       );
     }
     const userMessage = runMessage(run, this.schedules.timeZone);

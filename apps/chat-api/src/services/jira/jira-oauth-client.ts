@@ -1,3 +1,4 @@
+import { MYJIRA_SCOPES } from '@wap/tool-schemas';
 import type { JiraOAuthConfig } from '../../config/env.js';
 
 export type JiraOAuthErrorCode =
@@ -168,7 +169,7 @@ export class JiraOAuthClient {
       'scope',
       options.mode === 'identity'
         ? 'read:me offline_access'
-        : 'read:me read:jira-work offline_access'
+        : MYJIRA_SCOPES.join(' ')
     );
     url.searchParams.set('redirect_uri', this.config.redirectUri);
     url.searchParams.set('state', options.state);

@@ -680,21 +680,48 @@ describe('JIRA-09B: Jira Cockpit UI integration', () => {
     expect(SERVICE_GUIDES.jira.keys.join(' ')).toContain('Site URL');
   });
 
-  it('renders G2A read-only and D09-LLM-OFF policy banner in JiraConnection settings without breaking direct directory UI', async () => {
-    vi.spyOn(jiraApi, 'connection').mockResolvedValue({
+  it('renders write-scope upgrade warning CTA when hasWriteScope=false and full capability banner when write:jira-work is present', async () => {
+    const startSpy = vi.spyOn(jiraApi, 'start').mockResolvedValue({ authUrl: 'https://auth.atlassian.com/upgrade' });
+    const connSpy = vi.spyOn(jiraApi, 'connection').mockResolvedValue({
       connected: true,
       connectionState: 'connected',
+      jiraAccountId: 'jira-1',
       atlassianAccountId: 'atl-1',
       displayName: 'Alice',
-      sites: [{ cloudId: 'c1', name: 'Acme', url: 'https://acme.atlassian.net', scopes: ['read:jira-work'] }],
-    } as any);
+      scopes: ['read:me', 'read:jira-work', 'offline_access'],
+      hasWriteScope: false,
+      sites: [{ cloudId: 'c1', name: 'Acme', url: 'https://acme.atlassian.net' }],
+    });
     vi.spyOn(jiraApi, 'workspaces').mockResolvedValue({ workspaces: [] } as any);
 
-    render(<JiraConnection user={user} />);
+    const { unmount } = render(<JiraConnection user={user} />);
     await waitFor(() => {
       expect(screen.getByTestId('jira-g2a-policy-banner')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('jira-g2a-policy-banner')).toHaveTextContent(/D09-LLM-OFF/i);
     expect(screen.getByTestId('jira-g2a-policy-banner')).toHaveTextContent(/read:jira-work/i);
+    expect(screen.getByTestId('jira-g2a-policy-banner')).toHaveTextContent(/write:jira-work/i);
+    const upgradeButtons = screen.getAllByRole('button', { name: /cấp quyền ghi jira/i });
+    expect(upgradeButtons.length).toBeGreaterThanOrEqual(1);
+    fireEvent.click(upgradeButtons[0]!);
+    await waitFor(() => {
+      expect(startSpy).toHaveBeenCalledWith('authorize_sites');
+    });
+    unmount();
+
+    connSpy.mockResolvedValue({
+      connected: true,
+      connectionState: 'connected',
+      jiraAccountId: 'jira-1',
+      atlassianAccountId: 'atl-1',
+      displayName: 'Alice',
+      scopes: ['read:me', 'read:jira-work', 'write:jira-work', 'offline_access'],
+      hasWriteScope: true,
+      sites: [{ cloudId: 'c1', name: 'Acme', url: 'https://acme.atlassian.net' }],
+    });
+    render(<JiraConnection user={user} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('jira-g2a-policy-banner')).toHaveTextContent(/write:jira-work/i);
+    });
+    expect(screen.queryByRole('button', { name: /cấp quyền ghi jira/i })).not.toBeInTheDocument();
   });
 });

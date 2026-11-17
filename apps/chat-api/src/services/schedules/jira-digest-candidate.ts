@@ -1,23 +1,11 @@
 import { createHash } from 'node:crypto';
-import type { ScheduleRecurrence } from '@wap/tool-schemas';
+import type { MyJiraDigestConfig, MyJiraDigestProjectRef, ScheduleRecurrence } from '@wap/tool-schemas';
 import { canonicalizeRecurrence } from './github-digest-candidate.js';
 
-export interface JiraDigestProjectItem {
-  siteId: string;
-  siteName: string;
-  projectKey: string;
-  projectName?: string;
-}
+export type JiraDigestProjectItem = MyJiraDigestProjectRef;
 
-export interface JiraDigestConfig {
-  workspaceId: string;
-  grantId: string;
-  atlassianAccountId: string;
-  projects: JiraDigestProjectItem[];
-  channelId: string;
-  channelName: string;
-  telegramChatId?: string;
-  telegramChatTitle?: string;
+export interface JiraDigestConfig extends Omit<MyJiraDigestConfig, 'dueSoonHours'> {
+  dueSoonHours?: number;
 }
 
 export interface JiraDigestCandidate {
@@ -44,6 +32,11 @@ export function canonicalizeJiraDigestConfig(config: JiraDigestConfig): JiraDige
     channelName: String(config.channelName || ''),
     ...(config.telegramChatId ? { telegramChatId: String(config.telegramChatId) } : {}),
     ...(config.telegramChatTitle ? { telegramChatTitle: String(config.telegramChatTitle) } : {}),
+    ...(config.telegramCredentialId ? { telegramCredentialId: String(config.telegramCredentialId) } : {}),
+    ...(typeof config.includeAiSummary === 'boolean' ? { includeAiSummary: config.includeAiSummary } : {}),
+    ...(typeof config.dueSoonHours === 'number' && Number.isFinite(config.dueSoonHours)
+      ? { dueSoonHours: config.dueSoonHours }
+      : {}),
   };
 }
 
@@ -62,7 +55,15 @@ export function computeJiraDigestConfigHash(input: {
 }
 
 const JIRA_WRITE_INTENT_REGEX =
-  /(?:^|\s)(tạo\s+(?:issue|ticket|task|bug)|thêm\s+(?:issue|ticket|bình\s+luận|comment)|chuyển\s+trạng\s+thái|cập\s+nhật\s+(?:issue|ticket)|sửa\s+(?:issue|ticket)|xoá\s+(?:issue|ticket)|create\s+(?:issue|ticket)|transition\s+issue|update\s+issue|add\s+comment)(?=$|\s|[.,;!?])/i;
+  /(?:^|\s)(tạo\s+(?:issue|ticket|task|bug)|thêm\s+(?:issue|ticket|bình\s+luận|comment)|chuyển\s+trạng\s+thái|cập\s+nhật\s+(?:issue|ticket)|sửa\s+(?:issue|ticket)|xoá\s+(?:issue|ticket)|gán\s+(?:người|issue|ticket)|create\s+(?:issue|ticket)|transition\s+issue|update\s+issue|add\s+comment)(?=$|\s|[.,;!?])/i;
+
+export interface JiraConnectionLookupResult {
+  status: 'connected' | 'disconnected' | 'unavailable';
+  workspaceId?: string;
+  grantId?: string;
+  atlassianAccountId?: string;
+  projects?: JiraDigestProjectItem[];
+}
 
 export interface EvaluateJiraDigestInput {
   userId: string;
@@ -70,13 +71,8 @@ export interface EvaluateJiraDigestInput {
   request?: string;
   services: string[];
   recurrence: ScheduleRecurrence;
-  jiraConnection?: (userId: string, workspaceId?: string | null) => Promise<{
-    status: 'connected' | 'disconnected';
-    workspaceId?: string;
-    grantId?: string;
-    atlassianAccountId?: string;
-    projects?: JiraDigestProjectItem[];
-  } | null>;
+  includeAiSummary?: boolean;
+  jiraConnection?: (userId: string, workspaceId?: string | null) => Promise<JiraConnectionLookupResult | null>;
   telegramConnection?: (userId: string) => Promise<any>;
   getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
 }
@@ -111,7 +107,7 @@ export async function evaluateJiraDigestCandidate(
     };
   }
 
-  let jiraConn: Awaited<ReturnType<NonNullable<EvaluateJiraDigestInput['jiraConnection']>>> = null;
+  let jiraConn: JiraConnectionLookupResult | null = null;
   try {
     jiraConn = (await input.jiraConnection?.(userId, input.workspaceId)) ?? null;
   } catch {
@@ -130,17 +126,22 @@ export async function evaluateJiraDigestCandidate(
     return {
       canAutoDigest: false,
       disabledReason:
-        'Cần kết nối Jira OAuth 3LO trong Workspace và được cấp quyền ít nhất 1 dự án Jira hợp lệ.',
+        'Cần kết nối Jira OAuth 3LO trong Workspace Tổ chức và chọn ít nhất 1 dự án Jira hợp lệ.',
     };
   }
 
   const lowerReq = request.toLowerCase();
+  const keyTokenMatches = new Set(
+    (request.match(/\b[A-Z][A-Z0-9_]{1,19}\b/g) ?? []).map((k) => k.toLowerCase()),
+  );
   const matchedProjects = jiraConn.projects.filter(
     (p) =>
-      lowerReq.includes(p.projectKey.toLowerCase()) ||
+      keyTokenMatches.has(p.projectKey.toLowerCase()) ||
+      new RegExp(`(?:^|[^a-z0-9_])${p.projectKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=$|[^a-z0-9_])`, 'i').test(request) ||
       (p.projectName && lowerReq.includes(p.projectName.toLowerCase())),
   );
   const selectedProjects = (matchedProjects.length > 0 ? matchedProjects : jiraConn.projects).slice(0, 5);
+  const aiOption = typeof input.includeAiSummary === 'boolean' ? { includeAiSummary: input.includeAiSummary } : {};
 
   if (isTelegramDest) {
     let tg: any;
@@ -149,9 +150,13 @@ export async function evaluateJiraDigestCandidate(
     } catch {
       tg = null;
     }
-    const selectedChats: Array<{ chatId: string; title: string }> = Array.isArray(tg?.selectedChats)
+    const selectedChats: Array<{ chatId: string; title: string; type?: string }> = Array.isArray(tg?.selectedChats)
       ? tg.selectedChats
       : [];
+    const pinnedCredentialId: string | undefined =
+      typeof tg?.connection?.credentialId === 'string' && tg.connection.credentialId.trim()
+        ? tg.connection.credentialId.trim()
+        : undefined;
     if (!tg || tg.status !== 'connected' || selectedChats.length === 0) {
       return {
         canAutoDigest: false,
@@ -181,6 +186,8 @@ export async function evaluateJiraDigestCandidate(
       channelName: '',
       telegramChatId: String(matchedChat.chatId),
       telegramChatTitle: String(matchedChat.title),
+      ...(pinnedCredentialId ? { telegramCredentialId: pinnedCredentialId } : {}),
+      ...aiOption,
     });
 
     return {
@@ -196,7 +203,12 @@ export async function evaluateJiraDigestCandidate(
 
   let matchedChannel: { id: string; name: string } | null = null;
   try {
-    const slackAdapter = await input.getAdapter?.('slack', { userId, phase: 'planning' });
+    const slackAdapter = await input.getAdapter?.('slack', {
+      userId,
+      phase: 'planning',
+      workspaceId: jiraConn.workspaceId,
+      workspaceMode: 'organization',
+    });
     if (slackAdapter && typeof slackAdapter.execute === 'function') {
       const channels = await slackAdapter.execute('slack.search_channels', { query: channelQuery });
       if (Array.isArray(channels) && channels.length > 0) {
@@ -234,6 +246,7 @@ export async function evaluateJiraDigestCandidate(
     projects: selectedProjects,
     channelId: matchedChannel.id,
     channelName: matchedChannel.name,
+    ...aiOption,
   });
 
   return {

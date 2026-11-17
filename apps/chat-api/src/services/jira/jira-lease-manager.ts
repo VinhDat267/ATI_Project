@@ -34,7 +34,14 @@ export interface RevalidateLeaseResult {
 }
 
 type Row = Record<string, unknown>;
-const fail = (reason: string): never => { throw new Error(`Jira lease denied: ${reason}`); };
+export class JiraLeaseDeniedError extends Error {
+  constructor(reason: string) {
+    super(`Jira lease denied: ${reason}`);
+    this.name = 'JiraLeaseDeniedError';
+  }
+}
+
+const fail = (reason: string): never => { throw new JiraLeaseDeniedError(reason); };
 
 /** Short committed authorization record. Final outbound linearization belongs to JIRA-08. */
 export class JiraLeaseManager {

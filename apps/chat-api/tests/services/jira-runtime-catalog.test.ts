@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { routeIntent, WorkingMemory } from '@wap/planner';
-import { MYJIRA_SERVICE, MYJIRA_G2A_TOOLS, type PlanResponse } from '@wap/tool-schemas';
+import { MYJIRA_SERVICE, MYJIRA_TOOLS, type PlanResponse } from '@wap/tool-schemas';
 import {
   serviceRegistryForRuntime,
   runtimeToolCatalog,
@@ -31,7 +31,7 @@ describe('JIRA-08 Runtime Catalog, Factory, Legacy Route Lock & Resource Labels'
     expect(onRegistry.some((s) => s.id === 'jira')).toBe(false);
   });
 
-  it('adds MYJIRA_G2A_TOOLS and strips legacy jira.* tools in getToolCatalogFor and runtimeToolCatalog when myjiraEnabled is true', async () => {
+  it('adds full MYJIRA_TOOLS and strips legacy jira.* tools in getToolCatalogFor and runtimeToolCatalog when myjiraEnabled is true', async () => {
     const fakeJiraWorkspaceRepo = {
       getCapabilities: vi.fn().mockResolvedValue({
         workspaceId: 'ws-1',
@@ -58,7 +58,7 @@ describe('JIRA-08 Runtime Catalog, Factory, Legacy Route Lock & Resource Labels'
 
     expect(liveCatalog.some((t) => t.service === 'jira')).toBe(false);
     expect(liveCatalog.filter((t) => t.service === 'myjira').map((t) => t.name)).toEqual(
-      MYJIRA_G2A_TOOLS.map((t) => t.name)
+      MYJIRA_TOOLS.map((t) => t.name)
     );
 
     const sandboxCatalog = await runtimeToolCatalog('sandbox', fakeCredRepo, '0'.repeat(64), {
@@ -72,7 +72,7 @@ describe('JIRA-08 Runtime Catalog, Factory, Legacy Route Lock & Resource Labels'
 
     expect(sandboxCatalog.some((t) => t.service === 'jira')).toBe(false);
     expect(sandboxCatalog.filter((t) => t.service === 'myjira').map((t) => t.name)).toEqual(
-      MYJIRA_G2A_TOOLS.map((t) => t.name)
+      MYJIRA_TOOLS.map((t) => t.name)
     );
   });
 

@@ -334,20 +334,89 @@ describe('PersonalJiraAdapter', () => {
     });
   });
 
-  describe('myjira.create_issue & myjira.add_comment (G2A fail-closed containment)', () => {
-    it.each([
-      ['myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'Title', description: '<b>plain</b>\nnext' }],
-      ['myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'A bug report', issueType: 'Bug' }],
-      ['myjira.add_comment', { siteId: 'opaque_1', issueKey: 'ATI-42', body: 'hello' }],
-    ])('rejects %s before any transport call in G2A read-only mode', async (tool, args) => {
-      seen = [];
-      await expect(make().execute(tool, args as any)).rejects.toMatchObject({
-        category: 'AUTH_ERROR',
-        statusCode: 403,
-        retryable: false,
-        message: expect.stringContaining('JIRA_CAPABILITY_DISABLED_IN_G2A'),
+  describe('myjira.create_issue & myjira.add_comment', () => {
+    it('executes myjira.create_issue with ADF description and validates standard issueType', async () => {
+      reply = ({ url }) => {
+        if (url.includes('/issue/createmeta/ATI/issuetypes')) {
+          return {
+            body: {
+              startAt: 0,
+              total: 2,
+              issueTypes: [
+                { id: '1', name: 'Task', subtask: false },
+                { id: '2', name: 'Bug', subtask: false },
+              ],
+            },
+          };
+        }
+        if (url.endsWith('/issue')) {
+          return { body: { id: '10042', key: 'ATI-42' } };
+        }
+        return { status: 404, body: {} };
+      };
+      const created = await make().execute('myjira.create_issue', {
+        siteId: 'opaque_1',
+        projectKey: 'ATI',
+        summary: 'A bug report',
+        description: '<b>plain</b>\nnext',
+        issueType: 'Bug',
       });
-      expect(seen).toEqual([]);
+      expect(created).toEqual({
+        siteId: 'opaque_1',
+        id: '10042',
+        key: 'ATI-42',
+        url: 'https://company.atlassian.net/browse/ATI-42',
+      });
+      const post = seen.find((s) => s.url.endsWith('/issue'));
+      expect(post?.body.fields.issuetype).toEqual({ id: '2' });
+      expect(post?.body.fields.description.type).toBe('doc');
+    });
+
+    it('executes myjira.add_comment after checking current project matches allowlist', async () => {
+      reply = ({ url }) => {
+        if (url.endsWith('/issue/ATI-42?fields=project')) {
+          return { body: { id: '10042', key: 'ATI-42', fields: { project } } };
+        }
+        if (url.endsWith('/issue/ATI-42/comment')) {
+          return { body: { id: '777' } };
+        }
+        return { status: 404, body: {} };
+      };
+      const comment = await make().execute('myjira.add_comment', {
+        siteId: 'opaque_1',
+        issueKey: 'ATI-42',
+        body: 'hello',
+      });
+      expect(comment).toEqual({
+        siteId: 'opaque_1',
+        id: '777',
+        issueKey: 'ATI-42',
+        url: 'https://company.atlassian.net/browse/ATI-42?focusedCommentId=777',
+      });
+    });
+
+    it('throws UNKNOWN when myjira.create_issue returns malformed id without auto-retry', async () => {
+      let posts = 0;
+      reply = ({ url }) => {
+        if (url.includes('/issue/createmeta/ATI/issuetypes')) {
+          return {
+            body: {
+              startAt: 0,
+              total: 1,
+              issueTypes: [{ id: '1', name: 'Task', subtask: false }],
+            },
+          };
+        }
+        if (url.endsWith('/issue')) {
+          posts++;
+          return { body: { broken: true } };
+        }
+        return { status: 404, body: {} };
+      };
+      await expect(
+        make().execute('myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'Ambiguous write' })
+      ).rejects.toMatchObject({ category: 'UNKNOWN', retryable: false });
+      expect(posts).toBe(1);
     });
 
     it('plainTextToAdf formats multiline text with empty paragraphs for blank lines', () => {
@@ -539,7 +608,7 @@ describe('PersonalJiraAdapter', () => {
     });
   });
 
-  describe('Input validation for G2A read tools and fail-closed rejection for disabled tools', () => {
+  describe('Input validation and scope enforcement across all 9 Jira tools', () => {
     it.each([
       ['myjira.list_sites', { query: 123 }],
       ['myjira.list_sites', { query: 'x', limit: 0 }],
@@ -551,6 +620,8 @@ describe('PersonalJiraAdapter', () => {
       ['myjira.search_issues', { siteId: 'opaque_1' }],
       ['myjira.search_issues', { siteId: 'opaque_1', projectKey: 'invalid-key' }],
       ['myjira.search_issues', { siteId: 'opaque_1', projectKey: 'ATI', limit: 51 }],
+      ['myjira.search_issues', { siteId: 'opaque_1', projectKey: 'ATI', overdueOnly: true, dueWithinDays: 3 }],
+      ['myjira.search_issues', { siteId: 'opaque_1', projectKey: 'ATI', dueWithinDays: 31 }],
       ['myjira.search_issues', { siteId: 'opaque_1', projectKey: 'ATI', extra: true }],
       ['myjira.get_issue', { siteId: 'opaque_1', issueKey: 'bad' }],
       ['unknown_tool', {}],
@@ -561,19 +632,48 @@ describe('PersonalJiraAdapter', () => {
     });
 
     it.each([
-      ['myjira.create_issue', { siteId: 'opaque_1', projectKey: 'ATI', summary: 'ok' }],
-      ['myjira.add_comment', { siteId: 'opaque_1', issueKey: 'ATI-1', body: 'ok' }],
-      ['myjira.search_users', { siteId: 'opaque_1', projectKey: 'ATI', query: 'Nguyen' }],
-      ['myjira.transition_issue', { siteId: 'opaque_1', issueKey: 'ATI-1', status: 'Done' }],
-      ['myjira.update_issue', { siteId: 'opaque_1', issueKey: 'ATI-1', priority: 'High' }],
-    ])('rejects non-G2A myjira capability %s fail-closed with AUTH_ERROR 403 before transport', async (tool, args) => {
+      ['myjira.create_issue', { siteId: 'unknown', projectKey: 'ATI', summary: 'ok' }],
+      ['myjira.add_comment', { siteId: 'opaque_1', issueKey: 'SECRET-1', body: 'ok' }],
+      ['myjira.search_users', { siteId: 'opaque_1', projectKey: 'SECRET', query: 'Nguyen' }],
+      ['myjira.transition_issue', { siteId: 'opaque_1', issueKey: 'SECRET-1', status: 'Done' }],
+      ['myjira.update_issue', { siteId: 'opaque_1', issueKey: 'SECRET-1', priority: 'High' }],
+    ])('rejects out-of-scope %s fail-closed with AUTH_ERROR 403 before transport', async (tool, args) => {
       seen = [];
       await expect(make().execute(tool, args as any)).rejects.toMatchObject({
         category: 'AUTH_ERROR',
         statusCode: 403,
-        message: expect.stringContaining('JIRA_CAPABILITY_DISABLED_IN_G2A'),
       });
       expect(seen).toEqual([]);
+    });
+  });
+
+  describe.each([
+    ['myjira.add_comment', { body: 'Approved comment' }],
+    ['myjira.transition_issue', { status: 'Done' }],
+    ['myjira.update_issue', { priority: 'High' }],
+  ] as const)('%s issue write target', (tool, args) => {
+    it.each([
+      { reason: 'the issue moved to another selected project', key: 'CORE-7', project: { id: '10001', key: 'CORE' } },
+      { reason: 'the issue key changed in the selected project', key: 'ATI-43', project },
+      { reason: 'the returned project key changed', key: 'ATI-42', project: { id: '10000', key: 'CORE' } },
+      { reason: 'the returned project ID changed', key: 'ATI-42', project: { id: '19999', key: 'ATI' } },
+      { reason: 'the response lacks a project ID', key: 'ATI-42', project: { key: 'ATI' } },
+    ])('rejects before writing when $reason', async ({ key, project: currentProject }) => {
+      reply = ({ url }) => {
+        if (url.includes('/issue/ATI-42?fields=project')) {
+          return { body: { id: '10042', key, fields: { project: currentProject, status: { name: 'Open' } } } };
+        }
+        if (url.endsWith('/transitions')) {
+          return { body: { transitions: [{ id: '31', name: 'Done', to: { name: 'Done' } }] } };
+        }
+        return { status: 200, body: { id: '777' } };
+      };
+
+      await expect(make().execute(tool, { siteId: 'opaque_1', issueKey: 'ATI-42', ...args })).rejects.toMatchObject({
+        category: 'AUTH_ERROR',
+        details: { requestSent: false },
+      });
+      expect(seen.map(({ method }) => method)).toEqual(['GET']);
     });
   });
 
@@ -694,20 +794,81 @@ describe('PersonalJiraAdapter', () => {
       });
     });
 
-    it('blocks myjira.search_users, myjira.transition_issue, and myjira.update_issue in G2A read-only mode', async () => {
+    it('supports overdueOnly, dueWithinDays, and unassignedOnly JQL filters', async () => {
+      reply = () => ({ body: { issues: [], isLast: true } });
+
+      await make().execute('myjira.search_issues', {
+        siteId: 'opaque_1',
+        projectKey: 'ATI',
+        overdueOnly: true,
+        unassignedOnly: true,
+      });
+      expect(seen[0]!.body.jql).toBe(
+        'project = "ATI" AND duedate < startOfDay() AND assignee is EMPTY AND resolution = Unresolved ORDER BY duedate ASC, updated DESC'
+      );
+
       seen = [];
-      for (const [tool, args] of [
-        ['myjira.search_users', { siteId: 'opaque_1', projectKey: 'ATI', query: 'Nguyen' }],
-        ['myjira.transition_issue', { siteId: 'opaque_1', issueKey: 'ATI-42', status: 'Done' }],
-        ['myjira.update_issue', { siteId: 'opaque_1', issueKey: 'ATI-42', priority: 'High' }],
-      ] as const) {
-        await expect(make().execute(tool, args as any)).rejects.toMatchObject({
-          category: 'AUTH_ERROR',
-          statusCode: 403,
-          message: expect.stringContaining('JIRA_CAPABILITY_DISABLED_IN_G2A'),
-        });
-      }
-      expect(seen).toEqual([]);
+      await make().execute('myjira.search_issues', {
+        siteId: 'opaque_1',
+        projectKey: 'ATI',
+        dueWithinDays: 3,
+      });
+      expect(seen[0]!.body.jql).toBe(
+        'project = "ATI" AND duedate >= startOfDay() AND duedate <= "+3d" AND resolution = Unresolved ORDER BY duedate ASC, updated DESC'
+      );
+    });
+
+    it('executes myjira.search_users, myjira.transition_issue, and myjira.update_issue with updatedFields', async () => {
+      reply = ({ url }) => {
+        if (url.includes('/user/assignable/search')) {
+          return { body: [{ accountId: 'acc-9', displayName: 'Minh Nguyen' }] };
+        }
+        if (url.endsWith('/issue/ATI-42/transitions')) {
+          return { body: { transitions: [{ id: '31', name: 'Start Progress', to: { name: 'In Progress' } }] } };
+        }
+        if (url.endsWith('/issue/ATI-42?fields=project')) {
+          return { body: { id: '10042', key: 'ATI-42', fields: { project } } };
+        }
+        if (url.endsWith('/issue/ATI-42')) {
+          return { body: {} };
+        }
+        return { status: 404, body: {} };
+      };
+
+      const users = await make().execute('myjira.search_users', {
+        siteId: 'opaque_1',
+        projectKey: 'ATI',
+        query: 'Nguyen',
+      });
+      expect(users).toEqual([{ id: 'acc-9', siteId: 'opaque_1', accountId: 'acc-9', displayName: 'Minh Nguyen' }]);
+
+      const transitioned = await make().execute('myjira.transition_issue', {
+        siteId: 'opaque_1',
+        issueKey: 'ATI-42',
+        status: 'In Progress',
+        comment: 'Starting work',
+      });
+      expect(transitioned).toEqual({
+        siteId: 'opaque_1',
+        id: '10042',
+        key: 'ATI-42',
+        status: 'In Progress',
+        url: 'https://company.atlassian.net/browse/ATI-42',
+      });
+
+      const updated = await make().execute('myjira.update_issue', {
+        siteId: 'opaque_1',
+        issueKey: 'ATI-42',
+        priority: 'High',
+        dueDate: '2026-11-25',
+      });
+      expect(updated).toEqual({
+        siteId: 'opaque_1',
+        id: '10042',
+        key: 'ATI-42',
+        url: 'https://company.atlassian.net/browse/ATI-42',
+        updatedFields: ['priority', 'dueDate'],
+      });
     });
   });
 });

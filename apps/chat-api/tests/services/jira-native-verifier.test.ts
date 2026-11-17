@@ -217,6 +217,8 @@ describe('JiraNativeVerifier (Task 2 Tests)', () => {
         canBrowse: true,
         canCreateIssue: true,
         canAddComment: true,
+        canEditIssue: true,
+        canTransitionIssue: true,
         status: 'granted',
       });
 
@@ -259,6 +261,8 @@ describe('JiraNativeVerifier (Task 2 Tests)', () => {
         canBrowse: true,
         canCreateIssue: false,
         canAddComment: true,
+        canEditIssue: false,
+        canTransitionIssue: false,
         status: 'granted',
       });
     });
@@ -292,6 +296,8 @@ describe('JiraNativeVerifier (Task 2 Tests)', () => {
         canBrowse: true,
         canCreateIssue: true,
         canAddComment: false,
+        canEditIssue: true,
+        canTransitionIssue: true,
         status: 'granted',
       });
 
@@ -398,7 +404,14 @@ describe('JiraNativeVerifier (Task 2 Tests)', () => {
 
       const evidence = createDefaultUserEvidence();
       const result = await verifier.verifyUserPermissions(evidence);
-      expect(result).toEqual({ canBrowse: false, canCreateIssue: false, canAddComment: false, status: 'unavailable' });
+      expect(result).toEqual({
+        canBrowse: false,
+        canCreateIssue: false,
+        canAddComment: false,
+        canEditIssue: false,
+        canTransitionIssue: false,
+        status: 'unavailable',
+      });
     });
   });
 
