@@ -323,7 +323,8 @@ export class PersonalCalendarAdapter extends BaseAdapter {
       toolName === 'mycalendar.create_event' ||
       toolName === 'mycalendar.update_event' ||
       toolName === 'mycalendar.delete_event' ||
-      toolName === 'mycalendar.schedule_meet';
+      toolName === 'mycalendar.schedule_meet' ||
+      toolName === 'mycalendar.rsvp_event';
     let writeDispatched = false;
 
     try {
@@ -882,6 +883,218 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           'DELETE',
         );
         return { id: eventId, deleted: true };
+      }
+
+      if (toolName === 'mycalendar.list_event_instances') {
+        only(args, ['calendarId', 'eventId', 'timeMin', 'timeMax', 'timeZone', 'limit']);
+        const id = this.checkedId(args.calendarId);
+        const rawEventId = text(args.eventId, 256, true).trim();
+        if (rawEventId === '.' || rawEventId === '..' || rawEventId.includes('/')) {
+          invalid('eventId is invalid');
+        }
+        let calendarTz = args.timeZone !== undefined ? assertValidIanaTimeZone(args.timeZone) : undefined;
+        let timeMin: string;
+        let timeMax: string;
+        if (args.timeMin !== undefined || args.timeMax !== undefined) {
+          windowSize(args.timeMin, args.timeMax, 90);
+          timeMin = args.timeMin;
+          timeMax = args.timeMax;
+        } else {
+          const nowMs = this.nowFn().getTime();
+          timeMin = new Date(nowMs - 24 * 60 * 60_000).toISOString();
+          timeMax = new Date(nowMs + 90 * 24 * 60 * 60_000).toISOString();
+        }
+        const maximum = limit(args.limit, 10);
+
+        let masterEventId = rawEventId;
+        const buildInstanceParams = (pageToken?: string) => {
+          const p = new URLSearchParams({
+            timeMin,
+            timeMax,
+            maxResults: String(maximum),
+          });
+          if (pageToken) p.set('pageToken', pageToken);
+          return p;
+        };
+
+        let firstPage: any;
+        try {
+          firstPage = await this.request(
+            `${encodeURIComponent(id)}/events/${encodeURIComponent(masterEventId)}/instances?${buildInstanceParams()}`,
+            signal,
+          );
+        } catch (err) {
+          if (!(err instanceof StepError) || (err.category !== 'NOT_FOUND' && err.category !== 'VALIDATION')) {
+            throw err;
+          }
+          const resolvedEvent = await this.request(
+            `${encodeURIComponent(id)}/events/${encodeURIComponent(rawEventId)}`,
+            signal,
+          );
+          if (typeof resolvedEvent?.recurringEventId === 'string' && resolvedEvent.recurringEventId.trim()) {
+            masterEventId = resolvedEvent.recurringEventId.trim();
+            firstPage = await this.request(
+              `${encodeURIComponent(id)}/events/${encodeURIComponent(masterEventId)}/instances?${buildInstanceParams()}`,
+              signal,
+            );
+          } else {
+            const rawStart = resolvedEvent?.start?.dateTime ?? resolvedEvent?.start?.date;
+            const isAllDayItem = typeof rawStart === 'string' && !rawStart.includes('T');
+            const hasItemTz =
+              (typeof resolvedEvent?.start?.timeZone === 'string' && isValidIanaTimeZone(resolvedEvent.start.timeZone)) ||
+              (typeof resolvedEvent?.end?.timeZone === 'string' && isValidIanaTimeZone(resolvedEvent.end.timeZone));
+            if (isAllDayItem && !hasItemTz && !calendarTz) {
+              calendarTz = await this.resolveCalendarTimeZone(id, signal);
+            }
+            const single =
+              resolvedEvent?.status === 'cancelled'
+                ? []
+                : [normalizedEvent(resolvedEvent, false, isAllDayItem ? calendarTz : undefined)];
+            const truncated = single.some((e) => e.clipped);
+            const cleaned = single.map(({ clipped: _clipped, ...ev }) => ev);
+            return {
+              masterEventId,
+              events: cleaned,
+              ...(truncated ? { truncated: true } : {}),
+              coverage: {
+                complete: true,
+                returned: cleaned.length,
+                totalAvailable: cleaned.length,
+              },
+            };
+          }
+        }
+
+        const events: Array<ReturnType<typeof normalizedEvent>> = [];
+        const seenPages = new Set<string>();
+        let incompleteReason: string | undefined;
+        let currentPage = firstPage;
+        for (let page = 0; page < 20; page++) {
+          if (
+            !currentPage ||
+            typeof currentPage !== 'object' ||
+            (currentPage.items !== undefined && !Array.isArray(currentPage.items))
+          ) {
+            badResponse();
+          }
+          if (
+            currentPage.nextPageToken !== undefined &&
+            (typeof currentPage.nextPageToken !== 'string' ||
+              (currentPage.nextPageToken !== '' && seenPages.has(currentPage.nextPageToken)))
+          ) {
+            badResponse();
+          }
+          if (typeof currentPage.timeZone === 'string' && isValidIanaTimeZone(currentPage.timeZone)) {
+            const cleanTz = currentPage.timeZone.trim();
+            this.calendarTimeZoneCache.set(id, cleanTz);
+            calendarTz ??= cleanTz;
+          }
+          const items = currentPage.items ?? [];
+          let hitMaxWithUnreadItems = false;
+          for (let idx = 0; idx < items.length; idx++) {
+            const item = items[idx];
+            if (item?.status === 'cancelled') continue;
+            if (events.length >= maximum) {
+              hitMaxWithUnreadItems = true;
+              break;
+            }
+            const rawStart = item?.start?.dateTime ?? item?.start?.date;
+            const isAllDayItem = typeof rawStart === 'string' && !rawStart.includes('T');
+            const hasItemTz =
+              (typeof item?.start?.timeZone === 'string' && isValidIanaTimeZone(item.start.timeZone)) ||
+              (typeof item?.end?.timeZone === 'string' && isValidIanaTimeZone(item.end.timeZone));
+            if (isAllDayItem && !hasItemTz && !calendarTz) {
+              calendarTz = await this.resolveCalendarTimeZone(id, signal);
+            }
+            events.push(normalizedEvent(item, false, isAllDayItem ? calendarTz : undefined));
+          }
+          const hasNextPage = typeof currentPage.nextPageToken === 'string' && currentPage.nextPageToken !== '';
+          if (events.length >= maximum) {
+            if (hitMaxWithUnreadItems) incompleteReason = 'limit_reached';
+            else if (hasNextPage) incompleteReason = 'next_page_available';
+            break;
+          }
+          if (!hasNextPage) break;
+          if (page === 19) {
+            incompleteReason = 'page_budget_exceeded';
+            break;
+          }
+          seenPages.add(currentPage.nextPageToken);
+          currentPage = await this.request(
+            `${encodeURIComponent(id)}/events/${encodeURIComponent(masterEventId)}/instances?${buildInstanceParams(currentPage.nextPageToken)}`,
+            signal,
+          );
+        }
+
+        const truncated = events.some((ev) => ev.clipped);
+        const cleanedEvents = events.map(({ clipped: _clipped, ...ev }) => ev);
+        const complete = incompleteReason === undefined;
+        return {
+          masterEventId,
+          events: cleanedEvents,
+          ...(truncated ? { truncated: true } : {}),
+          coverage: {
+            complete,
+            returned: cleanedEvents.length,
+            totalAvailable: complete ? cleanedEvents.length : null,
+            ...(incompleteReason ? { reason: incompleteReason } : {}),
+          },
+        };
+      }
+
+      if (toolName === 'mycalendar.rsvp_event') {
+        only(args, ['calendarId', 'eventId', 'responseStatus', 'comment', 'sendInvites']);
+        const id = this.checkedId(args.calendarId);
+        const eventId = text(args.eventId, 256, true).trim();
+        if (eventId === '.' || eventId === '..' || eventId.includes('/')) {
+          invalid('eventId is invalid');
+        }
+        const allowedRsvp = new Set(['accepted', 'declined', 'tentative']);
+        if (typeof args.responseStatus !== 'string' || !allowedRsvp.has(args.responseStatus)) {
+          invalid('responseStatus must be accepted, declined, or tentative');
+        }
+        const comment = args.comment !== undefined ? text(args.comment, 500).trim() : undefined;
+        if (args.sendInvites !== undefined && typeof args.sendInvites !== 'boolean') {
+          invalid('sendInvites must be a boolean');
+        }
+        const sendUpdates = args.sendInvites === true ? 'all' : 'none';
+
+        const existing = await this.request(
+          `${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}`,
+          signal,
+        );
+        const existingAttendees = Array.isArray(existing?.attendees) ? existing.attendees : [];
+        let selfAttendee = existingAttendees.find((a: any) => a?.self === true);
+        if (!selfAttendee && id.includes('@')) {
+          const targetEmail = id.toLowerCase();
+          selfAttendee = existingAttendees.find(
+            (a: any) => typeof a?.email === 'string' && a.email.trim().toLowerCase() === targetEmail,
+          );
+        }
+        if (!selfAttendee) {
+          throwValidation(
+            'Cannot RSVP to an event where you are not listed as an attendee',
+            false,
+          );
+        }
+        const email = selfAttendee.email;
+        if (typeof email !== 'string' || !email.trim()) badResponse();
+
+        const patched = await this.request(
+          `${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}?sendUpdates=${sendUpdates}`,
+          signal,
+          {
+            // A regular PATCH replaces the attendees array. This flag limits the update to the participant's response.
+            attendeesOmitted: true,
+            attendees: [{ email, responseStatus: args.responseStatus, ...(comment !== undefined ? { comment } : {}) }],
+          },
+          (dispatched) => {
+            writeDispatched = dispatched;
+          },
+          'PATCH',
+        );
+        const { clipped: _clipped, ...updated } = normalizedEvent(patched, true);
+        return updated;
       }
 
       return invalid('tool is unsupported');

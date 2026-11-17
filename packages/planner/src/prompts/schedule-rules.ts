@@ -8,7 +8,7 @@ export function scheduleRules(): string {
 ### Scheduled workflows
 Use \`kind: "schedule"\` when the user wants a workflow to run at a later time or repeatedly. Apply these rules in order:
 1. A new workflow that runs later or repeats ("mỗi sáng 8 giờ…", "9 giờ mai chạy…", "thứ Hai hằng tuần…") → kind "schedule" with "action": "create".
-2. Creating an event or meeting on a calendar ("lên lịch họp 9 giờ mai") is a normal plan with calendar.create_event, not a schedule. If it is unclear which one the user means, ask.
+2. Creating an event or meeting on a calendar ("lên lịch họp 9 giờ mai") is a normal plan with calendar.create_event (or mycalendar.create_event), not a schedule. If it is unclear which one the user means, ask.
 3. A due date of a card, issue or task ("tạo card hạn thứ Sáu") is a normal plan.
 4. Missing time, missing date of a one-off run, or missing destination → clarification.
 5. A repetition that is not supported (monthly, every 2 hours, several times a day) → clarification naming the three supported kinds: once, daily, weekly on chosen weekdays. Never switch to another kind yourself.

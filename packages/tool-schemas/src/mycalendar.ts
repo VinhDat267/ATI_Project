@@ -14,6 +14,7 @@ const timeZone = {
   description: 'Múi giờ IANA của lịch hoặc sự kiện (ví dụ: "Asia/Ho_Chi_Minh").',
 };
 const calendarId = { type: 'string', pattern: CALENDAR_ID_PATTERN.source, 'x-resource': 'mycalendar' };
+const myEventId = { type: 'string', minLength: 1, maxLength: 256, 'x-resource': 'myevent' };
 const attendeesSchema = {
   type: 'array',
   minItems: 1,
@@ -32,6 +33,9 @@ const coverageSchema = output(
   },
   ['complete', 'returned', 'totalAvailable'],
 );
+const rsvpStatusSchema = { type: 'string', enum: ['accepted', 'declined', 'tentative'] };
+const selfResponseStatusSchema = { type: 'string', enum: ['needsAction', 'declined', 'tentative', 'accepted'] };
+
 const event = output(
   {
     id: str,
@@ -44,6 +48,8 @@ const event = output(
     attendees: { type: 'array', items: str },
     attendeesCount: { type: 'integer', minimum: 0 },
     recurrence: str,
+    recurringEventId: str,
+    selfResponseStatus: selfResponseStatusSchema,
     timeZone: str,
   },
   ['id', 'title', 'start', 'end', 'url'],
@@ -60,6 +66,8 @@ const eventObservedFields = [
   'attendees',
   'attendeesCount',
   'recurrence',
+  'recurringEventId',
+  'selfResponseStatus',
   'timeZone',
   'calendarId',
 ];
@@ -94,11 +102,11 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
     riskLevel: 'low',
     discovers: 'myevent',
     observedFields: [...eventObservedFields, 'description'],
-    description: 'Đọc chi tiết một sự kiện cụ thể trong lịch cá nhân theo eventId, bao gồm toàn bộ nội dung mô tả (description / agenda cuộc họp), link Google Meet, địa điểm và quy tắc lặp lại.',
+    description: 'Đọc chi tiết một sự kiện cụ thể trong lịch cá nhân theo eventId, bao gồm toàn bộ nội dung mô tả (description / agenda cuộc họp), danh sách khách mời, link Google Meet, địa điểm và quy tắc lặp lại.',
     inputSchema: input(
       {
         calendarId,
-        eventId: { type: 'string', minLength: 1, maxLength: 256 },
+        eventId: myEventId,
       },
       ['calendarId', 'eventId'],
     ),
@@ -112,8 +120,11 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
         url: str,
         location: str,
         meetLink: str,
+        attendees: { type: 'array', items: str },
         attendeesCount: { type: 'integer', minimum: 0 },
         recurrence: str,
+        recurringEventId: str,
+        selfResponseStatus: selfResponseStatusSchema,
         timeZone: str,
       },
       ['id', 'title', 'start', 'end', 'url'],
@@ -193,7 +204,7 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
     inputSchema: input(
       {
         calendarId,
-        eventId: { type: 'string', minLength: 1, maxLength: 256 },
+        eventId: myEventId,
         summary: { type: 'string', minLength: 1, maxLength: 200 },
         description: { type: 'string', maxLength: 4000 },
         start: time,
@@ -218,7 +229,7 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
     inputSchema: input(
       {
         calendarId,
-        eventId: { type: 'string', minLength: 1, maxLength: 256 },
+        eventId: myEventId,
       },
       ['calendarId', 'eventId'],
     ),
@@ -243,6 +254,53 @@ export const MYCALENDAR_TOOLS: ToolDefinition[] = [
         recurrence: { type: 'string', maxLength: 500 },
       },
       ['calendarId', 'summary', 'start', 'end'],
+    ),
+    outputSchema: event,
+  },
+  {
+    name: 'mycalendar.list_event_instances',
+    service: 'mycalendar',
+    sideEffect: 'read',
+    riskLevel: 'low',
+    discovers: 'myevent',
+    observedFields: eventObservedFields,
+    description: 'Liệt kê từng buổi họp cụ thể (instances) thuộc một chuỗi sự kiện lặp lại (recurring event) theo eventId của chuỗi hoặc một buổi bất kỳ trong chuỗi, để lấy eventId riêng khi cần dời giờ hoặc huỷ riêng một buổi.',
+    inputSchema: input(
+      {
+        calendarId,
+        eventId: myEventId,
+        timeMin: time,
+        timeMax: time,
+        timeZone,
+        limit: { type: 'integer', minimum: 1, maximum: 20, default: 10 },
+      },
+      ['calendarId', 'eventId'],
+    ),
+    outputSchema: output(
+      {
+        masterEventId: str,
+        events: { type: 'array', items: event },
+        truncated: { type: 'boolean' },
+        coverage: coverageSchema,
+      },
+      ['masterEventId', 'events'],
+    ),
+  },
+  {
+    name: 'mycalendar.rsvp_event',
+    service: 'mycalendar',
+    sideEffect: 'write',
+    riskLevel: 'medium',
+    description: 'Sau khi duyệt, phản hồi lời mời tham dự cuộc họp trên lịch cá nhân (responseStatus: "accepted" | "declined" | "tentative"), giữ nguyên toàn bộ danh sách khách mời hiện có và hỗ trợ tuỳ chọn ghi chú (comment) hoặc gửi thông báo cập nhật (sendInvites).',
+    inputSchema: input(
+      {
+        calendarId,
+        eventId: myEventId,
+        responseStatus: rsvpStatusSchema,
+        comment: { type: 'string', maxLength: 500 },
+        sendInvites: { type: 'boolean' },
+      },
+      ['calendarId', 'eventId', 'responseStatus'],
     ),
     outputSchema: event,
   },

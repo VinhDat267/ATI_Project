@@ -9,10 +9,10 @@ import { GmailConnectionRepo } from '../../src/db/repositories/gmail-connection-
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 import { AdapterFactory, type AdapterContext } from '../../src/services/adapter-factory.js';
 import { getToolCatalogFor } from '../../src/services/registered-services.js';
+import { runtimeToolCatalog, mayFallbackToShared } from '../../src/config/gmail-tools-runtime.js';
 import { ChatService } from '../../src/services/chat-service.js';
 import { createGmailConnectionLookup, createMyCalendarConnectionLookup } from '../../src/services/gmail/connection-reference.js';
 import { resourceLabels } from '../../src/services/resource-labels.js';
-import { mayFallbackToShared } from '../../src/config/gmail-tools-runtime.js';
 import { WorkingMemory } from '@wap/planner';
 
 const secret = 'mycal_services_test_secret_at_least_32_characters';
@@ -532,6 +532,54 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
       await expect(factory.getAdapterForService('mycalendar', context)).rejects.toThrow(
         /Kết nối hoặc phạm vi lịch Google Calendar đã thay đổi/i,
       );
+    });
+
+    it('rejects stale oauthClientId across getToolCatalogFor, runtimeToolCatalog, createMyCalendarConnectionLookup, and AdapterFactory', async () => {
+      await credentials.saveCredentials(
+        'mycalendar',
+        encryptCredentials(
+          {
+            refreshToken: '1//stale-client',
+            email: 'alice@example.com',
+            oauthClientId: 'old-shared-project-client',
+            selectedCalendars: [{ id: 'alice@example.com', summary: 'Lịch chính', timeZone: 'Asia/Ho_Chi_Minh', primary: true }],
+            allowedScope: { calendars: ['alice@example.com'] },
+          },
+          key,
+        ),
+        alice.id,
+      );
+
+      const expectedClientId = 'new-isolated-mycalendar-client';
+      const catalog = await getToolCatalogFor(credentials, key, {
+        userId: alice.id,
+        gmailEnabled: false,
+        mycalendarEnabled: true,
+        mycalendarOAuthClientId: expectedClientId,
+      });
+      expect(catalog.some((t) => t.service === 'mycalendar')).toBe(false);
+
+      const liveCatalog = await runtimeToolCatalog('live', credentials, key, {
+        userId: alice.id,
+        gmailEnabled: false,
+        mycalendarEnabled: true,
+        mycalendarOAuthClientId: expectedClientId,
+      });
+      expect(liveCatalog.some((t) => t.service === 'mycalendar')).toBe(false);
+
+      const lookup = createMyCalendarConnectionLookup(credentials, key, expectedClientId);
+      expect(await lookup(alice.id)).toBeNull();
+
+      const factory = new AdapterFactory({
+        credentialRepo: credentials,
+        encryptionKey: key,
+        mycalendarOAuthClientId: expectedClientId,
+        createMyCalendarAdapter: () => ({ execute: async () => ({ ok: true }) } as any),
+        mycalendarTokens: { forConnection: () => ({} as any), clear: () => {} } as any,
+      });
+      await expect(
+        factory.getAdapterForService('mycalendar', { userId: alice.id, phase: 'planning' }),
+      ).rejects.toThrow(/kết nối lại/i);
     });
   });
 

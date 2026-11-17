@@ -24,7 +24,14 @@ import { ExecutionService } from './services/execution-service.js';
 import { reconcileInterruptedExecutions } from './services/startup-reconciliation.js';
 import { createScheduleRuntime } from './config/schedules-runtime.js';
 import { evaluateCalendarDigestCandidate } from './services/schedules/calendar-digest-candidate.js';
-import { createCalendarDigestExecutor } from './services/schedules/calendar-digest-runner.js';
+import {
+  createCalendarDigestExecutor,
+  deliverCalendarTriggerNotification,
+  listCalendarTriggerDestinations,
+  verifyCalendarTriggerDestination,
+} from './services/schedules/calendar-digest-runner.js';
+import { CalendarTriggerService } from './services/calendar/calendar-trigger-service.js';
+import { parseCalendarWatchCallbackUrl } from './services/calendar/calendar-trigger-watch.js';
 import { createGithubDigestRunner, type RunGithubDigest } from './services/schedules/github-digest-runner.js';
 import { createTrelloDigestRunner, buildTrelloAiPromptPayload, type RunTrelloDigest } from './services/schedules/trello-digest-runner.js';
 import {
@@ -335,6 +342,7 @@ async function bootstrap() {
     timeZone: env.APP_TIME_ZONE,
     encryptionKey: env.ENCRYPTION_KEY,
     gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
+    mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
     credentialRepo: credRepo,
     mysheetsEnabled: mysheetsAvailable,
     fetchOrgSheetsMetadata,
@@ -784,6 +792,7 @@ async function bootstrap() {
       gmailEnabled: gmailAvailable || isNineServiceSandbox,
       gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
       mycalendarEnabled: mycalendarAvailable,
+      mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
       mysheetsEnabled: mysheetsAvailable,
       trelloEnabled: trelloAvailable,
       trelloTeamRepo,
@@ -848,7 +857,13 @@ async function bootstrap() {
     planner: planner as any,
     eventEmitter: chatEventEmitter,
     gmailConnection: gmailAvailable ? createGmailConnectionLookup(credRepo, env.ENCRYPTION_KEY, env.GMAIL_OAUTH?.clientId) : sandboxGmailConnection,
-    mycalendarConnection: mycalendarAvailable ? createMyCalendarConnectionLookup(credRepo, env.ENCRYPTION_KEY) : undefined,
+    mycalendarConnection: mycalendarAvailable
+      ? createMyCalendarConnectionLookup(
+          credRepo,
+          env.ENCRYPTION_KEY,
+          env.RUNTIME_MODE === 'live' ? env.MYCALENDAR_OAUTH?.clientId : undefined,
+        )
+      : undefined,
     mysheetsConnection: mysheetsAvailable
       ? createMySheetsConnectionLookup(credRepo, env.ENCRYPTION_KEY, (userId) =>
           (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService('mysheets', { userId, phase: 'planning' })
@@ -930,6 +945,7 @@ async function bootstrap() {
     gmailTokens,
     createGmailAdapter: gmailAvailable ? ({ tokens }) => runtimeGmailAdapter(env.RUNTIME_MODE, tokens, env.GMAIL_OAUTH!.apiBaseUrl) : undefined,
     mycalendarTokens,
+    mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
     createMyCalendarAdapter: mycalendarAvailable ? (input) => runtimeMyCalendarAdapter(env.RUNTIME_MODE, input, env.MYCALENDAR_OAUTH!.apiBaseUrl) : undefined,
     mysheetsTokens,
     createMySheetsAdapter: mysheetsAvailable ? (input) => runtimeMySheetsAdapter(env.RUNTIME_MODE, input, env.MYSHEETS_OAUTH!.apiBaseUrl) : undefined,
@@ -1124,6 +1140,7 @@ async function bootstrap() {
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
     gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
+    mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
     adapterFactory,
     botClient: telegramBotClient,
     notionSources: notionDigestSources,
@@ -1143,6 +1160,7 @@ async function bootstrap() {
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
     gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
+    mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
     adapterFactory,
     timeZone: env.APP_TIME_ZONE,
     resolveSlackMentions: true,
@@ -1216,6 +1234,25 @@ async function bootstrap() {
   }
 
   const slackAssistant=createPersonalSlackAssistantRuntime({pool:pool??undefined,oauth:env.MYSLACK_OAUTH,encryptionKey:env.ENCRYPTION_KEY,env:process.env,live:env.RUNTIME_MODE==='live'});
+  const calendarWatchUrl = env.RUNTIME_MODE === 'live' ? parseCalendarWatchCallbackUrl(process.env.MYCALENDAR_WEBHOOK_URL) : null;
+  if (mycalendarAvailable && env.RUNTIME_MODE === 'live' && process.env.MYCALENDAR_WEBHOOK_URL?.trim() && !calendarWatchUrl) {
+    console.warn('[chat-api] MYCALENDAR_WEBHOOK_URL must be a public HTTPS /api/connections/mycalendar/webhook URL. MyCalendar uses polling.');
+  }
+  const calendarTriggerService = mycalendarAvailable && pool
+    ? new CalendarTriggerService({
+        pool,
+        encryptionKey: env.ENCRYPTION_KEY,
+        timeZone: env.APP_TIME_ZONE,
+        webhookSecret: process.env.MYCALENDAR_WEBHOOK_SECRET,
+        ...(calendarWatchUrl && mycalendarTokens && env.MYCALENDAR_OAUTH ? {
+          watch: { callbackUrl: calendarWatchUrl, apiBaseUrl: env.MYCALENDAR_OAUTH.apiBaseUrl, tokens: mycalendarTokens },
+        } : {}),
+        getAdapter: (serviceName, context) => (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
+        verifyDestination: verifyCalendarTriggerDestination,
+        listDestinations: listCalendarTriggerDestinations,
+        deliverNotification: deliverCalendarTriggerNotification,
+      })
+    : undefined;
   // 8. Express App
   const app = createApp({
     slackAssistant,
@@ -1256,6 +1293,7 @@ async function bootstrap() {
       oauth: mycalendarAvailable ? env.MYCALENDAR_OAUTH : undefined,
       repo: mycalendarAvailable && pool ? new GmailConnectionRepo(pool, 'mycalendar', 'connect_mycalendar') : undefined,
       onConnectionChanged: (userId: string) => realAdapterFactory.clearPersonal(userId, 'mycalendar'),
+      triggerService: calendarTriggerService,
     } : undefined,
     mycalendarTokens,
     mysheets: env.MYSHEETS_ENABLED ? {
@@ -1350,6 +1388,7 @@ async function bootstrap() {
     console.log(`\x1b[32m[chat-api] ✓ Server đang lắng nghe tại http://${host}:${port}\x1b[0m`);
     console.log(`\x1b[36m[chat-api] ✓ Health check: http://${host}:${port}/api/health\x1b[0m`);
     schedules?.runner.start();
+    calendarTriggerService?.start();
     slackInvalidationRunner?.start();
     slackLifecycleRuntime?.start();
     slackFanoutRuntime?.start();
@@ -1360,7 +1399,13 @@ async function bootstrap() {
     schedules?.runner.stop();
     stopTelegramMessageCleanup?.();
     if (slackReceiptCleanupTimer) clearInterval(slackReceiptCleanupTimer);
-    await Promise.all([slackInvalidationRunner?.stop(), slackLifecycleRuntime?.stop(), slackFanoutRuntime?.stop(),slackAssistant?.runner?.stop()]);
+    await Promise.all([
+      calendarTriggerService?.stop(),
+      slackInvalidationRunner?.stop(),
+      slackLifecycleRuntime?.stop(),
+      slackFanoutRuntime?.stop(),
+      slackAssistant?.runner?.stop(),
+    ]);
     process.exit(0);
   };
   process.once('SIGINT', shutdown);

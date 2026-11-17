@@ -119,11 +119,16 @@ if (isMainModule) {
   if (!process.env.DATABASE_URL || !process.env.CHAT_ADMIN_EMAIL || !process.env.CHAT_ADMIN_PASSWORD) {
     throw new Error('Browser E2E requires DATABASE_URL and provisioned CHAT_ADMIN_* credentials');
   }
+  // Playwright fixtures and the API share encrypted rows across browser scenarios.
+  const browserEnv = {
+    ...process.env,
+    ENCRYPTION_KEY: process.env.ENCRYPTION_KEY || randomBytes(32).toString('hex'),
+  };
 
   const passArgs = process.argv.slice(2);
   if (passArgs.length > 0) {
     process.stdout.write(`Running v3 browser targeting: ${passArgs.join(' ')}\n`);
-    const env = { ...process.env, JWT_SECRET: process.env.JWT_SECRET || randomBytes(32).toString('hex') };
+    const env = { ...browserEnv, JWT_SECRET: process.env.JWT_SECRET || randomBytes(32).toString('hex') };
     if (passArgs.some(arg => /sched-03|github-oauth-and-digest|telegram-oauth-and-digest|trello-oauth|sheets-digest-v2-recovery|TRELLO:|TRELLO-E2E:|TELEGRAM-E2E-1:|TELEGRAM-E2E-2:/.test(arg))) {
       env.SANDBOX_SCENARIO = env.SANDBOX_SCENARIO || 'schedule';
       env.SCHEDULES_ENABLED = env.SCHEDULES_ENABLED || 'on';
@@ -160,7 +165,7 @@ if (isMainModule) {
     process.stdout.write(`Running v3 browser scenario: ${scenario.name}\n`);
     // The API child and native HTTP fixtures must verify the same browser bearer.
     // Generate a shared private key before spawning when no key was supplied.
-    const env = { ...process.env, JWT_SECRET: process.env.JWT_SECRET || randomBytes(32).toString('hex') };
+    const env = { ...browserEnv, JWT_SECRET: process.env.JWT_SECRET || randomBytes(32).toString('hex') };
     if (['default', 'auth02', 'auth04'].includes(scenario.name)) delete env.SANDBOX_SCENARIO;
     else env.SANDBOX_SCENARIO = scenario.sandboxScenario ?? scenario.name;
     // Keep every existing group on the old read-only policy regardless of the invoking shell.

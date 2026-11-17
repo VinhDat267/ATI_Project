@@ -19,6 +19,7 @@ import {
   executeMultiDigestReadSources,
 } from './multi-source-digest-reader.js';
 import { computeSlackDigestConfigHash } from './slack-digest-candidate.js';
+import { MYCALENDAR_DIGEST_REAPPROVAL, readMyCalendarDigestBinding } from './mycalendar-digest-source.js';
 import {
   assertDigestScheduleLiveScopeAndAuth,
 } from './digest-scope-guard.js';
@@ -49,6 +50,7 @@ export interface SlackDigestRunInput {
   request: string;
   dueAt: Date;
   trigger: 'scheduled' | 'manual' | 'replan';
+  services?: string[];
   digestConfig: SlackDigestConfig | null;
   digestConfigHash: string | null;
   workspaceMode?: 'legacy' | 'personal' | 'organization';
@@ -83,6 +85,7 @@ export interface SlackDigestRunnerOptions {
   credentialRepo: Pick<CredentialRepo, 'getPersonalCredentials'>;
   encryptionKey: string;
   gmailOAuthClientId?: string;
+  mycalendarOAuthClientId?: string;
   adapterFactory: {
     getAdapterForService(serviceName: string, context?: AdapterContext): Promise<any> | any;
   };
@@ -228,7 +231,9 @@ export class SlackDigestRunner {
         claimedWorkspaceId: run.workspaceId,
         encryptionKey: this.options.encryptionKey,
         gmailOAuthClientId: this.options.gmailOAuthClientId,
+        mycalendarOAuthClientId: this.options.mycalendarOAuthClientId,
         lockTelegramJiraAuthority: hasJira,
+        lockMyCalendarAuthority: 'nowait',
       });
       if (!guard.allowed) {
         await client.query('COMMIT');
@@ -319,6 +324,14 @@ export class SlackDigestRunner {
         error: 'Cấu hình bản tin Slack tự động không hợp lệ.',
         pauseSchedule: true,
       };
+    }
+
+    const mycalendar = readMyCalendarDigestBinding(digestConfig, run.services ?? null);
+    if (mycalendar.kind === 'invalid') {
+      return { status: 'blocked', error: MYCALENDAR_DIGEST_REAPPROVAL, pauseSchedule: true };
+    }
+    if (mycalendar.kind === 'bound' && typeof (this.options.pool as pg.Pool | undefined)?.connect !== 'function') {
+      return { status: 'blocked', error: 'Bản tin Google Calendar cần kết nối PostgreSQL.', pauseSchedule: true };
     }
 
     if (telegramNotionSource(digestConfig)) {
@@ -420,6 +433,7 @@ export class SlackDigestRunner {
         claimedWorkspaceId: run.workspaceId,
         encryptionKey: this.options.encryptionKey,
         gmailOAuthClientId: this.options.gmailOAuthClientId,
+        mycalendarOAuthClientId: this.options.mycalendarOAuthClientId,
       });
       if (!preGuard.allowed) {
         return {
@@ -538,6 +552,7 @@ export class SlackDigestRunner {
       dueAt: run.dueAt,
       sinceIso,
       untilIso,
+      timeZone: digestConfig.timeZone ?? this.options.timeZone,
       workspaceMode: run.workspaceMode ?? digestConfig.workspaceMode,
       workspaceId: run.workspaceId ?? expectedWorkspaceId,
       gmailBinding,

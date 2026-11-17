@@ -58,7 +58,7 @@ export function filterPermittedWorkflowDefaults(
   // 5. Calendar: calendarId must be in allowedCalendars
   if (rawDefaults.mycalendar && connections.mycalendar) {
     const allowed = connections.mycalendar.allowedCalendars ?? [];
-    if (allowed.includes(rawDefaults.mycalendar.calendarId) || rawDefaults.mycalendar.calendarId === 'primary') {
+    if (allowed.includes(rawDefaults.mycalendar.calendarId)) {
       filteredDefaults.mycalendar = rawDefaults.mycalendar;
     }
   }

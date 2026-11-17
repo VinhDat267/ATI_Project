@@ -240,4 +240,51 @@ describe('planSlackProposalWorkflow cross-service planning',()=>{
    expect(gmailPlan.plan.steps[0]?.args).toMatchObject({to:['partner@example.com'],subject:'Gửi báo giá Q4 cho đối tác'});
   }
  });
+
+ it('uses connected mycalendar allowedCalendars[0] instead of "primary" when calendarId is omitted, and asks needs_info if no valid calendar is available',()=>{
+  const withConn=planSlackProposalWorkflow({
+   ownerId:binding.atiUserId,
+   binding,
+   policyReference,
+   source:{channelId:'C_MEET',messageTs:'1730000000.000501'},
+   proposal:{
+    title:'Họp kiểm thử Slack -> Calendar',
+    rationale:'Chốt giờ họp',
+    intents:[{action:'task',service:'mycalendar',summary:'Họp kiểm thử'}],
+    sourceTexts:['<@U_ONE> đặt lịch họp 10h mai'],
+   },
+   targets:{
+    calendar:{startIso:'2026-11-05T10:00:00+07:00',endIso:'2026-11-05T11:00:00+07:00'},
+   },
+   targetConnections:{
+    mycalendar:{credentialId:'cred-cal-1',email:'alice@example.test',allowedCalendars:['alice@example.test']},
+   },
+  });
+  expect(withConn.kind).toBe('plan');
+  if(withConn.kind==='plan'){
+   expect(withConn.plan.steps[0]?.args.calendarId).toBe('alice@example.test');
+   expect(withConn.plan.connections?.mycalendar).toEqual({
+    credentialId:'cred-cal-1',
+    email:'alice@example.test',
+    allowedCalendars:['alice@example.test'],
+   });
+  }
+
+  const missingCal=planSlackProposalWorkflow({
+   ownerId:binding.atiUserId,
+   binding,
+   policyReference,
+   source:{channelId:'C_MEET',messageTs:'1730000000.000502'},
+   proposal:{
+    title:'Họp thiếu lịch',
+    rationale:'Chưa chọn lịch',
+    intents:[{action:'task',service:'mycalendar',summary:'Họp'}],
+    sourceTexts:['đặt lịch họp'],
+   },
+   targets:{
+    calendar:{startIso:'2026-11-05T10:00:00+07:00',endIso:'2026-11-05T11:00:00+07:00'},
+   },
+  });
+  expect(missingCal.kind).toBe('needs_info');
+ });
 });

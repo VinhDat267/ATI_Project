@@ -595,6 +595,13 @@ export interface JiraDigestSourceBinding {
   atlassianAccountId: string;
 }
 
+export interface MyCalendarDigestSourceBinding {
+  credentialId: string;
+  email: string;
+  calendarIds: string[];
+  truncated: boolean;
+}
+
 export interface TelegramDigestSource {
   service: string;
   tool: string;
@@ -603,6 +610,7 @@ export interface TelegramDigestSource {
   binding?: GmailDigestBinding;
   notionBinding?: NotionDigestSourceBinding;
   jiraBinding?: JiraDigestSourceBinding;
+  mycalendarBinding?: MyCalendarDigestSourceBinding;
 }
 
 export interface TelegramDigestConfig {

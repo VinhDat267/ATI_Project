@@ -31,6 +31,7 @@ import { PostgresSheetsAppendLeaseStore } from './sheets/sheets-append-lease-sto
 
 export { PostgresSheetsAppendLeaseStore };
 import type { GmailTokenManager } from './gmail/token-manager.js';
+import { hasGoogleCredentialOrigin } from './gmail/credential-origin.js';
 import { TelegramBotError, type TelegramBotClient } from './telegram/bot-client.js';
 import type { TelegramMessageRepo } from '../db/repositories/telegram-message-repo.js';
 import type { NotionConnectionRepo } from '../db/repositories/notion-connection-repo.js';
@@ -71,6 +72,7 @@ export interface AdapterFactoryOptions {
   /** Builds the MyCalendar adapter of one member with explicit scope allowlist. */
   createMyCalendarAdapter?: (input: { userId: string; tokens: GmailAccessTokenProvider; allowedScope: AllowedScope }) => AdapterExecutor;
   mycalendarTokens?: GmailTokenManager;
+  mycalendarOAuthClientId?: string;
   /** Builds the MySheets adapter of one member with explicit scope allowlist. */
   createMySheetsAdapter?: (input: {
     userId: string;
@@ -361,6 +363,12 @@ export class AdapterFactory {
     if (!userId) throw mycalendarError('AUTH_ERROR', 'Google Calendar cá nhân chỉ dùng được với kết nối của chính người dùng.');
     const record = await this.credentialRepo.getPersonalCredentials('mycalendar', userId);
     if (!record || record.status !== 'active') throw mycalendarError('AUTH_ERROR', 'Google Calendar chưa được kết nối hoặc cần kết nối lại.');
+    if (
+      this.options.mycalendarOAuthClientId &&
+      !hasGoogleCredentialOrigin(record.config, this.encryptionKey, this.options.mycalendarOAuthClientId)
+    ) {
+      throw mycalendarError('AUTH_ERROR', 'Google Calendar cần được kết nối lại.');
+    }
 
     let config: any;
     try {
@@ -380,7 +388,8 @@ export class AdapterFactory {
 
     if (context?.phase === 'execution') {
       const previewed = context.connections?.mycalendar;
-      if (!previewed || !previewed.credentialId || record.id !== previewed.credentialId) {
+      if (!previewed || !previewed.credentialId || record.id !== previewed.credentialId ||
+          (previewed.email && config.email !== previewed.email)) {
         throw mycalendarError('AUTH_ERROR', 'Kết nối hoặc phạm vi lịch Google Calendar đã thay đổi, hãy lập lại kế hoạch.');
       }
       const currentSet = new Set(allowedCalendars);

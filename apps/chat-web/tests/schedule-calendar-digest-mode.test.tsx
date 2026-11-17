@@ -60,6 +60,25 @@ afterEach(() => {
 });
 
 describe('ScheduleMoment — manual vs auto_digest mode selector', () => {
+  it('shows the approved Google Calendar account and capped calendars for a multi-source digest', () => {
+    render(<ScheduleMoment digestCandidate={{
+      canAutoDigest: true,
+      config: {
+        destination: 'slack', channelName: 'daily-briefing',
+        sources: [
+          {
+            service: 'mycalendar', label: 'Google Calendar', tool: 'mycalendar.list_events',
+            mycalendarBinding: { email: 'account@example.test', calendarIds: ['approved-calendar'], truncated: true },
+          },
+          { service: 'trello', tool: 'trello.search_cards', label: 'Trello' },
+        ],
+      },
+    }} />);
+    fireEvent.click(document.querySelector<HTMLInputElement>('#schedule-mode-auto-digest')!);
+    const scope = document.querySelector('#schedule-auto-digest-scope');
+    expect(scope).toHaveTextContent('Google Calendar (account@example.test · approved-calendar · giới hạn 1 lịch)');
+  });
+
   it('defaults to manual mode, allows selecting auto_digest with locked scope card, and passes approvalMode to confirmSchedule', async () => {
     vi.spyOn(apiClient, 'confirmSchedule').mockResolvedValue({ schedule: baseSchedule });
 
@@ -343,5 +362,71 @@ describe('One-click Primary Calendar Quick-Select (#mycalendar-quick-primary)', 
       expect(selectPrimarySpy).toHaveBeenCalledTimes(1);
     });
     expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('toggles includeAiSummary with accessible label/description in auto_digest Calendar mode and updates bottom caption', async () => {
+    const confirmSpy = vi.spyOn(apiClient, 'confirmSchedule').mockResolvedValue({
+      schedule: { ...baseSchedule, approvalMode: 'auto_digest' },
+    });
+
+    const msg: ChatMessage = {
+      id: 'msg-cal-ai-toggle',
+      role: 'assistant',
+      content: 'Đặt lịch gửi bản tin Google Calendar.',
+      metadata: {
+        type: 'schedule_proposal',
+        proposal: {
+          kind: 'schedule',
+          action: 'create',
+          name: 'Bản tin sáng',
+          request: 'Mỗi sáng gửi lịch họp lên Slack #daily-briefing',
+          recurrence: { type: 'daily', time: '07:30' },
+          summary: 'Mỗi sáng gửi lịch họp lên Slack #daily-briefing',
+        },
+        services: ['mycalendar', 'slack'],
+        nextRuns: ['2026-10-26T00:30:00Z'],
+        scheduleId: null,
+        baseVersion: null,
+        previous: null,
+        digestCandidate: {
+          canAutoDigest: true,
+          defaultMode: 'manual',
+          configPreview: {
+            email: 'owner@gmail.com',
+            calendars: [{ id: 'cal-1', summary: 'Lịch chính', primary: true }],
+            destinationService: 'slack',
+            destinationId: 'C0123456789',
+            destinationLabel: '#daily-briefing',
+          },
+          config: baseSchedule.digestConfig as any,
+        },
+      },
+    };
+
+    render(<ScheduleMoment message={msg} convId={CONV_ID} navigate={vi.fn()} onEdit={vi.fn()} />);
+
+    // Manual mode caption initially
+    expect(screen.getByText(/chờ bạn duyệt/i)).toBeInTheDocument();
+
+    // Select auto_digest
+    const autoRadio = document.querySelector<HTMLInputElement>('#schedule-mode-auto-digest')!;
+    fireEvent.click(autoRadio);
+
+    expect(screen.getByText(/tự đọc Google Calendar/i)).toBeInTheDocument();
+    const aiCheckbox = screen.getByRole('checkbox', { name: /Tóm tắt bằng AI/i }) as HTMLInputElement;
+    expect(aiCheckbox.checked).toBe(true);
+    expect(aiCheckbox.getAttribute('aria-describedby')).toBeTruthy();
+
+    // Uncheck includeAiSummary and confirm
+    fireEvent.click(aiCheckbox);
+    expect(aiCheckbox.checked).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: /Xác nhận/i }));
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledWith(CONV_ID, 'msg-cal-ai-toggle', {
+        approvalMode: 'auto_digest',
+        includeAiSummary: false,
+      });
+    });
   });
 });

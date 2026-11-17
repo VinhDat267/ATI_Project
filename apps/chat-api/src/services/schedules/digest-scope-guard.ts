@@ -10,6 +10,7 @@ import {
 import { computeTelegramDigestConfigHash, isJiraDigestSourceBinding } from './telegram-digest-candidate.js';
 import { computeSlackDigestConfigHash } from './slack-digest-candidate.js';
 import { matchesSlackDigestCredentialOwner } from './multi-source-digest-candidate.js';
+import { loadLiveMyCalendarDigestConnection, matchesMyCalendarDigestBinding, MYCALENDAR_DIGEST_REAPPROVAL, readMyCalendarDigestBinding } from './mycalendar-digest-source.js';
 
 type Queryable = pg.Pool | Pick<pg.Pool, 'query'>;
 
@@ -25,6 +26,7 @@ export type DigestScopeGuardCode =
   | 'DIGEST_SCOPE_REVOKED'
   | 'DIGEST_GMAIL_LEGACY_UNBOUND'
   | 'DIGEST_JIRA_BINDING_INVALID'
+  | 'DIGEST_MYCALENDAR_BINDING_INVALID'
   | GmailBindingGuardCode;
 
 export interface DigestScopeGuardInput {
@@ -33,8 +35,10 @@ export interface DigestScopeGuardInput {
   claimedWorkspaceId?: string | null;
   encryptionKey?: string;
   gmailOAuthClientId?: string;
+  mycalendarOAuthClientId?: string;
   expectedTelegramDigestConfigHash?: string;
   lockTelegramJiraAuthority?: boolean;
+  lockMyCalendarAuthority?: 'share' | 'nowait';
 }
 
 export interface DigestScopeGuardResult {
@@ -422,6 +426,25 @@ export async function assertDigestScheduleLiveScopeAndAuth(
       }
     }
 
+    const mycalendar = readMyCalendarDigestBinding(cfg, row.services);
+    if (mycalendar.kind !== 'none') {
+      const blocked = () => deny(
+        'DIGEST_MYCALENDAR_BINDING_INVALID', MYCALENDAR_DIGEST_REAPPROVAL,
+        trustedWorkspaceId, trustedWorkspaceMode,
+      );
+      if (mycalendar.kind !== 'bound') return blocked();
+      try {
+        if (computeMultiHash() !== row.digest_config_hash) return blocked();
+      } catch {
+        return blocked();
+      }
+      const live = await loadLiveMyCalendarDigestConnection(pool, row.user_id, input.encryptionKey, {
+        oauthClientId: input.mycalendarOAuthClientId,
+        lock: input.lockMyCalendarAuthority,
+      });
+      if (!matchesMyCalendarDigestBinding(live, mycalendar.binding)) return blocked();
+    }
+
     const gmailCheck = validateTelegramDigestGmailConfig(cfg);
     if (gmailCheck.kind === 'gmail_legacy') {
       return deny('DIGEST_GMAIL_LEGACY_UNBOUND', gmailCheck.reason, trustedWorkspaceId, trustedWorkspaceMode);
@@ -599,14 +622,18 @@ export async function buildPinnedTelegramAdapterContext(input: {
   scheduleId: string;
   encryptionKey: string;
   gmailOAuthClientId?: string;
+  mycalendarOAuthClientId?: string;
   lockTelegramJiraAuthority?: boolean;
+  lockMyCalendarAuthority?: 'share' | 'nowait';
 }): Promise<PinnedTelegramAdapterContextResult> {
   const guard = await assertDigestScheduleLiveScopeAndAuth({
     pool: input.pool,
     scheduleId: input.scheduleId,
     encryptionKey: input.encryptionKey,
     gmailOAuthClientId: input.gmailOAuthClientId,
+    mycalendarOAuthClientId: input.mycalendarOAuthClientId,
     lockTelegramJiraAuthority: input.lockTelegramJiraAuthority,
+    lockMyCalendarAuthority: input.lockMyCalendarAuthority,
   });
   const base = { trustedWorkspaceId: guard.trustedWorkspaceId, trustedWorkspaceMode: guard.trustedWorkspaceMode };
   if (!guard.allowed) return { allowed: false, code: guard.code, pauseReason: guard.pauseReason, ...base };

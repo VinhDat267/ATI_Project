@@ -144,6 +144,7 @@ export async function getToolCatalogFor(
     gmailEnabled: boolean;
     gmailOAuthClientId?: string;
     mycalendarEnabled?: boolean;
+    mycalendarOAuthClientId?: string;
     mysheetsEnabled?: boolean;
     /** Server-owned kill-switch for the 4 MySheets Drive/Docs write tools (defaults to false). */
     enableMySheetsDriveWriteTools?: boolean;
@@ -215,13 +216,23 @@ export async function getToolCatalogFor(
     if (mycal && mycal.status === 'active') {
       try {
         const config = decryptCredentials(mycal.config, encryptionKey);
-        const calendars: string[] = Array.isArray(config.allowedScope?.calendars)
-          ? config.allowedScope.calendars
-          : Array.isArray(config.selectedCalendars)
-            ? config.selectedCalendars.map((c: any) => c.id)
-            : [];
-        if (calendars.length > 0) {
-          catalog = [...catalog, ...MYCALENDAR_TOOLS];
+        if (
+          options.mycalendarOAuthClientId &&
+          (!encryptionKey ||
+            !hasGoogleCredentialOrigin(mycal.config, encryptionKey, options.mycalendarOAuthClientId))
+        ) {
+          console.warn(
+            "[registered-services] MyCalendar credential OAuth clientId mismatch; skipping service.",
+          );
+        } else {
+          const calendars: string[] = Array.isArray(config.allowedScope?.calendars)
+            ? config.allowedScope.calendars
+            : Array.isArray(config.selectedCalendars)
+              ? config.selectedCalendars.map((c: any) => c.id)
+              : [];
+          if (calendars.length > 0) {
+            catalog = [...catalog, ...MYCALENDAR_TOOLS];
+          }
         }
       } catch {
         // stale or unreadable connection does not add tools

@@ -556,7 +556,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                     <span>ID lịch Google Calendar</span>
                     <input
                       className={inputClass}
-                      placeholder="primary"
+                      placeholder="Ví dụ: ten-ban@gmail.com"
                       value={overrideCalendarId}
                       disabled={busy}
                       onChange={(e) => {

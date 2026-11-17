@@ -23,6 +23,52 @@ import type {
   WorkspaceSummary, WorkspacesListResponse,
 } from '../types';
 
+interface MyCalendarTriggerDestination {
+  service: string;
+  channelId: string;
+  channelName?: string;
+  credentialId?: string;
+}
+
+export interface MyCalendarTrigger {
+  id: string;
+  name: string;
+  triggerType: 'pre_meeting_reminder' | 'event_change_watch';
+  calendarIds: string[];
+  leadMinutes: number;
+  destination: MyCalendarTriggerDestination;
+  status: 'active' | 'paused' | 'blocked';
+  pauseReason: string | null;
+  watchActive: boolean;
+  watchExpiration: string | null;
+  lastCheckedAt: string | null;
+  lastError: string | null;
+  needsAttention: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MyCalendarTriggerDestinationOption extends MyCalendarTriggerDestination {
+  key: string;
+  channelName: string;
+  label: string;
+}
+
+export type MyCalendarTriggerDraft = Pick<MyCalendarTrigger, 'name' | 'triggerType' | 'calendarIds' | 'destination'> & {
+  leadMinutes?: number;
+};
+
+export interface MyCalendarTriggerPreview {
+  planHash: string;
+  expiresAt: string;
+  sourceEmail: string;
+  trigger: MyCalendarTriggerDraft;
+}
+
+type MyCalendarTriggerPatch = Partial<Pick<MyCalendarTrigger, 'name' | 'leadMinutes'>> & {
+  status?: 'active' | 'paused';
+};
+
 export function sharesAuthSession(previous: string | null, current: string | null): boolean {
   // Decode only to constrain retries, never to authenticate. The backend still
   // verifies signatures. Missing/malformed lineage cannot authorize adoption.
@@ -279,6 +325,67 @@ export class ApiClient {
   }
   disconnectMyCalendar() {
     return this.request<{ success: true }>('/api/connections/mycalendar', { method: 'DELETE', credentials: 'include' });
+  }
+  listMyCalendarTriggers() {
+    return this.request<{
+      triggers: MyCalendarTrigger[];
+      destinations: MyCalendarTriggerDestinationOption[];
+    }>('/api/connections/mycalendar/triggers', { credentials: 'include' });
+  }
+  previewMyCalendarTrigger(draft: MyCalendarTriggerDraft) {
+    return this.request<MyCalendarTriggerPreview>('/api/connections/mycalendar/triggers/preview', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify(draft),
+    });
+  }
+  previewMyCalendarTriggerUpdate(triggerId: string, patch: MyCalendarTriggerPatch) {
+    return this.request<MyCalendarTriggerPreview>(
+      `/api/connections/mycalendar/triggers/${encodeURIComponent(triggerId)}/preview`,
+      { method: 'POST', credentials: 'include', body: JSON.stringify(patch) },
+    );
+  }
+  createMyCalendarTrigger(payload: MyCalendarTriggerDraft & { planHash: string }) {
+    return this.request<{ trigger: MyCalendarTrigger }>('/api/connections/mycalendar/triggers', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+  }
+  updateMyCalendarTrigger(
+    triggerId: string,
+    patch: MyCalendarTriggerPatch & { planHash?: string },
+  ) {
+    return this.request<{ trigger: MyCalendarTrigger }>(
+      `/api/connections/mycalendar/triggers/${encodeURIComponent(triggerId)}`,
+      {
+        method: 'PATCH',
+        credentials: 'include',
+        body: JSON.stringify(patch),
+      },
+    );
+  }
+  deleteMyCalendarTrigger(triggerId: string) {
+    return this.request<{ deleted: boolean }>(
+      `/api/connections/mycalendar/triggers/${encodeURIComponent(triggerId)}`,
+      { method: 'DELETE', credentials: 'include' },
+    );
+  }
+  runMyCalendarTriggerNow(triggerId: string) {
+    return this.request<{
+      result: {
+        evaluated: boolean;
+        status: MyCalendarTrigger['status'];
+        pauseReason?: string | null;
+        notificationsSent: number;
+        baselineSeeded?: boolean;
+        checkedEvents: number;
+      };
+      trigger: MyCalendarTrigger | null;
+    }>(`/api/connections/mycalendar/triggers/${encodeURIComponent(triggerId)}/run-now`, {
+      method: 'POST',
+      credentials: 'include',
+    });
   }
   startMySheetsConnection(body?: { returnTo?: string }) {
     return this.request<{ url: string }>('/api/connections/mysheets/start', {

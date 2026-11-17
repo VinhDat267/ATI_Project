@@ -104,7 +104,11 @@ export class TelegramAdapter extends BaseAdapter {
     return true;
   }
 
-  async execute(toolName: string, args: Record<string, any>, context?: { signal?: AbortSignal; chatId?: string }): Promise<any> {
+  async execute(toolName: string, args: Record<string, any>, context?: {
+    signal?: AbortSignal;
+    chatId?: string;
+    beforeDispatch?: () => Promise<void>;
+  }): Promise<any> {
     if (!record(args)) throw fail('VALIDATION');
     const signal = context?.signal;
     if (toolName === 'telegram.list_chats') {
@@ -235,7 +239,7 @@ export class TelegramAdapter extends BaseAdapter {
       const limiter = chat.type === 'group' || chat.type === 'supergroup' ? this.groupRate : this.chatRate;
       const result = await this.request('sendMessage', {
         chat_id: id, text: args.text, link_preview_options: { is_disabled: true }, allow_paid_broadcast: false,
-      }, true, signal, { limiter, key: this.token + ':' + id });
+      }, true, signal, { limiter, key: this.token + ':' + id, beforeDispatch: context?.beforeDispatch });
       if (!record(result) || !integer(result.message_id, 1) || !integer(result.date) ||
           !record(result.chat) || !Number.isSafeInteger(result.chat.id) || String(result.chat.id) !== id) throw fail('UNKNOWN');
       return { messageId: result.message_id, chatId: id, date: result.date };
@@ -306,7 +310,7 @@ export class TelegramAdapter extends BaseAdapter {
   }
 
   private async request(method: 'getMe' | 'getChat' | 'sendMessage', body: object, write: boolean, signal?: AbortSignal,
-    pacing?: { limiter: GlobalRateLimiter; key: string }): Promise<any> {
+    pacing?: { limiter: GlobalRateLimiter; key: string; beforeDispatch?: () => Promise<void> }): Promise<any> {
     if (typeof this.token !== 'string' || !/^\d{1,20}:[A-Za-z0-9_-]{10,200}$/.test(this.token)) throw fail('AUTH_ERROR', 401, { requestSent: false });
     let networkRetries = 0; let serverRetries = 0; let rateRetries = 0;
     for (;;) {
@@ -315,6 +319,8 @@ export class TelegramAdapter extends BaseAdapter {
       // Last reservation before dispatch: transport contention cannot collapse
       // the per-chat send interval. A provider retry takes a fresh message slot.
       if (pacing) await this.slot(pacing.limiter, pacing.key, signal);
+      if (signal?.aborted) throw fail('NETWORK', undefined, { requestSent: false });
+      await pacing?.beforeDispatch?.();
       if (signal?.aborted) throw fail('NETWORK', undefined, { requestSent: false });
       let response: Response;
       try {

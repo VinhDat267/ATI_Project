@@ -9,6 +9,7 @@ import type {
 import type { TelegramConnectionLookupResult } from '../telegram/connection-reference.js';
 import type { GitHubConnectionLookupResult } from '../github/connection-reference.js';
 import type { JiraConnectionLookupResult } from './jira-digest-candidate.js';
+import type { MyCalendarDigestConnection } from './mycalendar-digest-source.js';
 import { isNotionDigestSourceBinding, NOTION_DIGEST_REAPPROVAL } from '../notion/digest-source-authority.js';
 import { validateTelegramDigestGmailConfig } from './gmail-digest-binding.js';
 import {
@@ -74,6 +75,7 @@ export function computeTelegramDigestConfigHash(config: TelegramDigestConfig): s
         : {}),
       ...(s.notionBinding !== undefined ? { notionBinding: s.notionBinding } : {}),
       ...(s.jiraBinding !== undefined ? { jiraBinding: s.jiraBinding } : {}),
+      ...(s.mycalendarBinding !== undefined ? { mycalendarBinding: s.mycalendarBinding } : {}),
     })),
     recurrence: config.recurrence,
     timeZone: config.timeZone,
@@ -88,6 +90,8 @@ export interface EvaluateTelegramDigestInput {
   telegramLookup?: TelegramConnectionLookupResult | null;
   githubLookup?: Pick<GitHubConnectionLookupResult, 'status' | 'connection'> | null;
   jiraLookup?: JiraConnectionLookupResult | null;
+  mycalendarLookup?: MyCalendarDigestConnection | null;
+  reauthorizeMyCalendar?: boolean;
   workspaceMode?: 'legacy' | 'personal' | 'organization';
   workspaceId?: string | null;
   gmailBinding?: GmailDigestBinding | null;
@@ -226,6 +230,9 @@ export function evaluateTelegramDigestCandidate(
     requestText,
     githubLookup: input.githubLookup,
     jiraLookup: input.jiraLookup,
+    mycalendarLookup: input.mycalendarLookup,
+    existingMyCalendarSources: Array.isArray(existingDigest?.sources) ? existingDigest.sources : undefined,
+    reauthorizeMyCalendar: input.reauthorizeMyCalendar,
     workspaceMode: input.workspaceMode,
     workspaceId: input.workspaceId,
     gmailBinding: input.gmailBinding,

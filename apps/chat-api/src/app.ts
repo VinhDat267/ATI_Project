@@ -53,6 +53,7 @@ import type { GmailTokenManager } from './services/gmail/token-manager.js';
 import type { SlackSourceRepo } from './db/repositories/slack-source-repo.js';
 import type { SlackInvalidationService } from './services/slack/slack-invalidation-service.js';
 import type { SlackInvalidationRunner } from './services/slack/slack-invalidation-runner.js';
+import type { CalendarTriggerService } from './services/calendar/calendar-trigger-service.js';
 import { createSlackEventsRouter, type SlackEventsRouterOptions } from './routes/slack-events.js';
 import type { TrelloTokenManager } from './services/trello/token-manager.js';
 import type { GitHubTokenManager } from './services/github/token-manager.js';
@@ -82,6 +83,7 @@ export interface MyCalendarAppOptions {
   googleTimeoutMs?: number;
   revokeTimeoutMs?: number;
   onConnectionChanged?: (userId: string) => void;
+  triggerService?: CalendarTriggerService;
 }
 
 /** MySheets as each member's own connection (MYSHEETS_ENABLED). Absent or disabled: the routes do not exist. */
@@ -250,6 +252,7 @@ export function createApp(options: AppOptions): Express {
     onConnectionChanged: options.mycalendar.onConnectionChanged,
     conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
     tokens: options.mycalendarTokens,
+    triggerService: options.mycalendar.triggerService,
     requireClientBinding: options.runtimeMode === 'live',
   } : undefined;
   const mysheetsRoutes = options.mysheets?.enabled ? {

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import pg from 'pg';
 import { test, expect, type Page } from '@playwright/test';
+import { encryptCredentials } from '../../../../packages/tool-adapters/src/crypto.js';
 import {
   fixtureConversation,
   fixtureMessage,
@@ -763,6 +764,87 @@ test('MYCALENDAR: Flow 7 - C2 real Chromium invitation & existing-attendee notif
       expect(req!.query.sendUpdates).toBe(c.expectedSendUpdates);
       expect(req!.body?.attendees).toEqual(c.expectedAttendees);
     }
+  } finally {
+    await db.end();
+  }
+
+  expect(pageErrors).toEqual([]);
+});
+
+test('MYCALENDAR: Flow 8 - Proactive calendar trigger create, run-now, pause/resume, and delete in Settings', async ({ page }) => {
+  test.setTimeout(60_000);
+  const pageErrors: Error[] = [];
+  page.on('pageerror', (err) => pageErrors.push(err));
+
+  await login(page);
+  const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  try {
+    const conn = await ensurePrimaryCalendarConnected(page, db);
+    const encKey = process.env.ENCRYPTION_KEY;
+    expect(encKey).toBeTruthy();
+
+    await db.query('DELETE FROM calendar_trigger_dispatches WHERE user_id = $1', [conn.userId]);
+    await db.query('DELETE FROM calendar_event_triggers WHERE user_id = $1', [conn.userId]);
+    await db.query("DELETE FROM service_credentials WHERE service = 'telegram' AND user_id = $1", [conn.userId]);
+    await db.query(
+      "INSERT INTO service_credentials(service, user_id, status, config) VALUES('telegram', $1, 'active', $2)",
+      [
+        conn.userId,
+        encryptCredentials(
+          {
+            botToken: '123456:fake-e2e-bot',
+            selectedChats: [{ chatId: '-100987654321', title: 'Nhóm E2E Lịch' }],
+            allowedScope: { chats: ['-100987654321'] },
+          },
+          encKey!,
+        ),
+      ],
+    );
+
+    await page.goto('/settings#mycalendar');
+    const card = page.locator('#service-row-mycalendar');
+    await expect(card).toBeVisible();
+
+    await card.getByRole('button', { name: /Cảnh báo & Nhắc lịch tự động/i }).click();
+    const triggersPanel = page.getByTestId('mycalendar-triggers-section');
+    await expect(triggersPanel).toBeVisible();
+    await expect(triggersPanel.getByLabel('Kênh nhận cảnh báo')).toContainText('Telegram · Nhóm E2E Lịch');
+
+    await triggersPanel.getByLabel(/Tên cảnh báo/i).fill('Nhắc họp E2E trước 15 phút');
+    await triggersPanel.getByRole('button', { name: 'Xem trước cảnh báo', exact: true }).click();
+    const preview = page.getByRole('dialog', { name: 'Xác nhận gửi cảnh báo tự động' });
+    await expect(preview).toContainText('Telegram · Nhóm E2E Lịch');
+    await expect(preview).toContainText('tối đa 5 email khách mời');
+    const beforeApproval = await db.query('SELECT COUNT(*)::int AS cnt FROM calendar_event_triggers WHERE user_id = $1', [conn.userId]);
+    expect(beforeApproval.rows[0].cnt).toBe(0);
+    await preview.getByRole('button', { name: 'Bật cảnh báo tự động', exact: true }).click();
+
+    await expect(triggersPanel).toContainText('Nhắc họp E2E trước 15 phút');
+    await expect(triggersPanel).toContainText('Đang bật');
+
+    const dbCount = await db.query('SELECT COUNT(*)::int AS cnt FROM calendar_event_triggers WHERE user_id = $1', [
+      conn.userId,
+    ]);
+    expect(dbCount.rows[0].cnt).toBe(1);
+
+    await triggersPanel.getByRole('button', { name: 'Kiểm tra và gửi ngay', exact: true }).click();
+    await expect(triggersPanel).toContainText(/Đã (kiểm tra lịch|gửi)|Chưa hoàn tất lượt kiểm tra cảnh báo/i);
+    await expect.poll(async () => (await db.query(
+      'SELECT last_checked_at IS NOT NULL AND last_error IS NULL AS checked FROM calendar_event_triggers WHERE user_id = $1',
+      [conn.userId],
+    )).rows[0]?.checked).toBe(true);
+
+    await triggersPanel.getByRole('button', { name: 'Tạm dừng', exact: true }).click();
+    await expect(triggersPanel.getByRole('button', { name: 'Bật lại', exact: true })).toBeVisible();
+    await triggersPanel.getByRole('button', { name: 'Bật lại', exact: true }).click();
+    await expect(triggersPanel.getByRole('button', { name: 'Tạm dừng', exact: true })).toBeVisible();
+
+    await triggersPanel.getByRole('button', { name: 'Xoá cảnh báo', exact: true }).click();
+    await expect(triggersPanel).not.toContainText('Nhắc họp E2E trước 15 phút');
+    const afterDelete = await db.query('SELECT COUNT(*)::int AS cnt FROM calendar_event_triggers WHERE user_id = $1', [
+      conn.userId,
+    ]);
+    expect(afterDelete.rows[0].cnt).toBe(0);
   } finally {
     await db.end();
   }

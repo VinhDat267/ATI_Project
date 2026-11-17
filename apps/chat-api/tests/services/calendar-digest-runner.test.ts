@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { encryptCredentials } from '@wap/tool-adapters';
+import { encryptCredentials, StepError } from '@wap/tool-adapters';
 import type { CalendarDigestConfig, ScheduleRecurrence } from '@wap/tool-schemas';
 import { CredentialRepo } from '../../src/db/repositories/credential-repo.js';
 import { computeCalendarDigestHash } from '../../src/services/schedules/calendar-digest-candidate.js';
@@ -633,5 +633,127 @@ describe('Calendar Digest Runner & ScheduleRunner integration on PostgreSQL 16',
     const updatedSched = (await db.pool.query('SELECT status, pause_reason FROM schedules WHERE id = $1', [sched.id])).rows[0];
     expect(updatedSched.status).toBe('paused');
     expect(updatedSched.pause_reason).toContain('Telegram');
+  });
+
+  it('pauses schedule with blocked outcome when mycalendar read fails with AUTH_ERROR (401/revoked)', async () => {
+    const credId = await seedConnections('slack');
+    const { row } = await insertDigestSchedule(credId, 'slack');
+
+    let slackSent = false;
+    const runDigest = createCalendarDigestExecutor({
+      pool: db.pool,
+      encryptionKey: key,
+      timeZone: 'Asia/Ho_Chi_Minh',
+      getAdapter: async (serviceName) => {
+        if (serviceName === 'mycalendar') {
+          return {
+            execute: async () => {
+              throw new StepError({
+                message: 'Google token expired or revoked',
+                category: 'AUTH_ERROR',
+                statusCode: 401,
+              });
+            },
+          };
+        }
+        slackSent = true;
+        return { execute: async () => ({ ts: '1.1', channel: 'C0123456789' }) };
+      },
+    });
+
+    const r = new ScheduleRunner({
+      pool: db.pool,
+      timeZone: 'Asia/Ho_Chi_Minh',
+      now: () => now,
+      planRun: async () => {
+        throw new Error('must not be called');
+      },
+      runDigest,
+      recordState: (client, rRow, at) => service.recordState(client, rRow, at),
+    });
+    runners.push(r);
+
+    await r.tick();
+
+    expect(slackSent).toBe(false);
+    const runRows = (await db.pool.query('SELECT status, error FROM schedule_runs WHERE schedule_id = $1', [row.id])).rows;
+    expect(runRows[0]!.status).toBe('blocked');
+    const updatedSched = (await db.pool.query('SELECT status, pause_reason FROM schedules WHERE id = $1', [row.id])).rows[0];
+    expect(updatedSched.status).toBe('paused');
+    expect(updatedSched.pause_reason).toContain('Google Calendar');
+  });
+
+  it('passes options.timeZone into detectCalendarConflicts for timezone-accurate all-day vs late-evening overlap', async () => {
+    const credId = await seedConnections('slack');
+    const nyNow = new Date('2026-11-02T14:00:00.000Z');
+    const { config } = await insertDigestSchedule(credId, 'slack', '2026-11-02T13:00:00.000Z');
+    const convId = (await db.pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [owner.id])).rows[0].id as string;
+    const sched = (
+      await db.pool.query(
+        `INSERT INTO schedules(user_id, conv_id, name, request, recurrence, services, status, next_run_at, kind, digest_config, digest_config_hash, digest_approved_at)
+         VALUES($1, $2, 'NY Schedule', 'Gửi lịch', '{"type":"daily","time":"08:00"}'::jsonb, $3, 'active', $4, 'calendar_digest', $5::jsonb, $6, now())
+         RETURNING *`,
+        [owner.id, convId, ['mycalendar', 'slack'], '2026-11-02T13:00:00.000Z', JSON.stringify(config), computeCalendarDigestHash(config)],
+      )
+    ).rows[0];
+    const runRow = (
+      await db.pool.query(
+        `INSERT INTO schedule_runs(schedule_id, schedule_version, trigger, due_at, status, dispatched_config, dispatched_config_hash)
+         VALUES($1, 1, 'scheduled', $2, 'planning', $3::jsonb, $4) RETURNING *`,
+        [sched.id, nyNow, JSON.stringify(config), computeCalendarDigestHash(config)],
+      )
+    ).rows[0];
+
+    const execute = createCalendarDigestExecutor({
+      pool: db.pool,
+      encryptionKey: key,
+      timeZone: 'America/New_York',
+      getAdapter: async (serviceName) => {
+        if (serviceName === 'mycalendar') {
+          return {
+            execute: async () => ({
+              events: [
+                {
+                  id: 'allday-ny',
+                  title: 'NY Offsite All Day',
+                  start: '2026-11-02',
+                  end: '2026-11-03',
+                },
+                {
+                  id: 'late-ny',
+                  title: 'Evening Sync',
+                  start: '2026-11-02T22:00:00-05:00',
+                  end: '2026-11-02T23:00:00-05:00',
+                },
+              ],
+              coverage: { complete: true, returned: 2, totalAvailable: 2 },
+            }),
+          };
+        }
+        return { execute: async () => ({ ts: '1.2', channel: 'C0123456789' }) };
+      },
+    });
+
+    const outcome = await execute(
+      {
+        runId: runRow.id,
+        scheduleId: sched.id,
+        scheduleVersion: 1,
+        trigger: 'scheduled',
+        userId: owner.id,
+        name: sched.name,
+        request: sched.request,
+        services: sched.services,
+        dueAt: nyNow,
+        digestConfig: config,
+        digestConfigHash: computeCalendarDigestHash(config),
+      },
+      new AbortController().signal,
+    );
+    expect(outcome.state).toBe('digest_sent');
+    if (outcome.state === 'digest_sent') {
+      expect(outcome.delivery.conflictCount).toBe(2);
+      expect(outcome.messageText).toContain('Trùng giờ');
+    }
   });
 });

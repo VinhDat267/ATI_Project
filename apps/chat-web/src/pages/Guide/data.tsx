@@ -712,6 +712,90 @@ export const CAPABILITIES_DATA: Capability[] = [
       }
     ];
 
+export const MYCALENDAR_PROMPTS: SamplePrompt[] = [
+  {
+    id: 'cal-rsvp',
+    category: 'coordination',
+    categoryLabel: 'Lịch họp & Điều phối',
+    title: 'Phản hồi lời mời họp (RSVP) kèm ghi chú cho người tổ chức',
+    prompt: 'Tìm cuộc họp Sprint Review ngày mai trên Google Calendar của tôi, xác nhận tham gia (accepted) hoặc báo có thể vào muộn 10 phút kèm gửi thông báo cho người tổ chức',
+    services: ['calendar'],
+    tools: ['mycalendar.list_events', 'mycalendar.rsvp_event'],
+    workflow: [
+      'Google Calendar: Tìm sự kiện Sprint Review và đọc trạng thái tham dự hiện tại',
+      'Google Calendar: Gửi phản hồi RSVP kèm ghi chú và giữ nguyên toàn bộ danh sách khách mời sau khi duyệt'
+    ],
+    badge: 'RSVP Lịch họp'
+  },
+  {
+    id: 'cal-recurring-single',
+    category: 'coordination',
+    categoryLabel: 'Lịch họp & Điều phối',
+    title: 'Dời giờ riêng 1 buổi trong chuỗi họp lặp lại hàng tuần',
+    prompt: 'Liệt kê các buổi sắp tới của chuỗi họp Weekly Sync trên Google Calendar và dời riêng buổi thứ Tư tuần sau sang 15:00–16:00 mà không ảnh hưởng các tuần khác',
+    services: ['calendar'],
+    tools: ['mycalendar.list_events', 'mycalendar.list_event_instances', 'mycalendar.update_event'],
+    workflow: [
+      'Google Calendar: Lấy danh sách từng buổi lẻ thuộc chuỗi lặp lại Weekly Sync',
+      'Google Calendar: Chỉ cập nhật đúng mã eventId của buổi thứ Tư tuần sau sau khi bạn xác nhận'
+    ],
+    badge: 'Sửa 1 buổi lặp'
+  },
+  {
+    id: 'cal-pre-brief',
+    category: 'reporting',
+    categoryLabel: 'Chuẩn bị trước họp',
+    title: 'Chuẩn bị hồ sơ trước cuộc họp: Lịch → Notion → Slack',
+    prompt: 'Kiểm tra chi tiết cuộc họp Review Quý 4 hôm nay trên Google Calendar, tìm trang tài liệu liên quan trên Notion và gửi bản chuẩn bị kèm link Google Meet vào kênh Slack #san-pham',
+    services: ['calendar', 'notion', 'slack'],
+    tools: ['mycalendar.list_events', 'mycalendar.get_event', 'notion.search_pages', 'slack.send_message'],
+    workflow: [
+      'Google Calendar: Đọc agenda, link Meet và danh sách người tham dự',
+      'Notion & Slack: Đính kèm tài liệu liên quan và gửi bản nhắc chuẩn bị trước giờ họp'
+    ],
+    badge: 'Chuẩn bị trước họp'
+  },
+  {
+    id: 'cal-post-loop',
+    category: 'reporting',
+    categoryLabel: 'Tổng kết sau họp',
+    title: 'Tổng kết khép kín sau họp: Lịch → Biên bản Docs → Jira → Gmail',
+    prompt: 'Đọc thông tin cuộc họp Design Review Quý 4 trên Google Calendar, tạo trang biên bản họp trên Google Docs, tạo ticket hành động trên dự án Jira ATI kèm link biên bản và gửi email thông báo cho những người đã tham dự',
+    services: ['calendar', 'sheets', 'jira', 'gmail'],
+    tools: ['mycalendar.list_events', 'mycalendar.get_event', 'mysheets.create_doc', 'myjira.create_issue', 'gmail.send_message'],
+    workflow: [
+      'Google Calendar: Đọc thông tin cuộc họp và lấy danh sách email người tham dự đã xác minh',
+      'Google Docs & Jira: Tạo biên bản họp và liên kết trực tiếp sang các đầu việc theo dõi',
+      'Gmail: Gửi email tóm tắt kèm link biên bản và ticket tới đúng các thành viên tham dự'
+    ],
+    badge: 'Khép kín 4 dịch vụ'
+  }
+];
+
+export const MYCALENDAR_CAPABILITY: Capability = {
+  id: 'calendar',
+  name: 'Google Calendar',
+  role: 'Lịch họp cá nhân, Phòng họp Google Meet & Tự động hoá sự kiện',
+  canDo: [
+    'Kết nối OAuth trực tiếp, chọn tối đa 5 lịch làm việc (hoặc bấm 1-Click chọn ngay Lịch chính)',
+    'Xem danh sách sự kiện, kiểm tra chi tiết người tham dự và tìm khung giờ trống trong ngày',
+    'Tạo sự kiện mới hoặc cuộc họp định kỳ (RRULE), tự động tạo liên kết Google Meet',
+    'Mời người tham dự qua email (bật/tắt gửi lời mời trước khi duyệt) và Phản hồi lời mời họp (RSVP: Chấp nhận / Từ chối / Có thể tham gia)',
+    'Cập nhật tiêu đề, khung giờ, địa điểm, danh sách khách mời hoặc sửa/huỷ riêng từng buổi lẻ trong chuỗi lặp lại (mycalendar.list_event_instances)',
+    'Đặt lịch Bản tin lịch họp mỗi sáng kèm phát hiện trùng lịch, và bật cảnh báo tự động trước giờ họp hoặc khi lịch thay đổi sang Slack/Telegram'
+  ],
+  cannotDo: [
+    'Truy cập hoặc thay đổi các lịch nằm ngoài phạm vi lịch đã cấp quyền',
+    'Tạo sự kiện vượt quá giới hạn tối đa 7 ngày liên tiếp cho mỗi lần đặt'
+  ]
+};
+
+export function capabilitiesForRuntime(mycalendarEnabled: boolean): Capability[] {
+  return mycalendarEnabled
+    ? CAPABILITIES_DATA.map((c) => (c.id === 'calendar' ? MYCALENDAR_CAPABILITY : c))
+    : CAPABILITIES_DATA;
+}
+
 export const GUIDE_HERO_FLOW_SERVICES: string[] = ['github', 'trello', 'slack'];
 
 export interface GuideOAuthShowcaseCard {

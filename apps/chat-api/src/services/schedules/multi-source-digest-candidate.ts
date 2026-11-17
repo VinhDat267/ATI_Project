@@ -11,6 +11,7 @@ import type { JiraConnectionLookupResult } from './jira-digest-candidate.js';
 import { isUuid } from '../../db/repositories/uuid.js';
 import { isValidGmailDigestBinding, isValidGmailDigestQuery } from './gmail-digest-binding.js';
 import { isNotionDigestSourceBinding, NOTION_DIGEST_REAPPROVAL } from '../notion/digest-source-authority.js';
+import { bindMyCalendarDigestSource, isMyCalendarDigestSource, MYCALENDAR_DIGEST_REAPPROVAL, type MyCalendarDigestConnection } from './mycalendar-digest-source.js';
 
 export function telegramNotionSource(config: { sources?: TelegramDigestSource[] } | null | undefined) {
   return Array.isArray(config?.sources) ? config.sources.find((source) => source?.service === 'notion') : undefined;
@@ -158,12 +159,12 @@ export function buildTelegramDigestSourceArgs(
   const base = { ...(source.args ?? {}) };
   if (source.tool === 'calendar.list_events') {
     return {
-      callArgs: { timeMin: window.sinceIso, timeMax: window.untilIso, maxResults: 20, ...base },
+      callArgs: { timeMin: window.sinceIso, timeMax: window.untilIso, limit: 20, ...base },
     };
   }
   if (source.tool === 'mycalendar.list_events') {
     return {
-      callArgs: { calendarId: 'primary', timeMin: window.sinceIso, timeMax: window.untilIso, ...base },
+      callArgs: { timeMin: window.sinceIso, timeMax: window.untilIso, ...base },
     };
   }
   if (source.tool === 'sheets.read_range') {
@@ -290,6 +291,9 @@ export interface BuildMultiDigestSourcesInput {
   requestText: string;
   githubLookup?: Pick<GitHubConnectionLookupResult, 'status' | 'connection'> | null;
   jiraLookup?: JiraConnectionLookupResult | null;
+  mycalendarLookup?: MyCalendarDigestConnection | null;
+  existingMyCalendarSources?: TelegramDigestSource[];
+  reauthorizeMyCalendar?: boolean;
   workspaceMode?: 'legacy' | 'personal' | 'organization';
   workspaceId?: string | null;
   gmailBinding?: GmailDigestBinding | null;
@@ -430,6 +434,20 @@ export function buildMultiDigestSources(
         notionBinding: input.notionBinding,
         label: `Notion · ${input.notionBinding.workspaceName} · ${input.notionBinding.databases.map((d) => d.title).join(', ')}`,
       });
+    } else if (service === 'mycalendar') {
+      const previous = input.existingMyCalendarSources?.filter(isMyCalendarDigestSource) ?? [];
+      const bound = previous.length <= 1
+        ? bindMyCalendarDigestSource(source, input.mycalendarLookup, previous[0], input.reauthorizeMyCalendar === true)
+        : null;
+      if (!bound) {
+        return {
+          ok: false,
+          disabledReason:
+            previous.length > 0 ? MYCALENDAR_DIGEST_REAPPROVAL :
+              'Hãy kết nối Google Calendar cá nhân và chọn ít nhất 1 lịch trước khi bật tự gửi báo cáo.',
+        };
+      }
+      sources.push(bound);
     } else {
       sources.push({ ...source });
     }

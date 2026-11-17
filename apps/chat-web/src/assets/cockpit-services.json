@@ -71,6 +71,18 @@
       "title": "Đọc tin nhắn Slack & Rà soát Pull Request GitHub",
       "services": ["slack", "github"],
       "prompt": "Đọc các tin nhắn gần đây trong kênh Slack {{kênh_slack}}, kiểm tra danh sách Pull Request đang mở trên kho GitHub {{kho_github}} và gửi bản tổng hợp tiến độ review vào kênh Slack {{kênh_slack}}."
+    },
+    {
+      "id": "playbook-post-meeting-followup",
+      "title": "Tổng kết sau cuộc họp (Lịch → Biên bản → Giao việc → Email)",
+      "services": ["calendar", "sheets", "jira", "gmail"],
+      "prompt": "Đọc thông tin cuộc họp {{tên_cuộc_họp}} trên Google Calendar, tạo tài liệu biên bản họp trên Google Docs, tạo ticket theo dõi trên dự án Jira {{dự_án}} kèm link biên bản và gửi email thông báo cho các thành viên tham dự cuộc họp."
+    },
+    {
+      "id": "playbook-pre-meeting-brief",
+      "title": "Chuẩn bị tài liệu trước cuộc họp (Lịch → Hồ sơ Notion → Slack)",
+      "services": ["calendar", "notion", "slack"],
+      "prompt": "Kiểm tra thông tin và danh sách người tham dự cuộc họp {{tên_cuộc_họp}} trên Google Calendar, tra cứu tài liệu liên quan trên Notion và gửi bản tóm tắt chuẩn bị kèm link Google Meet vào kênh Slack #{{kênh_slack}}."
     }
   ],
   "services": {
@@ -1047,6 +1059,22 @@
       "receipt": "Đã huỷ sự kiện",
       "kind": "Sự kiện",
       "link": "Mở kết quả",
+      "previewStyle": "calendar_event"
+    },
+    "mycalendar.list_event_instances": {
+      "action": "Xem các buổi trong chuỗi lặp lại",
+      "done": "Đã xem",
+      "receipt": "Đã xem các buổi lặp lại",
+      "kind": "Sự kiện lặp lại",
+      "link": "Mở kết quả"
+    },
+    "mycalendar.rsvp_event": {
+      "action": "Phản hồi lời mời họp (RSVP)",
+      "done": "Đã phản hồi",
+      "receipt": "Đã phản hồi lời mời họp",
+      "kind": "Lời mời họp",
+      "link": "Mở sự kiện trên Google Calendar",
+      "titleField": "title",
       "previewStyle": "calendar_event"
     },
     "mysheets.list_spreadsheets": {

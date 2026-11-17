@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { decryptCredentials, detectCalendarConflicts, GMAIL_DIGEST_READ_TOOL, StepError } from '@wap/tool-adapters';
+import { detectCalendarConflicts, GMAIL_DIGEST_READ_TOOL, StepError } from '@wap/tool-adapters';
 import type {
   GmailDigestBinding,
   NotionDigestSourceBinding,
@@ -10,6 +10,8 @@ import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import type { AdapterContext } from '../adapter-factory.js';
 import { GmailOAuthError } from '../gmail/oauth-client.js';
 import { isGoogleConnectionChanged } from '../gmail/token-manager.js';
+import { createMyCalendarConnectionLookup } from '../gmail/connection-reference.js';
+import { matchesMyCalendarDigestBinding, MYCALENDAR_DIGEST_REAPPROVAL, readMyCalendarDigestBinding } from './mycalendar-digest-source.js';
 import { analyzeSheetKpiMetrics } from './sheets-digest-runner.js';
 import { buildTelegramDigestSourceArgs } from './multi-source-digest-candidate.js';
 import { assertGmailDigestBinding, isValidGmailDigestQuery } from './gmail-digest-binding.js';
@@ -53,7 +55,7 @@ export function summarizeSourceItems(
   service: string,
   raw: unknown,
   now: Date = new Date(),
-  options?: { mentionIndex?: SlackMentionIndex | null; escapeText?: (value: string) => string },
+  options?: { mentionIndex?: SlackMentionIndex | null; escapeText?: (value: string) => string; timeZone?: string },
 ): { count: number; lines: string[]; truncated?: boolean } {
   const esc = options?.escapeText ?? ((v: string) => v);
   if (
@@ -121,19 +123,23 @@ export function summarizeSourceItems(
           url: String(ev.url ?? ''),
           ...ev,
         })),
+        { annotateConflicts: true, timeZone: options?.timeZone },
       );
     } catch {
       // Keep original items if date parsing fails
     }
   }
 
-  const notionTruncated =
-    service === 'notion' &&
+  const sourceTruncated =
+    (service === 'notion' || service === 'mycalendar' || service === 'calendar') &&
     raw != null &&
     typeof raw === 'object' &&
     !Array.isArray(raw) &&
-    Boolean((raw as Record<string, unknown>).truncated);
-  const truncation = notionTruncated ? { truncated: true } : {};
+    (Boolean((raw as Record<string, unknown>).truncated) ||
+      ((raw as any).coverage &&
+        typeof (raw as any).coverage === 'object' &&
+        (raw as any).coverage.complete === false));
+  const truncation = sourceTruncated ? { truncated: true } : {};
 
   if (items.length === 0) {
     return { count: 0, lines: ['  (Không có mục mới)'], ...truncation };
@@ -247,6 +253,9 @@ export function summarizeSourceItems(
   if (items.length > maxItems) {
     lines.push(`  ... và ${items.length - maxItems} mục khác`);
   }
+  if (sourceTruncated && (service === 'mycalendar' || service === 'calendar')) {
+    lines.push('  ⚠️ (Dữ liệu lịch có thể chưa đầy đủ do chạm giới hạn tải/số lịch)');
+  }
 
   return { count: items.length, lines, ...truncation };
 }
@@ -299,6 +308,7 @@ export async function executeMultiDigestReadSources(input: {
   dueAt: Date;
   sinceIso: string;
   untilIso: string;
+  timeZone?: string;
   workspaceMode?: 'legacy' | 'personal' | 'organization';
   workspaceId?: string | null;
   gmailBinding?: GmailDigestBinding | null;
@@ -317,6 +327,19 @@ export async function executeMultiDigestReadSources(input: {
 }): Promise<MultiDigestReadResult> {
   const esc = input.escapeText ?? ((v: string) => v);
   const { sources, userId, dueAt, sinceIso, untilIso, gmailBinding, notionBinding, signal } = input;
+  const mycalendar = readMyCalendarDigestBinding({ sources }, null);
+  if (mycalendar.kind === 'invalid') {
+    return { kind: 'blocked', error: MYCALENDAR_DIGEST_REAPPROVAL, pauseSchedule: true };
+  }
+  if (mycalendar.kind === 'bound') {
+    signal.throwIfAborted();
+    const lookup = createMyCalendarConnectionLookup(input.credentialRepo, input.encryptionKey);
+    const live = await lookup(userId).catch(() => null);
+    signal.throwIfAborted();
+    if (!matchesMyCalendarDigestBinding(live, mycalendar.binding)) {
+      return { kind: 'blocked', error: MYCALENDAR_DIGEST_REAPPROVAL, pauseSchedule: true };
+    }
+  }
   const sourceStatuses: DigestSourceRunStatus[] = [];
   const sections: string[] = [];
   const structuredSections: Array<{ label: string; count: number; body: string }> = [];
@@ -337,6 +360,10 @@ export async function executeMultiDigestReadSources(input: {
         sourceAdapterContext.connections = {
           gmail: { credentialId: gmailBinding.credentialId, email: gmailBinding.email },
         };
+      } else if (source.service === 'mycalendar' && mycalendar.kind === 'bound') {
+        const { credentialId, email, calendarIds } = mycalendar.binding;
+        sourceAdapterContext.phase = 'execution';
+        sourceAdapterContext.connections = { mycalendar: { credentialId, email, allowedCalendars: calendarIds } };
       } else if (source.service === 'myjira') {
         sourceAdapterContext.phase = 'execution';
         sourceAdapterContext.jiraDigestBinding = source.jiraBinding;
@@ -365,36 +392,25 @@ export async function executeMultiDigestReadSources(input: {
           { query: rawQuery.trim() },
           { signal },
         );
-      } else if (source.service === 'mycalendar' && source.tool === 'mycalendar.list_events') {
-        let allowedCalendars: string[] = [];
-        try {
-          const mycalRec = await input.credentialRepo.getPersonalCredentials('mycalendar', userId);
-          if (mycalRec && mycalRec.status === 'active') {
-            const dec = decryptCredentials(mycalRec.config, input.encryptionKey);
-            allowedCalendars = Array.isArray(dec.allowedScope?.calendars)
-              ? dec.allowedScope.calendars.filter((id: unknown) => typeof id === 'string' && id)
-              : Array.isArray(dec.selectedCalendars)
-                ? dec.selectedCalendars.map((c: any) => String(c?.id ?? '')).filter(Boolean)
-                : [];
+      } else if (source.service === 'mycalendar' && mycalendar.kind === 'bound') {
+        const targetCalendars = mycalendar.binding.calendarIds;
+        let anyTruncated = mycalendar.binding.truncated;
+        const mergedEvents: any[] = [];
+        for (const calId of targetCalendars) {
+          const res = await adapter.execute(
+            source.tool,
+            { ...callArgs, calendarId: calId },
+            { signal },
+          );
+          if (res && typeof res === 'object' && !Array.isArray(res)) {
+            if ((res as any).truncated === true || (res as any).coverage?.complete === false) {
+              anyTruncated = true;
+            }
           }
-        } catch {
-          // fallback to callArgs.calendarId
+          const evs = Array.isArray(res?.events) ? res.events : Array.isArray(res) ? res : [];
+          mergedEvents.push(...evs);
         }
-        if (allowedCalendars.length > 0) {
-          const mergedEvents: any[] = [];
-          for (const calId of allowedCalendars.slice(0, 5)) {
-            const res = await adapter.execute(
-              source.tool,
-              { ...callArgs, calendarId: calId },
-              { signal },
-            );
-            const evs = Array.isArray(res?.events) ? res.events : Array.isArray(res) ? res : [];
-            mergedEvents.push(...evs);
-          }
-          rawResult = { events: mergedEvents };
-        } else {
-          rawResult = await adapter.execute(source.tool, callArgs, { signal });
-        }
+        rawResult = { events: mergedEvents, ...(anyTruncated ? { truncated: true } : {}) };
       } else if (sheetReadTool) {
         const listRes = await adapter.execute(source.tool, callArgs, { signal });
         const sheets = Array.isArray(listRes)
@@ -466,6 +482,38 @@ export async function executeMultiDigestReadSources(input: {
             } else {
               throw innerErr;
             }
+          } else if (
+            source.service === 'calendar' &&
+            source.tool === 'calendar.list_events' &&
+            !callArgs.calendarId &&
+            /calendarId/i.test(String(innerErr?.message ?? ''))
+          ) {
+            const calsRes = await adapter.execute('calendar.list_calendars', { query: '' }, { signal });
+            const cals = Array.isArray(calsRes) ? calsRes.slice(0, 5) : [];
+            if (cals.length === 0) throw innerErr;
+            const mergedOrgEvents: any[] = [];
+            let orgTruncated = Array.isArray(calsRes) && calsRes.length > 5;
+            for (const c of cals) {
+              const calId = String(c?.id ?? '').trim();
+              if (!calId) continue;
+              const calRes = await adapter.execute(
+                source.tool,
+                { ...callArgs, calendarId: calId },
+                { signal },
+              );
+              if (calRes && typeof calRes === 'object' && !Array.isArray(calRes)) {
+                if ((calRes as any).truncated === true || (calRes as any).coverage?.complete === false) {
+                  orgTruncated = true;
+                }
+              }
+              const evs = Array.isArray(calRes?.events)
+                ? calRes.events
+                : Array.isArray(calRes)
+                  ? calRes
+                  : [];
+              mergedOrgEvents.push(...evs);
+            }
+            rawResult = { events: mergedOrgEvents, ...(orgTruncated ? { truncated: true } : {}) };
           } else {
             throw innerErr;
           }
@@ -475,6 +523,7 @@ export async function executeMultiDigestReadSources(input: {
       const { count, lines, truncated } = summarizeSourceItems(source.service, rawResult, dueAt, {
         mentionIndex: input.mentionIndex,
         escapeText: input.escapeText,
+        timeZone: input.timeZone,
       });
       okOrEmptyCount++;
       sourceStatuses.push({
@@ -493,6 +542,13 @@ export async function executeMultiDigestReadSources(input: {
       }
       if (source.service === 'notion' && isNotionSourceDenied(err)) {
         return { kind: 'notion_blocked' };
+      }
+      if (source.service === 'mycalendar' && isGmailAuthOrBindingFailure(err)) {
+        return {
+          kind: 'blocked',
+          error: MYCALENDAR_DIGEST_REAPPROVAL,
+          pauseSchedule: true,
+        };
       }
       if (source.service === 'gmail') {
         let bindingLost = isGmailAuthOrBindingFailure(err);

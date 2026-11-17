@@ -6,8 +6,9 @@ import { PlanMoment } from '../src/pages/Cockpit/PlanMoment';
 import { PreviewContents } from '../src/pages/Cockpit/PreviewContents';
 import { ReceiptMoment } from '../src/pages/Cockpit/ReceiptMoment';
 import { PrivacyPage } from '../src/pages/Privacy/PrivacyPage';
+import { GuidePage } from '../src/pages/Guide/GuidePage';
 import { MyCalendarCallbackView } from '../src/views/MyCalendarCallbackView';
-import { apiClient } from '../src/services/api-client';
+import { apiClient, type MyCalendarTrigger } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
 import * as connection from '../src/services/gmail-connection';
 import type { ActivePlan, ChatMessage, PlanStep, ServiceInfo, User } from '../src/types';
@@ -283,6 +284,146 @@ describe('SettingsPage - mycalendar section', () => {
     render(<SettingsPage user={member} navigate={() => {}} onLogout={() => {}} />);
 
     expect(await screen.findByText('Đã kết nối calendar.user@gmail.com')).toBeTruthy();
+  });
+
+  it('allows creating, testing (run-now), pausing, and deleting proactive calendar triggers when mycalendar is connected', async () => {
+    setupServices(mycalendarService('connected'));
+    const listSpy = vi.spyOn(apiClient as any, 'listMyCalendarTriggers').mockResolvedValue({
+      triggers: [],
+      destinations: [
+        { key: 'dest-1', service: 'slack', channelId: 'C01', channelName: '#general', label: 'Slack · #general' },
+      ],
+    });
+    const createdTrigger: MyCalendarTrigger = {
+      id: 'trig-1',
+      name: 'Nhắc họp trước 15 phút',
+      triggerType: 'pre_meeting_reminder',
+      calendarIds: ['user@gmail.com', 'work@group.calendar.google.com'],
+      leadMinutes: 15,
+      destination: { service: 'slack', channelId: 'C01', channelName: '#general' },
+      status: 'active',
+      pauseReason: null,
+      watchActive: false,
+      watchExpiration: null,
+      lastCheckedAt: null,
+      lastError: null,
+      needsAttention: false,
+      createdAt: '2026-11-18T00:00:00Z',
+      updatedAt: '2026-11-18T00:00:00Z',
+    };
+    const preview = {
+      planHash: 'trigger-plan-1',
+      expiresAt: '2026-11-18T00:10:00Z',
+      sourceEmail: 'user@gmail.com',
+      trigger: createdTrigger,
+    };
+    const previewSpy = vi.spyOn(apiClient, 'previewMyCalendarTrigger').mockResolvedValue(preview);
+    const createSpy = vi.spyOn(apiClient, 'createMyCalendarTrigger').mockResolvedValue({ trigger: createdTrigger });
+    const runSpy = vi.spyOn(apiClient, 'runMyCalendarTriggerNow').mockResolvedValue({
+      result: { evaluated: true, status: 'active', notificationsSent: 1, checkedEvents: 1 },
+      trigger: createdTrigger,
+    });
+    const updateSpy = vi.spyOn(apiClient, 'updateMyCalendarTrigger').mockResolvedValue({
+      trigger: { ...createdTrigger, status: 'paused' },
+    });
+    const deleteSpy = vi.spyOn(apiClient as any, 'deleteMyCalendarTrigger').mockResolvedValue({ deleted: true });
+
+    render(<SettingsPage user={member} navigate={() => {}} onLogout={() => {}} />);
+    const personal = await screen.findByRole('region', { name: 'Của riêng bạn' });
+    const toggleBtn = await within(personal).findByRole('button', { name: /Cảnh báo & Nhắc lịch tự động/i });
+    fireEvent.click(toggleBtn);
+    await waitFor(() => expect(listSpy).toHaveBeenCalled());
+
+    fireEvent.change(within(personal).getByLabelText(/Tên cảnh báo/i), { target: { value: 'Nhắc họp trước 15 phút' } });
+    fireEvent.click(within(personal).getByRole('button', { name: 'Xem trước cảnh báo' }));
+    const previewDialog = within(await screen.findByRole('dialog', { name: 'Xác nhận gửi cảnh báo tự động' }));
+    expect(previewSpy).toHaveBeenCalledOnce();
+    expect(previewDialog.getByText(/tối đa 5 email khách mời/i)).toBeVisible();
+    expect(previewDialog.getByText(/Slack · #general/)).toBeVisible();
+    expect(createSpy).not.toHaveBeenCalled();
+    fireEvent.click(previewDialog.getByRole('button', { name: 'Bật cảnh báo tự động' }));
+
+    await waitFor(() => expect(createSpy).toHaveBeenCalledWith(expect.objectContaining({ planHash: preview.planHash })));
+    expect(await within(personal).findByText('Nhắc họp trước 15 phút')).toBeTruthy();
+
+    fireEvent.click(within(personal).getByRole('button', { name: 'Kiểm tra và gửi ngay' }));
+    await waitFor(() => expect(runSpy).toHaveBeenCalledWith('trig-1'));
+    expect(await within(personal).findByText('Đã gửi 1 thông báo cảnh báo tới kênh nhận.')).toBeVisible();
+
+    runSpy.mockResolvedValueOnce({
+      result: { evaluated: true, status: 'active', notificationsSent: 0, checkedEvents: 1 },
+      trigger: { ...createdTrigger, needsAttention: true },
+    });
+    fireEvent.click(within(personal).getByRole('button', { name: 'Kiểm tra và gửi ngay' }));
+    expect(await within(personal).findByText(/Chưa rõ cảnh báo đã gửi hay chưa/i)).toBeVisible();
+    expect(within(personal).queryByText(/hiện chưa có sự kiện nào cần báo/i)).not.toBeInTheDocument();
+
+    runSpy.mockResolvedValueOnce({
+      result: { evaluated: false, status: 'active', notificationsSent: 0, checkedEvents: 0 },
+      trigger: createdTrigger,
+    });
+    fireEvent.click(within(personal).getByRole('button', { name: 'Kiểm tra và gửi ngay' }));
+    expect(await within(personal).findByText('Chưa hoàn tất lượt kiểm tra cảnh báo.')).toBeVisible();
+    expect(within(personal).queryByText(/đang tạm dừng hoặc cần kiểm tra/i)).not.toBeInTheDocument();
+
+    runSpy.mockResolvedValueOnce({
+      result: { evaluated: false, status: 'active', notificationsSent: 1, checkedEvents: 1 },
+      trigger: createdTrigger,
+    });
+    fireEvent.click(within(personal).getByRole('button', { name: 'Kiểm tra và gửi ngay' }));
+    expect(await within(personal).findByText('Đã gửi 1 thông báo cảnh báo tới kênh nhận.')).toBeVisible();
+    expect(within(personal).getByText('Chưa hoàn tất lượt kiểm tra cảnh báo.')).toBeVisible();
+
+    fireEvent.click(within(personal).getByRole('button', { name: /Tạm dừng/i }));
+    await waitFor(() => expect(updateSpy).toHaveBeenCalledWith('trig-1', { status: 'paused' }));
+
+    updateSpy.mockRejectedValueOnce(Object.assign(new Error('Cần duyệt lại'), { code: 'CALENDAR_TRIGGER_APPROVAL_REQUIRED' }));
+    updateSpy.mockResolvedValueOnce({ trigger: createdTrigger });
+    const resumePreview = vi.spyOn(apiClient, 'previewMyCalendarTriggerUpdate').mockResolvedValue({
+      ...preview,
+      planHash: 'trigger-resume-2',
+      sourceEmail: 'new-calendar-account@example.test',
+    });
+    fireEvent.click(await within(personal).findByRole('button', { name: 'Bật lại' }));
+    const resumeDialog = within(await screen.findByRole('dialog', { name: 'Xác nhận gửi cảnh báo tự động' }));
+    expect(resumePreview).toHaveBeenCalledWith('trig-1', { status: 'active' });
+    expect(resumeDialog.getByText('new-calendar-account@example.test')).toBeVisible();
+    fireEvent.click(resumeDialog.getByRole('button', { name: 'Bật cảnh báo tự động' }));
+    await waitFor(() => expect(updateSpy).toHaveBeenCalledWith('trig-1', { status: 'active', planHash: 'trigger-resume-2' }));
+
+    fireEvent.click(within(personal).getByRole('button', { name: /Xoá cảnh báo/i }));
+    await waitFor(() => expect(deleteSpy).toHaveBeenCalledWith('trig-1'));
+  });
+
+  it('requires an explicit nonempty selection and sends only the chosen calendars', async () => {
+    setupServices(mycalendarService('connected'));
+    vi.spyOn(apiClient, 'listMyCalendarTriggers').mockResolvedValue({
+      triggers: [],
+      destinations: [{ key: 'dest-1', service: 'slack', channelId: 'C01', channelName: '#general', label: 'Slack · #general' }],
+    });
+    const preview = vi.spyOn(apiClient, 'previewMyCalendarTrigger').mockRejectedValue(new Error('Test destination'));
+
+    render(<SettingsPage user={member} navigate={() => {}} onLogout={() => {}} />);
+    const personal = await screen.findByRole('region', { name: 'Của riêng bạn' });
+    fireEvent.click(await within(personal).findByRole('button', { name: /Cảnh báo & Nhắc lịch tự động/i }));
+    const panel = within(await screen.findByTestId('mycalendar-triggers-section'));
+    fireEvent.change(await panel.findByLabelText(/Tên cảnh báo/i), { target: { value: 'Nhắc họp' } });
+
+    const primary = panel.getByRole('checkbox', { name: 'Lịch chính' });
+    const work = panel.getByRole('checkbox', { name: 'Lịch công việc' });
+    fireEvent.click(primary);
+    fireEvent.click(work);
+    const submit = panel.getByRole('button', { name: 'Xem trước cảnh báo' });
+    expect(submit).toBeDisabled();
+    fireEvent.submit(panel.getByRole('form', { name: 'Cảnh báo sự kiện chủ động' }));
+    expect(preview).not.toHaveBeenCalled();
+
+    fireEvent.click(work);
+    fireEvent.click(submit);
+    await waitFor(() => expect(preview).toHaveBeenCalledWith(expect.objectContaining({
+      calendarIds: ['work@group.calendar.google.com'],
+    })));
+    await panel.findByRole('alert');
   });
 });
 
@@ -636,5 +777,102 @@ describe('PrivacyPage with mycalendarEnabled', () => {
     expect(
       screen.getByText(/Planora chỉ tạo, cập nhật hoặc huỷ sự kiện trên lịch đã chọn sau khi bạn bấm phê duyệt kế hoạch/i)
     ).toBeTruthy();
+  });
+});
+
+describe('Slice 4 Calendar UI parity (PreviewContents eventId labels & GuidePage capabilities)', () => {
+  it('renders resolved event label in PreviewContents for mycalendar.delete_event when labels[eventId] is provided', () => {
+    const deleteStep: PlanStep = {
+      id: 'step-del-labeled',
+      tool: 'mycalendar.delete_event',
+      description: 'Huỷ cuộc họp Sprint Review',
+      args: {
+        calendarId: 'cal-primary',
+        eventId: 'evt-old-99',
+      },
+    };
+
+    render(
+      <PreviewContents
+        step={deleteStep}
+        destination="Lịch chính"
+        labels={{ 'evt-old-99': 'Họp Sprint Review (09:00 - 10:00)' }}
+      />
+    );
+    const previewBox = screen.getByTestId('calendar-event-preview');
+    expect(within(previewBox).getByText('Sự kiện mục tiêu:')).toBeTruthy();
+    expect(within(previewBox).getByText('Họp Sprint Review (09:00 - 10:00)')).toBeTruthy();
+    expect(within(previewBox).queryByText(/Mã sự kiện/i)).toBeNull();
+  });
+
+  it('shows full personal Google Calendar capabilities in GuidePage when mycalendarEnabled is true', async () => {
+    vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({
+      runtimeMode: 'sandbox',
+      gmailEnabled: true,
+      mycalendarEnabled: true,
+    });
+
+    render(<GuidePage navigate={() => {}} />);
+    await waitFor(() => expect(apiClient.getRuntime).toHaveBeenCalled());
+
+    fireEvent.click(document.getElementById('tab-btn-capabilities')!);
+    expect(await screen.findByText(/Mời người tham dự qua email/i)).toBeTruthy();
+    expect(screen.getByText(/Phản hồi lời mời họp \(RSVP:/i)).toBeTruthy();
+    expect(screen.getByText(/từng buổi lẻ trong chuỗi lặp lại/i)).toBeTruthy();
+    expect(screen.queryByText('Sửa hoặc xoá sự kiện')).toBeNull();
+    expect(screen.queryByText('Mời người khác')).toBeNull();
+  });
+
+  it('renders RSVP status badge, response note, and notify status in PreviewContents and PlanMoment for mycalendar.rsvp_event', () => {
+    const rsvpStep: PlanStep = {
+      id: 'step-rsvp-1',
+      tool: 'mycalendar.rsvp_event',
+      description: 'Xác nhận tham gia Họp Sprint Review',
+      args: {
+        calendarId: 'user@gmail.com',
+        eventId: 'evt-sprint-1',
+        responseStatus: 'tentative',
+        comment: 'Có thể vào muộn 10 phút',
+        sendInvites: true,
+      },
+    };
+
+    const { unmount } = render(
+      <PreviewContents
+        step={rsvpStep}
+        destination="Lịch chính"
+        labels={{ 'evt-sprint-1': 'Họp Sprint Review (Thứ 5)' }}
+      />,
+    );
+    const previewBox = screen.getByTestId('calendar-event-preview');
+    expect(within(previewBox).getByText('Họp Sprint Review (Thứ 5)')).toBeTruthy();
+    expect(within(previewBox).getByText(/Có thể tham gia/i)).toBeTruthy();
+    expect(within(previewBox).getByText('Có thể vào muộn 10 phút')).toBeTruthy();
+    expect(within(previewBox).getByText(/Gửi thông báo phản hồi cho khách mời/i)).toBeTruthy();
+    unmount();
+
+    const destination = (step: PlanStep, labels?: Record<string, string>) =>
+      labels?.[String(step.args.calendarId)] ?? String(step.args.calendarId);
+    render(
+      <PlanMoment
+        services={[{ id: 'mycalendar', name: 'Google Calendar', configured: true, connected: true, connectionStatus: 'healthy' }]}
+        plan={{
+          id: 'plan-rsvp',
+          summary: 'Phản hồi lời mời họp',
+          steps: [rsvpStep],
+          resourceLabels: { 'user@gmail.com': 'Lịch chính', 'evt-sprint-1': 'Họp Sprint Review (Thứ 5)' },
+        }}
+        destination={destination}
+        onPreview={() => {}}
+        onApprove={() => {}}
+        onCancel={() => {}}
+        onEdit={() => {}}
+        inlineComposer={null}
+        runtimeMode="sandbox"
+      />,
+    );
+    expect(screen.getByText(/Phản hồi lời mời họp \(RSVP\)/i)).toBeTruthy();
+    expect(screen.getByText(/❔ Có thể tham gia/i)).toBeTruthy();
+    expect(screen.getByText(/Gửi thông báo phản hồi cho khách mời/i)).toBeTruthy();
   });
 });
