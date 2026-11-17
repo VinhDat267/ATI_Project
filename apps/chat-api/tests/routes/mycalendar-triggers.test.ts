@@ -10,7 +10,7 @@ import {
   listCalendarTriggerDestinations,
   verifyCalendarTriggerDestination,
 } from '../../src/services/schedules/calendar-digest-runner.js';
-import { CalendarTriggerService, signCalendarWatchToken } from '../../src/services/calendar/calendar-trigger-service.js';
+import { CalendarTriggerService } from '../../src/services/calendar/calendar-trigger-service.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 
 const secret = 'mycal_triggers_routes_secret_at_least_32_chars';
@@ -43,7 +43,7 @@ describe('/api/connections/mycalendar/triggers & webhook routes on PostgreSQL 16
   });
 
   beforeEach(async () => {
-    await db.pool.query('DELETE FROM calendar_trigger_dispatches; DELETE FROM calendar_event_triggers; DELETE FROM service_credentials;');
+    await db.pool.query('DELETE FROM calendar_trigger_watch_channels; DELETE FROM calendar_trigger_dispatches; DELETE FROM calendar_event_triggers; DELETE FROM service_credentials;');
     alice = await db.person('Alice');
     bob = await db.person('Bob');
     sentNotifications = [];
@@ -66,8 +66,8 @@ describe('/api/connections/mycalendar/triggers & webhook routes on PostgreSQL 16
           refreshToken: '1//alice-cal',
           email: 'alice@example.test',
           scopes: ['https://www.googleapis.com/auth/calendar'],
-          selectedCalendars: [{ id: 'alice@example.test', summary: 'Lịch Alice', primary: true }],
-          allowedScope: { calendars: ['alice@example.test'] },
+          selectedCalendars: [{ id: 'alice@example.test', summary: 'Lịch Alice', primary: true }, { id: 'team@example.test' }],
+          allowedScope: { calendars: ['alice@example.test', 'team@example.test'] },
         },
         key,
       ),
@@ -85,14 +85,16 @@ describe('/api/connections/mycalendar/triggers & webhook routes on PostgreSQL 16
   });
 
   const bearer = (who: Person) => `Bearer ${generateAccessToken(who, secret, who.sid).accessToken}`;
+  const triggersPath = '/api/connections/mycalendar/triggers';
 
-  const makeTestApp = () => {
+  const makeTestApp = (watch?: ConstructorParameters<typeof CalendarTriggerService>[0]['watch']) => {
     const triggerService = new CalendarTriggerService({
       pool: db.pool,
       encryptionKey: key,
       timeZone: 'Asia/Ho_Chi_Minh',
       clock: () => fixedNow,
       webhookSecret: secret,
+      watch,
       verifyDestination: verifyCalendarTriggerDestination,
       listDestinations: listCalendarTriggerDestinations,
       deliverNotification: deliverCalendarTriggerNotification,
@@ -160,18 +162,32 @@ describe('/api/connections/mycalendar/triggers & webhook routes on PostgreSQL 16
       });
     expect(badChan.status).toBe(400);
 
+    const reminder = {
+      name: 'Nhắc họp Sprint',
+      triggerType: 'pre_meeting_reminder',
+      calendarIds: ['alice@example.test'],
+      leadMinutes: 15,
+      destination: { service: 'slack', channelId: 'C_ALLOWED_1', channelName: '#general' },
+    };
+    const unapproved = await request(app).post(triggersPath).set('Authorization', bearer(alice)).send(reminder);
+    expect(unapproved.status).toBe(409);
+    expect(unapproved.body.code).toBe('CALENDAR_TRIGGER_APPROVAL_REQUIRED');
+    const preview = await request(app).post(`${triggersPath}/preview`).set('Authorization', bearer(alice)).send(reminder);
+    expect(preview.status).toBe(200);
+    expect(preview.body).toMatchObject({ sourceEmail: 'alice@example.test', trigger: reminder });
+    expect((await request(app).get(triggersPath).set('Authorization', bearer(alice))).body.triggers).toEqual([]);
+    expect((await request(app).post(triggersPath).set('Authorization', bearer(alice))
+      .send({ ...reminder, leadMinutes: 20, planHash: preview.body.planHash })).status).toBe(409);
     const created = await request(app)
-      .post('/api/connections/mycalendar/triggers')
+      .post(triggersPath)
       .set('Authorization', bearer(alice))
-      .send({
-        name: 'Nhắc họp Sprint',
-        triggerType: 'pre_meeting_reminder',
-        calendarIds: ['alice@example.test'],
-        leadMinutes: 15,
-        destination: { service: 'slack', channelId: 'C_ALLOWED_1', channelName: '#general' },
-      });
+      .send({ ...reminder, planHash: preview.body.planHash });
     expect(created.status).toBe(201);
     const triggerId = created.body.trigger.id as string;
+    expect((await request(app).post(triggersPath).set('Authorization', bearer(alice))
+      .send({ ...reminder, planHash: preview.body.planHash })).status).toBe(409);
+    expect((await request(app).patch(`${triggersPath}/${triggerId}`).set('Authorization', bearer(alice))
+      .send({ leadMinutes: 10 })).status).toBe(409);
 
     const listRes = await request(app)
       .get('/api/connections/mycalendar/triggers')
@@ -219,24 +235,94 @@ describe('/api/connections/mycalendar/triggers & webhook routes on PostgreSQL 16
     expect(delRes.body.deleted).toBe(true);
   });
 
-  it('rejects unauthenticated webhook spoof requests and dispatches when HMAC channel token matches', async () => {
+  it('blocks legacy triggers and requires a fresh approval when the source connection changes', async () => {
     const { app } = makeTestApp();
-    const created = await request(app)
-      .post('/api/connections/mycalendar/triggers')
-      .set('Authorization', bearer(alice))
-      .send({
-        name: 'Push Webhook Trigger',
-        triggerType: 'pre_meeting_reminder',
-        calendarIds: ['alice@example.test'],
-        leadMinutes: 15,
-        destination: { service: 'slack', channelId: 'C_ALLOWED_1' },
-      });
-    const triggerId = created.body.trigger.id as string;
-    const channelId = 'chan-watch-abc-123';
-    await db.pool.query(
-      'UPDATE calendar_event_triggers SET watch_channel_id = $1, watch_resource_id = $2 WHERE id = $3',
-      [channelId, 'res-watch-1', triggerId],
+    const auth = bearer(alice);
+    const draft = {
+      name: 'Nhắc họp',
+      triggerType: 'pre_meeting_reminder',
+      calendarIds: ['team@example.test'],
+      destination: { service: 'slack', channelId: 'C_ALLOWED_1' },
+    };
+    const original = await credentials.getPersonalCredentials('mycalendar', alice.id);
+    const legacy = await db.pool.query<{ id: string }>(
+      `INSERT INTO calendar_event_triggers (user_id, name, trigger_type, credential_id, calendar_ids, destination)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb) RETURNING id`,
+      [alice.id, draft.name, draft.triggerType, original!.id, JSON.stringify(draft.calendarIds), JSON.stringify(draft.destination)],
     );
+    const path = `${triggersPath}/${legacy.rows[0]!.id}`;
+    const blocked = await request(app).post(`${path}/run-now`).set('Authorization', auth);
+    expect(blocked.body.result).toMatchObject({ status: 'blocked', notificationsSent: 0 });
+    expect(sentNotifications).toHaveLength(0);
+    const activate = { status: 'active' };
+    const firstPreview = await request(app).post(`${path}/preview`).set('Authorization', auth).send(activate);
+    expect(firstPreview.status).toBe(200);
+
+    await credentials.saveCredentials('mycalendar', encryptCredentials({
+      email: 'replacement@example.test', refreshToken: '1//replacement', allowedScope: { calendars: draft.calendarIds },
+    }, key), alice.id);
+    for (const input of [activate, { ...activate, planHash: firstPreview.body.planHash }]) {
+      const denied = await request(app).patch(path).set('Authorization', auth).send(input);
+      expect(denied.status).toBe(409);
+      expect(denied.body.code).toBe('CALENDAR_TRIGGER_APPROVAL_REQUIRED');
+    }
+    const fresh = await request(app).post(`${path}/preview`).set('Authorization', auth).send(activate);
+    expect(fresh.body.sourceEmail).toBe('replacement@example.test');
+    const approved = await request(app).patch(path).set('Authorization', auth).send({ ...activate, planHash: fresh.body.planHash });
+    expect(approved.body.trigger.status).toBe('active');
+    const run = await request(app).post(`${path}/run-now`).set('Authorization', auth);
+    expect(run.body.result.notificationsSent).toBe(1);
+  });
+
+  it('registers, renews and retires each selected Google channel and validates signed notifications', async () => {
+    const watched: Array<{ id: string; resourceId: string; calendar: string; token: string }> = [];
+    const stopped: Array<{ id: string; resourceId: string }> = [];
+    const callbackUrl = 'https://calendar.example.test/api/connections/mycalendar/webhook';
+    const { app, triggerService } = makeTestApp({
+      callbackUrl,
+      apiBaseUrl: 'https://www.googleapis.com',
+      tokens: {
+        forConnection: (userId, _credentialId, refreshToken) => {
+          expect(userId).toBe(alice.id);
+          expect(refreshToken).toBe('1//alice-cal');
+          return { getAccessToken: async () => 'test-calendar-access' };
+        },
+      },
+      fetchFn: async (url, init) => {
+        expect(init?.method).toBe('POST');
+        expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer test-calendar-access');
+        const body = JSON.parse(String(init?.body));
+        if (String(url).endsWith('/channels/stop')) {
+          stopped.push(body);
+          return new Response(null, { status: 204 });
+        }
+        const calendar = decodeURIComponent(new URL(String(url)).pathname.split('/')[4]!);
+        expect(body).toMatchObject({ type: 'web_hook', address: callbackUrl });
+        const resourceId = `resource-${watched.length}`;
+        watched.push({ id: body.id, calendar, token: body.token, resourceId });
+        return Response.json({ id: body.id, resourceId, expiration: `${fixedNow.getTime() + 3_600_000}` });
+      },
+    });
+    upcomingEvents = [];
+    const config = {
+      name: 'Push Webhook Trigger',
+      triggerType: 'event_change_watch',
+      calendarIds: ['alice@example.test', 'team@example.test'],
+      destination: { service: 'slack', channelId: 'C_ALLOWED_1' },
+    };
+    const preview = await request(app).post(`${triggersPath}/preview`).set('Authorization', bearer(alice)).send(config);
+    expect(preview.status).toBe(200);
+    const created = await request(app)
+      .post(triggersPath)
+      .set('Authorization', bearer(alice))
+      .send({ ...config, planHash: preview.body.planHash });
+    const triggerId = created.body.trigger.id as string;
+    expect(created.status).toBe(201);
+    expect(created.body.trigger.watchActive).toBe(false);
+    await triggerService.evaluateAllActiveTriggers();
+    expect(watched.map((channel) => channel.calendar)).toEqual(['alice@example.test', 'team@example.test']);
+    expect((await triggerService.listTriggers(alice.id))[0]).toMatchObject({ watchActive: true, watchExpiration: '2026-11-18T03:00:00.000Z' });
+    const { id: channelId, token: validToken, resourceId } = watched[0]!;
 
     const spoofed = await request(app)
       .post('/api/connections/mycalendar/webhook')
@@ -247,26 +333,43 @@ describe('/api/connections/mycalendar/triggers & webhook routes on PostgreSQL 16
     expect(spoofed.status).toBe(401);
     expect(sentNotifications).toHaveLength(0);
 
-    const validToken = signCalendarWatchToken(secret, channelId, triggerId);
     const syncPush = await request(app)
       .post('/api/connections/mycalendar/webhook')
       .set('x-goog-channel-id', channelId)
-      .set('x-goog-resource-id', 'res-watch-1')
+      .set('x-goog-resource-id', resourceId)
       .set('x-goog-channel-token', validToken)
       .set('x-goog-resource-state', 'sync')
       .send({});
     expect(syncPush.status).toBe(200);
     expect(sentNotifications).toHaveLength(0);
+    const missingResource = await request(app)
+      .post('/api/connections/mycalendar/webhook')
+      .set('x-goog-channel-id', channelId)
+      .set('x-goog-channel-token', validToken)
+      .set('x-goog-resource-state', 'exists');
+    expect(missingResource.status).toBe(401);
 
+    upcomingEvents = [{ id: 'new-event', title: 'Họp mới', start: '2026-11-18T09:15:00+07:00', end: '2026-11-18T10:00:00+07:00' }];
     const existsPush = await request(app)
       .post('/api/connections/mycalendar/webhook')
       .set('x-goog-channel-id', channelId)
-      .set('x-goog-resource-id', 'res-watch-1')
+      .set('x-goog-resource-id', resourceId)
       .set('x-goog-channel-token', validToken)
       .set('x-goog-resource-state', 'exists')
       .send({});
     expect(existsPush.status).toBe(200);
-    expect(existsPush.body.notificationsSent).toBe(1);
-    expect(sentNotifications).toHaveLength(1);
+    expect(existsPush.body.notificationsSent).toBe(2);
+    expect(sentNotifications).toHaveLength(2);
+
+    fixedNow = new Date('2026-11-18T02:55:00.000Z');
+    await triggerService.evaluateAllActiveTriggers();
+    expect(watched).toHaveLength(4);
+    expect(stopped).toEqual(watched.slice(0, 2).map(({ id, resourceId }) => ({ id, resourceId })));
+    expect((await triggerService.listTriggers(alice.id))[0]).toMatchObject({ watchActive: true, watchExpiration: '2026-11-18T03:55:00.000Z' });
+
+    await triggerService.updateTrigger(alice.id, triggerId, { status: 'paused' });
+    expect((await triggerService.listTriggers(alice.id))[0]?.watchActive).toBe(false);
+    await triggerService.evaluateAllActiveTriggers();
+    expect(stopped).toHaveLength(4);
   });
 });

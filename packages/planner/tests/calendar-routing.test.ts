@@ -91,6 +91,8 @@ it('includes Personal Google Calendar (mycalendar) Rules in buildSystemPrompt wh
   expect(prompt).toContain('mycalendar.find_free_slots');
   expect(prompt).toContain('mycalendar.list_event_instances');
   expect(prompt).toContain('mycalendar.rsvp_event');
+  expect(prompt).toContain('use `sendInvites: true` only when the user agrees to notify all guests');
+  expect(prompt).toContain('If the user asks to notify only the organizer, ask whether to update without notifications or notify all guests');
   expect(prompt).toContain('post-meeting');
   expect(prompt).toContain('pre-meeting');
   expect(prompt).toContain('meetLink');

@@ -23,6 +23,52 @@ import type {
   WorkspaceSummary, WorkspacesListResponse,
 } from '../types';
 
+interface MyCalendarTriggerDestination {
+  service: string;
+  channelId: string;
+  channelName?: string;
+  credentialId?: string;
+}
+
+export interface MyCalendarTrigger {
+  id: string;
+  name: string;
+  triggerType: 'pre_meeting_reminder' | 'event_change_watch';
+  calendarIds: string[];
+  leadMinutes: number;
+  destination: MyCalendarTriggerDestination;
+  status: 'active' | 'paused' | 'blocked';
+  pauseReason: string | null;
+  watchActive: boolean;
+  watchExpiration: string | null;
+  lastCheckedAt: string | null;
+  lastError: string | null;
+  needsAttention: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MyCalendarTriggerDestinationOption extends MyCalendarTriggerDestination {
+  key: string;
+  channelName: string;
+  label: string;
+}
+
+export type MyCalendarTriggerDraft = Pick<MyCalendarTrigger, 'name' | 'triggerType' | 'calendarIds' | 'destination'> & {
+  leadMinutes?: number;
+};
+
+export interface MyCalendarTriggerPreview {
+  planHash: string;
+  expiresAt: string;
+  sourceEmail: string;
+  trigger: MyCalendarTriggerDraft;
+}
+
+type MyCalendarTriggerPatch = Partial<Pick<MyCalendarTrigger, 'name' | 'leadMinutes'>> & {
+  status?: 'active' | 'paused';
+};
+
 export function sharesAuthSession(previous: string | null, current: string | null): boolean {
   // Decode only to constrain retries, never to authenticate. The backend still
   // verifies signatures. Missing/malformed lineage cannot authorize adoption.
@@ -282,40 +328,25 @@ export class ApiClient {
   }
   listMyCalendarTriggers() {
     return this.request<{
-      triggers: Array<{
-        id: string;
-        name: string;
-        triggerType: 'pre_meeting_reminder' | 'event_change_watch';
-        calendarIds: string[];
-        leadMinutes: number;
-        destination: { service: string; channelId: string; channelName?: string; credentialId?: string };
-        status: 'active' | 'paused' | 'blocked';
-        pauseReason: string | null;
-        watchActive: boolean;
-        watchExpiration: string | null;
-        lastCheckedAt: string | null;
-        lastError: string | null;
-        createdAt: string;
-        updatedAt: string;
-      }>;
-      destinations: Array<{
-        key: string;
-        service: string;
-        channelId: string;
-        channelName: string;
-        credentialId?: string;
-        label: string;
-      }>;
+      triggers: MyCalendarTrigger[];
+      destinations: MyCalendarTriggerDestinationOption[];
     }>('/api/connections/mycalendar/triggers', { credentials: 'include' });
   }
-  createMyCalendarTrigger(payload: {
-    name: string;
-    triggerType: 'pre_meeting_reminder' | 'event_change_watch';
-    calendarIds: string[];
-    leadMinutes?: number;
-    destination: { service: string; channelId: string; channelName?: string; credentialId?: string };
-  }) {
-    return this.request<{ trigger: any }>('/api/connections/mycalendar/triggers', {
+  previewMyCalendarTrigger(draft: MyCalendarTriggerDraft) {
+    return this.request<MyCalendarTriggerPreview>('/api/connections/mycalendar/triggers/preview', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify(draft),
+    });
+  }
+  previewMyCalendarTriggerUpdate(triggerId: string, patch: MyCalendarTriggerPatch) {
+    return this.request<MyCalendarTriggerPreview>(
+      `/api/connections/mycalendar/triggers/${encodeURIComponent(triggerId)}/preview`,
+      { method: 'POST', credentials: 'include', body: JSON.stringify(patch) },
+    );
+  }
+  createMyCalendarTrigger(payload: MyCalendarTriggerDraft & { planHash: string }) {
+    return this.request<{ trigger: MyCalendarTrigger }>('/api/connections/mycalendar/triggers', {
       method: 'POST',
       credentials: 'include',
       body: JSON.stringify(payload),
@@ -323,9 +354,9 @@ export class ApiClient {
   }
   updateMyCalendarTrigger(
     triggerId: string,
-    patch: { status?: 'active' | 'paused'; name?: string; leadMinutes?: number },
+    patch: MyCalendarTriggerPatch & { planHash?: string },
   ) {
-    return this.request<{ trigger: any }>(
+    return this.request<{ trigger: MyCalendarTrigger }>(
       `/api/connections/mycalendar/triggers/${encodeURIComponent(triggerId)}`,
       {
         method: 'PATCH',
@@ -344,13 +375,13 @@ export class ApiClient {
     return this.request<{
       result: {
         evaluated: boolean;
-        status: string;
+        status: MyCalendarTrigger['status'];
         pauseReason?: string | null;
         notificationsSent: number;
         baselineSeeded?: boolean;
         checkedEvents: number;
       };
-      trigger: any;
+      trigger: MyCalendarTrigger | null;
     }>(`/api/connections/mycalendar/triggers/${encodeURIComponent(triggerId)}/run-now`, {
       method: 'POST',
       credentials: 'include',

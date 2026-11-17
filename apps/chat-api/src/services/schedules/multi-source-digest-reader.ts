@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { decryptCredentials, detectCalendarConflicts, GMAIL_DIGEST_READ_TOOL, StepError } from '@wap/tool-adapters';
+import { detectCalendarConflicts, GMAIL_DIGEST_READ_TOOL, StepError } from '@wap/tool-adapters';
 import type {
   GmailDigestBinding,
   NotionDigestSourceBinding,
@@ -10,6 +10,8 @@ import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import type { AdapterContext } from '../adapter-factory.js';
 import { GmailOAuthError } from '../gmail/oauth-client.js';
 import { isGoogleConnectionChanged } from '../gmail/token-manager.js';
+import { createMyCalendarConnectionLookup } from '../gmail/connection-reference.js';
+import { matchesMyCalendarDigestBinding, MYCALENDAR_DIGEST_REAPPROVAL, readMyCalendarDigestBinding } from './mycalendar-digest-source.js';
 import { analyzeSheetKpiMetrics } from './sheets-digest-runner.js';
 import { buildTelegramDigestSourceArgs } from './multi-source-digest-candidate.js';
 import { assertGmailDigestBinding, isValidGmailDigestQuery } from './gmail-digest-binding.js';
@@ -325,6 +327,19 @@ export async function executeMultiDigestReadSources(input: {
 }): Promise<MultiDigestReadResult> {
   const esc = input.escapeText ?? ((v: string) => v);
   const { sources, userId, dueAt, sinceIso, untilIso, gmailBinding, notionBinding, signal } = input;
+  const mycalendar = readMyCalendarDigestBinding({ sources }, null);
+  if (mycalendar.kind === 'invalid') {
+    return { kind: 'blocked', error: MYCALENDAR_DIGEST_REAPPROVAL, pauseSchedule: true };
+  }
+  if (mycalendar.kind === 'bound') {
+    signal.throwIfAborted();
+    const lookup = createMyCalendarConnectionLookup(input.credentialRepo, input.encryptionKey);
+    const live = await lookup(userId).catch(() => null);
+    signal.throwIfAborted();
+    if (!matchesMyCalendarDigestBinding(live, mycalendar.binding)) {
+      return { kind: 'blocked', error: MYCALENDAR_DIGEST_REAPPROVAL, pauseSchedule: true };
+    }
+  }
   const sourceStatuses: DigestSourceRunStatus[] = [];
   const sections: string[] = [];
   const structuredSections: Array<{ label: string; count: number; body: string }> = [];
@@ -345,6 +360,10 @@ export async function executeMultiDigestReadSources(input: {
         sourceAdapterContext.connections = {
           gmail: { credentialId: gmailBinding.credentialId, email: gmailBinding.email },
         };
+      } else if (source.service === 'mycalendar' && mycalendar.kind === 'bound') {
+        const { credentialId, email, calendarIds } = mycalendar.binding;
+        sourceAdapterContext.phase = 'execution';
+        sourceAdapterContext.connections = { mycalendar: { credentialId, email, allowedCalendars: calendarIds } };
       } else if (source.service === 'myjira') {
         sourceAdapterContext.phase = 'execution';
         sourceAdapterContext.jiraDigestBinding = source.jiraBinding;
@@ -373,45 +392,9 @@ export async function executeMultiDigestReadSources(input: {
           { query: rawQuery.trim() },
           { signal },
         );
-      } else if (source.service === 'mycalendar' && source.tool === 'mycalendar.list_events') {
-        let allowedCalendars: string[] = [];
-        let mycalActive = false;
-        let decryptedOk = true;
-        try {
-          const mycalRec = await input.credentialRepo.getPersonalCredentials('mycalendar', userId);
-          if (mycalRec && mycalRec.status === 'active') {
-            mycalActive = true;
-            const dec = decryptCredentials(mycalRec.config, input.encryptionKey);
-            allowedCalendars = Array.isArray(dec.allowedScope?.calendars)
-              ? dec.allowedScope.calendars.filter((id: unknown) => typeof id === 'string' && id)
-              : Array.isArray(dec.selectedCalendars)
-                ? dec.selectedCalendars.map((c: any) => String(c?.id ?? '')).filter(Boolean)
-                : [];
-          }
-        } catch {
-          decryptedOk = false;
-        }
-        if (!mycalActive || !decryptedOk || allowedCalendars.length === 0) {
-          return {
-            kind: 'blocked',
-            error: 'Kết nối Google Calendar cá nhân đã bị ngắt hoặc không còn lịch nào được phép.',
-            pauseSchedule: true,
-          };
-        }
-        const targetCalendars =
-          typeof callArgs.calendarId === 'string' && callArgs.calendarId
-            ? allowedCalendars.includes(callArgs.calendarId)
-              ? [callArgs.calendarId]
-              : []
-            : allowedCalendars.slice(0, 5);
-        if (targetCalendars.length === 0) {
-          return {
-            kind: 'blocked',
-            error: 'Lịch Google Calendar trong cấu hình bản tin không còn nằm trong phạm vi cho phép.',
-            pauseSchedule: true,
-          };
-        }
-        let anyTruncated = !callArgs.calendarId && allowedCalendars.length > 5;
+      } else if (source.service === 'mycalendar' && mycalendar.kind === 'bound') {
+        const targetCalendars = mycalendar.binding.calendarIds;
+        let anyTruncated = mycalendar.binding.truncated;
         const mergedEvents: any[] = [];
         for (const calId of targetCalendars) {
           const res = await adapter.execute(
@@ -563,7 +546,7 @@ export async function executeMultiDigestReadSources(input: {
       if (source.service === 'mycalendar' && isGmailAuthOrBindingFailure(err)) {
         return {
           kind: 'blocked',
-          error: 'Kết nối Google Calendar cá nhân không còn hợp lệ hoặc cần kết nối lại.',
+          error: MYCALENDAR_DIGEST_REAPPROVAL,
           pauseSchedule: true,
         };
       }

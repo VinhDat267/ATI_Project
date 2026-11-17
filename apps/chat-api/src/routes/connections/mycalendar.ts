@@ -83,7 +83,7 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
       return;
     }
     try {
-      const result = await options.triggerService.handleWebhookNotification(req.headers);
+      const result = await options.triggerService.handleWebhookNotification(req.headers, AbortSignal.timeout(10_000));
       res.json({ received: true, ...result });
     } catch (error) {
       if (error instanceof CalendarTriggerError) {
@@ -611,6 +611,8 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
   router.delete('/', async (req, res) => {
     const user = (req as any).user as AuthUser;
     try {
+      // Stop registered channels while the connection can still authenticate to Google.
+      await options.triggerService?.stopUserWatchChannels(user.id).catch(() => {});
       await options.repo!.disconnect(user.id, async (removed, peers, otherFlows) => {
         if (!removed || otherFlows) return;
         try {
@@ -647,6 +649,23 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
     }
   });
 
+  router.post('/triggers/preview', async (req, res) => {
+    const user = (req as any).user as AuthUser;
+    if (!options.triggerService) {
+      res.status(503).json({ error: 'Dịch vụ cảnh báo lịch chưa sẵn sàng.' });
+      return;
+    }
+    try {
+      res.json(await options.triggerService.previewTrigger(user.id, req.body ?? {}));
+    } catch (error) {
+      if (error instanceof CalendarTriggerError) {
+        res.status(error.statusCode).json({ error: error.message, code: error.code });
+        return;
+      }
+      res.status(500).json({ error: 'Không xem trước được quy tắc cảnh báo lịch.' });
+    }
+  });
+
   router.post('/triggers', async (req, res) => {
     const user = (req as any).user as AuthUser;
     if (!options.triggerService) {
@@ -662,6 +681,33 @@ export function createMyCalendarConnectionRoutes(options: MyCalendarConnectionsO
         return;
       }
       res.status(500).json({ error: 'Không tạo được quy tắc cảnh báo lịch.' });
+    }
+  });
+
+  router.post('/triggers/:triggerId/preview', async (req, res) => {
+    const user = (req as any).user as AuthUser;
+    if (!options.triggerService) {
+      res.status(503).json({ error: 'Dịch vụ cảnh báo lịch chưa sẵn sàng.' });
+      return;
+    }
+    const triggerId = String(req.params.triggerId || '');
+    if (!isUuid(triggerId)) {
+      res.status(400).json({ error: 'Mã cảnh báo không hợp lệ.', code: 'CALENDAR_TRIGGER_INVALID' });
+      return;
+    }
+    try {
+      const preview = await options.triggerService.previewTriggerUpdate(user.id, triggerId, req.body ?? {});
+      if (!preview) {
+        res.status(404).json({ error: 'Không tìm thấy quy tắc cảnh báo lịch.', code: 'CALENDAR_TRIGGER_NOT_FOUND' });
+        return;
+      }
+      res.json(preview);
+    } catch (error) {
+      if (error instanceof CalendarTriggerError) {
+        res.status(error.statusCode).json({ error: error.message, code: error.code });
+        return;
+      }
+      res.status(500).json({ error: 'Không xem trước được quy tắc cảnh báo lịch.' });
     }
   });
 

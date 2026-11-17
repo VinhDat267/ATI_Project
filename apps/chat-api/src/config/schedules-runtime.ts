@@ -30,6 +30,7 @@ export interface ScheduleRuntimeOptions {
   timeZone: string;
   encryptionKey?: string;
   gmailOAuthClientId?: string;
+  mycalendarOAuthClientId?: string;
   /** Plans one run. Until SCHED-02 connects the planner, every run fails without calling a model. */
   planRun?: PlanRun;
   runDigest?: RunCalendarDigest | RunGithubDigest;
@@ -72,6 +73,7 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
     jiraConnection: options.jiraConnection,
     encryptionKey: options.encryptionKey,
     gmailOAuthClientId: options.gmailOAuthClientId,
+    mycalendarOAuthClientId: options.mycalendarOAuthClientId,
     mysheetsEnabled: options.mysheetsEnabled,
     emitV2: options.emitV2,
     fetchOrgSheetsMetadata: options.fetchOrgSheetsMetadata,
@@ -98,6 +100,7 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
     timeZone,
     encryptionKey: options.encryptionKey,
     gmailOAuthClientId: options.gmailOAuthClientId,
+    mycalendarOAuthClientId: options.mycalendarOAuthClientId,
     planRun: options.planRun ?? notConnected,
     runDigest: options.runDigest,
     runGithubDigest: options.runGithubDigest,

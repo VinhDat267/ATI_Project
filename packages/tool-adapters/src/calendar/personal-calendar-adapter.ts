@@ -1064,34 +1064,30 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           signal,
         );
         const existingAttendees = Array.isArray(existing?.attendees) ? existing.attendees : [];
-        let selfIdx = existingAttendees.findIndex((a: any) => a?.self === true);
-        if (selfIdx < 0 && id.includes('@')) {
-          const targetEmail = id.trim().toLowerCase();
-          selfIdx = existingAttendees.findIndex(
+        let selfAttendee = existingAttendees.find((a: any) => a?.self === true);
+        if (!selfAttendee && id.includes('@')) {
+          const targetEmail = id.toLowerCase();
+          selfAttendee = existingAttendees.find(
             (a: any) => typeof a?.email === 'string' && a.email.trim().toLowerCase() === targetEmail,
           );
         }
-        if (selfIdx < 0) {
+        if (!selfAttendee) {
           throwValidation(
             'Cannot RSVP to an event where you are not listed as an attendee',
             false,
           );
         }
-
-        const updatedAttendees = existingAttendees.map((attendee: any, index: number) =>
-          index === selfIdx
-            ? {
-                ...attendee,
-                responseStatus: args.responseStatus,
-                ...(comment !== undefined ? { comment } : {}),
-              }
-            : { ...attendee },
-        );
+        const email = selfAttendee.email;
+        if (typeof email !== 'string' || !email.trim()) badResponse();
 
         const patched = await this.request(
           `${encodeURIComponent(id)}/events/${encodeURIComponent(eventId)}?sendUpdates=${sendUpdates}`,
           signal,
-          { attendees: updatedAttendees },
+          {
+            // A regular PATCH replaces the attendees array. This flag limits the update to the participant's response.
+            attendeesOmitted: true,
+            attendees: [{ email, responseStatus: args.responseStatus, ...(comment !== undefined ? { comment } : {}) }],
+          },
           (dispatched) => {
             writeDispatched = dispatched;
           },

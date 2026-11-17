@@ -388,7 +388,8 @@ export class AdapterFactory {
 
     if (context?.phase === 'execution') {
       const previewed = context.connections?.mycalendar;
-      if (!previewed || !previewed.credentialId || record.id !== previewed.credentialId) {
+      if (!previewed || !previewed.credentialId || record.id !== previewed.credentialId ||
+          (previewed.email && config.email !== previewed.email)) {
         throw mycalendarError('AUTH_ERROR', 'Kết nối hoặc phạm vi lịch Google Calendar đã thay đổi, hãy lập lại kế hoạch.');
       }
       const currentSet = new Set(allowedCalendars);

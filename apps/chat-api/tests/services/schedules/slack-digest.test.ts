@@ -28,6 +28,14 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
   let wsPersonalSlackCredId: string;
   let wsOrgSlackCredId: string;
   let orgWsId: string;
+  let calendarCredentialId: string;
+  const mycalendarSource = () => ({
+    service: 'mycalendar', tool: 'mycalendar.list_events', label: 'Calendar',
+    mycalendarBinding: {
+      credentialId: calendarCredentialId, email: 'owner@example.test',
+      calendarIds: ['work@example.test'], truncated: false,
+    },
+  });
 
   beforeAll(async () => {
     db = await createMigratedSchema('slack_digest_multi');
@@ -86,6 +94,7 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
       ),
       owner.id,
     );
+    calendarCredentialId = (await creds.getPersonalCredentials('mycalendar', owner.id))!.id;
 
     await creds.saveCredentials(
       'github',
@@ -192,6 +201,7 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
     expect(cand?.config?.slackCredentialId).toBe(wsPersonalSlackCredId);
     expect(cand?.config?.channelId).toBe('C_GENERAL');
     expect(cand?.config?.sources.map((s: any) => s.service)).toEqual(['github', 'mycalendar']);
+    expect(cand.config.sources[1].mycalendarBinding).toEqual(mycalendarSource().mycalendarBinding);
 
     const confirmed = await scheduleService.confirmProposal({
       userId: owner.id,
@@ -225,6 +235,7 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
       workspaceMode: 'organization',
       workspaceId: orgWsId,
       githubLookup: { status: 'connected', connection: { credentialId: 'gh-1', githubUserId: '100', login: 'octo', repos: ['ati/core'] } },
+      mycalendarLookup: { credentialId: calendarCredentialId, email: 'owner@example.test', allowedCalendars: ['work@example.test'] },
       getAdapter: async () => ({ execute: async () => [{ id: 'C_ORG_ENG', name: 'org-eng' }] }),
     });
     expect(wrongCredCandidate.canAutoDigest).toBe(true);
@@ -287,7 +298,7 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
         includeAiSummary: true,
         sources: [
           { service: 'github', tool: 'github.search_issues', args: { repo: 'ati/core', query: 'open' }, label: 'GitHub (ati/core)' },
-          { service: 'mycalendar', tool: 'mycalendar.list_events', label: 'Google Calendar hôm nay' },
+          mycalendarSource(),
         ],
         recurrence: { type: 'daily', time: '08:00' },
         timeZone: TZ,
@@ -491,7 +502,7 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
     }
   });
 
-  it.each(['once', 'scope changed', 'scope changed during throttling', 'large workspace'] as const)('handles a scheduled delivery when %s', async (scenario) => {
+  it.each(['once', 'scope changed', 'scope changed during throttling', 'calendar scope changed during read', 'large workspace'] as const)('handles a scheduled delivery when %s', async (scenario) => {
     const scheduling = new ScheduleService({ pool: db.pool, timeZone: TZ, encryptionKey: KEY });
     const conv = await new ConversationRepo(db.pool).createConversation(owner.id, 'Digest authority', {
       workspaceMode: 'organization', workspaceId: orgWsId,
@@ -510,7 +521,7 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
       slackCredentialId: wsOrgSlackCredId,
       channelId: target.id,
       channelName: target.name,
-      sources: [{ service: 'mycalendar', tool: 'mycalendar.list_events', label: 'Calendar' }],
+      sources: [mycalendarSource()],
       recurrence: scenario === 'once' ? { type: 'once', date: '2026-11-17', time: '08:00' } : { type: 'daily', time: '08:00' },
       timeZone: TZ,
     };
@@ -567,6 +578,12 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
             if (scenario === 'scope changed') {
               await revokeChannel();
             }
+            if (scenario === 'calendar scope changed during read') {
+              await db.pool.query('UPDATE service_credentials SET config=$2 WHERE id=$1', [
+                calendarCredentialId,
+                encryptCredentials({ email: 'owner@example.test', refreshToken: 'cal-ref', allowedScope: { calendars: ['other@example.test'] } }, KEY),
+              ]);
+            }
             return { events: [] };
           },
         },
@@ -581,7 +598,7 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
 
     await runner.tick();
     const run = (await db.pool.query('SELECT status, delivery_started_at FROM schedule_runs WHERE schedule_id = $1', [scheduleId])).rows[0];
-    if (scenario === 'scope changed' || scenario === 'scope changed during throttling') {
+    if (scenario.includes('scope changed')) {
       expect(posts).toEqual([]);
       expect(run).toMatchObject({ status: 'blocked', delivery_started_at: null });
     } else {

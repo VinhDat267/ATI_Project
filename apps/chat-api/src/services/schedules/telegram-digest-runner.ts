@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { decryptCredentials } from '@wap/tool-adapters';
+import { decryptCredentials, TelegramAdapter } from '@wap/tool-adapters';
 import {
   normalizeTelegramChatId,
   TELEGRAM_CHAT_ID_PATTERN,
@@ -12,6 +12,7 @@ import type { AdapterContext } from '../adapter-factory.js';
 import type { TelegramBotClient } from '../telegram/bot-client.js';
 import { localLabel } from './next-occurrence.js';
 import { assertGmailDigestBinding } from './gmail-digest-binding.js';
+import { MYCALENDAR_DIGEST_REAPPROVAL, readMyCalendarDigestBinding } from './mycalendar-digest-source.js';
 import { isNotionSourceDenied } from '../notion/digest-source-authority.js';
 import {
   approvedTelegramNotionBinding,
@@ -98,6 +99,7 @@ export interface TelegramDigestRunnerOptions {
   credentialRepo: Pick<CredentialRepo, 'getPersonalCredentials'>;
   encryptionKey: string;
   gmailOAuthClientId?: string;
+  mycalendarOAuthClientId?: string;
   adapterFactory: {
     getAdapterForService(serviceName: string, context?: AdapterContext): Promise<any> | any;
   };
@@ -107,6 +109,11 @@ export interface TelegramDigestRunnerOptions {
   aiTimeoutMs?: number;
   sendTimeoutMs?: number;
   notionSources?: Pick<NotionDigestSourceAuthority, 'read' | 'withSource'>;
+}
+
+interface TelegramEgressOptions {
+  delivery?: 'claim' | 'recheck';
+  onBeforeClaimSql?: () => void;
 }
 
 export class TelegramDigestRunner {
@@ -262,7 +269,7 @@ export class TelegramDigestRunner {
     signal: AbortSignal,
     timeoutMs: number,
     action: (callSignal: AbortSignal) => Promise<T>,
-    options?: { claimDelivery?: boolean; onBeforeClaimSql?: () => void },
+    options?: TelegramEgressOptions,
   ): Promise<{ kind: 'ok'; value: T } | { kind: 'outcome'; outcome: DigestRunOutcome }> {
     signal.throwIfAborted();
     if (!this.options.pool) {
@@ -330,7 +337,7 @@ export class TelegramDigestRunner {
             },
           };
         }
-        if (options?.claimDelivery) {
+        if (options?.delivery) {
           const preSendCheck = await this.options.pool.query(
             'SELECT version, status FROM schedules WHERE id = $1',
             [run.scheduleId],
@@ -395,7 +402,7 @@ export class TelegramDigestRunner {
         }
       }
 
-      if (options?.claimDelivery && run.beforeSendCheck) {
+      if (options?.delivery && run.beforeSendCheck) {
         throwIfAbortedOrExpired();
         if (!(await run.beforeSendCheck())) {
           return { kind: 'outcome', outcome: { status: 'discarded' } };
@@ -621,7 +628,7 @@ export class TelegramDigestRunner {
           !convRow ||
           !schedule ||
           currentRun?.status !== 'planning' ||
-          currentRun.delivery_started_at != null ||
+          (currentRun.delivery_started_at != null) !== (options?.delivery === 'recheck') ||
           schedule.user_id !== run.userId ||
           schedule.kind !== 'telegram_digest' ||
           schedule.version !== run.scheduleVersion ||
@@ -641,7 +648,9 @@ export class TelegramDigestRunner {
           scheduleId: run.scheduleId,
           encryptionKey: this.options.encryptionKey,
           gmailOAuthClientId: this.options.gmailOAuthClientId,
+          mycalendarOAuthClientId: this.options.mycalendarOAuthClientId,
           lockTelegramJiraAuthority: lockJiraAuthority,
+          lockMyCalendarAuthority: 'nowait',
         });
         if (
           !pinnedCtx.allowed ||
@@ -655,14 +664,14 @@ export class TelegramDigestRunner {
             kind: 'outcome',
             outcome: {
               status: 'blocked',
-              error: (lockJiraAuthority ? pinnedCtx.pauseReason : undefined) ??
+              error: pinnedCtx.pauseReason ??
                 'Kết nối hoặc phạm vi Telegram của lịch chạy không còn hợp lệ.',
               pauseSchedule: true,
             },
           };
         }
 
-        if (options?.claimDelivery) {
+        if (options?.delivery === 'claim') {
           options.onBeforeClaimSql?.();
           const claimed = await runBoundedSql<{ id: string }>(
             `UPDATE schedule_runs
@@ -788,7 +797,7 @@ export class TelegramDigestRunner {
     signal: AbortSignal,
     deadlineAt: number,
     action: (callSignal: AbortSignal) => Promise<T>,
-    options?: { claimDelivery?: boolean; onBeforeClaimSql?: () => void },
+    options?: TelegramEgressOptions,
   ): Promise<{ kind: 'ok'; value: T } | { kind: 'outcome'; outcome: DigestRunOutcome }> {
     const backoffStepsMs = [20, 35, 50];
     let lastResult: { kind: 'ok'; value: T } | { kind: 'outcome'; outcome: DigestRunOutcome } | undefined;
@@ -874,6 +883,14 @@ export class TelegramDigestRunner {
       };
     }
 
+    const mycalendar = readMyCalendarDigestBinding(digestConfig, null);
+    if (mycalendar.kind === 'invalid') {
+      return { status: 'blocked', error: MYCALENDAR_DIGEST_REAPPROVAL, pauseSchedule: true };
+    }
+    if (mycalendar.kind === 'bound' && typeof (this.options.pool as pg.Pool | undefined)?.connect !== 'function') {
+      return { status: 'blocked', error: 'Bản tin Google Calendar cần kết nối PostgreSQL.', pauseSchedule: true };
+    }
+
     const jiraSources = digestConfig.sources.filter((source) => source?.service === 'myjira');
     const hasJiraSources = jiraSources.length > 0;
     if (
@@ -944,6 +961,7 @@ export class TelegramDigestRunner {
         scheduleId: run.scheduleId,
         encryptionKey: this.options.encryptionKey,
         gmailOAuthClientId: this.options.gmailOAuthClientId,
+        mycalendarOAuthClientId: this.options.mycalendarOAuthClientId,
         expectedTelegramDigestConfigHash: hasJiraSources ? digestConfigHash : undefined,
       });
       if (
@@ -1186,6 +1204,7 @@ export class TelegramDigestRunner {
     const sendDeadlineAt = Date.now() + (Number.isFinite(sendTimeoutMs) ? Math.max(0, sendTimeoutMs) : 0);
     let deliveryStarted = false;
     let sendDispatched = false;
+    let preventedOutcome: DigestRunOutcome | undefined;
 
     try {
       const telegramAdapter = await this.options.adapterFactory.getAdapterForService('telegram', {
@@ -1225,52 +1244,43 @@ export class TelegramDigestRunner {
         if (!sent.allowed) return sent.outcome;
         sendRes = sent.receipt;
       } else {
-        let sendClaim:
-          | { kind: 'ok'; value: { claimedInDb: boolean } }
-          | { kind: 'outcome'; outcome: DigestRunOutcome };
-        let claimSqlIssued = false;
-        try {
-          sendClaim = await this.claimOrVerifyAuthorityWithRetry(
-            run,
-            gmailBinding,
-            targetChatId,
-            { credentialId: record.id, telegramUserId },
-            signal,
-            sendDeadlineAt,
-            async () => ({
-              claimedInDb: typeof (this.options.pool as any)?.connect === 'function',
-            }),
-            {
-              claimDelivery: true,
-              onBeforeClaimSql: () => {
-                claimSqlIssued = true;
+        const nativeCalendarDelivery = mycalendar.kind === 'bound' && telegramAdapter instanceof TelegramAdapter;
+        const claimDelivery = async (claimSignal: AbortSignal) => {
+          const recheck = deliveryStarted;
+          let claimSqlIssued = false;
+          try {
+            const claim = await this.claimOrVerifyAuthorityWithRetry(
+              run,
+              gmailBinding,
+              targetChatId,
+              { credentialId: record.id, telegramUserId },
+              claimSignal,
+              sendDeadlineAt,
+              async () => typeof (this.options.pool as pg.Pool | undefined)?.connect === 'function',
+              {
+                delivery: recheck ? 'recheck' : 'claim',
+                onBeforeClaimSql: () => { claimSqlIssued = true; },
               },
-            },
-          );
-        } catch (claimErr) {
-          // Outbound Telegram HTTP has NOT been initiated yet. Best-effort clear any orphaned
-          // delivery_started_at that may have committed on the wire if COMMIT acknowledgement was lost.
-          if (claimSqlIssued && this.options.pool && typeof (this.options.pool as any).connect === 'function') {
-            await this.options.pool
-              .query(
+            );
+            if (claim.kind === 'outcome') {
+              preventedOutcome = claim.outcome;
+              throw new Error('Telegram digest dispatch was not authorized');
+            }
+            claimSignal.throwIfAborted();
+            deliveryStarted = claim.value;
+          } catch (error) {
+            // A retry reaches this callback only after Telegram definitively rejects the previous request.
+            if ((claimSqlIssued || recheck) && this.options.pool) {
+              await this.options.pool.query(
                 "UPDATE schedule_runs SET delivery_started_at = NULL, updated_at = now() WHERE id = $1 AND schedule_id = $2 AND status = 'planning'",
                 [run.runId, run.scheduleId],
-              )
-              .catch(() => undefined);
+              ).catch(() => undefined);
+            }
+            deliveryStarted = false;
+            throw error;
           }
-          if (signal.aborted) {
-            throw signal.reason instanceof Error ? signal.reason : claimErr;
-          }
-          return {
-            status: 'digest_failed',
-            error: 'Không gửi được tin nhắn báo cáo tới Telegram.',
-          };
-        }
-
-        if (sendClaim.kind === 'outcome') {
-          return sendClaim.outcome;
-        }
-        deliveryStarted = sendClaim.value.claimedInDb;
+        };
+        if (!nativeCalendarDelivery) await claimDelivery(signal);
 
         const remainingSendMs = Math.max(1, sendDeadlineAt - Date.now());
         const sendController = new AbortController();
@@ -1297,12 +1307,21 @@ export class TelegramDigestRunner {
             if (sendController.signal.aborted) onSendAbort();
             else sendController.signal.addEventListener('abort', onSendAbort, { once: true });
           });
-          sendDispatched = true;
+          const beforeDispatch = async () => {
+            sendDispatched = false;
+            await claimDelivery(sendController.signal);
+            sendDispatched = true;
+          };
+          sendDispatched = !nativeCalendarDelivery;
           sendRes = await Promise.race([
             telegramAdapter.execute(
               'telegram.send_message',
               { chatId: targetChatId, text: digestText },
-              { signal: sendController.signal, chatId: targetChatId },
+              {
+                signal: sendController.signal,
+                chatId: targetChatId,
+                ...(nativeCalendarDelivery ? { beforeDispatch } : {}),
+              },
             ),
             abortPromise,
           ]);
@@ -1338,6 +1357,7 @@ export class TelegramDigestRunner {
         },
       };
     } catch (err: any) {
+      if (preventedOutcome) return preventedOutcome;
       if (!deliveryStarted && notionBinding && isNotionSourceDenied(err)) {
         return notionBlocked();
       }

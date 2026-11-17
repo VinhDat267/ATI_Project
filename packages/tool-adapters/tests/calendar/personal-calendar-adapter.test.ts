@@ -903,78 +903,101 @@ describe('PersonalCalendarAdapter', () => {
     expect(calls.some((c) => c.url.pathname.endsWith('/events/series_master_1/instances'))).toBe(true);
   });
 
-  it('supports mycalendar.rsvp_event preserving all attendees verbatim, updating only self responseStatus & comment, and blocks non-attendee events before PATCH', async () => {
+  it('updates only the calendar participant and preserves attendee changes made after the RSVP lookup', async () => {
+    const participantEmail = 'invitee@example.com';
     const existingAttendees = [
       { email: 'organizer@example.com', organizer: true, responseStatus: 'accepted' },
-      { email: calendarId, self: true, displayName: 'Me', responseStatus: 'needsAction' },
+      { email: participantEmail, self: true, displayName: 'Me', responseStatus: 'needsAction' },
       { email: 'colleague@example.com', optional: true, responseStatus: 'tentative' },
     ];
-    let patchedBody: any = null;
+    const concurrentAttendees = [
+      ...existingAttendees.slice(0, 2),
+      { email: 'colleague@example.com', optional: true, responseStatus: 'accepted' },
+      { email: 'new-guest@example.com', responseStatus: 'needsAction' },
+    ];
+    let patchedAttendees: Array<{ email: string; responseStatus: string; comment?: string }> = [];
 
     const { adapter, calls } = setup({
-      handler: (url, init) => {
-        if (url.pathname.endsWith('/events/evt_invite_1') && (!init.method || init.method === 'GET')) {
-          return json({
-            id: 'evt_invite_1',
-            summary: 'Product Roadmap Review',
-            htmlLink: 'https://www.google.com/calendar/event?eid=inv1',
-            start: { dateTime: '2026-11-12T10:00:00+07:00' },
-            end: { dateTime: '2026-11-12T11:00:00+07:00' },
-            attendees: existingAttendees,
-          });
+      handler: (_url, init) => {
+        if (init.method === 'GET') {
+          return json({ ...fixtureEvent, attendees: existingAttendees });
         }
-        if (url.pathname.endsWith('/events/evt_invite_1') && init.method === 'PATCH') {
-          patchedBody = JSON.parse(String(init.body));
-          return json({
-            id: 'evt_invite_1',
-            summary: 'Product Roadmap Review',
-            htmlLink: 'https://www.google.com/calendar/event?eid=inv1',
-            start: { dateTime: '2026-11-12T10:00:00+07:00' },
-            end: { dateTime: '2026-11-12T11:00:00+07:00' },
-            attendees: patchedBody.attendees,
-          });
-        }
-        if (url.pathname.endsWith('/events/evt_not_invited') && (!init.method || init.method === 'GET')) {
-          return json({
-            id: 'evt_not_invited',
-            summary: 'External Event',
-            htmlLink: 'https://www.google.com/calendar/event?eid=noinv',
-            start: { dateTime: '2026-11-12T14:00:00+07:00' },
-            end: { dateTime: '2026-11-12T15:00:00+07:00' },
-            attendees: [{ email: 'stranger@example.com', responseStatus: 'accepted' }],
-          });
-        }
-        return json({ error: { message: 'Unexpected' } }, 500);
+        const body = JSON.parse(String(init.body)) as {
+          attendeesOmitted?: boolean;
+          attendees: typeof patchedAttendees;
+        };
+        patchedAttendees = body.attendeesOmitted
+          ? concurrentAttendees.map((attendee) => ({
+              ...attendee,
+              ...body.attendees.find(({ email }) => email === attendee.email),
+            }))
+          : body.attendees;
+        return json({ ...fixtureEvent, attendees: patchedAttendees });
       },
     });
 
-    const accepted = await adapter.execute('mycalendar.rsvp_event', {
+    const result = await adapter.execute('mycalendar.rsvp_event', {
       calendarId,
-      eventId: 'evt_invite_1',
+      eventId: fixtureEvent.id,
       responseStatus: 'declined',
       comment: 'Bận họp khách hàng cùng giờ',
       sendInvites: true,
     });
 
-    expect(accepted.selfResponseStatus).toBe('declined');
-    expect(accepted.attendees).toEqual(['organizer@example.com', calendarId, 'colleague@example.com']);
-    expect(patchedBody.attendees).toEqual([
-      { email: 'organizer@example.com', organizer: true, responseStatus: 'accepted' },
-      { email: calendarId, self: true, displayName: 'Me', responseStatus: 'declined', comment: 'Bận họp khách hàng cùng giờ' },
-      { email: 'colleague@example.com', optional: true, responseStatus: 'tentative' },
-    ]);
-    const patchCall = calls.find((c) => c.init.method === 'PATCH');
-    expect(patchCall?.url.searchParams.get('sendUpdates')).toBe('all');
+    expect(patchedAttendees.find(({ email }) => email === 'colleague@example.com')?.responseStatus).toBe('accepted');
+    expect(result.selfResponseStatus).toBe('declined');
+    expect(result.attendees).toEqual(['organizer@example.com', participantEmail, 'colleague@example.com', 'new-guest@example.com']);
+    expect(calls.map(({ init }) => init.method)).toEqual(['GET', 'PATCH']);
+    const patchCall = calls[1]!;
+    expect(patchCall.url.pathname).toBe(calls[0]!.url.pathname);
+    expect(patchCall.url.searchParams.get('sendUpdates')).toBe('all');
+    expect(JSON.parse(String(patchCall.init.body))).toEqual({
+      attendeesOmitted: true,
+      attendees: [{ email: participantEmail, responseStatus: 'declined', comment: 'Bận họp khách hàng cùng giờ' }],
+    });
+  });
 
-    const beforeCount = calls.length;
+  it('blocks RSVP when the calendar is not an attendee before dispatching the write', async () => {
+    const { adapter, calls } = setup({
+      handler: () => json({
+        ...fixtureEvent,
+        attendees: [{ email: 'stranger@example.com', responseStatus: 'accepted' }],
+      }),
+    });
     await expect(
       adapter.execute('mycalendar.rsvp_event', {
         calendarId,
-        eventId: 'evt_not_invited',
+        eventId: fixtureEvent.id,
         responseStatus: 'accepted',
       }),
     ).rejects.toMatchObject({ category: 'VALIDATION', details: { requestSent: false } });
-    // Only the GET lookup ran; no PATCH write was sent
-    expect(calls.slice(beforeCount).some((c) => c.init.method === 'PATCH')).toBe(false);
+    expect(calls.map(({ init }) => init.method)).toEqual(['GET']);
+  });
+
+  it('does not retry an RSVP when the connection fails after dispatch', async () => {
+    const { adapter, calls } = setup({
+      handler: (_url, init) => {
+        if (init.method === 'PATCH') throw new TypeError('Connection lost');
+        return json({
+          ...fixtureEvent,
+          attendees: [{ email: calendarId, self: true, responseStatus: 'needsAction' }],
+        });
+      },
+    });
+
+    const response = adapter.execute('mycalendar.rsvp_event', {
+      calendarId,
+      eventId: fixtureEvent.id,
+      responseStatus: 'accepted',
+    });
+
+    await expect(response).rejects.toMatchObject({ category: 'UNKNOWN', retryable: false });
+    await expect(response).rejects.not.toHaveProperty('details.requestSent', false);
+    expect(calls.map(({ init }) => init.method)).toEqual(['GET', 'PATCH']);
+    const patchCall = calls[1]!;
+    expect(patchCall.url.searchParams.get('sendUpdates')).toBe('none');
+    expect(JSON.parse(String(patchCall.init.body)).attendees).toEqual([
+      { email: calendarId, responseStatus: 'accepted' },
+    ]);
   });
 });

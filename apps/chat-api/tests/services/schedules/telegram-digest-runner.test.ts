@@ -3,7 +3,7 @@ import pg from 'pg';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { encryptCredentials, StepError } from '@wap/tool-adapters';
+import { encryptCredentials, GlobalRateLimiter, StepError, TelegramAdapter } from '@wap/tool-adapters';
 import { buildTelegramDigestSourceArgs } from '../../../src/services/schedules/multi-source-digest-candidate.js';
 import { executeMultiDigestReadSources } from '../../../src/services/schedules/multi-source-digest-reader.js';
 import { evaluateSlackDigestCandidate } from '../../../src/services/schedules/slack-digest-candidate.js';
@@ -14,6 +14,7 @@ import { NotionTokenManager } from '../../../src/services/notion/token-manager.j
 import { fingerprintSecret, startNotionLoopbackServer, waitForOwnerLockWaiter } from '../../helpers/notion-oauth-test-env.js';
 import { CredentialRepo } from '../../../src/db/repositories/credential-repo.js';
 import { ScheduleService } from '../../../src/services/schedules/schedule-service.js';
+import type { AdapterContext } from '../../../src/services/adapter-factory.js';
 import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
 import { computeTelegramDigestConfigHash, evaluateTelegramDigestCandidate, READ_DIGEST_SOURCE_MAP } from '../../../src/services/schedules/telegram-digest-candidate.js';
 import { TelegramDigestRunner, summarizeSourceItems } from '../../../src/services/schedules/telegram-digest-runner.js';
@@ -50,6 +51,16 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
   let credRepo: CredentialRepo;
   let service: ScheduleService;
   const now = new Date('2026-11-02T01:00:30.000Z');
+  async function mycalendarSource() {
+    const row = await credRepo.getPersonalCredentials('mycalendar', USER_ID);
+    return {
+      service: 'mycalendar', tool: 'mycalendar.list_events', label: 'Google Calendar của bạn hôm nay',
+      mycalendarBinding: {
+        credentialId: row!.id, email: 'runner.cal@example.com',
+        calendarIds: ['runner.cal@example.com'], truncated: false,
+      },
+    };
+  }
 
   beforeAll(async () => {
     const conn = await connectAdmin();
@@ -654,7 +665,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
     expect(summary.lines[1]).toBe('  - [Minh <minh@example.com>] Báo cáo tuần 📎 (báo cáo.pdf) — Nhờ bạn xem báo cáo tuần này.');
   });
 
-  it('resolves user allowedCalendars for mycalendar.list_events (instead of hardcoded "primary") and formats meetLink/location in multi-service Telegram digest', async () => {
+  it.each(['live grant', 'grant replaced during read', 'grant replaced while pacing', 'grant replaced after rejection', 'retry after rejection'] as const)('uses the approved MyCalendar source only with live authority: %s', async (scenario) => {
     await credRepo.saveCredentials(
       'telegram',
       encryptCredentials(
@@ -690,7 +701,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
       chatId: '-100555666777',
       chatTitle: 'Đội Sản Phẩm',
       sources: [
-        { service: 'mycalendar', tool: 'mycalendar.list_events', label: 'Google Calendar của bạn hôm nay' },
+        await mycalendarSource(),
         { service: 'github', tool: 'github.search_issues', args: { repo: 'acme/ati', query: 'open' }, label: 'GitHub Issues đang mở' },
       ],
       recurrence: { type: 'daily', time: '08:00' },
@@ -700,17 +711,49 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
     const sched = await seedDigestSchedule(config);
     const sentMessages: Array<{ chatId: string; text: string }> = [];
     let capturedMyCalArgs: any = null;
+    const replaceCalendar = () => credRepo.saveCredentials('mycalendar', encryptCredentials({
+      email: 'replacement@example.test', refreshToken: 'replacement',
+      allowedScope: { calendars: ['runner.cal@example.com'] },
+    }, ENCRYPTION_KEY), USER_ID);
+    const limiter = new GlobalRateLimiter({ maxRequests: 10, windowMs: 1000 });
+    if (scenario === 'grant replaced while pacing') {
+      vi.spyOn(limiter, 'waitForSlot').mockImplementationOnce(async () => {
+        await replaceCalendar();
+        return true;
+      });
+    }
+    const native = new TelegramAdapter({
+      credentials: { botToken: '42:fixturetoken' }, allowedScope: { chats: [config.chatId] },
+      groupRateLimiter: limiter,
+      async fetchFn(input, init) {
+        const chat = { id: Number(config.chatId), title: config.chatTitle, type: 'supergroup' };
+        if (String(input).endsWith('/getChat')) return Response.json({ ok: true, result: chat });
+        sentMessages.push(JSON.parse(String(init?.body)));
+        if (sentMessages.length === 1 && (scenario === 'grant replaced after rejection' || scenario === 'retry after rejection')) {
+          if (scenario === 'grant replaced after rejection') await replaceCalendar();
+          return Response.json({ ok: false, error_code: 429, parameters: { retry_after: 0 } }, { status: 429 });
+        }
+        return Response.json({ ok: true, result: { chat, message_id: 902, date: 1 } });
+      },
+    });
 
     const digestRunner = new TelegramDigestRunner({
       pool,
       credentialRepo: credRepo,
       encryptionKey: ENCRYPTION_KEY,
       adapterFactory: {
-        getAdapterForService: async (serviceName: string) => {
+        getAdapterForService: async (serviceName: string, context?: AdapterContext) => {
           if (serviceName === 'mycalendar') {
+            expect(context).toMatchObject({
+              phase: 'execution',
+              connections: { mycalendar: { allowedCalendars: ['runner.cal@example.com'] } },
+            });
             return {
               execute: async (_tool: string, args: any) => {
                 capturedMyCalArgs = args;
+                if (scenario === 'grant replaced during read') {
+                  await replaceCalendar();
+                }
                 if (args.calendarId === 'primary') {
                   throw new Error('VALIDATION: calendarId "primary" is not in allowedCalendars');
                 }
@@ -736,12 +779,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
             };
           }
           if (serviceName === 'telegram') {
-            return {
-              execute: async (_tool: string, args: any) => {
-                sentMessages.push(args);
-                return { messageId: 902 };
-              },
-            };
+            return native;
           }
           throw new Error(`Unexpected service ${serviceName}`);
         },
@@ -753,6 +791,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
     const runner = new ScheduleRunner({
       pool,
       timeZone: 'Asia/Ho_Chi_Minh',
+      encryptionKey: ENCRYPTION_KEY,
       now: () => now,
       planRun: async () => {
         throw new Error('Should not call planRun');
@@ -765,7 +804,13 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
 
     expect(capturedMyCalArgs).toBeDefined();
     expect(capturedMyCalArgs.calendarId).toBe('runner.cal@example.com');
-    expect(sentMessages).toHaveLength(1);
+    if (scenario.startsWith('grant replaced')) {
+      expect(sentMessages).toHaveLength(scenario === 'grant replaced after rejection' ? 1 : 0);
+      const run = (await pool.query('SELECT status, delivery_started_at FROM schedule_runs WHERE schedule_id = $1', [sched.id])).rows[0];
+      expect(run).toMatchObject({ status: 'blocked', delivery_started_at: null });
+      return;
+    }
+    expect(sentMessages).toHaveLength(scenario === 'retry after rejection' ? 2 : 1);
     expect(sentMessages[0]!.text).toContain('Họp Sprint');
     expect(sentMessages[0]!.text).toContain('https://meet.google.com/spr-int-123');
     expect(sentMessages[0]!.text).toContain('Phòng 302');
@@ -814,11 +859,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
           tool: 'mysheets.list_spreadsheets',
           label: 'Google Sheets của bạn',
         },
-        {
-          service: 'mycalendar',
-          tool: 'mycalendar.list_events',
-          label: 'Google Calendar của bạn hôm nay',
-        },
+        await mycalendarSource(),
       ],
       recurrence: { type: 'daily', time: '08:00' },
       timeZone: 'Asia/Ho_Chi_Minh',
@@ -899,6 +940,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
     const runner = new ScheduleRunner({
       pool,
       timeZone: 'Asia/Ho_Chi_Minh',
+      encryptionKey: ENCRYPTION_KEY,
       now: () => now,
       planRun: async () => {
         throw new Error('Should not call planRun');
@@ -976,8 +1018,10 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
       services: ['mycalendar', 'slack'],
       timeZone: 'Asia/Ho_Chi_Minh',
       userId: USER_ID,
+      slackCredentialId: 'slack-fixture',
       mycalendarLookup: {
-        credentialId: 'cal-1',
+        credentialId: randomUUID(),
+        email: 'runner.cal@example.com',
         allowedCalendars: [],
       },
       getAdapter: async () => ({ execute: async () => [{ id: 'C_GENERAL', name: 'general' }] }),
@@ -1025,7 +1069,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
     );
 
     const authErrOutcome = await executeMultiDigestReadSources({
-      sources: [{ service: 'mycalendar', tool: 'mycalendar.list_events', label: 'Google Calendar cá nhân' }],
+      sources: [await mycalendarSource()],
       userId: USER_ID,
       dueAt: new Date('2026-11-02T08:00:00.000Z'),
       sinceIso: win.sinceIso,
@@ -1045,7 +1089,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
 
     const nyOutcome = await executeMultiDigestReadSources({
       sources: [
-        { service: 'mycalendar', tool: 'mycalendar.list_events', label: 'Google Calendar cá nhân' },
+        await mycalendarSource(),
         { service: 'calendar', tool: 'calendar.list_events', label: 'Lịch nhóm' },
       ],
       userId: USER_ID,

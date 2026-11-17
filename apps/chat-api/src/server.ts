@@ -31,6 +31,7 @@ import {
   verifyCalendarTriggerDestination,
 } from './services/schedules/calendar-digest-runner.js';
 import { CalendarTriggerService } from './services/calendar/calendar-trigger-service.js';
+import { parseCalendarWatchCallbackUrl } from './services/calendar/calendar-trigger-watch.js';
 import { createGithubDigestRunner, type RunGithubDigest } from './services/schedules/github-digest-runner.js';
 import { createTrelloDigestRunner, buildTrelloAiPromptPayload, type RunTrelloDigest } from './services/schedules/trello-digest-runner.js';
 import {
@@ -341,6 +342,7 @@ async function bootstrap() {
     timeZone: env.APP_TIME_ZONE,
     encryptionKey: env.ENCRYPTION_KEY,
     gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
+    mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
     credentialRepo: credRepo,
     mysheetsEnabled: mysheetsAvailable,
     fetchOrgSheetsMetadata,
@@ -1138,6 +1140,7 @@ async function bootstrap() {
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
     gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
+    mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
     adapterFactory,
     botClient: telegramBotClient,
     notionSources: notionDigestSources,
@@ -1157,6 +1160,7 @@ async function bootstrap() {
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
     gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
+    mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
     adapterFactory,
     timeZone: env.APP_TIME_ZONE,
     resolveSlackMentions: true,
@@ -1230,12 +1234,19 @@ async function bootstrap() {
   }
 
   const slackAssistant=createPersonalSlackAssistantRuntime({pool:pool??undefined,oauth:env.MYSLACK_OAUTH,encryptionKey:env.ENCRYPTION_KEY,env:process.env,live:env.RUNTIME_MODE==='live'});
+  const calendarWatchUrl = env.RUNTIME_MODE === 'live' ? parseCalendarWatchCallbackUrl(process.env.MYCALENDAR_WEBHOOK_URL) : null;
+  if (mycalendarAvailable && env.RUNTIME_MODE === 'live' && process.env.MYCALENDAR_WEBHOOK_URL?.trim() && !calendarWatchUrl) {
+    console.warn('[chat-api] MYCALENDAR_WEBHOOK_URL must be a public HTTPS /api/connections/mycalendar/webhook URL. MyCalendar uses polling.');
+  }
   const calendarTriggerService = mycalendarAvailable && pool
     ? new CalendarTriggerService({
         pool,
         encryptionKey: env.ENCRYPTION_KEY,
         timeZone: env.APP_TIME_ZONE,
         webhookSecret: process.env.MYCALENDAR_WEBHOOK_SECRET,
+        ...(calendarWatchUrl && mycalendarTokens && env.MYCALENDAR_OAUTH ? {
+          watch: { callbackUrl: calendarWatchUrl, apiBaseUrl: env.MYCALENDAR_OAUTH.apiBaseUrl, tokens: mycalendarTokens },
+        } : {}),
         getAdapter: (serviceName, context) => (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
         verifyDestination: verifyCalendarTriggerDestination,
         listDestinations: listCalendarTriggerDestinations,

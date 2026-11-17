@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import type { ScheduleApprovalMode, ScheduleView, SheetsDigestPreviewInfo } from '@wap/tool-schemas';
+import type { ScheduleApprovalMode, ScheduleView, SheetsDigestPreviewInfo, TelegramDigestSource } from '@wap/tool-schemas';
 import type { ChatMessage } from '../../types';
 import { apiClient } from '../../services/api-client';
 import { describeRecurrence, formatRunTime, scheduleLabel } from '../../services/schedule-text';
@@ -10,6 +10,14 @@ import { ScheduleActions, scheduleButton, primaryScheduleButton } from './Schedu
 import { ServiceLogo } from '../../components/ServiceLogo';
 import { WorkflowFlowCanvas } from '../../components/WorkflowFlowCanvas';
 import { normalizeConversationMessages } from '../../services/conversation-messages';
+
+function digestSourcePreviewLabel(source: TelegramDigestSource): string {
+  const calendar = source.mycalendarBinding;
+  const label = source.label || source.service;
+  if (!calendar || !Array.isArray(calendar.calendarIds)) return label;
+  const cap = calendar.truncated ? ` · giới hạn ${calendar.calendarIds.length} lịch` : '';
+  return `${label} (${calendar.email} · ${calendar.calendarIds.join(', ')}${cap})`;
+}
 
 export async function reloadScheduleConversation(id: string) {
   const before = useChatStore.getState();
@@ -361,9 +369,9 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                       <strong className="font-semibold">Tự gửi bản tin, không cần duyệt lại</strong>
                     </span>
                     {digestCandidate.canAutoDigest && digestCandidate.config && (
-                      <span className="block text-xs text-[#4B5563]">
+                      <span className="block text-xs text-[#4B5563] [overflow-wrap:anywhere]">
                         {Array.isArray(digestCandidate.config.sources) && digestCandidate.config.sources.length > 0 && (
-                          <>Nguồn đọc: {digestCandidate.config.sources.map((s: { label?: string; service: string }) => s.label || s.service).join(', ')} · </>
+                          <>Nguồn đọc: {digestCandidate.config.sources.map(digestSourcePreviewLabel).join(', ')} · </>
                         )}
                         {isSlackMultiCandidate ? (
                           <>Gửi về Slack: <strong>#{String(digestCandidate.config.channelName ?? '').replace(/^#/, '')}</strong></>
@@ -395,7 +403,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                   >
                     <p className="font-semibold">Phạm vi tự gửi đã khóa:</p>
                     {Array.isArray(digestCandidate.config.sources) && digestCandidate.config.sources.length > 0 && (
-                      <p>• Nguồn dữ liệu: {digestCandidate.config.sources.map((s: any) => s.label ?? s.service).join(', ')}</p>
+                      <p className="[overflow-wrap:anywhere]">• Nguồn dữ liệu: {digestCandidate.config.sources.map(digestSourcePreviewLabel).join(', ')}</p>
                     )}
                     {gmailQuery && (
                       <p data-testid="gmail-digest-locked-query">

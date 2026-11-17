@@ -501,7 +501,7 @@ export function PlanMoment({
                                 )}
                                 {sendInvites && (
                                   <span className="text-[11px] font-medium px-2 py-0.5 bg-sky-50 text-sky-800 border border-sky-200 rounded-full">
-                                    {isRsvp ? '📨 Gửi thông báo phản hồi' : notifyExisting ? '📨 Gửi thông báo cập nhật cho khách mời hiện có và danh sách khách mời sau thay đổi' : '📨 Gửi email mời họp'}
+                                    {isRsvp ? '📨 Gửi thông báo phản hồi cho khách mời' : notifyExisting ? '📨 Gửi thông báo cập nhật cho khách mời hiện có và danh sách khách mời sau thay đổi' : '📨 Gửi email mời họp'}
                                   </span>
                                 )}
                                 {suppressInvites && (

@@ -811,7 +811,13 @@ test('MYCALENDAR: Flow 8 - Proactive calendar trigger create, run-now, pause/res
     await expect(triggersPanel.getByLabel('Kênh nhận cảnh báo')).toContainText('Telegram · Nhóm E2E Lịch');
 
     await triggersPanel.getByLabel(/Tên cảnh báo/i).fill('Nhắc họp E2E trước 15 phút');
-    await triggersPanel.getByRole('button', { name: 'Tạo cảnh báo', exact: true }).click();
+    await triggersPanel.getByRole('button', { name: 'Xem trước cảnh báo', exact: true }).click();
+    const preview = page.getByRole('dialog', { name: 'Xác nhận gửi cảnh báo tự động' });
+    await expect(preview).toContainText('Telegram · Nhóm E2E Lịch');
+    await expect(preview).toContainText('tối đa 5 email khách mời');
+    const beforeApproval = await db.query('SELECT COUNT(*)::int AS cnt FROM calendar_event_triggers WHERE user_id = $1', [conn.userId]);
+    expect(beforeApproval.rows[0].cnt).toBe(0);
+    await preview.getByRole('button', { name: 'Bật cảnh báo tự động', exact: true }).click();
 
     await expect(triggersPanel).toContainText('Nhắc họp E2E trước 15 phút');
     await expect(triggersPanel).toContainText('Đang bật');
@@ -821,11 +827,17 @@ test('MYCALENDAR: Flow 8 - Proactive calendar trigger create, run-now, pause/res
     ]);
     expect(dbCount.rows[0].cnt).toBe(1);
 
-    await triggersPanel.getByRole('button', { name: 'Chạy thử ngay', exact: true }).click();
-    await expect(triggersPanel).toContainText(/Đã (kiểm tra lịch|gửi)/i);
+    await triggersPanel.getByRole('button', { name: 'Kiểm tra và gửi ngay', exact: true }).click();
+    await expect(triggersPanel).toContainText(/Đã (kiểm tra lịch|gửi)|Chưa hoàn tất lượt kiểm tra cảnh báo/i);
+    await expect.poll(async () => (await db.query(
+      'SELECT last_checked_at IS NOT NULL AND last_error IS NULL AS checked FROM calendar_event_triggers WHERE user_id = $1',
+      [conn.userId],
+    )).rows[0]?.checked).toBe(true);
 
     await triggersPanel.getByRole('button', { name: 'Tạm dừng', exact: true }).click();
-    await expect(triggersPanel).toContainText('Tạm dừng');
+    await expect(triggersPanel.getByRole('button', { name: 'Bật lại', exact: true })).toBeVisible();
+    await triggersPanel.getByRole('button', { name: 'Bật lại', exact: true }).click();
+    await expect(triggersPanel.getByRole('button', { name: 'Tạm dừng', exact: true })).toBeVisible();
 
     await triggersPanel.getByRole('button', { name: 'Xoá cảnh báo', exact: true }).click();
     await expect(triggersPanel).not.toContainText('Nhắc họp E2E trước 15 phút');

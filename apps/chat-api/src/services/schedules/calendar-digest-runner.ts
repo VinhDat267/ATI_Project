@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { decryptCredentials, detectCalendarConflicts, SlackAdapter, StepError, type CalendarEventWithConflict } from '@wap/tool-adapters';
+import { decryptCredentials, detectCalendarConflicts, SlackAdapter, StepError, TelegramAdapter, type CalendarEventWithConflict } from '@wap/tool-adapters';
 import type { CalendarDigestConfig, CalendarDigestDelivery } from '@wap/tool-schemas';
 import { computeCalendarDigestHash } from './calendar-digest-candidate.js';
 import { findSlackDigestCredential } from './multi-source-digest-candidate.js';
@@ -860,7 +860,8 @@ export interface VerifiedCalendarTriggerDestination {
   service: string;
   channelId: string;
   channelName?: string;
-  credentialId?: string;
+  credentialId: string;
+  credentialConfig: string;
   slackDestContext?: Pick<AdapterContext, 'workspaceMode' | 'workspaceId' | 'expectedCredential'>;
   telegramDestBinding?: {
     credentialId: string;
@@ -1005,7 +1006,8 @@ export async function verifyCalendarTriggerDestination(
 
   if (service === 'slack') {
     const destRow = await findSlackDigestCredential(pool, { userId, workspaceMode: 'personal' });
-    if (!destRow || destRow.status !== 'active' || typeof destRow.config !== 'string') {
+    if (!destRow || destRow.status !== 'active' || typeof destRow.config !== 'string' ||
+        (pinnedCredId && destRow.id !== pinnedCredId)) {
       return { ok: false, pauseReason: 'Dịch vụ Slack không còn hoạt động.' };
     }
     const rawSlackConfig = destRow.config;
@@ -1022,6 +1024,7 @@ export async function verifyCalendarTriggerDestination(
           channelId,
           channelName: channelName ?? (channelId.startsWith('#') ? channelId : `#${channelId}`),
           credentialId: String(destRow.id),
+          credentialConfig: rawSlackConfig,
           slackDestContext: {
             ...(destRow.workspace_id
               ? { workspaceMode: 'organization', workspaceId: destRow.workspace_id }
@@ -1043,7 +1046,7 @@ export async function verifyCalendarTriggerDestination(
     [userId],
   );
   const tgRow = tgRes.rows[0];
-  if (!tgRow || tgRow.status !== 'active') {
+  if (!tgRow || tgRow.status !== 'active' || typeof tgRow.config !== 'string') {
     return { ok: false, pauseReason: 'Kết nối Telegram cá nhân không còn hoạt động.' };
   }
   if (pinnedCredId && String(tgRow.id) !== pinnedCredId) {
@@ -1063,6 +1066,7 @@ export async function verifyCalendarTriggerDestination(
         channelId,
         channelName: channelName ?? matched.title,
         credentialId: String(tgRow.id),
+        credentialConfig: tgRow.config,
         telegramDestBinding: {
           credentialId: String(tgRow.id),
           telegramUserId: typeof dec?.telegramUserId === 'string' ? dec.telegramUserId : '',
@@ -1084,9 +1088,10 @@ export async function deliverCalendarTriggerNotification(
     headerTitle: string;
     messageText: string;
     signal?: AbortSignal;
+    beforeDispatch: () => Promise<void>;
   },
 ): Promise<void> {
-  const { verified, userId, headerTitle, messageText, signal } = input;
+  const { verified, userId, headerTitle, messageText, signal, beforeDispatch } = input;
   const destAdapter = await options.getAdapter(verified.service, {
     userId,
     phase: 'execution',
@@ -1097,6 +1102,12 @@ export async function deliverCalendarTriggerNotification(
   if (!destAdapter) {
     throw new Error(`Không khởi tạo được kết nối ${verified.service === 'slack' ? 'Slack' : 'Telegram'}.`);
   }
+  const guardedAdapter = destAdapter instanceof SlackAdapter || destAdapter instanceof TelegramAdapter;
+  if (!guardedAdapter) {
+    await beforeDispatch();
+    signal?.throwIfAborted();
+  }
+  const context = { signal, ...(guardedAdapter ? { beforeDispatch } : {}) };
 
   if (verified.service === 'slack') {
     const blocks = buildSlackMarkdownDigestBlocks({
@@ -1106,7 +1117,7 @@ export async function deliverCalendarTriggerNotification(
     await destAdapter.execute(
       'slack.send_message',
       { channel: verified.channelId, text: messageText, blocks },
-      { signal },
+      context,
     );
     return;
   }
@@ -1114,6 +1125,6 @@ export async function deliverCalendarTriggerNotification(
   await destAdapter.execute(
     'telegram.send_message',
     { chatId: verified.channelId, text: slackMrkdwnToTelegramPlain(messageText) },
-    { signal },
+    context,
   );
 }

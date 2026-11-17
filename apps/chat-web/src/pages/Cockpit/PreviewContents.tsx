@@ -236,7 +236,7 @@ export function PreviewContents({step,destination,labels}:{step:PlanStep;destina
           ))}
           {sendInvites && (
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-sky-50 text-sky-800 border border-sky-200">
-              {isRsvp ? '📨 Gửi thông báo phản hồi tới người tổ chức' : notifyExisting ? '📨 Gửi thông báo cập nhật cho khách mời hiện có và danh sách khách mời sau thay đổi' : '📨 Gửi email mời họp cho khách mời'}
+              {isRsvp ? '📨 Gửi thông báo phản hồi cho khách mời' : notifyExisting ? '📨 Gửi thông báo cập nhật cho khách mời hiện có và danh sách khách mời sau thay đổi' : '📨 Gửi email mời họp cho khách mời'}
             </span>
           )}
           {suppressInvites && (

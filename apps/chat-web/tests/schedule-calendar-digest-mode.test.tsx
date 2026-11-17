@@ -60,6 +60,25 @@ afterEach(() => {
 });
 
 describe('ScheduleMoment — manual vs auto_digest mode selector', () => {
+  it('shows the approved Google Calendar account and capped calendars for a multi-source digest', () => {
+    render(<ScheduleMoment digestCandidate={{
+      canAutoDigest: true,
+      config: {
+        destination: 'slack', channelName: 'daily-briefing',
+        sources: [
+          {
+            service: 'mycalendar', label: 'Google Calendar', tool: 'mycalendar.list_events',
+            mycalendarBinding: { email: 'account@example.test', calendarIds: ['approved-calendar'], truncated: true },
+          },
+          { service: 'trello', tool: 'trello.search_cards', label: 'Trello' },
+        ],
+      },
+    }} />);
+    fireEvent.click(document.querySelector<HTMLInputElement>('#schedule-mode-auto-digest')!);
+    const scope = document.querySelector('#schedule-auto-digest-scope');
+    expect(scope).toHaveTextContent('Google Calendar (account@example.test · approved-calendar · giới hạn 1 lịch)');
+  });
+
   it('defaults to manual mode, allows selecting auto_digest with locked scope card, and passes approvalMode to confirmSchedule', async () => {
     vi.spyOn(apiClient, 'confirmSchedule').mockResolvedValue({ schedule: baseSchedule });
 
