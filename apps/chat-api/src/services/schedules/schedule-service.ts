@@ -413,6 +413,12 @@ export class ScheduleService {
       const metadata = guarded.row.metadata as ScheduleProposalMetadata;
       if (metadata?.type !== 'schedule_proposal') throw new ScheduleNotFound();
       const rawJiraCandidateConfig = (metadata.digestCandidate as any)?.config;
+      const usesMyJira =
+        metadata.services?.some((service) => service === 'myjira' || service.startsWith('myjira.')) ||
+        metadata.proposal?.request?.toLowerCase().includes('myjira') ||
+        Array.isArray(rawJiraCandidateConfig?.projects) ||
+        (Array.isArray(rawJiraCandidateConfig?.sources) &&
+          rawJiraCandidateConfig.sources.some((source: { service?: string } | null) => source?.service === 'myjira'));
       const isReadOnlyJiraDigestConfirm =
         !metadata.reauthorize &&
         approvalMode === 'auto_digest' &&
@@ -433,8 +439,7 @@ export class ScheduleService {
         Boolean(scope?.workspaceId) &&
         !metadata.services?.includes('jira');
       if (
-        (metadata.services?.some((s) => s === 'myjira' || s.startsWith('myjira')) ||
-          metadata.proposal?.request?.toLowerCase().includes('myjira')) &&
+        usesMyJira &&
         !isReadOnlyJiraDigestConfirm &&
         !isReadOnlyTelegramJiraDigestConfirm &&
         !isAuthorizedOrgManualMyJiraConfirm
@@ -514,6 +519,16 @@ export class ScheduleService {
       }
       const effectiveApprovalMode: ScheduleApprovalMode | undefined =
         approvalMode ?? (metadata.reauthorize ? 'auto_digest' : undefined);
+      if (
+        usesMyJira &&
+        (proposal.action === 'create' || proposal.action === 'update') &&
+        effectiveApprovalMode !== 'auto_digest'
+      ) {
+        throw new ScheduleConflict(
+          'DIGEST_NOT_ELIGIBLE',
+          'Lịch Jira chỉ hỗ trợ tự gửi bản tin đã xác nhận. Hãy chọn kênh Slack hoặc cuộc trò chuyện Telegram cho bản tin.',
+        );
+      }
       const wantAutoDigest = effectiveApprovalMode === 'auto_digest';
       let persistedServices = metadata.services;
       const candidateConfig = (metadata.digestCandidate as any)?.config;
@@ -1221,10 +1236,12 @@ export class ScheduleService {
             if (wsMode !== 'organization' || !wsId || candidateConfig.workspaceId !== wsId) {
               throw new ScheduleConflict('DIGEST_NOT_ELIGIBLE', 'Bản tin Jira chỉ hỗ trợ trong Workspace Tổ chức hợp lệ.');
             }
-            const nextRawConfig: JiraDigestConfig =
-              typeof includeAiSummary === 'boolean'
-                ? { ...candidateConfig, includeAiSummary }
-                : candidateConfig;
+            const previousConfig = existing.kind === 'myjira_digest' && isValidJiraDigestConfig(existing.digest_config)
+              ? existing.digest_config
+              : null;
+            const confirmedAiSummary = includeAiSummary ??
+              (previousConfig ? previousConfig.includeAiSummary === true : candidateConfig.includeAiSummary);
+            const nextRawConfig: JiraDigestConfig = { ...candidateConfig, includeAiSummary: confirmedAiSummary };
             await this.assertJiraDigestConfigInTx(client, userId, wsId, nextRawConfig);
             const config = canonicalizeJiraDigestConfig(nextRawConfig);
             const configHash = computeJiraDigestConfigHash({

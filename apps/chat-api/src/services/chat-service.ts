@@ -1680,6 +1680,9 @@ export class ChatService {
         services,
         recurrence,
         jiraConnection: this.myjiraDigestConnection,
+        includeAiSummary: current?.kind === 'myjira_digest'
+          ? (current.digestConfig as { includeAiSummary?: boolean } | null)?.includeAiSummary === true
+          : undefined,
         telegramConnection: this.telegramConnection,
         getAdapter: this.getAdapter,
       });

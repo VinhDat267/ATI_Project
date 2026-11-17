@@ -22,6 +22,24 @@ const ENCRYPTION_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef01234567
 const NOW = new Date('2026-11-17T02:00:00Z');
 const CHAT_ID = '777888999';
 
+it('explains that mixed Jira and Telegram schedules support read-only digests', () => {
+  const candidate = evaluateTelegramDigestCandidate({
+    proposal: {
+      kind: 'schedule', action: 'create', name: 'Jira qua Telegram',
+      request: 'Tạo issue Jira rồi gửi tóm tắt qua Telegram',
+      recurrence: { type: 'daily', time: '09:00' }, summary: 'Lịch Jira',
+    },
+    services: ['myjira', 'trello', 'telegram'],
+    timeZone: 'Asia/Ho_Chi_Minh',
+    workspaceMode: 'organization',
+    workspaceId: randomUUID(),
+  });
+  expect(candidate).toMatchObject({
+    canAutoDigest: false,
+    disabledReason: expect.stringContaining('chỉ đọc'),
+  });
+});
+
 describe('Jira approval binding for mixed Telegram digests', () => {
   let db: IsolatedTestContext;
 

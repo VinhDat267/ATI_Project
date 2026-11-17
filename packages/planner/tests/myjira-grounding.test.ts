@@ -409,6 +409,22 @@ describe('Jira site grounding', () => {
     expect(responseCorrect.kind).toBe('plan');
   });
 
+  it.each([{ dueDate: 'next Friday' }, { assigneeAccountId: '' }])(
+    'rejects invalid nullable Jira string values %j before preview',
+    (fields) => {
+      const result = validatePlan(plan([{
+        id: 'step_1',
+        tool: 'myjira.update_issue',
+        description: 'Update issue',
+        args: { siteId: 'site-a', issueKey: 'ATI-12', ...fields },
+        dependsOn: [],
+      }]), MYJIRA_TOOLS, {
+        grounding: { memory, userTexts: ['trên Acme Jira'] },
+      });
+      expect(result).toMatchObject({ valid: false, layer: 'schema' });
+    },
+  );
+
   it('accepts nullable union schema fields (type: ["string", "null"]) on myjira.update_issue for assigneeAccountId and dueDate', () => {
     const userMemory = {
       ...memory,

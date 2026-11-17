@@ -71,6 +71,12 @@ export function validateSchemaValue(value: unknown, schema: Record<string, any>,
 
   if (Array.isArray(schema.type)) {
     if (allowedTypes.length === 0) return null;
+    if (typeof value === 'string' && allowedTypes.includes('string')) {
+      const length = Array.from(value).length;
+      if (typeof schema.minLength === 'number' && length < schema.minLength) return `${path} is shorter than minLength`;
+      if (typeof schema.maxLength === 'number' && length > schema.maxLength) return `${path} exceeds maxLength`;
+      if (typeof schema.pattern === 'string' && !new RegExp(schema.pattern).test(value)) return `${path} does not match pattern ${schema.pattern}`;
+    }
     const branchErrors: string[] = [];
     for (const singleType of allowedTypes) {
       const err = validateSchemaValue(value, { ...schema, type: singleType }, path);

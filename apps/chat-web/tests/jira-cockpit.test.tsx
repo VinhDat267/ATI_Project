@@ -675,9 +675,71 @@ describe('JIRA-09B: Jira Cockpit UI integration', () => {
 
     expect(screen.getByText(/Tự gửi bản tin Standup & Blocker Jira, không cần duyệt lại/i)).toBeInTheDocument();
     expect(screen.getByText(/Dự án Jira: Acme Jira · ENG/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Chờ tôi duyệt mỗi lượt/)).not.toBeInTheDocument();
+    expect(screen.getByRole('radio')).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Xác nhận và bật tự gửi' })).toBeEnabled();
 
     expect(GUIDE_OAUTH_SHOWCASE_CARDS.some((c) => c.service === 'jira')).toBe(true);
     expect(SERVICE_GUIDES.jira.keys.join(' ')).toContain('Site URL');
+  });
+
+  it.each([true, false])('only offers approved auto delivery for mixed Jira and Telegram (eligible %s)', (canAutoDigest) => {
+    render(<ScheduleMoment message={{
+      id: 'mixed-jira-schedule',
+      role: 'assistant',
+      content: '',
+      metadata: {
+        type: 'schedule_proposal',
+        proposal: { kind: 'schedule', action: 'create', name: 'Bản tin', request: 'Bản tin Jira và Trello qua Telegram', recurrence: { type: 'daily', time: '08:00' }, summary: 'Bản tin mỗi ngày' },
+        services: ['myjira', 'trello', 'telegram'],
+        digestCandidate: canAutoDigest ? {
+          canAutoDigest,
+          config: { chatTitle: 'Test', sources: [{ service: 'myjira', label: 'Jira' }] },
+        } : { canAutoDigest, disabledReason: 'Chọn cuộc trò chuyện Telegram.' },
+      },
+    } as Parameters<typeof ScheduleMoment>[0]['message']} />);
+    expect(screen.queryByText(/Chờ tôi duyệt mỗi lượt/)).not.toBeInTheDocument();
+    if (canAutoDigest) {
+      expect(screen.getByRole('radio')).toBeChecked();
+      expect(screen.getByRole('button', { name: 'Xác nhận và bật tự gửi' })).toBeEnabled();
+    } else {
+      expect(screen.getByText('Chọn cuộc trò chuyện Telegram.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Xác nhận' })).toBeDisabled();
+    }
+  });
+
+  it('preserves the current AI setting when confirming an older Jira update preview', async () => {
+    const confirm = vi.spyOn(apiClient, 'confirmSchedule').mockResolvedValue({ schedule: null } as any);
+    render(<ScheduleMoment message={{
+      id: 'legacy-jira-update',
+      role: 'assistant',
+      content: '',
+      metadata: {
+        type: 'schedule_proposal',
+        proposal: {
+          kind: 'schedule',
+          action: 'update',
+          name: 'Bản tin Jira',
+          request: 'Gửi bản tin Jira qua Slack',
+          recurrence: { type: 'daily', time: '08:00' },
+          summary: 'Đổi giờ gửi bản tin',
+        },
+        services: ['myjira', 'slack'],
+      },
+    }} digestCandidate={{
+      kind: 'myjira_digest',
+      canAutoDigest: true,
+      config: { projects: [{ projectKey: 'ENG' }], channelName: 'eng-standup' },
+    }} />);
+
+    expect(screen.queryByTestId('checkbox-jira-include-ai-summary')).not.toBeInTheDocument();
+    expect(screen.getByText('Giữ tùy chọn tóm tắt AI của lịch hiện tại.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Xác nhận và bật tự gửi' }));
+    await waitFor(() => expect(confirm).toHaveBeenCalledWith(
+      'conv-default',
+      'legacy-jira-update',
+      { approvalMode: 'auto_digest' },
+    ));
   });
 
   it('renders write-scope upgrade warning CTA when hasWriteScope=false and full capability banner when write:jira-work is present', async () => {

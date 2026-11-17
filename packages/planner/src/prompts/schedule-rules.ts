@@ -7,13 +7,13 @@ export function scheduleRules(): string {
   return `
 ### Scheduled workflows
 Use \`kind: "schedule"\` when the user wants a workflow to run at a later time or repeatedly. Apply these rules in order:
-1. A workflow that runs later or repeats ("mỗi sáng 8 giờ…", "9 giờ mai chạy…", "thứ Hai hằng tuần…") → kind "schedule" with "action": "create".
+1. A new workflow that runs later or repeats ("mỗi sáng 8 giờ…", "9 giờ mai chạy…", "thứ Hai hằng tuần…") → kind "schedule" with "action": "create".
 2. Creating an event or meeting on a calendar ("lên lịch họp 9 giờ mai") is a normal plan with calendar.create_event, not a schedule. If it is unclear which one the user means, ask.
 3. A due date of a card, issue or task ("tạo card hạn thứ Sáu") is a normal plan.
 4. Missing time, missing date of a one-off run, or missing destination → clarification.
 5. A repetition that is not supported (monthly, every 2 hours, several times a day) → clarification naming the three supported kinds: once, daily, weekly on chosen weekdays. Never switch to another kind yourself.
-6. A scheduled task with no write or send action ("mỗi sáng cho tôi biết lịch họp") → clarification with "reason": "read_only", because nobody is there to answer a question when it runs. A scheduled report or digest that sends to Slack or Telegram ("tổng hợp tiến độ và blocker Jira ... gửi lên Slack #...", "gửi tóm tắt ... vào Telegram") HAS a send action → ALWAYS output kind "schedule" with "action": "create", putting the full read-and-send task in "request".
-7. When the conversation already has a schedule (the history contains a schedule proposal or a schedule state), a change of time, days or task → "action": "update"; "tạm dừng / chạy tiếp / hủy lịch này" → "pause" / "resume" / "cancel". If that schedule was cancelled and the user wants a new one → clarification suggesting a new conversation: a conversation holds one schedule.
+6. A scheduled task with no write or send action ("mỗi sáng cho tôi biết lịch họp") → clarification with "reason": "read_only", because nobody is there to answer a question when it runs. A scheduled report or digest that sends to Slack or Telegram ("tổng hợp tiến độ và blocker Jira ... gửi lên Slack #...", "gửi tóm tắt ... vào Telegram") counts as a send action. For a digest that runs later or repeats, output kind "schedule" and follow rule 7 to choose the action. For creation or updates, put the full read-and-send task in "request".
+7. For a new schedule, use "action": "create". When the conversation already has a schedule (the history contains a schedule proposal or a schedule state), a change of time, days or task → "action": "update"; "tạm dừng / chạy tiếp / hủy lịch này" → "pause" / "resume" / "cancel". If that schedule was cancelled and the user wants a new one → clarification suggesting a new conversation: a conversation holds one schedule.
 Fields of a schedule:
 - "request": the task as the user would type it to run now, without the timing ("Gửi lịch họp hôm nay lên Slack #ati-test"). Keep resource names exactly as the user typed them; never search for resources and never put IDs in it.
 - "name": a short Vietnamese name of at most 80 characters.
