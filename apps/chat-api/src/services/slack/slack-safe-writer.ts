@@ -27,15 +27,19 @@ const SLACK_EMOJI_SHORTCODES:ReadonlyArray<readonly [string,string]>=[
 ];
 const SHORTCODE_SEQ_RE=/(?::[a-z0-9_+-]+:)+/gi;
 const UNICODE_EMOJI_SEQ_RE=/(?:[\p{Extended_Pictographic}\p{Emoji_Presentation}][\uFE0F\u200D\u{1F3FB}-\u{1F3FF}\p{Extended_Pictographic}\p{Emoji_Presentation}]*)+/gu;
-function normalizeSlackReadbackText(value:string):string{
- let out=value.normalize('NFC');
+const SLACK_HTML_ENTITIES:Record<string,string>={lt:'<',gt:'>',amp:'&'};
+function decodeSlackReadbackEntities(value:string):string{
+ return value.replace(/&(lt|gt|amp);/g,(_m,entity:string)=>SLACK_HTML_ENTITIES[entity]??_m);
+}
+function normalizeSlackReadbackText(value:string,decodeEntities=false):string{
+ let out=(decodeEntities?decodeSlackReadbackEntities(value):value).normalize('NFC');
  for(const [code,tone] of SLACK_SKIN_TONES)out=out.split(code).join(tone);
  for(const [code,emoji] of SLACK_EMOJI_SHORTCODES)out=out.split(code).join(emoji);
  return out.replace(/\uFE0F/g,'');
 }
 function slackReadbackTextMatches(actual:string,expected:string):boolean{
- const normActual=normalizeSlackReadbackText(actual);
- const normExpected=normalizeSlackReadbackText(expected);
+ const normActual=normalizeSlackReadbackText(actual,true);
+ const normExpected=normalizeSlackReadbackText(expected,false);
  if(normActual===normExpected)return true;
  if(SHORTCODE_SEQ_RE.test(normActual)&&UNICODE_EMOJI_SEQ_RE.test(normExpected)){
   SHORTCODE_SEQ_RE.lastIndex=0;UNICODE_EMOJI_SEQ_RE.lastIndex=0;
@@ -58,7 +62,11 @@ export class SlackSafeWriter {
  private async call(method:string,params:Record<string,unknown>,token:string,signal?:AbortSignal):Promise<any>{
   const combined=signal?AbortSignal.any([signal,AbortSignal.timeout(this.timeout)]):AbortSignal.timeout(this.timeout);
   combined.throwIfAborted();
-  const response=await (this.options.fetchFn??fetch)(this.endpoint+'/'+method,{method:'POST',redirect:'error',signal:combined,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(params)});
+  const isJsonMethod=method==='chat.postMessage'||method==='conversations.history';
+  let body:string;
+  if(isJsonMethod){body=JSON.stringify(params);}
+  else{const form=new URLSearchParams();for(const [k,v] of Object.entries(params))if(v!==undefined&&v!==null)form.set(k,String(v));body=form.toString();}
+  const response=await (this.options.fetchFn??fetch)(this.endpoint+'/'+method,{method:'POST',redirect:'error',signal:combined,headers:{Authorization:'Bearer '+token,'Content-Type':isJsonMethod?'application/json; charset=utf-8':'application/x-www-form-urlencoded'},body});
   const reader=response.body?.getReader();if(!reader)throw new Error();const chunks:Uint8Array[]=[];let bytes=0;
   try{for(;;){const {value,done}=await reader.read();if(done)break;bytes+=value.length;if(bytes>262144)throw new Error();chunks.push(value);}}finally{await reader.cancel().catch(()=>{});}
   combined.throwIfAborted();const data=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(!response.ok||data?.ok!==true)throw new Error();return data;

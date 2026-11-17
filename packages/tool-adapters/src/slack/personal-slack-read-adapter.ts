@@ -44,7 +44,7 @@ const MAX_TIMEOUT_MS = 2_147_483_647;
 const MAX_ATTEMPTS = 3; // initial attempt + 2 bounded retries
 const SLACK_TS_REGEX = /^\d{10}\.\d{6}$/;
 const SAFE_PERMALINK_REGEX =
-  /^https:\/\/([a-z0-9_-]+)\.slack\.com\/archives\/([A-Z0-9_]+)\/p(\d{10,20})$/;
+  /^https:\/\/([a-z0-9_-]+)\.slack\.com\/archives\/([A-Z0-9_]+)\/p(\d{10,20})(?:\?(?:thread_ts=\d{10}\.\d{6}|cid=[A-Z0-9_]+)(?:&(?:thread_ts=\d{10}\.\d{6}|cid=[A-Z0-9_]+))*)?$/;
 const TOKEN_REDACTION_REGEX = /(?:xox[baprs]-[a-zA-Z0-9-]+|Bearer\s+[a-zA-Z0-9._~+/-]+)/gi;
 
 const DEFAULT_PAGE_LIMITS = {
@@ -479,7 +479,7 @@ function readTopicOrPurpose(
   if (!isPlainObject(value)) throw protocolError();
   return {
     value: readOptionalString(value, 'value', MAX_TEXT_LENGTH),
-    creator: readOptionalId(value, 'creator'),
+    creator: value.creator === '' ? undefined : readOptionalId(value, 'creator'),
     last_set: readOptionalCount(value, 'last_set'),
   };
 }
@@ -497,7 +497,7 @@ function readConversationSummaryFields(source: JsonObject): Omit<SlackConversati
     is_archived: readOptionalBoolean(source, 'is_archived'),
     is_general: readOptionalBoolean(source, 'is_general'),
     unlinked: readOptionalCount(source, 'unlinked'),
-    creator: readOptionalId(source, 'creator'),
+    creator: source.creator === '' ? undefined : readOptionalId(source, 'creator'),
     name_normalized: readOptionalString(source, 'name_normalized', MAX_NAME_LENGTH),
     is_shared: readOptionalBoolean(source, 'is_shared'),
     is_org_shared: readOptionalBoolean(source, 'is_org_shared'),

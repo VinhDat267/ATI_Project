@@ -1,6 +1,6 @@
 import {captureScheduleArtifact,guardScheduleArtifact,prelockScheduleArtifacts,registerScheduleFields,scheduleRegistry,scheduleSourceContext,tagScheduleContext} from '../slack/slack-schedule-lineage.js';
 import type pg from 'pg';
-import { JIRA_LLM_EGRESS_DISABLED_IN_G2A, type CalendarDigestConfig, type GithubDigestConfig, type MyJiraDigestConfig, type NotionDigestConfig, type ScheduleKind, type ScheduleRecurrence, type ScheduleRunMessageMetadata, type TelegramDigestConfig, type TrelloDigestConfig } from '@wap/tool-schemas';
+import { JIRA_LLM_EGRESS_DISABLED_IN_G2A, type CalendarDigestConfig, type GithubDigestConfig, type MyJiraDigestConfig, type NotionDigestConfig, type ScheduleKind, type ScheduleRecurrence, type ScheduleRunMessageMetadata, type SlackDigestConfig, type TelegramDigestConfig, type TrelloDigestConfig } from '@wap/tool-schemas';
 import { MessageRepo } from '../../db/repositories/message-repo.js';
 import type { Queryable, ScheduleRow } from '../../db/repositories/schedule-repo.js';
 import type { DigestRunOutcome as CalendarDigestRunOutcome, RunCalendarDigest } from './calendar-digest-runner.js';
@@ -27,6 +27,7 @@ import {
 } from './trello-digest-runner.js';
 import { NOTION_DELIVERY_UNKNOWN, type NotionDigestRunOutcome, type RunNotionDigest } from './notion-digest-runner.js';
 import { TELEGRAM_DELIVERY_UNKNOWN, type DigestRunInput, type DigestRunOutcome } from './telegram-digest-runner.js';
+import { SLACK_DIGEST_DELIVERY_UNKNOWN, type SlackDigestRunInput, type SlackDigestRunOutcome } from './slack-digest-runner.js';
 import { assertDigestScheduleLiveScopeAndAuth } from './digest-scope-guard.js';
 
 export interface RunToPlan {
@@ -45,6 +46,7 @@ export interface PreparedRun {
 }
 export type PlanRun = (run: RunToPlan, convId: string, signal: AbortSignal) => Promise<PreparedRun>;
 export type ExecuteDigestRun = (run: DigestRunInput, signal: AbortSignal) => Promise<DigestRunOutcome>;
+export type ExecuteSlackDigestRun = (run: SlackDigestRunInput, signal: AbortSignal) => Promise<SlackDigestRunOutcome>;
 
 /** The message a run is planned from (design 5.5), saved first in the run's conversation. */
 export function runMessage(run: Pick<RunToPlan, 'name' | 'request' | 'dueAt'>, timeZone: string): string {
@@ -61,6 +63,7 @@ export interface ScheduleRunnerOptions {
   runJiraDigest?: RunJiraDigestExecutorFn;
   jiraLlmEgressEnabled?: boolean;
   executeDigestRun?: ExecuteDigestRun;
+  executeSlackDigestRun?: ExecuteSlackDigestRun;
   timeZone: string;
   encryptionKey?: string;
   gmailOAuthClientId?: string;
@@ -142,6 +145,7 @@ export async function reconcileScheduleRuns(pool: pg.Pool): Promise<void> {
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'github_digest' THEN $6
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'notion_digest' THEN $7
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'myjira_digest' THEN $8
+           WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'slack_digest' THEN $9
            WHEN r.delivery_started_at IS NOT NULL THEN $2
            ELSE $1
          END,
@@ -158,6 +162,7 @@ export async function reconcileScheduleRuns(pool: pg.Pool): Promise<void> {
         GITHUB_DELIVERY_UNKNOWN,
         NOTION_DELIVERY_UNKNOWN,
         MYJIRA_DELIVERY_UNKNOWN,
+        SLACK_DIGEST_DELIVERY_UNKNOWN,
       ],
     );
     for (const row of res.rows) {
@@ -333,7 +338,7 @@ export class ScheduleRunner {
               if (moved.status === 'completed') changes.push(await this.options.recordState(client, tagScheduleContext(moved, segments), now));
               continue;
             }
-            if (row.kind !== 'github_digest' && row.kind !== 'trello_digest' && row.kind !== 'notion_digest' && row.kind !== 'myjira_digest' && row.kind !== 'telegram_digest' && await this.lastThreeExpired(client, row.id, now)) {
+            if (row.kind !== 'github_digest' && row.kind !== 'trello_digest' && row.kind !== 'notion_digest' && row.kind !== 'myjira_digest' && row.kind !== 'telegram_digest' && row.kind !== 'slack_digest' && await this.lastThreeExpired(client, row.id, now)) {
               changes.push(await this.options.recordState(client, tagScheduleContext(await this.pause(client, row.id, UNAPPROVED), segments), now));
               continue;
             }
@@ -488,21 +493,24 @@ export class ScheduleRunner {
       started.kind === 'trello_digest' ||
       started.kind === 'notion_digest' ||
       started.kind === 'myjira_digest' ||
-      started.kind === 'telegram_digest';
+      started.kind === 'telegram_digest' ||
+      started.kind === 'slack_digest';
 
     if (isDigestSchedule) {
-      const telegramSources = started.kind === 'telegram_digest'
+      const multiSources = started.kind === 'telegram_digest'
         ? (started.digestConfig as TelegramDigestConfig | null)?.sources
-        : undefined;
-      const hasTelegramJiraSource = started.kind === 'telegram_digest' && (
+        : started.kind === 'slack_digest'
+          ? (started.digestConfig as SlackDigestConfig | null)?.sources
+          : undefined;
+      const hasMultiJiraSource = (started.kind === 'telegram_digest' || started.kind === 'slack_digest') && (
         started.toPlan.services?.includes('myjira') ||
-        (Array.isArray(telegramSources) && telegramSources.some((source) =>
+        (Array.isArray(multiSources) && multiSources.some((source) =>
           source?.service === 'myjira' ||
           (typeof source?.tool === 'string' && source.tool.startsWith('myjira.')),
         ))
       );
       const jiraEgressBlocked = this.options.jiraLlmEgressEnabled === false &&
-        (started.kind === 'myjira_digest' || hasTelegramJiraSource);
+        (started.kind === 'myjira_digest' || hasMultiJiraSource);
       const liveGuard = jiraEgressBlocked ? undefined : await assertDigestScheduleLiveScopeAndAuth({
         pool,
         scheduleId: started.toPlan.scheduleId,
@@ -612,10 +620,26 @@ export class ScheduleRunner {
     }
 
     if (started.kind === 'telegram_digest' && this.options.executeDigestRun) {
-      await this.executeTelegramDigestOne(runId, {
-        ...started,
-        digestConfig: started.digestConfig as TelegramDigestConfig | null,
-      });
+      await this.executeMultiSourceDigestOne(
+        runId,
+        {
+          ...started,
+          digestConfig: started.digestConfig as TelegramDigestConfig | null,
+        },
+        'telegram_digest',
+      );
+      return;
+    }
+
+    if (started.kind === 'slack_digest' && this.options.executeSlackDigestRun) {
+      await this.executeMultiSourceDigestOne(
+        runId,
+        {
+          ...started,
+          digestConfig: started.digestConfig as SlackDigestConfig | null,
+        },
+        'slack_digest',
+      );
       return;
     }
 
@@ -1170,15 +1194,16 @@ export class ScheduleRunner {
     }
   }
 
-  private async executeTelegramDigestOne(
+  private async executeMultiSourceDigestOne(
     runId: string,
     started: {
       toPlan: RunToPlan;
       convId: string;
       messageId: string;
-      digestConfig: TelegramDigestConfig | null;
+      digestConfig: TelegramDigestConfig | SlackDigestConfig | null;
       digestConfigHash: string | null;
     },
+    kind: 'telegram_digest' | 'slack_digest',
   ): Promise<void> {
     const { pool } = this.options;
     const now = this.now();
@@ -1190,33 +1215,43 @@ export class ScheduleRunner {
       controller.abort();
     }, this.planTimeoutMs);
 
-    let outcome: DigestRunOutcome;
+    let outcome: DigestRunOutcome | SlackDigestRunOutcome;
     try {
       const aborted = new Promise<never>((_, reject) =>
         controller.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }),
       );
-      outcome = await Promise.race([
-        this.options.executeDigestRun!(
-          {
-            ...started.toPlan,
-            digestConfig: started.digestConfig,
-            digestConfigHash: started.digestConfigHash,
-            beforeSendCheck: async () => {
-              const checkRes = await pool.query('SELECT version, status FROM schedules WHERE id = $1', [
-                started.toPlan.scheduleId,
-              ]);
-              const current = checkRes.rows[0];
-              return Boolean(
-                current &&
-                  current.version === started.toPlan.scheduleVersion &&
-                  current.status === 'active',
-              );
-            },
-          },
-          controller.signal,
-        ),
-        aborted,
-      ]);
+      const beforeSendCheck = async () => {
+        const checkRes = await pool.query('SELECT version, status FROM schedules WHERE id = $1', [
+          started.toPlan.scheduleId,
+        ]);
+        const current = checkRes.rows[0];
+        return Boolean(
+          current &&
+            current.version === started.toPlan.scheduleVersion &&
+            current.status === 'active',
+        );
+      };
+      const execPromise =
+        kind === 'slack_digest'
+          ? this.options.executeSlackDigestRun!(
+              {
+                ...started.toPlan,
+                digestConfig: started.digestConfig as SlackDigestConfig | null,
+                digestConfigHash: started.digestConfigHash,
+                beforeSendCheck,
+              },
+              controller.signal,
+            )
+          : this.options.executeDigestRun!(
+              {
+                ...started.toPlan,
+                digestConfig: started.digestConfig as TelegramDigestConfig | null,
+                digestConfigHash: started.digestConfigHash,
+                beforeSendCheck,
+              },
+              controller.signal,
+            );
+      outcome = await Promise.race([execPromise, aborted]);
     } catch {
       outcome = {
         status: 'digest_failed',
@@ -1227,8 +1262,13 @@ export class ScheduleRunner {
       this.current = null;
     }
 
+    const unknownFallback = kind === 'slack_digest' ? SLACK_DIGEST_DELIVERY_UNKNOWN : TELEGRAM_DELIVERY_UNKNOWN;
     const pauseChanges: ScheduleChange[] = [];
     const replyTo = { replyToMessageId: started.messageId };
+    let sseResult:
+      | { kind: 'sent'; text: string }
+      | { kind: 'error'; error: string }
+      | null = null;
 
     await inTransaction(pool, async (client) => {
       const schedule = (
@@ -1258,7 +1298,7 @@ export class ScheduleRunner {
       }
 
       if (outcome.status === 'delivery_unknown' || (run.delivery_started_at != null && outcome.status !== 'digest_sent')) {
-        const unknownErr = outcome.status === 'delivery_unknown' ? outcome.error : TELEGRAM_DELIVERY_UNKNOWN;
+        const unknownErr = outcome.status === 'delivery_unknown' ? outcome.error : unknownFallback;
         await this.messages.createMessage(
           started.convId,
           'system',
@@ -1270,6 +1310,7 @@ export class ScheduleRunner {
           "UPDATE schedule_runs SET status='needs_attention', error=$2, updated_at=now() WHERE id=$1",
           [runId, unknownErr],
         );
+        sseResult = { kind: 'error', error: unknownErr };
         return;
       }
 
@@ -1304,6 +1345,7 @@ export class ScheduleRunner {
           "UPDATE schedule_runs SET status='digest_sent', delivery=$2, updated_at=now() WHERE id=$1",
           [runId, JSON.stringify(outcome.delivery)],
         );
+        sseResult = { kind: 'sent', text: outcome.digestText };
         return;
       }
 
@@ -1323,6 +1365,7 @@ export class ScheduleRunner {
           const pausedRow = await this.pause(client, schedule.id, outcome.error);
           pauseChanges.push(await this.options.recordState(client, pausedRow, now));
         }
+        sseResult = { kind: 'error', error: outcome.error };
         return;
       }
 
@@ -1347,8 +1390,31 @@ export class ScheduleRunner {
         const pausedRow = await this.pause(client, schedule.id, reason);
         pauseChanges.push(await this.options.recordState(client, pausedRow, now));
       }
+      sseResult = { kind: 'error', error: outcome.error };
     });
 
     this.announce(pauseChanges);
+    if (sseResult && (sseResult as { kind: string }).kind === 'sent') {
+      const sent = sseResult as { kind: 'sent'; text: string };
+      this.send(started.convId, 'answer', {
+        conversationId: started.convId,
+        text: sent.text,
+        lookups: [],
+        usedDirectory: [],
+        replyToMessageId: started.messageId,
+      });
+      this.send(started.convId, 'agent_state', {
+        conversationId: started.convId,
+        state: 'idle',
+        replyToMessageId: started.messageId,
+      });
+    } else if (sseResult && (sseResult as { kind: string }).kind === 'error') {
+      const failed = sseResult as { kind: 'error'; error: string };
+      this.send(started.convId, 'error', {
+        conversationId: started.convId,
+        message: failed.error,
+        replyToMessageId: started.messageId,
+      });
+    }
   }
 }

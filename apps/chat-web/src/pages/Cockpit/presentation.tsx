@@ -15,6 +15,7 @@ const FRIENDLY_FIELD_LABELS: Record<string, string> = {
   htmlLink: 'Đường dẫn sự kiện',
   shortUrl: 'Đường dẫn thẻ Trello',
   url: 'Đường dẫn kết quả',
+  permalink: 'Đường dẫn tin nhắn Slack',
   webViewLink: 'Đường dẫn xem trực tuyến',
   updatedRange: 'Vùng dữ liệu đã cập nhật',
   spreadsheetUrl: 'Đường dẫn trang tính',
@@ -84,7 +85,7 @@ export function resultObject(output:unknown):Record<string,unknown>|null {
 export function outcomeURL(step:ExecutionStepInfo):string|undefined {
   if(step.status!=='succeeded') return;
   const output=resultObject(step.output);
-  for(const field of ['url','html_url','webUrl']) {
+  for(const field of ['url','html_url','webUrl','permalink']) {
     const value=output?.[field]; if(typeof value!=='string') continue;
     try {const url=new URL(value); if(url.protocol==='https:' && !url.username && !url.password) return value;}catch { /* Untrusted output is kept only in technical details. */ }
   }

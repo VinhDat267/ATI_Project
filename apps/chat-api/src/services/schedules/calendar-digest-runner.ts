@@ -2,9 +2,11 @@ import type pg from 'pg';
 import { decryptCredentials, detectCalendarConflicts, StepError, type CalendarEventWithConflict } from '@wap/tool-adapters';
 import type { CalendarDigestConfig, CalendarDigestDelivery } from '@wap/tool-schemas';
 import { computeCalendarDigestHash } from './calendar-digest-candidate.js';
+import { findSlackDigestCredential } from './multi-source-digest-candidate.js';
 import { localLabel } from './next-occurrence.js';
 import type { RunToPlan } from './schedule-runner.js';
 import { slackMrkdwnToTelegramPlain } from './telegram-plain-text.js';
+import { buildSlackMarkdownDigestBlocks } from '../slack/slack-digest-blocks.js';
 
 export const CALENDAR_DELIVERY_UNKNOWN = 'Chưa xác định bản tin lịch đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
 export const MAX_DIGEST_DISPLAY_EVENTS = 20;
@@ -493,14 +495,26 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
 
     // Verify destination service (slack shared or personal telegram)
     const destService = config.destination.service;
-    const destRow = (
-      await options.pool.query(
-        destService === 'telegram'
-          ? 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND user_id = $2 LIMIT 1'
-          : 'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL LIMIT 1',
-        destService === 'telegram' ? [destService, run.userId] : [destService],
-      )
-    ).rows[0];
+    // The shared Slack credential must belong to the schedule's own workspace (NULL = default/personal).
+    const schedMeta =
+      destService === 'slack'
+        ? (await options.pool.query('SELECT workspace_id, workspace_mode FROM schedules WHERE id = $1', [run.scheduleId])).rows[0]
+        : undefined;
+    const scheduleWorkspaceId: string | null = schedMeta?.workspace_id ?? null;
+    const scheduleWorkspaceMode: string | null = schedMeta?.workspace_mode ?? null;
+    const destRow =
+      destService === 'telegram'
+        ? (
+            await options.pool.query(
+              'SELECT id, user_id, config, status FROM service_credentials WHERE service = $1 AND user_id = $2 LIMIT 1',
+              [destService, run.userId],
+            )
+          ).rows[0]
+        : await findSlackDigestCredential(options.pool, {
+            userId: run.userId,
+            workspaceMode: scheduleWorkspaceMode,
+            workspaceId: scheduleWorkspaceId,
+          });
 
     if (!destRow || destRow.status !== 'active') {
       return {
@@ -694,6 +708,9 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
         userId: run.userId,
         phase: 'execution',
         actor: { userId: run.userId },
+        ...(destService === 'slack' && scheduleWorkspaceMode === 'organization' && scheduleWorkspaceId
+          ? { workspaceMode: 'organization' as const, workspaceId: scheduleWorkspaceId }
+          : {}),
         ...(telegramDestBinding ? { connections: { telegram: telegramDestBinding } } : {}),
       });
       if (!destAdapter) {
@@ -721,9 +738,13 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
       deliveryStarted = true;
       signal.throwIfAborted();
       if (config.destination.service === 'slack') {
+        const blocks = buildSlackMarkdownDigestBlocks({
+          headerTitle: 'Bản tin Lịch họp Google Calendar của Planora',
+          messageText: formatted.text,
+        });
         await destAdapter.execute(
           'slack.send_message',
-          { channel: config.destination.channelId, text: formatted.text },
+          { channel: config.destination.channelId, text: formatted.text, blocks },
           { signal },
         );
       } else {

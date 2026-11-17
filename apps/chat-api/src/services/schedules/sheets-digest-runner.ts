@@ -15,6 +15,7 @@ import {
   computeSheetsDigestV1Hash,
 } from './sheets-digest-candidate.js';
 import { hasGoogleCredentialOrigin } from '../gmail/credential-origin.js';
+import { buildSlackMarkdownDigestBlocks } from '../slack/slack-digest-blocks.js';
 
 export const SHEETS_DELIVERY_UNKNOWN =
   'SHEETS_DELIVERY_UNKNOWN: Đã bắt đầu gửi báo cáo nhưng mất kết nối trước khi nhận xác nhận từ dịch vụ đích. Hệ thống tạm dừng tự động gửi lại để tránh trùng lặp.';
@@ -1174,9 +1175,13 @@ export class SheetsDigestRunner {
     try {
       let sendRes: any;
       if (config.destination.service === 'slack') {
+        const blocks = buildSlackMarkdownDigestBlocks({
+          headerTitle: headerTitle || 'Bản tin Google Sheets của Planora',
+          messageText: finalMessage,
+        });
         sendRes = await destAdapter.execute(
           'slack.send_message',
-          { channel: config.destination.channelId, text: finalMessage },
+          { channel: config.destination.channelId, text: finalMessage, blocks },
           { signal: outerSignal }
         );
         const ts = typeof sendRes?.ts === 'string' ? sendRes.ts.trim() : '';

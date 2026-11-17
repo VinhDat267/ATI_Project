@@ -10,6 +10,7 @@ export function slackMrkdwnToTelegramPlain(text: string): string {
       line
         .replace(/^(\s*)&gt;\s?/, '$1')
         .replace(/^(\s*)>\s/, '$1')
+        .replace(/<@[UW][A-Z0-9]+\|([^>]+)>/g, '@$1')
         .replace(/<(https?:\/\/[^|>\s]+)\|([^>]+)>/g, (_m, url: string, label: string) => `${label} — ${url}`)
         .replace(/<(https?:\/\/[^|>\s]+)>/g, '$1')
         .replace(/(^|[\s(•\-])\*([^*\n]+?)\*(?=$|[\s:).,!?])/g, '$1$2')

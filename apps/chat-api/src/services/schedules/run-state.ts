@@ -8,6 +8,7 @@ import type {
   ScheduleRunView,
   SheetsDigestConfig,
   SheetsDigestDelivery,
+  SlackDigestDelivery,
   TelegramDigestDelivery,
   TrelloDigestDelivery,
 } from '@wap/tool-schemas';
@@ -36,6 +37,7 @@ export interface RunRow {
     | CalendarDigestDelivery
     | GithubDigestDelivery
     | TelegramDigestDelivery
+    | SlackDigestDelivery
     | TrelloDigestDelivery
     | NotionDigestDelivery
     | MyJiraDigestDelivery
@@ -119,6 +121,23 @@ export function calendarOrGithubDeliveryUnknownKind(
   return schedule?.kind === markerKind ? markerKind : null;
 }
 
+export function isSlackDigestDeliveryUnknown(
+  run: RunRow,
+  schedule?: Pick<ScheduleRow, 'kind'>,
+): boolean {
+  if (
+    run.status !== 'needs_attention' ||
+    run.delivery_started_at == null ||
+    run.delivery_resolution != null ||
+    typeof run.error !== 'string'
+  ) {
+    return false;
+  }
+  if (schedule && schedule.kind !== 'slack_digest') return false;
+  // Match prefix of SLACK_DIGEST_DELIVERY_UNKNOWN without importing slack-digest-runner (breaks circular dep back to schedule-repo).
+  return run.error.includes('SLACK_DELIVERY_UNKNOWN');
+}
+
 export function matchesDispatchedDigestConfig(run: RunRow, schedule: DeliverySchedule): boolean {
   return run.schedule_version === schedule.version &&
     schedule.digest_config != null &&
@@ -189,8 +208,13 @@ export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): Sc
     deliveryFollowupRunId: row.delivery_followup_run_id ?? null,
   };
   const unknownKind = calendarOrGithubDeliveryUnknownKind(row, schedule);
+  const slackUnknown = isSlackDigestDeliveryUnknown(row, schedule);
   if (schedule && jiraUnknown) {
     view.canRetryDelivery = schedule.kind === 'myjira_digest' && schedule.status === 'active' &&
+      matchesDispatchedDigestConfig(row, schedule);
+  } else if (schedule && slackUnknown) {
+    view.canRetryDelivery = schedule.kind === 'slack_digest' &&
+      (schedule.status === 'active' || (schedule.status === 'completed' && schedule.recurrence.type === 'once')) &&
       matchesDispatchedDigestConfig(row, schedule);
   } else if (schedule && unknownKind) {
     view.canRetryDelivery = schedule.kind === unknownKind &&

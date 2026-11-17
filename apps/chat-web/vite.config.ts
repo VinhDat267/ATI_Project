@@ -9,6 +9,13 @@ export default defineConfig(({ command, mode }) => {
   const demo = command === 'serve' && env.RUNTIME_MODE === 'sandbox' &&
     env.VITE_SHOW_DEMO_LOGIN === 'true' && Boolean(env.SANDBOX_USER_EMAIL && env.SANDBOX_USER_PASSWORD) &&
     env.SANDBOX_USER_EMAIL !== env.CHAT_ADMIN_EMAIL;
+  const allowedRedirectHost = (() => {
+    try {
+      return env.MYSLACK_OAUTH_REDIRECT_URI ? new URL(env.MYSLACK_OAUTH_REDIRECT_URI.trim()).hostname : '';
+    } catch {
+      return '';
+    }
+  })();
   return {
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -28,6 +35,11 @@ export default defineConfig(({ command, mode }) => {
   server: {
     host: '127.0.0.1',
     port: Number(process.env.V3_WEB_PORT) || 5174,
+    allowedHosts: [
+      'localhost',
+      '127.0.0.1',
+      ...(allowedRedirectHost ? [allowedRedirectHost] : []),
+    ],
     proxy: {
       '/api': {
         target: `http://127.0.0.1:${process.env.PORT || 3000}`,

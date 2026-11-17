@@ -14,6 +14,12 @@ import {
 import { escapeSlackMrkdwn } from './github-digest-runner.js';
 import type { RunToPlan } from './schedule-runner.js';
 import { slackMrkdwnToTelegramPlain } from './telegram-plain-text.js';
+import { buildSlackMarkdownDigestBlocks } from '../slack/slack-digest-blocks.js';
+import {
+  fetchSlackMentionIndexSafe,
+  formatAssigneeForSlack,
+  type SlackMentionIndex,
+} from '../slack/slack-mention-resolver.js';
 
 export const TRELLO_DELIVERY_UNKNOWN =
   'TRELLO_DELIVERY_UNKNOWN: Chưa xác định bản tin Trello đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
@@ -49,12 +55,21 @@ export type RunTrelloDigest = (
   signal: AbortSignal
 ) => Promise<TrelloDigestRunOutcome>;
 
+export interface TrelloCardAssignee {
+  id: string;
+  fullName?: string;
+  username?: string;
+}
+
 export interface TrelloCardDigestItem {
+  boardId?: string;
   boardName: string;
   id: string;
   name: string;
   url: string;
   due?: string | null;
+  assigneeIds?: string[];
+  assignees?: TrelloCardAssignee[];
 }
 
 export interface TrelloDigestRunnerOptions {
@@ -63,6 +78,8 @@ export interface TrelloDigestRunnerOptions {
   trelloConnection?: (userId: string, scopeId?: string) => Promise<any>;
   telegramConnection?: (userId: string) => Promise<any>;
   getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
+  /** Resolve Trello assignees to Slack `<@U...>` mentions on Slack deliveries (opt-in / server enabled). */
+  resolveSlackMentions?: boolean;
   summarizeDigest?: (
     input: {
       boards: Array<{ id: string; name: string }>;
@@ -191,15 +208,35 @@ function formatTrelloDueInTimeZone(isoDue: string, timeZone: string): string {
   }
 }
 
-function formatTrelloSectionItems(items: TrelloCardDigestItem[], timeZone: string): string[] {
+function formatTrelloSectionItems(
+  items: TrelloCardDigestItem[],
+  timeZone: string,
+  mentionIndex?: SlackMentionIndex | null,
+): string[] {
   return items.map((item) => {
     const safeTitle = escapeSlackMrkdwn(sanitizeUntrustedTrelloText(item.name, 120));
     const safeBoard = escapeSlackMrkdwn(sanitizeUntrustedTrelloText(item.boardName, 60));
     const dueSuffix = item.due ? ` _(hạn: ${formatTrelloDueInTimeZone(item.due, timeZone)})_` : '';
-    if (item.url) {
-      return `  - [${safeBoard}] <${item.url}|${safeTitle}>${dueSuffix}`;
+    let assigneeSuffix = '';
+    if (mentionIndex !== undefined && Array.isArray(item.assignees) && item.assignees.length > 0) {
+      const renderedAssignees = item.assignees
+        .slice(0, 2)
+        .map((a) =>
+          formatAssigneeForSlack(
+            { displayName: a.fullName, username: a.username },
+            mentionIndex,
+            (s) => escapeSlackMrkdwn(sanitizeUntrustedTrelloText(s, 40)),
+          ),
+        )
+        .filter(Boolean);
+      if (renderedAssignees.length > 0) {
+        assigneeSuffix = ` · 👤 ${renderedAssignees.join(', ')}`;
+      }
     }
-    return `  - [${safeBoard}] ${safeTitle}${dueSuffix}`;
+    if (item.url) {
+      return `  - [${safeBoard}] <${item.url}|${safeTitle}>${dueSuffix}${assigneeSuffix}`;
+    }
+    return `  - [${safeBoard}] ${safeTitle}${dueSuffix}${assigneeSuffix}`;
   });
 }
 
@@ -774,12 +811,17 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
           seenCardIds.add(cardId);
           uniqueScannedCount++;
 
+          const assigneeIds = Array.isArray(c.idMembers)
+            ? c.idMembers.map((id: any) => String(id ?? '').trim()).filter(Boolean)
+            : [];
           const item: TrelloCardDigestItem = {
+            boardId: board.id,
             boardName: board.name,
             id: cardId,
             name: String(c.name ?? ''),
             url: String(c.url ?? ''),
             due: typeof c.due === 'string' ? c.due : null,
+            ...(assigneeIds.length > 0 ? { assigneeIds } : {}),
           };
 
           const inDoneList = doneListIds.has(String(c?.listId ?? c?.idList ?? ''));
@@ -838,6 +880,54 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
     }
 
     const scanComplete = everyBoardFullyListed && !truncatedByFetchLimit;
+
+    // Best-effort Trello board member -> Slack <@U...> mention resolution (Slack delivery only)
+    let mentionIndex: SlackMentionIndex | null | undefined;
+    if (!isTelegramDest && options.resolveSlackMentions === true) {
+      const displayWithMembers = [...overdueCards, ...dueSoonCards, ...completedCards].filter(
+        (card) => Array.isArray(card.assigneeIds) && card.assigneeIds.length > 0 && card.boardId,
+      );
+      if (displayWithMembers.length > 0) {
+        const boardIdsToFetch = [...new Set(displayWithMembers.map((c) => c.boardId!))];
+        const membersById = new Map<string, TrelloCardAssignee>();
+        for (const boardId of boardIdsToFetch) {
+          if (signal.aborted) break;
+          try {
+            const members = await trelloAdapter.execute(
+              'trello.search_members',
+              { boardId, query: '' },
+              { signal: trelloSignal(TRELLO_READ_TIMEOUT_MS, signal), boardId },
+            );
+            if (Array.isArray(members)) {
+              for (const m of members) {
+                const id = typeof m?.id === 'string' ? m.id.trim() : '';
+                if (!id) continue;
+                membersById.set(id, {
+                  id,
+                  ...(typeof m.fullName === 'string' && m.fullName.trim() ? { fullName: m.fullName.trim() } : {}),
+                  ...(typeof m.username === 'string' && m.username.trim() ? { username: m.username.trim() } : {}),
+                });
+              }
+            }
+          } catch {
+            // Non-blocking: missing board members leaves card text clean
+          }
+        }
+        let hasResolvedTrelloMember = false;
+        for (const card of displayWithMembers) {
+          const resolved = (card.assigneeIds ?? [])
+            .map((id) => membersById.get(id))
+            .filter((m): m is TrelloCardAssignee => Boolean(m));
+          if (resolved.length > 0) {
+            card.assignees = resolved;
+            hasResolvedTrelloMember = true;
+          }
+        }
+        mentionIndex = hasResolvedTrelloMember
+          ? await fetchSlackMentionIndexSafe(slackAdapter, { signal })
+          : null;
+      }
+    }
     const deliveryCounts = {
       overdueCards: matchedOverdueCount,
       dueSoonCards: matchedDueSoonCount,
@@ -943,7 +1033,7 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
 
     const section = (title: string, items: TrelloCardDigestItem[], matched: number) => ({
       title,
-      rows: formatTrelloSectionItems(items, timeZone),
+      rows: formatTrelloSectionItems(items, timeZone, mentionIndex),
       shown: 0,
       matched,
     });
@@ -1142,9 +1232,13 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
     }
 
     try {
+      const blocks = buildSlackMarkdownDigestBlocks({
+        headerTitle: 'Bản tin Trello tự động của Planora',
+        messageText,
+      });
       const sendRes = await slackAdapter.execute(
         'slack.send_message',
-        { channel: config.channelId, text: messageText },
+        { channel: config.channelId, text: messageText, blocks },
         { signal }
       );
       if (!isValidSlackReceiptTs(sendRes?.ts)) {

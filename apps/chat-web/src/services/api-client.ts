@@ -1021,6 +1021,16 @@ export class ApiClient {
     return this.request<{ services: ServiceInfo[]; canConfigure: boolean; personalOAuth?: string[] }>('/api/services');
   }
 
+  async getScopeCandidates(
+    service: string,
+    credentials?: Record<string, string>,
+  ): Promise<{ items: Array<{ id: string; label: string; warning?: string }>; truncated: boolean }> {
+    return this.request(`/api/services/${encodeURIComponent(service)}/scope-candidates`, {
+      method: 'POST',
+      body: JSON.stringify(credentials ? { credentials } : {}),
+    });
+  }
+
   async saveServiceScope(
     service: string,
     allowedScope: string[] | Record<string, string[]>

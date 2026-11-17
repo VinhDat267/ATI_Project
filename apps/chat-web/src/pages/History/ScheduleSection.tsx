@@ -47,7 +47,19 @@ function RunLink({ run, navigate }: { run: ScheduleRunView; navigate: (path: str
             : ''
         }`
       : null;
-  return <><span>{formatRunTime(run.dueAt)} · </span>{run.convId ? <a className="underline text-[#B43E00]" href={`/c/${run.convId}`} onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(`/c/${run.convId}`); }}>{runLabel(run)}</a> : <span>{runLabel(run)}</span>}{sheetsDelivery && <span className="text-xs text-[#6B7280]"> ({sheetsDelivery.spreadsheetTitle} → {sheetsDelivery.targetLabel ?? sheetsDelivery.targetId})</span>}{githubDest && <span className="text-xs text-[#6B7280]"> ({githubDest})</span>}{telegramDest && <span className="text-xs text-[#6B7280]"> ({telegramDest})</span>}{run.error && <span className="block text-xs text-[#6B7280]">{run.error}</span>}</>;
+  const slackMultiDest =
+    run.delivery &&
+    'destinationService' in run.delivery &&
+    run.delivery.destinationService === 'slack' &&
+    'sources' in run.delivery &&
+    !('counts' in run.delivery)
+      ? `Slack #${run.delivery.channelName.replace(/^#/, '')}${
+          Array.isArray(run.delivery.sources) && run.delivery.sources.length > 0
+            ? ` · ${run.delivery.sources.length} nguồn`
+            : ''
+        }`
+      : null;
+  return <><span>{formatRunTime(run.dueAt)} · </span>{run.convId ? <a className="underline text-[#B43E00]" href={`/c/${run.convId}`} onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(`/c/${run.convId}`); }}>{runLabel(run)}</a> : <span>{runLabel(run)}</span>}{sheetsDelivery && <span className="text-xs text-[#6B7280]"> ({sheetsDelivery.spreadsheetTitle} → {sheetsDelivery.targetLabel ?? sheetsDelivery.targetId})</span>}{githubDest && <span className="text-xs text-[#6B7280]"> ({githubDest})</span>}{telegramDest && <span className="text-xs text-[#6B7280]"> ({telegramDest})</span>}{slackMultiDest && <span className="text-xs text-[#6B7280]"> ({slackMultiDest})</span>}{run.error && <span className="block text-xs text-[#6B7280]">{run.error}</span>}</>;
 }
 function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: ScheduleView; navigate: (path: string) => void; reload: () => Promise<void>; onChanged: (schedule: ScheduleView) => void }) {
   const [open, setOpen] = useState(false), [runs, setRuns] = useState<ScheduleRunView[]>([]), [error, setError] = useState('');
@@ -75,7 +87,7 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
         <span data-schedule-kind="plan" data-schedule-mode="manual" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
           Mỗi lượt cần bạn duyệt
         </span>
-      ) : schedule.kind !== 'telegram_digest' ? (
+      ) : schedule.kind !== 'telegram_digest' && schedule.kind !== 'slack_digest' ? (
         <span data-schedule-kind={schedule.kind} data-schedule-mode="auto_digest" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
           Tự gửi
         </span>
@@ -86,7 +98,12 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
         Tự gửi Telegram{schedule.digest && 'chatTitle' in schedule.digest && schedule.digest.chatTitle ? ` · ${schedule.digest.chatTitle}` : ''}
       </p>
     )}
-    {schedule.kind !== 'plan' && schedule.kind !== 'telegram_digest' && (
+    {schedule.kind === 'slack_digest' && (
+      <p data-schedule-kind={schedule.kind} className="text-xs font-semibold text-emerald-700">
+        Tự gửi Slack{schedule.digest && 'channelName' in schedule.digest && schedule.digest.channelName ? ` · #${schedule.digest.channelName.replace(/^#/, '')}` : ''}
+      </p>
+    )}
+    {schedule.kind !== 'plan' && schedule.kind !== 'telegram_digest' && schedule.kind !== 'slack_digest' && (
       <p className="text-xs font-semibold text-emerald-700">
         Gửi định kỳ theo phạm vi đã xác nhận
       </p>

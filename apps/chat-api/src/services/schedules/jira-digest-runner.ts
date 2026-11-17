@@ -14,6 +14,12 @@ import {
 } from './jira-digest-candidate.js';
 import { escapeSlackMrkdwn } from './github-digest-runner.js';
 import { slackMrkdwnToTelegramPlain } from './telegram-plain-text.js';
+import { buildSlackMarkdownDigestBlocks } from '../slack/slack-digest-blocks.js';
+import {
+  fetchSlackMentionIndexSafe,
+  formatAssigneeForSlack,
+  type SlackMentionIndex,
+} from '../slack/slack-mention-resolver.js';
 
 export const MYJIRA_DELIVERY_UNKNOWN =
   'Không rõ bản tin Jira đã gửi hay chưa (hệ thống mất kết nối hoặc hết thời gian chờ sau khi bắt đầu gửi). Hãy kiểm tra kênh đích rồi xác nhận ở nút bên dưới trước khi chạy bù.';
@@ -133,6 +139,7 @@ export function analyzeJiraDigestIssues(issues: JiraDigestIssueItem[]): {
 
 export function formatJiraDigestReport(
   projectSections: Array<{ projectKey: string; projectName?: string; issues: JiraDigestIssueItem[] }>,
+  mentionIndex?: SlackMentionIndex | null,
 ): string {
   const lines: string[] = ['📋 *Bản tin Tiến độ & Blocker Jira (Read-Only Standup Digest)*'];
   for (const section of projectSections) {
@@ -155,7 +162,11 @@ export function formatJiraDigestReport(
       const safeSummary = escapeSlackMrkdwn(sanitizeUntrustedJiraText(issue.summary, 100));
       const metaParts = [escapeSlackMrkdwn(issue.status)];
       if (issue.priority) metaParts.push(`⚡ ${escapeSlackMrkdwn(issue.priority)}`);
-      if (issue.assignee) metaParts.push(`👤 ${escapeSlackMrkdwn(issue.assignee)}`);
+      if (issue.assignee) {
+        metaParts.push(
+          `👤 ${formatAssigneeForSlack({ displayName: issue.assignee }, mentionIndex, escapeSlackMrkdwn)}`,
+        );
+      }
       lines.push(`  - ${icon}<${issue.url}|${escapeSlackMrkdwn(issue.key)}>: ${safeSummary} _(${metaParts.join(' · ')})_`);
     }
   }
@@ -170,6 +181,7 @@ export interface RunJiraDigestInput {
   revalidatePolicy: (userId: string, config: JiraDigestConfig, signal?: AbortSignal) => Promise<{ allowed: boolean; reason?: string }>;
   getAdapter: (serviceName: string, context?: any) => Promise<any> | any;
   signal?: AbortSignal;
+  resolveSlackMentions?: boolean;
 }
 
 export async function runJiraDigest(
@@ -240,9 +252,8 @@ export async function runJiraDigest(
     });
   }
 
-  const text = formatJiraDigestReport(sections);
-
   if (digestConfig.telegramChatId) {
+    const text = formatJiraDigestReport(sections);
     const tgAdapter = await input.getAdapter('telegram', { userId, phase: 'execution' });
     await tgAdapter.execute(
       'telegram.send_message',
@@ -252,10 +263,25 @@ export async function runJiraDigest(
     return { state: 'digest_sent', text };
   }
 
-  const slackAdapter = await input.getAdapter('slack', { userId, phase: 'execution' });
+  const slackAdapter = await input.getAdapter('slack', {
+    userId,
+    phase: 'execution',
+    workspaceId: digestConfig.workspaceId,
+    workspaceMode: 'organization',
+  });
+  const hasAssignee = sections.some((s) => s.issues.some((it) => Boolean(it.assignee?.trim())));
+  const mentionIndex =
+    input.resolveSlackMentions === true && hasAssignee
+      ? await fetchSlackMentionIndexSafe(slackAdapter, { signal })
+      : null;
+  const text = formatJiraDigestReport(sections, mentionIndex);
+  const blocks = buildSlackMarkdownDigestBlocks({
+    headerTitle: 'Bản tin Tiến độ & Blocker Jira của Planora',
+    messageText: text,
+  });
   await slackAdapter.execute(
     'slack.send_message',
-    { channel: digestConfig.channelId, text },
+    { channel: digestConfig.channelId, text, blocks },
     { signal },
   );
   return { state: 'digest_sent', text };
@@ -312,6 +338,7 @@ export interface CreateJiraDigestExecutorOptions {
     signal: AbortSignal,
   ) => Promise<string | null>;
   now?: () => Date;
+  resolveSlackMentions?: boolean;
 }
 
 export function buildJiraAiPromptPayload(input: {
@@ -978,13 +1005,23 @@ export function createJiraDigestExecutor(options: CreateJiraDigestExecutorOption
       }
     }
 
+    const hasAssignee = allIssues.some((it) => Boolean(it.assignee?.trim()));
+    const mentionIndex =
+      !isTelegramDest && options.resolveSlackMentions === true && hasAssignee
+        ? await fetchSlackMentionIndexSafe(slackAdapter, { signal })
+        : null;
+
     const formatIssueLines = (items: JiraDigestIssueItem[]) =>
       items.slice(0, PER_CATEGORY_DISPLAY_LIMIT).map((it) => {
         const safeTitle = escapeSlackMrkdwn(sanitizeUntrustedJiraText(it.summary, 110));
         const meta: string[] = [escapeSlackMrkdwn(it.status)];
         if (it.priority) meta.push(`⚡ ${escapeSlackMrkdwn(it.priority)}`);
         if (it.dueDate) meta.push(`hạn: ${it.dueDate}`);
-        if (it.assignee) meta.push(`👤 ${escapeSlackMrkdwn(it.assignee)}`);
+        if (it.assignee) {
+          meta.push(
+            `👤 ${formatAssigneeForSlack({ displayName: it.assignee }, mentionIndex, escapeSlackMrkdwn)}`,
+          );
+        }
         const label = `<${it.url}|${escapeSlackMrkdwn(it.key)}>`;
         return `  - ${label}: ${safeTitle} _(${meta.join(' · ')})_`;
       });
@@ -1116,9 +1153,13 @@ export function createJiraDigestExecutor(options: CreateJiraDigestExecutorOption
     }
 
     try {
+      const blocks = buildSlackMarkdownDigestBlocks({
+        headerTitle: 'Bản tin Tiến độ & Blocker Jira của Planora',
+        messageText,
+      });
       const sendRes = await slackAdapter.execute(
         'slack.send_message',
-        { channel: config.channelId, text: messageText },
+        { channel: config.channelId, text: messageText, blocks },
         { signal },
       );
       if (!isValidSlackReceiptTs(sendRes?.ts)) {

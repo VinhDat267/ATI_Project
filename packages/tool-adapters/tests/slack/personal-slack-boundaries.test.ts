@@ -510,6 +510,7 @@ describe('PersonalSlackReadAdapter — bounded transport boundaries (SLACK-03C1 
         'https://workspace-a.slack.com.evil.example/archives/C_GENERAL_A/p1712345678000100',
         'https://evil.example/archives/C_GENERAL_A/p1712345678000100',
         'http://workspace-a.slack.com/archives/C_GENERAL_A/p1712345678000100',
+        'https://workspace-a.slack.com/archives/C_GENERAL_A/p1712345678000100?redirect=https://evil.example',
       ]) {
         mockServer.setNextResponse(200, { ok: true, channel: 'C_GENERAL_A', permalink });
         const adapter = createAdapter();
@@ -521,6 +522,42 @@ describe('PersonalSlackReadAdapter — bounded transport boundaries (SLACK-03C1 
           })
         ).rejects.toMatchObject({ category: 'SERVER_ERROR' });
       }
+    });
+
+    it('accepts live Slack thread permalink query params and empty topic/purpose creators', async () => {
+      const adapter = createAdapter();
+      const threadPermalink =
+        'https://workspace-a.slack.com/archives/C_GENERAL_A/p1712345678000100?thread_ts=1712345678.000100&cid=C_GENERAL_A';
+      mockServer.setNextResponse(200, {
+        ok: true,
+        channel: 'C_GENERAL_A',
+        permalink: threadPermalink,
+      });
+      const perm = await adapter.execute('myslack.chat_getPermalink', {
+        binding: bindingA,
+        channel: 'C_GENERAL_A',
+        message_ts: '1712345678.000100',
+      });
+      expect(perm.permalink).toBe(threadPermalink);
+
+      mockServer.setNextResponse(200, {
+        ok: true,
+        channel: {
+          id: 'C_GENERAL_A',
+          name: 'ati-test',
+          is_channel: true,
+          creator: '',
+          topic: { value: '', creator: '', last_set: 0 },
+          purpose: { value: '', creator: '', last_set: 0 },
+        },
+      });
+      const info = await adapter.execute('myslack.conversations_info', {
+        binding: bindingA,
+        channel: 'C_GENERAL_A',
+      });
+      expect(info.channel.id).toBe('C_GENERAL_A');
+      expect(info.channel.creator).toBeUndefined();
+      expect(info.channel.topic?.creator).toBeUndefined();
     });
 
     it('whitelists provider fields and never forwards unknown objects or prototypes', async () => {

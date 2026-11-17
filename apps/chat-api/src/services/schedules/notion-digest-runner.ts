@@ -3,6 +3,7 @@ import type { NotionDigestConfig, NotionDigestDelivery, ScheduleRecurrence } fro
 import { approvedSlackNotionBinding, computeNotionDigestConfigHash } from './notion-digest-candidate.js';
 import { escapeSlackMrkdwn } from './github-digest-runner.js';
 import { isSlackMessageTimestamp } from './slack-message-timestamp.js';
+import { buildSlackMarkdownDigestBlocks } from '../slack/slack-digest-blocks.js';
 import { NOTION_DIGEST_REAPPROVAL, isNotionSourceDenied, type NotionDigestSourceAuthority } from '../notion/digest-source-authority.js';
 import type { RunToPlan } from './schedule-runner.js';
 
@@ -464,7 +465,11 @@ export function createNotionDigestRunner(options: NotionDigestRunnerOptions): Ru
         }
         if (claim === 'discarded') return { state: 'discarded' };
         deliveryStarted = true;
-        const receipt = await slackAdapter.execute('slack.send_message', { channel: config.channelId, text }, { signal });
+        const blocks = buildSlackMarkdownDigestBlocks({
+          headerTitle: 'Bản tin Notion tự động của Planora',
+          messageText: text,
+        });
+        const receipt = await slackAdapter.execute('slack.send_message', { channel: config.channelId, text, blocks }, { signal });
         if (!isSlackMessageTimestamp(receipt?.ts)) {
           return { state: 'delivery_unknown', error: NOTION_DELIVERY_UNKNOWN };
         }

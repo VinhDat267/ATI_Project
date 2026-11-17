@@ -1,6 +1,6 @@
 import {PlanRepo} from './plan-repo.js';
 import type pg from 'pg';
-import type { CalendarDigestConfig, GithubDigestConfig, NotionDigestConfig, ScheduleKind, ScheduleRecurrence, ScheduleStatus, ScheduleView, SheetsDigestConfig, TelegramDigestConfig, TrelloDigestConfig } from '@wap/tool-schemas';
+import type { CalendarDigestConfig, GithubDigestConfig, NotionDigestConfig, ScheduleKind, ScheduleRecurrence, ScheduleStatus, ScheduleView, SheetsDigestConfig, SlackDigestConfig, TelegramDigestConfig, TrelloDigestConfig } from '@wap/tool-schemas';
 import { RUN_SELECT, runView, type RunRow } from '../../services/schedules/run-state.js';
 import { localLabel, nextRuns } from '../../services/schedules/next-occurrence.js';
 import { readScheduleArtifact,scheduleSourceContext,tagScheduleContext,maskScheduleArtifact } from '../../services/slack/slack-schedule-lineage.js';
@@ -29,7 +29,7 @@ export interface ScheduleRow {
   workspace_id?: string | null;
   workspace_mode?: 'legacy' | 'personal' | 'organization';
   kind?: ScheduleKind;
-  digest_config?: SheetsDigestConfig | CalendarDigestConfig | GithubDigestConfig | TelegramDigestConfig | TrelloDigestConfig | NotionDigestConfig | null;
+  digest_config?: SheetsDigestConfig | CalendarDigestConfig | GithubDigestConfig | TelegramDigestConfig | SlackDigestConfig | TrelloDigestConfig | NotionDigestConfig | null;
   digest_config_hash?: string | null;
   digest_approved_at?: Date | string | null;
   created_at: Date;
@@ -54,7 +54,9 @@ export class ScheduleRepo {
             ? 'github_digest'
             : row.kind === 'telegram_digest'
               ? 'telegram_digest'
-              : row.kind === 'trello_digest'
+              : row.kind === 'slack_digest'
+                ? 'slack_digest'
+                : row.kind === 'trello_digest'
                 ? 'trello_digest'
                 : row.kind === 'notion_digest'
                   ? 'notion_digest'
@@ -102,6 +104,23 @@ export class ScheduleRepo {
       base.digest = {
         chatId: cfg.chatId,
         chatTitle: cfg.chatTitle,
+        sources: (cfg.sources ?? []).map((s) => {
+          const q = (s.args as Record<string, unknown> | undefined)?.query;
+          return {
+            service: s.service,
+            label: s.label,
+            ...(typeof q === 'string' && q.trim() ? { query: q.trim() } : {}),
+          };
+        }),
+        ...(typeof cfg.includeAiSummary === 'boolean' ? { includeAiSummary: cfg.includeAiSummary } : {}),
+        approvedAt: row.digest_approved_at ? new Date(row.digest_approved_at).toISOString() : null,
+      };
+    } else if (row.kind === 'slack_digest' && row.digest_config) {
+      const cfg = row.digest_config as SlackDigestConfig;
+      base.digest = {
+        destinationService: 'slack',
+        channelId: cfg.channelId,
+        channelName: cfg.channelName,
         sources: (cfg.sources ?? []).map((s) => {
           const q = (s.args as Record<string, unknown> | undefined)?.query;
           return {

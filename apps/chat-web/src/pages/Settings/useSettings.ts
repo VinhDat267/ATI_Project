@@ -162,6 +162,8 @@ export function useSettings(user: User | null) {
       removeScopeItem: (index: number) => { if (active && canEdit) updateDraft(active.id, d => ({ ...d, scopes: d.scopes.filter((_, i) => i !== index) })); },
       onKeyInputChanged: (key: string, value: string) => { if (active && canEdit) updateDraft(active.id, d => ({ ...d, credentials: { ...d.credentials, [key]: value } })); },
       onScopeInputChanged: (value: string) => { if (active && canEdit) { updateDraft(active.id, d => ({ ...d, newScope: value })); setErrors(e => ({ ...e, [active.id]: '' })); } },
+      /** Toggle one picked resource (e.g. a Slack channel chosen from the picker) in the draft scope. */
+      toggleScopeValue: (value: string) => { if (active && canEdit && value) updateDraft(active.id, d => ({ ...d, scopes: d.scopes.includes(value) ? d.scopes.filter(s => s !== value) : [...d.scopes, value] })); },
       saveServiceChanges, runTestConnection,
     } };
 }
