@@ -50,6 +50,8 @@ export interface AdapterContext {
   connections?: PlanConnections;
   /** Approved Jira identity for a scheduled, project-scoped read. */
   jiraDigestBinding?: JiraDigestSourceBinding;
+  /** Exact shared credential already checked by the caller, including its encrypted configuration. */
+  expectedCredential?: { id: string; config: string };
   actorId?: string;
   conversationId?: string;
   planId?: string;
@@ -257,8 +259,11 @@ export class AdapterFactory {
       cacheKey = `org:${trimmedWorkspaceId}:${serviceName}`;
     }
 
-    const cached = this.adapterCache.get(cacheKey);
-    if (cached && context?.phase !== 'execution') return cached;
+    const expectedCredential = context?.expectedCredential;
+    if (context?.phase !== 'execution' && !expectedCredential) {
+      const cached = this.adapterCache.get(cacheKey);
+      if (cached) return cached;
+    }
 
     const registration = getRegisteredService(serviceName);
     if (!registration) throw new Error(`Unsupported service '${serviceName}'`);
@@ -277,7 +282,16 @@ export class AdapterFactory {
       this.adapterCacheMeta.delete(cacheKey);
       throw new Error(`No credentials configured for service '${serviceName}'`);
     }
+    if (expectedCredential && (record.id !== expectedCredential.id || record.config !== expectedCredential.config)) {
+      throw new StepError({
+        category: 'VALIDATION',
+        message: 'Kết nối hoặc phạm vi tài nguyên đã thay đổi.',
+        retryable: false,
+        details: { requestSent: false },
+      });
+    }
 
+    const cached = this.adapterCache.get(cacheKey);
     if (cached) {
       const cachedMeta = this.adapterCacheMeta.get(cacheKey);
       if (cachedMeta && cachedMeta.id === record.id && cachedMeta.config === record.config) {

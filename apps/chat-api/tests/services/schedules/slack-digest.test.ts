@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { encryptCredentials, SlackAdapter, StepError } from '@wap/tool-adapters';
+import { encryptCredentials, GlobalRateLimiter, SlackAdapter, StepError } from '@wap/tool-adapters';
 import type { SlackDigestConfig } from '@wap/tool-schemas';
 import { CredentialRepo } from '../../../src/db/repositories/credential-repo.js';
 import { ConversationRepo } from '../../../src/db/repositories/conversation-repo.js';
@@ -36,7 +36,12 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
 
   beforeEach(async () => {
     await db.pool.query(
-      'DELETE FROM schedule_runs; DELETE FROM schedules; DELETE FROM workspace_members; DELETE FROM workspaces; DELETE FROM service_credentials;',
+      `DELETE FROM schedule_runs;
+       DELETE FROM schedules;
+       DELETE FROM messages WHERE conv_id IN (SELECT id FROM conversations WHERE workspace_id IS NOT NULL);
+       DELETE FROM workspace_members;
+       DELETE FROM workspaces;
+       DELETE FROM service_credentials;`,
     );
     owner = await db.person('Multi Slack Owner');
     orgWsId = (
@@ -241,9 +246,9 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
       let rawBody = '';
       for await (const chunk of req) rawBody += chunk;
 
-      if (url.includes('/conversations.list')) {
+      if (url.includes('/conversations.info')) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, channels: [{ id: 'C_GENERAL', name: 'general', is_private: false }] }));
+        res.end(JSON.stringify({ ok: true, channel: { id: 'C_GENERAL', name: 'general', is_private: false } }));
         return;
       }
       if (url.includes('/chat.postMessage')) {
@@ -486,6 +491,105 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
     }
   });
 
+  it.each(['once', 'scope changed', 'scope changed during throttling', 'large workspace'] as const)('handles a scheduled delivery when %s', async (scenario) => {
+    const scheduling = new ScheduleService({ pool: db.pool, timeZone: TZ, encryptionKey: KEY });
+    const conv = await new ConversationRepo(db.pool).createConversation(owner.id, 'Digest authority', {
+      workspaceMode: 'organization', workspaceId: orgWsId,
+    });
+    const target = { id: 'C_ORG_ENG', name: 'org-eng' };
+    const otherChannels = Array.from({ length: 200 }, (_, i) => ({ id: `C_OTHER_${i}`, name: `other-${i}` }));
+    const channels = scenario === 'large workspace' ? [...otherChannels, target] : [target];
+    const allowedScope = { channels: channels.map((c) => c.id) };
+    const token = 'xoxb-org-valid';
+    const encrypt = (scope: typeof allowedScope) => encryptCredentials({ botToken: token, allowedScope: scope }, KEY);
+    await creds.updateCredentials('slack', () => encrypt(allowedScope), orgWsId);
+    const config: SlackDigestConfig = {
+      destination: 'slack',
+      workspaceMode: 'organization',
+      workspaceId: orgWsId,
+      slackCredentialId: wsOrgSlackCredId,
+      channelId: target.id,
+      channelName: target.name,
+      sources: [{ service: 'mycalendar', tool: 'mycalendar.list_events', label: 'Calendar' }],
+      recurrence: scenario === 'once' ? { type: 'once', date: '2026-11-17', time: '08:00' } : { type: 'daily', time: '08:00' },
+      timeZone: TZ,
+    };
+    const { id: scheduleId } = (await db.pool.query(
+      `INSERT INTO schedules(user_id, conv_id, name, request, recurrence, services, status, next_run_at,
+        kind, digest_config, digest_config_hash, digest_approved_at, workspace_mode, workspace_id)
+       VALUES($1, $2, 'Digest', 'Calendar to Slack', $3, $4, 'active', $5,
+        'slack_digest', $6, $7, now(), 'organization', $8) RETURNING id`,
+      [owner.id, conv.id, JSON.stringify(config.recurrence), ['mycalendar', 'slack'], NOW,
+        JSON.stringify(config), computeSlackDigestConfigHash(config), orgWsId],
+    )).rows[0];
+
+    const posts: string[] = [];
+    const revokeChannel = () => creds.updateCredentials('slack', () => encrypt({ channels: ['C_OTHER_0'] }), orgWsId);
+    const rateLimiter = new GlobalRateLimiter({ maxRequests: 1, windowMs: 1000 });
+    if (scenario === 'scope changed during throttling') {
+      vi.spyOn(rateLimiter, 'waitForSlot')
+        .mockResolvedValueOnce(true)
+        .mockImplementationOnce(async () => {
+          await revokeChannel();
+          return true;
+        });
+    }
+    const slackAdapter = new SlackAdapter({
+      credentials: { botToken: token }, allowedScope,
+      ...(scenario === 'scope changed during throttling' ? { rateLimiter } : {}),
+      fetchFn: async (input, init) => {
+        const url = new URL(String(input));
+        switch (url.pathname) {
+          case '/api/conversations.info':
+            expect(url.searchParams.get('channel')).toBe(target.id);
+            return Response.json({ ok: true, channel: target });
+          case '/api/conversations.list': {
+            const cursor = url.searchParams.get('cursor');
+            return Response.json({
+              ok: true,
+              channels: cursor ? channels.slice(200) : channels.slice(0, 200),
+              response_metadata: { next_cursor: !cursor && channels.length > 200 ? 'next' : '' },
+            });
+          }
+          case '/api/chat.postMessage':
+            posts.push(JSON.parse(String(init?.body)).channel);
+            return Response.json({ ok: true, channel: target.id, ts: '1700000888.000100' });
+          default:
+            throw new Error(`Unexpected Slack API request: ${url.pathname}`);
+        }
+      },
+    });
+    const slackRunner = new SlackDigestRunner({
+      pool: db.pool, credentialRepo: creds, encryptionKey: KEY, timeZone: TZ,
+      adapterFactory: {
+        getAdapterForService: async (service) => service === 'slack' ? slackAdapter : {
+          execute: async () => {
+            if (scenario === 'scope changed') {
+              await revokeChannel();
+            }
+            return { events: [] };
+          },
+        },
+      },
+    });
+    const runner = new ScheduleRunner({
+      pool: db.pool, timeZone: TZ, encryptionKey: KEY, now: () => NOW,
+      planRun: async () => { throw new Error('Expected a digest run'); },
+      executeSlackDigestRun: (run, signal) => slackRunner.execute(run, signal),
+      recordState: (client, row, at) => scheduling.recordState(client, row, at),
+    });
+
+    await runner.tick();
+    const run = (await db.pool.query('SELECT status, delivery_started_at FROM schedule_runs WHERE schedule_id = $1', [scheduleId])).rows[0];
+    if (scenario === 'scope changed' || scenario === 'scope changed during throttling') {
+      expect(posts).toEqual([]);
+      expect(run).toMatchObject({ status: 'blocked', delivery_started_at: null });
+    } else {
+      expect(posts).toEqual([target.id]);
+      expect(run.status).toBe('digest_sent');
+    }
+  });
+
   it('isolates personal-mode per-user Slack credentials, escapes mrkdwn, supports >10 channels & renamed channels, routes multi-source mysheets, and enforces update validation', async () => {
     const otherUser = await db.person('Other Personal User');
     await db.pool.query('DELETE FROM service_credentials');
@@ -512,6 +616,12 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
       if (url.includes('/conversations.list')) {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true, channels: manyChannels }));
+        return;
+      }
+      if (url.includes('/conversations.info')) {
+        const channelId = new URL(url, 'http://fixture').searchParams.get('channel');
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, channel: manyChannels.find((channel) => channel.id === channelId) }));
         return;
       }
       if (url.includes('/users.list')) {

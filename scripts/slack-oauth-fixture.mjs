@@ -41,12 +41,27 @@ async function serveSlackOAuthFixture({ redirectUri, readFixtures,writeFixtures 
     if (url.pathname === '/api/auth.test') return reply({ ok: true, team_id: team, user_id: 'U_FIXTURE' });
     if (url.pathname === '/api/auth.revoke') { tokens.delete(token); return reply({ ok: true, revoked: true }); }
     if(writeFixtures && req.method==='POST'){
-      let json;try{json=JSON.parse(body);}catch{return reply({ok:false,error:'invalid_json'});}
-      if(url.pathname==='/api/conversations.info')return reply({ok:true,channel:{id:json.channel,is_member:json.channel==='C_FIXTURE',is_archived:false}});
+      const contentType = req.headers['content-type']?.split(';', 1)[0].trim().toLowerCase();
+      let payload;
+      if (contentType === 'application/x-www-form-urlencoded') {
+        payload = Object.fromEntries(params);
+      } else if (contentType === 'application/json') {
+        try {
+          payload = JSON.parse(body);
+        } catch {
+          return reply({ ok: false, error: 'invalid_json' });
+        }
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+          return reply({ ok: false, error: 'invalid_json' });
+        }
+      } else {
+        return reply({ ok: false, error: 'invalid_content_type' });
+      }
+      if(url.pathname==='/api/conversations.info')return reply({ok:true,channel:{id:payload.channel,is_member:payload.channel==='C_FIXTURE',is_archived:false}});
       if(url.pathname==='/api/chat.postMessage'){
-        posts++;const m={type:'message',user:'U_FIXTURE',text:json.text,client_msg_id:json.client_msg_id,ts:'1730000000.'+String(posts).padStart(6,'0')};const rows=messages.get(team)??[];rows.push(m);messages.set(team,rows);
-        if(json.text==='FIXTURE_UNKNOWN_M3'){req.socket.destroy();return;}
-        return reply({ok:true,channel:json.channel,ts:m.ts,message:m});
+        posts++;const m={type:'message',user:'U_FIXTURE',text:payload.text,client_msg_id:payload.client_msg_id,ts:'1730000000.'+String(posts).padStart(6,'0')};const rows=messages.get(team)??[];rows.push(m);messages.set(team,rows);
+        if(payload.text==='FIXTURE_UNKNOWN_M3'){req.socket.destroy();return;}
+        return reply({ok:true,channel:payload.channel,ts:m.ts,message:m});
       }
       if(url.pathname==='/api/conversations.history')return reply({ok:true,messages:messages.get(team)??[],has_more:false,response_metadata:{next_cursor:''}});
     }

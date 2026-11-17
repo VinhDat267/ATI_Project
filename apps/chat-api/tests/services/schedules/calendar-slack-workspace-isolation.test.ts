@@ -1,7 +1,8 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { encryptCredentials } from '@wap/tool-adapters';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { encryptCredentials, GlobalRateLimiter } from '@wap/tool-adapters';
 import type { CalendarDigestConfig } from '@wap/tool-schemas';
 import { CredentialRepo } from '../../../src/db/repositories/credential-repo.js';
+import { AdapterFactory } from '../../../src/services/adapter-factory.js';
 import {
   computeCalendarDigestHash,
   evaluateCalendarDigestCandidate,
@@ -38,6 +39,10 @@ describe('Digest Slack credential isolation by workspace', () => {
     }, KEY), owner.id);
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
   afterAll(async () => db?.close());
 
   it('evaluateCalendarDigestCandidate selects only the caller workspace Slack credential and blocks cross-workspace fallback', async () => {
@@ -112,6 +117,76 @@ describe('Digest Slack credential isolation by workspace', () => {
     expect(sent.state).toBe('digest_sent');
     const slackCall = adapterCalls.find((c) => c.service === 'slack');
     expect(slackCall?.ctx).toMatchObject({ workspaceMode: 'organization', workspaceId: wsA });
+  });
+
+  it.each([
+    { scenario: 'personal Slack credential', hasPersonal: true, replace: null, expectedToken: 'xoxb-personal', state: 'digest_sent' },
+    { scenario: 'legacy fallback', hasPersonal: false, replace: null, expectedToken: 'xoxb-legacy', state: 'digest_sent' },
+    { scenario: 'changed credential during Calendar read', hasPersonal: true, replace: 'read', expectedToken: null, state: 'digest_failed' },
+    { scenario: 'changed credential during throttling', hasPersonal: true, replace: 'throttle', expectedToken: null, state: 'discarded' },
+  ])('uses the validated Slack bot in a personal Calendar digest with $scenario', async ({ hasPersonal, replace, expectedToken, state }) => {
+    const channel = 'C01PERSON01';
+    const encrypted = (botToken: string) => encryptCredentials({ botToken, allowedScope: { channels: [channel] } }, KEY);
+    await creds.upsertCredentials('slack', encrypted('xoxb-legacy'));
+    const personalCredential = hasPersonal ? await creds.saveCredentials('slack', encrypted('xoxb-personal'), owner.id) : null;
+    const replaceCredential = () => db.pool.query(
+      'UPDATE service_credentials SET config=$1 WHERE id=$2', [encrypted('xoxb-replaced'), personalCredential?.id],
+    );
+
+    const services = ['mycalendar', 'slack'];
+    const request = 'Gửi lịch họp lên Slack';
+    const { config, configHash } = await evaluateCalendarDigestCandidate({
+      pool: db.pool, encryptionKey: KEY, userId: owner.id, services, request, workspaceMode: 'personal',
+    });
+    if (replace === 'throttle') {
+      vi.spyOn(GlobalRateLimiter.prototype, 'waitForSlot').mockImplementationOnce(async () => {
+        await replaceCredential();
+        return true;
+      });
+    }
+    expect(config?.destination).toMatchObject({ service: 'slack', channelId: channel });
+    expect(configHash).toBeDefined();
+
+    const convId = (await db.pool.query(
+      "INSERT INTO conversations(user_id, workspace_mode) VALUES($1, 'personal') RETURNING id", [owner.id],
+    )).rows[0].id;
+    const scheduleId = (await db.pool.query(
+      `INSERT INTO schedules(user_id,conv_id,name,request,recurrence,services,status,next_run_at,kind,digest_config,digest_config_hash,digest_approved_at,workspace_mode)
+       VALUES($1,$2,'Personal Agenda',$3,$4,$5,'active',now(),'calendar_digest',$6,$7,now(),'personal') RETURNING id`,
+      [owner.id, convId, request, JSON.stringify({ type: 'daily', time: '08:00' }), services, JSON.stringify(config), configHash],
+    )).rows[0].id;
+    const runId = (await db.pool.query(
+      "INSERT INTO schedule_runs(schedule_id,schedule_version,trigger,due_at,status) VALUES($1,1,'manual',$2,'planning') RETURNING id",
+      [scheduleId, NOW],
+    )).rows[0].id;
+
+    const posts: Array<{ authorization: string | null; channel: string }> = [];
+    vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+      if (url !== 'https://slack.com/api/chat.postMessage' || init.method !== 'POST') throw new Error('Unexpected HTTP request');
+      const body = JSON.parse(String(init.body));
+      posts.push({ authorization: new Headers(init.headers).get('Authorization'), channel: body.channel });
+      return Response.json({ ok: true, ts: '1.1', channel });
+    });
+    const factory = new AdapterFactory({ credentialRepo: creds, encryptionKey: KEY });
+    const executor = createCalendarDigestExecutor({
+      pool: db.pool, encryptionKey: KEY, timeZone: TZ,
+      getAdapter: (service, context) => service === 'mycalendar'
+        ? {
+            execute: async () => {
+              if (replace === 'read') await replaceCredential();
+              return { events: [] };
+            },
+          }
+        : factory.getAdapterForService(service, context),
+    });
+    const outcome = await executor({
+      runId, scheduleId, scheduleVersion: 1, userId: owner.id, name: 'Personal Agenda',
+      request, dueAt: NOW, trigger: 'manual', services, workspaceMode: 'personal',
+      digestConfig: config!, digestConfigHash: configHash!,
+    }, new AbortController().signal);
+
+    expect(outcome.state).toBe(state);
+    expect(posts).toEqual(expectedToken ? [{ authorization: `Bearer ${expectedToken}`, channel }] : []);
   });
 
   it('evaluateGithubDigestCandidate forwards workspaceMode and workspaceId when resolving Slack adapter', async () => {

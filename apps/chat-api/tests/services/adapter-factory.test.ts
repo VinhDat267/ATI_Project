@@ -31,6 +31,28 @@ describe('registered adapter factory', () => {
     expect(getCredentials).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps shared adapter and credential metadata paired across concurrent lookups', async () => {
+    const record = (channel: string) => ({
+      id: 'credential',
+      config: encryptCredentials({ botToken: 'xoxb-test', allowedScope: { channels: [channel] } }, key),
+    });
+    const before = record('C_BEFORE');
+    const after = record('C_AFTER');
+    let finishLookup!: (value: typeof after) => void;
+    const pendingRecord = new Promise<typeof after>((resolve) => { finishLookup = resolve; });
+    const getCredentials = vi.fn()
+      .mockResolvedValueOnce(before)
+      .mockReturnValueOnce(pendingRecord)
+      .mockResolvedValueOnce(after);
+    const factory = new AdapterFactory({ credentialRepo: { getCredentials } as any, encryptionKey: key });
+    const oldAdapter = await factory.getAdapterForService('slack');
+    const pendingAdapter = factory.getAdapterForService('slack', { phase: 'execution', expectedCredential: after });
+    const freshAdapter = await factory.getAdapterForService('slack', { phase: 'execution', expectedCredential: after });
+    finishLookup(after);
+    expect(freshAdapter).not.toBe(oldAdapter);
+    expect(await pendingAdapter).toBe(freshAdapter);
+  });
+
   it('throws a clean domain error and logs a warning without leaking secrets when shared credentials cannot be decrypted, while healthy services still work', async () => {
     const foreignKey = 'another-encryption-key-of-32-bytes!';
     const foreignNotionConfig = encryptCredentials(

@@ -36,7 +36,7 @@ import { MessageRepo } from '../../db/repositories/message-repo.js';
 import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
 import { calendarDigestCandidateMatches, computeCalendarDigestHash, evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js';
-import { calendarOrGithubDeliveryUnknownKind, getJiraDeliveryUnknown, isNotionDeliveryUnknown, isSlackDigestDeliveryUnknown, matchesDispatchedDigestConfig, runState, runView } from './run-state.js';
+import { calendarOrGithubDeliveryUnknownKind, getJiraDeliveryUnknown, getSlackDeliveryUnknown, isNotionDeliveryUnknown, matchesDispatchedDigestConfig, runState, runView } from './run-state.js';
 import { nextOccurrence, nextRuns } from './next-occurrence.js';
 import { captureScheduleArtifact, guardScheduleArtifact, prelockScheduleArtifacts, registerScheduleFields, scheduleRegistry, scheduleSourceContext, tagScheduleContext } from '../slack/slack-schedule-lineage.js';
 import { messageOutputSelectors } from '../slack/slack-message-selectors.js';
@@ -2723,14 +2723,17 @@ export class ScheduleService {
         typeof run.error === 'string' &&
         run.error.includes('SHEETS_DELIVERY_UNKNOWN');
       const isTrelloOrTelegramUnknown =
-        (schedule.kind === 'trello_digest' || schedule.kind === 'telegram_digest' || schedule.kind === 'slack_digest') &&
+        (schedule.kind === 'trello_digest' || schedule.kind === 'telegram_digest') &&
         run.status === 'needs_attention' &&
         run.delivery_started_at != null &&
         typeof run.error === 'string' &&
         run.error.trim().length > 0;
       const isNotionUnknown = isNotionDeliveryUnknown(run, schedule);
       const jiraUnknown = getJiraDeliveryUnknown(run);
-      const unknownDigestKind = jiraUnknown ? 'myjira_digest' : calendarOrGithubDeliveryUnknownKind(run, schedule);
+      const slackUnknown = getSlackDeliveryUnknown(run);
+      const unknownDigestKind = jiraUnknown ? 'myjira_digest'
+        : slackUnknown ? 'slack_digest'
+        : calendarOrGithubDeliveryUnknownKind(run, schedule);
       if (!isSheetsUnknown && !isTrelloOrTelegramUnknown && !isNotionUnknown && !unknownDigestKind) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
@@ -2981,14 +2984,10 @@ export class ScheduleService {
           };
           deliveryPayload = delivery;
         } else if (deliveryKind === 'slack_digest') {
-          const cfg =
-            run.dispatched_config && typeof run.dispatched_config === 'object'
-              ? (run.dispatched_config as unknown as SlackDigestConfig)
-              : schedule.version === run.schedule_version &&
-                  schedule.digest_config &&
-                  typeof schedule.digest_config === 'object'
-                ? (schedule.digest_config as unknown as SlackDigestConfig)
-                : null;
+          const target = slackUnknown?.target ??
+            (schedule.kind === 'slack_digest' && matchesDispatchedDigestConfig(run, schedule)
+              ? schedule.digest_config as SlackDigestConfig
+              : null);
           const prevDelivery =
             run.delivery && typeof run.delivery === 'object'
               ? (run.delivery as unknown as Record<string, unknown>)
@@ -2996,8 +2995,8 @@ export class ScheduleService {
           deliveryPayload = {
             ...prevDelivery,
             destinationService: 'slack',
-            channelId: prevDelivery.channelId ?? cfg?.channelId ?? 'unknown',
-            channelName: prevDelivery.channelName ?? cfg?.channelName ?? 'unknown',
+            channelId: prevDelivery.channelId ?? target?.channelId ?? 'unknown',
+            channelName: prevDelivery.channelName ?? target?.channelName ?? 'unknown',
             ts: typeof prevDelivery.ts === 'string' && prevDelivery.ts.trim() ? prevDelivery.ts : null,
             sentAt: typeof prevDelivery.sentAt === 'string' ? prevDelivery.sentAt : resolvedAtIso,
             sources: Array.isArray(prevDelivery.sources) ? prevDelivery.sources : [],
@@ -3105,9 +3104,8 @@ export class ScheduleService {
             this.isReauthPauseReason(schedule) ? 'REAUTHORIZATION_REQUIRED' : 'SCHEDULE_PAUSED',
           );
         }
-        const slackUnknown = isSlackDigestDeliveryUnknown(run, schedule);
         const isCompletedOneTimeRecovery = schedule.status === 'completed' &&
-          schedule.recurrence.type === 'once' && (unknownDigestKind !== null || slackUnknown) && !jiraUnknown;
+          schedule.recurrence.type === 'once' && unknownDigestKind !== null && !jiraUnknown;
         if (schedule.status !== 'active' && !isCompletedOneTimeRecovery) {
           throw new ScheduleConflict('SCHEDULE_CLOSED');
         }

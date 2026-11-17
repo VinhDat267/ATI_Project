@@ -44,7 +44,7 @@ export class SlackAdapter extends BaseAdapter {
    * Executes HTTP request against Slack Web API, automatically injecting Bearer authorization,
    * and normalizing response error statuses and Slack body error fields to StepError categories.
    */
-  async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  async request<T = any>(endpoint: string, options: RequestInit = {}, beforeDispatch?: () => Promise<void>): Promise<T> {
     const rawUrl = endpoint.startsWith('http')
       ? endpoint
       : `${this.baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
@@ -97,6 +97,7 @@ export class SlackAdapter extends BaseAdapter {
           throw err;
         }
       }
+      if (beforeDispatch) await beforeDispatch();
       if (signal?.aborted && !writeDispatched) {
         throw new StepError({
           message: 'Slack request aborted before dispatch',
@@ -220,9 +221,23 @@ export class SlackAdapter extends BaseAdapter {
    * Search Slack channels by query, filtered by AllowedScope.
    */
   async searchChannels(
-    args: { query: string; limit?: number },
+    args: { query: string; limit?: number; channelId?: string },
     options?: { signal?: AbortSignal }
   ): Promise<Array<{ id: string; name: string; isPrivate: boolean }>> {
+    // A digest already has an approved channel ID and can verify it without scanning a directory.
+    if (args.channelId !== undefined) {
+      this.assertAllowedScope('channels', args.channelId);
+      const data = await this.request(
+        `/conversations.info?channel=${encodeURIComponent(args.channelId)}`,
+        { signal: options?.signal },
+      );
+      const channel = data?.channel;
+      if (channel?.id !== args.channelId || channel.is_archived === true || typeof channel.name !== 'string') {
+        return [];
+      }
+      return [{ id: channel.id, name: channel.name, isPrivate: channel.is_private === true }];
+    }
+
     // conversations.list is cursor-paginated; scan up to SLACK_CHANNEL_MAX_PAGES pages.
     const channels: any[] = [];
     let cursor = '';
@@ -265,7 +280,7 @@ export class SlackAdapter extends BaseAdapter {
    */
   async sendMessage(
     args: { channel: string; text: string; threadTs?: string; blocks?: Array<Record<string, unknown>> },
-    options?: { signal?: AbortSignal; includePermalink?: boolean }
+    options?: { signal?: AbortSignal; includePermalink?: boolean; beforeDispatch?: () => Promise<void> }
   ): Promise<{ ts: string; channel: string; permalink?: string }> {
     try {
       this.assertAllowedScope('channels', args.channel);
@@ -319,7 +334,7 @@ export class SlackAdapter extends BaseAdapter {
         ...(validBlocks ? { blocks: validBlocks } : {}),
       }),
       signal: options?.signal,
-    });
+    }, options?.beforeDispatch);
 
     const rawTs = typeof res?.ts === 'string' ? res.ts.trim() : '';
     const rawChannel = typeof res?.channel === 'string' ? res.channel.trim() : '';
@@ -563,7 +578,7 @@ export class SlackAdapter extends BaseAdapter {
   override async execute(
     toolName: string,
     args: Record<string, any>,
-    context?: { signal?: AbortSignal; stepId?: string; includePermalink?: boolean }
+    context?: { signal?: AbortSignal; stepId?: string; includePermalink?: boolean; beforeDispatch?: () => Promise<void> }
   ): Promise<any> {
     const opts = context?.signal ? { signal: context.signal } : undefined;
     switch (toolName) {
@@ -575,6 +590,7 @@ export class SlackAdapter extends BaseAdapter {
         return this.sendMessage(args as any, {
           ...(opts ?? {}),
           ...(context?.stepId || context?.includePermalink ? { includePermalink: true } : {}),
+          beforeDispatch: context?.beforeDispatch,
         });
       case 'slack.read_messages':
         return this.readMessages(args as any, opts);

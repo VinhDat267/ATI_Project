@@ -3,7 +3,7 @@ import request from 'supertest';
 import {createApp} from '../../src/app.js';
 import {generateTokens} from '../../src/auth/jwt.js';
 import {encryptCredentials} from '@wap/tool-adapters';
-import {ALL_TOOLS} from '@wap/tool-schemas';
+import {ALL_TOOLS,SLACK_EXTENDED_TOOLS} from '@wap/tool-schemas';
 const secret='fixture-secret-at-least-32-characters';
 const key='test-only-encryption-key-with-32bytes';
 const token=generateTokens({id:'u1',email:'test@example.test',name:'Tester'},secret).accessToken;
@@ -19,7 +19,10 @@ it('reports registered tools, configured scope and the latest connection check, 
   const check=()=>request(app).post('/api/services/slack/test').set('Authorization',`Bearer ${token}`);
   const before=(await list()).body.services;
   expect(before.map((s:any)=>s.id)).toEqual(['trello','slack','github','sheets','calendar','notion','telegram']);
-  for(const service of before) expect(service.tools).toEqual(ALL_TOOLS.filter(t=>t.service===service.id).map(t=>t.name));
+  const registeredTools = [...ALL_TOOLS, ...SLACK_EXTENDED_TOOLS];
+  for (const service of before) {
+    expect(service.tools).toEqual(registeredTools.filter(tool => tool.service === service.id).map(tool => tool.name));
+  }
   expect(before.find((s:any)=>s.id==='slack')).toMatchObject({configured:true,connected:false,connectionStatus:'unchecked'});
   await check(); expect((await list()).body.services.find((s:any)=>s.id==='slack')).toMatchObject({connected:true,connectionStatus:'healthy',lastCheckedAt:expect.any(String)});
   await check(); expect((await list()).body.services.find((s:any)=>s.id==='slack')).toMatchObject({connected:false,connectionStatus:'unhealthy'});

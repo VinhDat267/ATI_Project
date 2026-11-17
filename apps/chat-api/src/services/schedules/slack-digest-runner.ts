@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { decryptCredentials } from '@wap/tool-adapters';
+import { decryptCredentials, SlackAdapter } from '@wap/tool-adapters';
 import type {
   SlackDigestConfig,
   SlackDigestDelivery,
@@ -30,9 +30,9 @@ import { isSlackMessageTimestamp } from './slack-message-timestamp.js';
 import { buildSlackDigestBlocks } from '../slack/slack-digest-blocks.js';
 import { fetchSlackMentionIndexSafe, type SlackMentionIndex } from '../slack/slack-mention-resolver.js';
 import { escapeSlackMrkdwn } from './github-digest-runner.js';
+import { SLACK_DIGEST_DELIVERY_UNKNOWN } from './run-state.js';
 
-export const SLACK_DIGEST_DELIVERY_UNKNOWN =
-  'SLACK_DELIVERY_UNKNOWN: Đã bắt đầu gửi bản tin Slack nhưng mất kết nối hoặc thiếu biên nhận hợp lệ từ Slack. Hệ thống tạm dừng tự động gửi lại để tránh trùng lặp.';
+export { SLACK_DIGEST_DELIVERY_UNKNOWN };
 
 function isDefiniteSlackRejection(error: unknown): boolean {
   const details = (error as { details?: { requestSent?: unknown } } | null)?.details;
@@ -96,12 +96,18 @@ export interface SlackDigestRunnerOptions {
 export class SlackDigestRunner {
   constructor(private options: SlackDigestRunnerOptions) {}
 
+  private allowsSlackChannel(config: string, channelId: string): boolean {
+    const channels = decryptCredentials(config, this.options.encryptionKey)?.allowedScope?.channels;
+    return Array.isArray(channels) && channels.includes(channelId);
+  }
+
   private async verifyAuthorityAndMaybeClaim(
     run: SlackDigestRunInput,
     claimDelivery: boolean,
     gmailBinding: ReturnType<typeof validateTelegramDigestGmailConfig> extends infer V
       ? V extends { kind: 'gmail_bound'; binding: infer B } ? B | null : null
       : null,
+    slackCredential: AdapterContext['expectedCredential'],
     signal: AbortSignal,
   ): Promise<{ allowed: true; claimedInDb: boolean } | { allowed: false; outcome: SlackDigestRunOutcome }> {
     const pool = this.options.pool;
@@ -199,8 +205,7 @@ export class SlackDigestRunner {
 
       const validCompletedOnce =
         schedule?.status === 'completed' &&
-        schedule?.recurrence?.type === 'once' &&
-        run.trigger === 'manual';
+        schedule?.recurrence?.type === 'once';
       if (
         !convRow ||
         !schedule ||
@@ -238,6 +243,31 @@ export class SlackDigestRunner {
       }
 
       if (claimDelivery) {
+        const liveCredential = slackCredential && (
+          await client.query<{ config: string }>(
+            "SELECT config FROM service_credentials WHERE id = $1 AND status = 'active' FOR SHARE NOWAIT",
+            [slackCredential.id],
+          )
+        ).rows[0];
+        // The adapter is bound to the ciphertext checked before reading sources. Settings can
+        // change that ciphertext without changing the credential ID or the schedule's version.
+        if (!liveCredential || liveCredential.config !== slackCredential?.config) {
+          let allowed = false;
+          try {
+            allowed = Boolean(liveCredential && this.allowsSlackChannel(liveCredential.config, run.digestConfig!.channelId));
+          } catch {
+            // Unreadable credentials cannot authorize a send.
+          }
+          await client.query('COMMIT');
+          return {
+            allowed: false,
+            outcome: allowed
+              ? { status: 'digest_failed', error: 'Kết nối hoặc phạm vi Slack vừa thay đổi trong lúc tổng hợp bản tin.' }
+              : { status: 'blocked', error: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.', pauseSchedule: true },
+          };
+        }
+
+        signal.throwIfAborted();
         const claimed = await client.query(
           `UPDATE schedule_runs
            SET delivery_started_at = now(), updated_at = now(),
@@ -382,6 +412,7 @@ export class SlackDigestRunner {
     // 1. Live workspace scope & pinned Slack credential verification
     const expectedWorkspaceId =
       digestConfig.workspaceMode === 'organization' ? (digestConfig.workspaceId ?? null) : null;
+    let slackCredential: AdapterContext['expectedCredential'];
     if (this.options.pool) {
       const preGuard = await assertDigestScheduleLiveScopeAndAuth({
         pool: this.options.pool,
@@ -404,7 +435,7 @@ export class SlackDigestRunner {
         user_id: string | null;
         workspace_id: string | null;
         status: string;
-        config: unknown;
+        config: string;
       }>(
         `SELECT id, service, user_id, workspace_id, status, config FROM service_credentials
          WHERE id = $1`,
@@ -428,16 +459,7 @@ export class SlackDigestRunner {
       }
 
       try {
-        const decrypted = decryptCredentials(slackCred.config as any, this.options.encryptionKey);
-        const allowedChannels = Array.isArray(decrypted?.allowedScope?.channels)
-          ? decrypted.allowedScope.channels.map((c: any) => String(c))
-          : null;
-        if (
-          allowedChannels &&
-          allowedChannels.length > 0 &&
-          !allowedChannels.includes(digestConfig.channelId) &&
-          !allowedChannels.includes(digestConfig.channelName)
-        ) {
+        if (!this.allowsSlackChannel(slackCred.config, digestConfig.channelId)) {
           return {
             status: 'blocked',
             error: 'Kênh Slack nhận báo cáo đã bị gỡ khỏi phạm vi cho phép.',
@@ -451,6 +473,7 @@ export class SlackDigestRunner {
           pauseSchedule: true,
         };
       }
+      slackCredential = { id: slackCred.id, config: slackCred.config };
     }
 
     let slackAdapter: any;
@@ -460,13 +483,14 @@ export class SlackDigestRunner {
         phase: 'execution',
         workspaceMode: digestConfig.workspaceMode,
         workspaceId: expectedWorkspaceId,
+        expectedCredential: slackCredential,
       });
       if (!slackAdapter || typeof slackAdapter.execute !== 'function') {
         return { status: 'digest_failed', error: 'Không khởi tạo được bộ kết nối Slack.' };
       }
       const channels = await slackAdapter.execute(
         'slack.search_channels',
-        { query: '', limit: 200 },
+        { query: '', channelId: digestConfig.channelId },
         { signal },
       );
       if (!Array.isArray(channels) || !channels.some((c: any) => String(c?.id) === digestConfig.channelId)) {
@@ -478,7 +502,7 @@ export class SlackDigestRunner {
       }
     } catch (err: any) {
       if (signal.aborted) throw err;
-      if (err?.category === 'AUTH_ERROR' || err?.category === 'PERMISSION_DENIED') {
+      if (err?.category === 'AUTH_ERROR' || err?.category === 'PERMISSION_DENIED' || err?.category === 'NOT_FOUND') {
         return {
           status: 'blocked',
           error: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
@@ -542,7 +566,7 @@ export class SlackDigestRunner {
     // 4. Optional AI highlight summary
     let aiHighlight = '';
     if (this.options.summarizeWithAi && digestConfig.includeAiSummary !== false) {
-      const auth = await this.verifyAuthorityAndMaybeClaim(run, false, gmailBinding, signal);
+      const auth = await this.verifyAuthorityAndMaybeClaim(run, false, gmailBinding, slackCredential, signal);
       if (!auth.allowed) return auth.outcome;
 
       const aiTimeoutMs = this.options.aiTimeoutMs ?? 10_000;
@@ -599,13 +623,7 @@ export class SlackDigestRunner {
       footer: footerText,
     });
 
-    // 5. Atomic claim delivery_started_at BEFORE outbound HTTP
-    signal.throwIfAborted();
-    const claim = await this.verifyAuthorityAndMaybeClaim(run, true, gmailBinding, signal);
-    if (!claim.allowed) return claim.outcome;
-    const deliveryStarted = claim.claimedInDb;
-
-    // 6. Execute single non-retried slack.send_message
+    // Claim immediately before the real transport dispatch, after its rate-limit wait.
     const sendTimeoutMs = this.options.sendTimeoutMs ?? 15_000;
     const sendController = new AbortController();
     const onParentSendAbort = () => sendController.abort(signal.reason ?? new Error('SEND_ABORTED'));
@@ -614,8 +632,23 @@ export class SlackDigestRunner {
     const sendTimer = setTimeout(() => sendController.abort(new Error('EGRESS_TIMEOUT')), sendTimeoutMs);
     sendTimer.unref?.();
 
+    let preventedOutcome: SlackDigestRunOutcome | undefined;
+    let deliveryStarted = false;
+    let dispatchApproved = false;
     let sendDispatched = false;
+    const nativeSlack = slackAdapter instanceof SlackAdapter;
+    const claimDelivery = async () => {
+      sendController.signal.throwIfAborted();
+      const claim = await this.verifyAuthorityAndMaybeClaim(run, true, gmailBinding, slackCredential, sendController.signal);
+      if (!claim.allowed) {
+        preventedOutcome = claim.outcome;
+        throw new Error('Slack digest delivery was not claimed');
+      }
+      deliveryStarted = claim.claimedInDb;
+      dispatchApproved = true;
+    };
     try {
+      if (!nativeSlack) await claimDelivery();
       const abortPromise = new Promise<never>((_, reject) => {
         const onAbort = () =>
           reject(sendController.signal.reason instanceof Error ? sendController.signal.reason : new Error('SEND_ABORTED'));
@@ -627,7 +660,7 @@ export class SlackDigestRunner {
         slackAdapter.execute(
           'slack.send_message',
           { channel: digestConfig.channelId, text: digestText, blocks },
-          { signal: sendController.signal },
+          { signal: sendController.signal, ...(nativeSlack ? { beforeDispatch: claimDelivery } : {}) },
         ),
         abortPromise,
       ]);
@@ -655,6 +688,10 @@ export class SlackDigestRunner {
         },
       };
     } catch (err: any) {
+      if (preventedOutcome) return preventedOutcome;
+      if (nativeSlack && !dispatchApproved && !signal.aborted) {
+        return { status: 'digest_failed', error: 'Không gửi được bản tin tổng hợp tới Slack.' };
+      }
       if (deliveryStarted && sendDispatched) {
         if (isDefiniteSlackRejection(err) && this.options.pool) {
           await this.options.pool

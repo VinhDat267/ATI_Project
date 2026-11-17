@@ -18,6 +18,9 @@ export const SLACK_FAKE: FakeService = {
               { id: 'C_ATI_TEST', name: 'ati-test' },
             ]
           : DEFAULT_SANDBOX_CHANNELS;
+      if (typeof args?.channelId === 'string') {
+        return channels.filter((ch) => ch.id === args.channelId);
+      }
       const rawQuery =
         typeof args?.query === 'string' ? args.query.trim().replace(/^#/, '').toLowerCase() : '';
       const filtered = rawQuery

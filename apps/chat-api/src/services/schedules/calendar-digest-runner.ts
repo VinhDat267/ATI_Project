@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { decryptCredentials, detectCalendarConflicts, StepError, type CalendarEventWithConflict } from '@wap/tool-adapters';
+import { decryptCredentials, detectCalendarConflicts, SlackAdapter, StepError, type CalendarEventWithConflict } from '@wap/tool-adapters';
 import type { CalendarDigestConfig, CalendarDigestDelivery } from '@wap/tool-schemas';
 import { computeCalendarDigestHash } from './calendar-digest-candidate.js';
 import { findSlackDigestCredential } from './multi-source-digest-candidate.js';
@@ -7,6 +7,7 @@ import { localLabel } from './next-occurrence.js';
 import type { RunToPlan } from './schedule-runner.js';
 import { slackMrkdwnToTelegramPlain } from './telegram-plain-text.js';
 import { buildSlackMarkdownDigestBlocks } from '../slack/slack-digest-blocks.js';
+import type { AdapterContext } from '../adapter-factory.js';
 
 export const CALENDAR_DELIVERY_UNKNOWN = 'Chưa xác định bản tin lịch đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
 export const MAX_DIGEST_DISPLAY_EVENTS = 20;
@@ -493,9 +494,8 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
       };
     }
 
-    // Verify destination service (slack shared or personal telegram)
+    // Verify destination service (workspace-scoped Slack or personal Telegram)
     const destService = config.destination.service;
-    // The shared Slack credential must belong to the schedule's own workspace (NULL = default/personal).
     const schedMeta =
       destService === 'slack'
         ? (await options.pool.query('SELECT workspace_id, workspace_mode FROM schedules WHERE id = $1', [run.scheduleId])).rows[0]
@@ -534,6 +534,7 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
       };
     }
 
+    let slackDestContext: Pick<AdapterContext, 'workspaceMode' | 'workspaceId' | 'expectedCredential'> | undefined;
     let telegramDestBinding:
       | { credentialId: string; telegramUserId: string; username: string; chatIds: string[] }
       | undefined;
@@ -554,6 +555,14 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
             pauseReason: 'Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.',
           };
         }
+        // Resolve the adapter in the scope of the credential that passed this gate.
+        // A personal schedule can select the legacy row when its owner has no active Slack credential.
+        slackDestContext = {
+          ...(destRow.workspace_id
+            ? { workspaceMode: 'organization', workspaceId: destRow.workspace_id }
+            : { workspaceMode: destRow.user_id ? 'personal' : 'legacy' }),
+          expectedCredential: { id: destRow.id, config: destRow.config },
+        };
       } else {
         const scopeChats: string[] = Array.isArray(scopeObj?.chats)
           ? scopeObj.chats
@@ -703,14 +712,13 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
 
     // 6. Send to locked Slack channel or Telegram chat
     let deliveryStarted = false;
+    let discarded = false;
     try {
       const destAdapter = await options.getAdapter(destService, {
         userId: run.userId,
         phase: 'execution',
         actor: { userId: run.userId },
-        ...(destService === 'slack' && scheduleWorkspaceMode === 'organization' && scheduleWorkspaceId
-          ? { workspaceMode: 'organization' as const, workspaceId: scheduleWorkspaceId }
-          : {}),
+        ...slackDestContext,
         ...(telegramDestBinding ? { connections: { telegram: telegramDestBinding } } : {}),
       });
       if (!destAdapter) {
@@ -719,24 +727,40 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
           error: `Không khởi tạo được kết nối ${destService === 'slack' ? 'Slack' : 'Telegram'}.`,
         };
       }
-      signal.throwIfAborted();
-      const marked = await options.pool.query(
-        `UPDATE schedule_runs r SET delivery_started_at=now(), updated_at=now(),
-             dispatched_config=COALESCE(r.dispatched_config, $4::jsonb),
-             dispatched_config_hash=COALESCE(r.dispatched_config_hash, $5)
-         FROM schedules s WHERE r.id=$1 AND r.schedule_id=s.id AND s.id=$2
-           AND r.status='planning' AND r.delivery_started_at IS NULL AND r.schedule_version=$3
-           AND s.version=$3 AND s.kind='calendar_digest' AND s.user_id=$6
-           AND s.digest_config=$4::jsonb AND s.digest_config_hash=$5
-           AND (s.status='active' OR (s.status='completed' AND s.recurrence->>'type'='once'))
-           AND (r.dispatched_config IS NULL OR r.dispatched_config=$4::jsonb)
-           AND (r.dispatched_config_hash IS NULL OR r.dispatched_config_hash=$5)
-         RETURNING r.id`,
-        [run.runId, run.scheduleId, run.scheduleVersion, JSON.stringify(config), expectedHash, run.userId],
-      );
-      if (!marked.rowCount) return { state: 'discarded' };
-      deliveryStarted = true;
-      signal.throwIfAborted();
+      const claimDelivery = async () => {
+        signal.throwIfAborted();
+        const expectedCredential = slackDestContext?.expectedCredential;
+        const marked = await options.pool.query(
+          `UPDATE schedule_runs r SET delivery_started_at=now(), updated_at=now(),
+               dispatched_config=COALESCE(r.dispatched_config, $4::jsonb),
+               dispatched_config_hash=COALESCE(r.dispatched_config_hash, $5)
+           FROM schedules s WHERE r.id=$1 AND r.schedule_id=s.id AND s.id=$2
+             AND r.status='planning' AND r.delivery_started_at IS NULL AND r.schedule_version=$3
+             AND s.version=$3 AND s.kind='calendar_digest' AND s.user_id=$6
+             AND s.digest_config=$4::jsonb AND s.digest_config_hash=$5
+             AND (s.status='active' OR (s.status='completed' AND s.recurrence->>'type'='once'))
+             AND (r.dispatched_config IS NULL OR r.dispatched_config=$4::jsonb)
+             AND (r.dispatched_config_hash IS NULL OR r.dispatched_config_hash=$5)
+             AND ($7::uuid IS NULL OR EXISTS (
+               SELECT 1 FROM service_credentials sc
+               WHERE sc.id=$7 AND sc.config=$8 AND sc.status='active'
+               FOR SHARE NOWAIT
+             ))
+           RETURNING r.id`,
+          [run.runId, run.scheduleId, run.scheduleVersion, JSON.stringify(config), expectedHash, run.userId,
+            expectedCredential?.id ?? null, expectedCredential?.config ?? null],
+        );
+        if (!marked.rowCount) {
+          discarded = true;
+          throw new Error('Calendar digest delivery was not claimed');
+        }
+        deliveryStarted = true;
+      };
+      const nativeSlack = destService === 'slack' && destAdapter instanceof SlackAdapter;
+      if (!nativeSlack) {
+        await claimDelivery();
+        signal.throwIfAborted();
+      }
       if (config.destination.service === 'slack') {
         const blocks = buildSlackMarkdownDigestBlocks({
           headerTitle: 'Bản tin Lịch họp Google Calendar của Planora',
@@ -745,7 +769,7 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
         await destAdapter.execute(
           'slack.send_message',
           { channel: config.destination.channelId, text: formatted.text, blocks },
-          { signal },
+          { signal, ...(nativeSlack ? { beforeDispatch: claimDelivery } : {}) },
         );
       } else {
         await destAdapter.execute(
@@ -755,6 +779,7 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
         );
       }
     } catch (error) {
+      if (discarded) return { state: 'discarded' };
       const definitelyRejected = error instanceof StepError &&
         ['AUTH_ERROR', 'NOT_FOUND', 'VALIDATION', 'RATE_LIMIT'].includes(error.category);
       if (deliveryStarted && !definitelyRejected) {
