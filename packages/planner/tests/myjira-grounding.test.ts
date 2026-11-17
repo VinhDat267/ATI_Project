@@ -408,4 +408,53 @@ describe('Jira site grounding', () => {
     });
     expect(responseCorrect.kind).toBe('plan');
   });
+
+  it('accepts nullable union schema fields (type: ["string", "null"]) on myjira.update_issue for assigneeAccountId and dueDate', () => {
+    const userMemory = {
+      ...memory,
+      jira_user: [
+        { id: 'acc-9', accountId: 'acc-9', displayName: 'Vinh Dat', siteId: 'site-a' },
+      ],
+    };
+
+    const assignResult = validatePlan(plan([
+      {
+        id: 'step_1',
+        tool: 'myjira.update_issue',
+        description: 'Assign user and update due date',
+        args: { siteId: 'site-a', issueKey: 'ATI-12', assigneeAccountId: 'acc-9', dueDate: '2026-11-25' },
+        dependsOn: [],
+      },
+    ]), MYJIRA_TOOLS, {
+      grounding: { memory: userMemory, userTexts: ['trên Acme Jira'] },
+    });
+    expect(assignResult.valid).toBe(true);
+
+    const clearResult = validatePlan(plan([
+      {
+        id: 'step_1',
+        tool: 'myjira.update_issue',
+        description: 'Unassign user and clear due date',
+        args: { siteId: 'site-a', issueKey: 'ATI-12', assigneeAccountId: null, dueDate: null },
+        dependsOn: [],
+      },
+    ]), MYJIRA_TOOLS, {
+      grounding: { memory: userMemory, userTexts: ['trên Acme Jira'] },
+    });
+    expect(clearResult.valid).toBe(true);
+
+    const invalidType = validatePlan(plan([
+      {
+        id: 'step_1',
+        tool: 'myjira.update_issue',
+        description: 'Invalid assignee type',
+        args: { siteId: 'site-a', issueKey: 'ATI-12', assigneeAccountId: 12345 },
+        dependsOn: [],
+      },
+    ]), MYJIRA_TOOLS, {
+      grounding: { memory: userMemory, userTexts: ['trên Acme Jira'] },
+    });
+    expect(invalidType.valid).toBe(false);
+    expect(invalidType.layer).toBe('schema');
+  });
 });
