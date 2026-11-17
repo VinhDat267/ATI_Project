@@ -36,7 +36,7 @@ export function ScheduleActions({ schedule, navigate, onChanged, onConflict }: {
       setCancel(false);
       if (
         kind === 'resume' &&
-        (schedule.kind === 'sheets_digest' || schedule.kind === 'telegram_digest') &&
+        (schedule.kind === 'sheets_digest' || schedule.kind === 'telegram_digest' || schedule.kind === 'slack_digest') &&
         reason?.status === 409 &&
         (reason?.code === 'REAUTHORIZATION_REQUIRED' ||
           /cấp quyền lại|REAUTHORIZATION_REQUIRED|xác nhận lại/iu.test(reason?.message ?? ''))
@@ -65,7 +65,7 @@ export function ScheduleActions({ schedule, navigate, onChanged, onConflict }: {
   };
   const closed = schedule.status === 'cancelled' || schedule.status === 'completed';
   const requiresReauth =
-    (schedule.kind === 'sheets_digest' || schedule.kind === 'telegram_digest') &&
+    (schedule.kind === 'sheets_digest' || schedule.kind === 'telegram_digest' || schedule.kind === 'slack_digest') &&
     schedule.status === 'paused' &&
     (needsReauth || REAUTH_PAUSE_REASON_RE.test(schedule.pauseReason ?? ''));
   return <><div className="flex flex-wrap gap-2">

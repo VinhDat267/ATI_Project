@@ -178,7 +178,7 @@ export interface ScheduleResponse {
 export type PlannerResponse = PlanResponse | ClarificationResponse | RefusalResponse | AnswerResponse | ScheduleResponse;
 
 export type ScheduleStatus = 'active' | 'paused' | 'cancelled' | 'completed';
-export type ScheduleKind = 'plan' | 'plan_approval' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest' | 'trello_digest' | 'notion_digest' | 'myjira_digest';
+export type ScheduleKind = 'plan' | 'plan_approval' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest' | 'slack_digest' | 'trello_digest' | 'notion_digest' | 'myjira_digest';
 export type ScheduleApprovalMode = 'manual' | 'auto_digest';
 
 export type SheetsDigestWorkspaceMode = 'personal' | 'organization' | 'legacy';
@@ -642,6 +642,46 @@ export interface TelegramDigestCandidate {
   configHash?: string;
 }
 
+export interface SlackDigestConfig {
+  destination: 'slack';
+  workspaceMode: SheetsDigestWorkspaceMode;
+  workspaceId: string | null;
+  slackCredentialId: string;
+  channelId: string;
+  channelName: string;
+  sourceBindingVersion?: 1;
+  includeAiSummary?: boolean;
+  sources: TelegramDigestSource[];
+  recurrence: ScheduleRecurrence;
+  timeZone: string;
+}
+
+export interface SlackDigestDelivery {
+  destinationService: 'slack';
+  channelId: string;
+  channelName: string;
+  ts: string | null;
+  permalink?: string | null;
+  sentAt?: string;
+  manualConfirmedAt?: string;
+  manualResolution?: SheetsDigestManualResolution;
+  sources: Array<{
+    service: string;
+    label: string;
+    status: 'ok' | 'partial_error' | 'empty';
+    truncated?: boolean;
+    itemCount?: number;
+    error?: string;
+  }>;
+}
+
+export interface SlackDigestCandidate {
+  canAutoDigest: boolean;
+  disabledReason?: string;
+  config?: SlackDigestConfig;
+  configHash?: string;
+}
+
 export interface TrelloDigestConfig {
   credentialId: string;
   trelloMemberId: string;
@@ -818,7 +858,7 @@ export interface ScheduleView {
   lastRun: ScheduleRunView | null;
   kind?: ScheduleKind;
   approvalMode?: ScheduleApprovalMode;
-  digestConfig?: SheetsDigestConfig | CalendarDigestConfig | GithubDigestConfig | TelegramDigestConfig | TrelloDigestConfig | NotionDigestConfig | MyJiraDigestConfig | null;
+  digestConfig?: SheetsDigestConfig | CalendarDigestConfig | GithubDigestConfig | TelegramDigestConfig | SlackDigestConfig | TrelloDigestConfig | NotionDigestConfig | MyJiraDigestConfig | null;
   digest?:
     | { config: GithubDigestConfig; approvedAt: string }
     | { config: TrelloDigestConfig; approvedAt: string }
@@ -828,6 +868,14 @@ export interface ScheduleView {
     | {
         chatId: string;
         chatTitle: string;
+        sources: Array<{ service: string; label: string; query?: string }>;
+        includeAiSummary?: boolean;
+        approvedAt: string | null;
+      }
+    | {
+        destinationService: 'slack';
+        channelId: string;
+        channelName: string;
         sources: Array<{ service: string; label: string; query?: string }>;
         includeAiSummary?: boolean;
         approvedAt: string | null;
@@ -855,7 +903,7 @@ export interface ScheduleRunView {
   planStatus: string | null;
   /** A Vietnamese sentence for the user. */
   error: string | null;
-  delivery?: SheetsDigestDelivery | CalendarDigestDelivery | GithubDigestDelivery | TelegramDigestDelivery | TrelloDigestDelivery | NotionDigestDelivery | MyJiraDigestDelivery | null;
+  delivery?: SheetsDigestDelivery | CalendarDigestDelivery | GithubDigestDelivery | TelegramDigestDelivery | SlackDigestDelivery | TrelloDigestDelivery | NotionDigestDelivery | MyJiraDigestDelivery | null;
   deliveryStartedAt?: string | null;
   deliveryResolution?: ScheduleRunDeliveryResolution | null;
   /** The current schedule and dispatched configuration permit a confirmed resend for this run. */
@@ -878,6 +926,7 @@ export interface ScheduleProposalMetadata {
     | CalendarDigestCandidate
     | ScheduleDigestCandidate
     | TelegramDigestCandidate
+    | SlackDigestCandidate
     | TrelloDigestCandidate
     | NotionDigestCandidate
     | MyJiraDigestCandidate

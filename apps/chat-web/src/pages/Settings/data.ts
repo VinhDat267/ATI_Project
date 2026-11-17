@@ -8,7 +8,7 @@ const guides = settingsMetadata as Record<string, SettingsMetadata>;
 const toolLabels: Record<string, string> = {
   search_boards: 'Tìm bảng', list_boards: 'Tìm bảng', list_lists: 'Xem danh sách', get_board: 'Xem bảng',
   list_members: 'Xem thành viên', search_lists: 'Tìm danh sách', search_members: 'Tìm thành viên', search_cards: 'Tìm card', get_card: 'Xem card', create_card: 'Tạo card', update_card: 'Cập nhật card', add_member: 'Gán thành viên', add_checklist: 'Thêm checklist',
-  list_channels: 'Tìm kênh', search_channels: 'Tìm kênh', send_message: 'Gửi tin nhắn', post_message: 'Gửi tin nhắn',
+  list_channels: 'Tìm kênh', search_channels: 'Tìm kênh', search_users: 'Tìm thành viên', send_message: 'Gửi tin nhắn', post_message: 'Gửi tin nhắn', read_messages: 'Đọc tin nhắn kênh', read_thread: 'Đọc hội thoại thread',
   list_repos: 'Tìm kho', search_repos: 'Tìm kho', search_issues: 'Tìm issue', get_issue: 'Xem issue', create_issue: 'Tạo issue', add_labels: 'Gắn nhãn', add_label: 'Gắn nhãn',
   get_spreadsheet: 'Xem bảng tính', list_spreadsheets: 'Tìm bảng tính', list_sheets: 'Xem tab', read_range: 'Đọc vùng ô', append_rows: 'Thêm dòng',
   list_calendars: 'Xem lịch', list_events: 'Xem sự kiện', create_event: 'Tạo sự kiện (không mời người khác)',

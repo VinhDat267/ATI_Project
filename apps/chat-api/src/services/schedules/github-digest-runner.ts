@@ -3,6 +3,7 @@ import type { GithubDigestConfig, GithubDigestDelivery, ScheduleRecurrence } fro
 import { isUuid } from '../../db/repositories/uuid.js';
 import { computeDigestConfigHash } from './github-digest-candidate.js';
 import type { RunToPlan } from './schedule-runner.js';
+import { buildSlackMarkdownDigestBlocks } from '../slack/slack-digest-blocks.js';
 
 export const GITHUB_DELIVERY_UNKNOWN =
   'Chưa xác định bản tin GitHub đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
@@ -658,9 +659,13 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
     }
 
     try {
+      const blocks = buildSlackMarkdownDigestBlocks({
+        headerTitle: 'Bản tin GitHub tự động của Planora',
+        messageText,
+      });
       const sendRes = await slackAdapter.execute(
         'slack.send_message',
-        { channel: config.channelId, text: messageText },
+        { channel: config.channelId, text: messageText, blocks },
         { signal },
       );
       const ts = typeof sendRes?.ts === 'string' && sendRes.ts.trim().length > 0 ? sendRes.ts.trim() : null;

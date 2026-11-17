@@ -158,6 +158,9 @@ describe('packages/tool-adapters (Task 5: Slack Adapter & Allowed Channels Filte
           text: 'Deploy staging failed on login',
         },
       ],
+      scanned: 3,
+      matched: 1,
+      truncated: false,
     });
   });
 
@@ -320,5 +323,184 @@ describe('packages/tool-adapters (Task 5: Slack Adapter & Allowed Channels Filte
       details: { requestSent: true },
     });
     expect(networkFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves slack.search_users via users.lookupByEmail and cursor-paginated users.list, filtering bots/deleted users', async () => {
+    const calls: string[] = [];
+    const adapter = new SlackAdapter({
+      credentials: { botToken: 'xoxb-users-valid' },
+      allowedScope: { channels: ['C2'] },
+      fetchFn: (async (url: string | URL) => {
+        const u = url.toString();
+        calls.push(u);
+        if (u.includes('/users.lookupByEmail?email=an%40ati.local')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              ok: true,
+              user: {
+                id: 'U_AN',
+                name: 'an.nguyen',
+                deleted: false,
+                is_bot: false,
+                profile: { real_name: 'Nguyễn Văn An', display_name: 'an', email: 'an@ati.local' },
+              },
+            }),
+          };
+        }
+        if (u.includes('/users.lookupByEmail?email=missing%40ati.local')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ ok: false, error: 'users_not_found' }),
+          };
+        }
+        if (u.includes('/users.list') && !u.includes('cursor=')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              ok: true,
+              members: [
+                { id: 'USLACKBOT', name: 'slackbot', deleted: false, is_bot: false },
+                { id: 'U_BOT', name: 'planora-bot', deleted: false, is_bot: true },
+                { id: 'U_DEL', name: 'old.user', deleted: true, is_bot: false },
+                { id: 'U_AN', name: 'an.nguyen', profile: { real_name: 'Nguyễn Văn An', display_name: 'an', email: 'an@ati.local' } },
+              ],
+              response_metadata: { next_cursor: 'page-2' },
+            }),
+          };
+        }
+        if (u.includes('/users.list') && u.includes('cursor=page-2')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              ok: true,
+              members: [
+                { id: 'U_BINH', name: 'binh.tran', profile: { real_name: 'Trần Thị Bình', display_name: 'binh', email: 'binh@ati.local' } },
+              ],
+              response_metadata: { next_cursor: '' },
+            }),
+          };
+        }
+        return { ok: false, status: 404, text: async () => 'not found' };
+      }) as any,
+    });
+
+    const foundByEmail = await adapter.execute('slack.search_users', { email: 'an@ati.local' });
+    expect(foundByEmail).toEqual([
+      {
+        id: 'U_AN',
+        name: 'an.nguyen',
+        realName: 'Nguyễn Văn An',
+        displayName: 'an',
+        email: 'an@ati.local',
+      },
+    ]);
+
+    const missingEmail = await adapter.execute('slack.search_users', { email: 'missing@ati.local' });
+    expect(missingEmail).toEqual([]);
+
+    const listedAll = await adapter.execute('slack.search_users', { query: '' });
+    expect(listedAll.map((u: any) => u.id)).toEqual(['U_AN', 'U_BINH']);
+
+    const filtered = await adapter.execute('slack.search_users', { query: 'bình' });
+    expect(filtered.map((u: any) => u.id)).toEqual(['U_BINH']);
+    expect(calls.some((c) => c.includes('cursor=page-2'))).toBe(true);
+  });
+
+  it('forwards optional Block Kit blocks on slack.send_message and rejects invalid blocks with requestSent=false', async () => {
+    const sentPayloads: any[] = [];
+    const adapter = new SlackAdapter({
+      credentials: { botToken: 'xoxb-blocks' },
+      allowedScope: { channels: ['C2'] },
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 100, windowMs: 10 }),
+      fetchFn: (async (url: string | URL, opts?: RequestInit) => {
+        if (url.toString().includes('/chat.postMessage')) {
+          const parsed = JSON.parse(String(opts?.body ?? '{}'));
+          sentPayloads.push(parsed);
+          if (parsed.text === 'trigger_invalid_blocks') {
+            return { ok: true, status: 200, json: async () => ({ ok: false, error: 'invalid_blocks' }) };
+          }
+          return { ok: true, status: 200, json: async () => ({ ok: true, channel: 'C2', ts: '1700000100.000200' }) };
+        }
+        return { ok: false, status: 404, text: async () => 'not found' };
+      }) as any,
+    });
+
+    const blocks = [
+      { type: 'header', text: { type: 'plain_text', text: 'Bản tin Slack' } },
+      { type: 'section', text: { type: 'mrkdwn', text: '*Xin chào* <@U_AN>' } },
+    ];
+    const receipt = await adapter.execute('slack.send_message', { channel: 'C2', text: 'Bản tin', blocks });
+    expect(receipt).toEqual({ channel: 'C2', ts: '1700000100.000200' });
+    expect(sentPayloads[0]).toEqual({ channel: 'C2', text: 'Bản tin', blocks });
+
+    await expect(
+      adapter.execute('slack.send_message', {
+        channel: 'C2',
+        text: 'bad blocks',
+        blocks: Array.from({ length: 51 }, () => ({ type: 'divider' })),
+      }),
+    ).rejects.toMatchObject({ category: 'VALIDATION', details: { requestSent: false } });
+
+    await expect(
+      adapter.execute('slack.send_message', {
+        channel: 'C2',
+        text: 'bad item',
+        blocks: ['not-an-object' as any],
+      }),
+    ).rejects.toMatchObject({ category: 'VALIDATION', details: { requestSent: false } });
+    expect(sentPayloads).toHaveLength(1);
+
+    await expect(
+      adapter.execute('slack.send_message', {
+        channel: 'C2',
+        text: 'trigger_invalid_blocks',
+        blocks,
+      }),
+    ).rejects.toMatchObject({ category: 'VALIDATION', details: { requestSent: false } });
+  });
+
+  it('supports limit up to 200 on searchChannels and sets requestSent=false on scope or HTTP 401/403/404 write rejections', async () => {
+    const manyChannels = Array.from({ length: 15 }, (_, i) => ({
+      id: `C_MANY_${i + 1}`,
+      name: `ops-channel-${i + 1}`,
+      is_private: false,
+    }));
+    let httpStatus = 403;
+    const adapter = new SlackAdapter({
+      credentials: { botToken: 'xoxb-cap' },
+      allowedScope: { channels: manyChannels.map((c) => c.id) },
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 100, windowMs: 10 }),
+      fetchFn: (async (url: string | URL) => {
+        if (url.toString().includes('/conversations.list')) {
+          return { ok: true, status: 200, json: async () => ({ ok: true, channels: manyChannels }) };
+        }
+        return { ok: false, status: httpStatus, statusText: 'Err', text: async () => 'err' };
+      }) as any,
+    });
+
+    const defaultLimit = await adapter.searchChannels({ query: 'ops-channel' });
+    expect(defaultLimit).toHaveLength(10);
+
+    const expandedLimit = await adapter.searchChannels({ query: 'ops-channel', limit: 200 });
+    expect(expandedLimit).toHaveLength(15);
+
+    await expect(
+      adapter.sendMessage({ channel: 'C_OUT_OF_SCOPE', text: 'nope' }),
+    ).rejects.toMatchObject({ category: 'AUTH_ERROR', details: { requestSent: false } });
+
+    httpStatus = 401;
+    await expect(
+      adapter.sendMessage({ channel: 'C_MANY_1', text: 'unauth' }),
+    ).rejects.toMatchObject({ category: 'AUTH_ERROR', details: { requestSent: false } });
+
+    httpStatus = 404;
+    await expect(
+      adapter.sendMessage({ channel: 'C_MANY_1', text: 'missing' }),
+    ).rejects.toMatchObject({ category: 'NOT_FOUND', details: { requestSent: false } });
   });
 });

@@ -11,6 +11,7 @@ import { PersonalGmail } from './PersonalGmail';
 import { PersonalMyCalendar } from './PersonalMyCalendar';
 import { PersonalMySheets } from './PersonalMySheets';
 import { PersonalSlack } from './PersonalSlack';
+import { ScopeCandidatePicker } from './ScopeCandidatePicker';
 import { TrelloConnection } from './TrelloConnection';
 import { GitHubConnection } from './GitHubConnection';
 import { NotionConnection } from './NotionConnection';
@@ -545,6 +546,10 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                     {scopeError.text}
                   </p>
                 </div>
+                {/* Chọn nơi được dùng từ danh sách nhà cung cấp thay vì nhập ID */}
+                {drawer.service.scopeCandidates && !isMemberDrawer ? (
+                  <ScopeCandidatePicker serviceId={drawer.service.id} scopeLabel={scopeLabel ?? 'tài nguyên'} credentials={draft.credentials} selected={draft.scopes} onToggle={actions.toggleScopeValue} />
+                ) : null}
                 {/* Ô thêm mới nơi được phép dùng */}
                 <div id="scope-add-form" className={`${isMemberDrawer ? 'hidden ' : ''}v3-space-y-1.5`}>
                   <div className="flex items-center gap-2">

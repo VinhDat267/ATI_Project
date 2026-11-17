@@ -730,6 +730,20 @@
       "kind": "Tin nhắn kênh",
       "link": "Xem kênh Slack"
     },
+    "slack.read_thread": {
+      "action": "Đọc hội thoại thread",
+      "done": "Đã đọc thread",
+      "receipt": "Đã đọc thread Slack",
+      "kind": "Hội thoại thread",
+      "link": "Xem kênh Slack"
+    },
+    "slack.search_users": {
+      "action": "Tìm thành viên",
+      "done": "Đã tìm thành viên",
+      "receipt": "Đã tìm thành viên Slack",
+      "kind": "Thành viên",
+      "link": "Mở Slack"
+    },
     "telegram.send_message": {
       "action": "Gửi tin",
       "done": "Đã gửi",

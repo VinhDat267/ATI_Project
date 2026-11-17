@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { decryptCredentials } from '@wap/tool-adapters';
 import type { CalendarDigestCandidate, CalendarDigestConfig } from '@wap/tool-schemas';
 import type { Queryable } from '../../db/repositories/schedule-repo.js';
+import { findSlackDigestCredential } from './multi-source-digest-candidate.js';
 
 const WRITE_INTENT_RE =
   /\b(tạo\s+sự\s+kiện|tao\s+su\s+kien|đặt\s+lịch\s+họp|dat\s+lich\s+hop|thêm\s+sự\s+kiện|them\s+su\s+kien|xóa\s+sự\s+kiện|xoa\s+su\s+kien|hủy\s+cuộc\s+họp|huy\s+cuoc\s+hop|create\s+event|book\s+meeting|schedule\s+a\s+meeting|tạo\s+thẻ|create\s+card|tạo\s+issue|create\s+issue|gửi\s+email|send\s+email|cập\s+nhật\s+bảng\s+tính|append\s+row)\b/iu;
@@ -49,6 +50,8 @@ export interface EvaluateCalendarDigestInput {
   userId: string;
   services: string[];
   request: string;
+  workspaceMode?: 'legacy' | 'personal' | 'organization';
+  workspaceId?: string | null;
   windowHours?: number;
   includeSummary?: boolean;
 }
@@ -169,15 +172,30 @@ export async function evaluateCalendarDigestCandidate(
     };
   }
 
-  // 2. Check destination service (slack shared or personal telegram)
-  const destRow = (
-    await pool.query(
-      destService === 'telegram'
-        ? 'SELECT id, config, status FROM service_credentials WHERE service = $1 AND user_id = $2 LIMIT 1'
-        : 'SELECT id, config, status FROM service_credentials WHERE service = $1 AND user_id IS NULL LIMIT 1',
-      destService === 'telegram' ? [destService, userId] : [destService],
-    )
-  ).rows[0];
+  // 2. Check destination service (workspace-scoped slack or personal telegram)
+  const targetWorkspaceId = input.workspaceMode === 'organization' ? input.workspaceId ?? null : null;
+  if (destService === 'slack' && input.workspaceMode === 'organization' && !targetWorkspaceId) {
+    return {
+      candidate: {
+        canAutoDigest: false,
+        defaultMode: 'manual',
+        disabledReason: 'Không xác định được workspace tổ chức cho kênh Slack nhận bản tin.',
+      },
+    };
+  }
+  const destRow =
+    destService === 'telegram'
+      ? (
+          await pool.query(
+            'SELECT id, config, status FROM service_credentials WHERE service = $1 AND user_id = $2 LIMIT 1',
+            [destService, userId],
+          )
+        ).rows[0]
+      : await findSlackDigestCredential(pool, {
+          userId,
+          workspaceMode: input.workspaceMode,
+          workspaceId: targetWorkspaceId,
+        });
 
   if (!destRow || destRow.status !== 'active') {
     return {

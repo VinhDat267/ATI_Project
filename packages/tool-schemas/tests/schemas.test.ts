@@ -4,6 +4,7 @@ import {
   TRELLO_TOOLS,
   TRELLO_OAUTH_TOOLS,
   SLACK_TOOLS,
+  SLACK_EXTENDED_TOOLS,
   GITHUB_TOOLS,
   GITHUB_OAUTH_TOOLS,
   SERVICE_REGISTRY,
@@ -16,6 +17,9 @@ import {
   type PlannerResponse,
   type GithubDigestConfig,
   type GithubDigestDelivery,
+  type SlackDigestConfig,
+  type SlackDigestDelivery,
+  type ScheduleKind,
   type TrelloDigestConfig,
   type TrelloDigestDelivery,
 } from '../src/index.js';
@@ -75,6 +79,7 @@ describe('packages/tool-schemas (Task 2)', () => {
     expect(getToolDefinition('github.list_issues')?.sideEffect).toBe('read');
     expect(getToolDefinition('github.list_pull_requests')?.sideEffect).toBe('read');
     expect(getToolDefinition('slack.read_messages')?.sideEffect).toBe('read');
+    expect(getToolDefinition('slack.read_thread')?.sideEffect).toBe('read');
 
     const repoPattern = github?.gatherRules?.[0]?.pattern;
     expect(repoPattern?.exec('Tạo issue trong repo nhom/ati')?.[1]).toBe('nhom/ati');
@@ -120,6 +125,39 @@ describe('packages/tool-schemas (Task 2)', () => {
     expect(getToolDefinition('trello.remove_member')?.inputSchema.required).toEqual(['cardId', 'memberId']);
     expect(getToolDefinition('trello.update_checklist_item')?.inputSchema.required).toEqual(['cardId', 'itemName', 'state']);
     expect(getToolDefinition('trello.set_card_due_complete')?.inputSchema.required).toEqual(['cardId', 'dueComplete']);
+
+    const slackService = getServiceDefinition('slack')!;
+    expect(slackService.scopes).toEqual(expect.arrayContaining(['users:read', 'users:read.email']));
+    expect(SLACK_EXTENDED_TOOLS.map((t) => t.name)).toContain('slack.search_users');
+    const searchUsersTool = getToolDefinition('slack.search_users')!;
+    expect(searchUsersTool.sideEffect).toBe('read');
+    expect(searchUsersTool.riskLevel).toBe('low');
+    expect(getToolDefinition('slack.send_message')?.inputSchema.properties.blocks).toMatchObject({
+      type: 'array',
+      maxItems: 50,
+    });
+    const slackDigestKind: ScheduleKind = 'slack_digest';
+    const slackDigestCfg: SlackDigestConfig = {
+      destination: 'slack',
+      workspaceMode: 'personal',
+      workspaceId: null,
+      slackCredentialId: 'cred-slack-1',
+      channelId: 'C_GENERAL',
+      channelName: 'general',
+      sources: [{ service: 'github', tool: 'github.search_issues', args: { repo: 'org/app', query: 'open' }, label: 'GitHub' }],
+      recurrence: { type: 'daily', time: '08:00' },
+      timeZone: 'Asia/Ho_Chi_Minh',
+    };
+    const slackDigestDelivery: SlackDigestDelivery = {
+      destinationService: 'slack',
+      channelId: 'C_GENERAL',
+      channelName: 'general',
+      ts: '1700000000.000100',
+      sources: [{ service: 'github', label: 'GitHub', status: 'ok', itemCount: 2 }],
+    };
+    expect(slackDigestKind).toBe('slack_digest');
+    expect(slackDigestCfg.channelId).toBe('C_GENERAL');
+    expect(slackDigestDelivery.destinationService).toBe('slack');
 
     const trelloDigestConfig: TrelloDigestConfig = {
       credentialId: 'cred-trello-1',

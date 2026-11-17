@@ -14,6 +14,7 @@ import {
   MYSHEETS_SERVICE,
   MYSHEETS_TOOLS,
   NOTION_OAUTH_TOOLS,
+  SLACK_EXTENDED_TOOLS,
   TELEGRAM_OAUTH_TOOLS,
   type PersonalCalendarItem,
   type PersonalSpreadsheetItem,
@@ -714,7 +715,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
             ? [...ALL_TOOLS.filter((tool) => tool.service === 'notion'), ...NOTION_OAUTH_TOOLS].map((tool) => tool.name)
             : id === 'telegram' && personalConnected
               ? [...ALL_TOOLS.filter((tool) => tool.service === 'telegram'), ...TELEGRAM_OAUTH_TOOLS].map((tool) => tool.name)
-              : ALL_TOOLS.filter((tool) => tool.service === id).map((tool) => tool.name);
+              : [...ALL_TOOLS, ...SLACK_EXTENDED_TOOLS].filter((tool) => tool.service === id).map((tool) => tool.name);
 
           return {
             id,
@@ -731,6 +732,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
             connectionStatus: effectiveConnectionStatus,
             lastCheckedAt: check?.lastCheckedAt ?? null,
             allowedScope: personalAllowedScope ?? (Array.isArray(entries) ? entries : []),
+            ...(!effectiveIsPersonalOAuth && getRegisteredService(id)?.transport.listScopeCandidates ? { scopeCandidates: true } : {}),
             ...(effectiveIsPersonalOAuth && personalStatus
               ? { personalStatus, ...(username ? { username } : {}), ...(connectedAt ? { connectedAt } : {}) }
               : {}),
@@ -1043,6 +1045,60 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
 
   router.delete('/:service', handleDeleteCredentials);
   router.delete('/:service/credentials', handleDeleteCredentials);
+
+  // POST /api/services/:service/scope-candidates
+  // Lists resources the credential can reach (e.g. chat channels) so admins pick them
+  // instead of typing raw IDs. Accepts unsaved `credentials` (first-time setup) or falls
+  // back to the stored credential of the caller's workspace. Read-only.
+  router.post('/:service/scope-candidates', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { mode, workspaceId, isAdminUser } = getContext(req);
+      const userId = (req as any).user?.id;
+      const service = String(req.params.service);
+      const registration = getRegisteredService(service);
+      const list = registration?.transport.listScopeCandidates;
+      if (!registration || !list) {
+        res.status(404).json({ error: 'Dịch vụ này chưa hỗ trợ chọn từ danh sách.', code: 'SCOPE_CANDIDATES_UNSUPPORTED' });
+        return;
+      }
+      if (mode !== 'personal' && !isAdminUser) {
+        res.status(403).json({ error: 'Chỉ quản trị viên mới xem được danh sách tài nguyên.' });
+        return;
+      }
+      const fields = registration.definition.credentialFields;
+      const supplied = req.body?.credentials && typeof req.body.credentials === 'object' ? req.body.credentials : {};
+      let config: Record<string, unknown> | null = hasValidCredentials(fields, supplied)
+        ? Object.fromEntries(fields.map(({ key }) => [key, supplied[key]]))
+        : null;
+      if (!config) {
+        if (mode === 'personal' && !userId) {
+          res.status(401).json({ error: 'Phiên đăng nhập không hợp lệ.' });
+          return;
+        }
+        if (mode === 'organization' && !workspaceId) {
+          res.status(400).json({ error: 'Thiếu thông tin không gian làm việc.' });
+          return;
+        }
+        const record =
+          mode === 'personal'
+            ? await credentialRepo?.getPersonalCredentials(service, userId!)
+            : await credentialRepo?.getCredentials(service, mode === 'organization' ? workspaceId : null);
+        if (record && encryptionKey) config = decryptCredentials(record.config, encryptionKey);
+      }
+      if (!config) {
+        res.status(400).json({ error: 'Nhập khoá truy cập trước để tải danh sách.', code: 'CREDENTIALS_REQUIRED' });
+        return;
+      }
+      const result = await list(config, fetchFn, AbortSignal.timeout(10_000));
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error, code: result.code });
+        return;
+      }
+      res.json({ items: result.items, truncated: result.truncated });
+    } catch {
+      res.status(502).json({ error: 'Không tải được danh sách. Thử lại sau.', code: 'SCOPE_CANDIDATES_FAILED' });
+    }
+  });
 
   // PUT /api/services/:service/scope
   router.put('/:service/scope', async (req: Request, res: Response): Promise<void> => {

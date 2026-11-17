@@ -68,6 +68,8 @@ const WRITE_INTENT_PATTERNS = [
 export interface EvaluateGithubDigestInput {
   userId: string;
   scopeId?: string;
+  workspaceMode?: 'legacy' | 'personal' | 'organization';
+  workspaceId?: string | null;
   request?: string;
   proposal?: { request: string; recurrence: ScheduleRecurrence; [key: string]: any };
   services: string[];
@@ -242,7 +244,12 @@ export async function evaluateGithubDigestCandidate(
 
   let matchedChannel: { id: string; name: string } | null = null;
   try {
-    const slackAdapter = await input.getAdapter?.('slack', { userId, phase: 'planning' });
+    const slackAdapter = await input.getAdapter?.('slack', {
+      userId,
+      phase: 'planning',
+      ...(input.workspaceMode ? { workspaceMode: input.workspaceMode } : {}),
+      ...(input.workspaceId !== undefined ? { workspaceId: input.workspaceId } : {}),
+    });
     if (slackAdapter && typeof slackAdapter.execute === 'function') {
       const channels = await slackAdapter.execute('slack.search_channels', { query: channelQuery });
       if (Array.isArray(channels) && channels.length > 0) {

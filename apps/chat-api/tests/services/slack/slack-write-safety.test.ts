@@ -186,4 +186,14 @@ describe('04C real PostgreSQL/HTTP write attempt, echo and readback',()=>{
   expect(receipt).toMatchObject({status:'confirmed',channel:'C_FIXTURE',ts:'1730000000.000001'});
   expect((await outbox()).status).toBe('confirmed');
  });
+ it('confirms readback when Slack HTML-escapes &, <, > in stored message text',async()=>{
+  input.params.text='Check A & B < C > D';
+  const body={kind:'plan',steps:[{id:'post',tool:'myslack.chat_postMessage',args:input.params,dependsOn:[]}],connections:{myslack:{bindings:{[seed.binding.connectionId]:seed.binding},steps:{post:{connectionId:seed.binding.connectionId,tool:'myslack.chat_postMessage',dependencies:[]}}}}};
+  input.planHash=createHash('sha256').update(JSON.stringify(body)).digest('hex');
+  await env.db.pool.query('UPDATE plans SET plan_json=$2,plan_text=$3,plan_hash=$4 WHERE id=$1',[input.planId,body,JSON.stringify(body),input.planHash]);
+  env.fixture.setHandler('/chat.postMessage',r=>{const b=JSON.parse(r.body);const m={user:seed.binding.slackUserId,text:'Check A &amp; B &lt; C &gt; D',client_msg_id:b.client_msg_id,ts:'1730000000.000009'};saved=[m];return {body:{ok:true,channel:b.channel,ts:m.ts,message:m}};});
+  const receipt=await writer().execute(input);
+  expect(receipt).toMatchObject({status:'confirmed',channel:'C_FIXTURE',ts:'1730000000.000009'});
+  expect((await outbox()).status).toBe('confirmed');
+ });
 });

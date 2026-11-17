@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { decryptCredentials, detectCalendarConflicts, GMAIL_DIGEST_READ_TOOL, StepError } from '@wap/tool-adapters';
+import { decryptCredentials } from '@wap/tool-adapters';
 import {
   normalizeTelegramChatId,
   TELEGRAM_CHAT_ID_PATTERN,
@@ -9,34 +9,36 @@ import {
 } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import type { AdapterContext } from '../adapter-factory.js';
-import { GmailOAuthError } from '../gmail/oauth-client.js';
-import { isGoogleConnectionChanged } from '../gmail/token-manager.js';
 import type { TelegramBotClient } from '../telegram/bot-client.js';
 import { localLabel } from './next-occurrence.js';
-import { analyzeSheetKpiMetrics } from './sheets-digest-runner.js';
+import { assertGmailDigestBinding } from './gmail-digest-binding.js';
+import { isNotionSourceDenied } from '../notion/digest-source-authority.js';
 import {
   approvedTelegramNotionBinding,
   telegramNotionSource,
-  buildTelegramDigestSourceArgs,
   computeTelegramDigestConfigHash,
   getDigestSourceDisabledReason,
   isJiraDigestSourceBinding,
   READ_DIGEST_SOURCE_MAP,
 } from './telegram-digest-candidate.js';
 import {
+  computeDigestSinceWindow,
+  executeMultiDigestReadSources,
+  summarizeSourceItems,
+} from './multi-source-digest-reader.js';
+import {
   assertDigestScheduleLiveScopeAndAuth,
   buildPinnedTelegramAdapterContext,
 } from './digest-scope-guard.js';
 import {
-  assertGmailDigestBinding,
-  isValidGmailDigestQuery,
   validateTelegramDigestGmailConfig,
 } from './gmail-digest-binding.js';
 import {
   NOTION_DIGEST_REAPPROVAL,
-  isNotionSourceDenied,
   type NotionDigestSourceAuthority,
 } from '../notion/digest-source-authority.js';
+
+export { summarizeSourceItems };
 
 const notionBlocked = (): DigestRunOutcome => ({
   status: 'blocked',
@@ -105,219 +107,6 @@ export interface TelegramDigestRunnerOptions {
   aiTimeoutMs?: number;
   sendTimeoutMs?: number;
   notionSources?: Pick<NotionDigestSourceAuthority, 'read' | 'withSource'>;
-}
-
-function isGmailAuthOrBindingFailure(error: unknown): boolean {
-  if (isGoogleConnectionChanged(error)) return true;
-  if (error instanceof GmailOAuthError && error.kind === 'invalid_grant') return true;
-  if (error instanceof StepError) {
-    if (error.category === 'AUTH_ERROR' || error.statusCode === 401 || error.statusCode === 403) {
-      return true;
-    }
-  }
-  const anyErr = error as Record<string, unknown> | null | undefined;
-  if (anyErr && typeof anyErr === 'object') {
-    if (
-      anyErr.category === 'AUTH_ERROR' ||
-      anyErr.statusCode === 401 ||
-      anyErr.statusCode === 403
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
-export function summarizeSourceItems(
-  service: string,
-  raw: unknown,
-  now: Date = new Date()
-): { count: number; lines: string[]; truncated?: boolean } {
-  if (
-    raw &&
-    typeof raw === 'object' &&
-    !Array.isArray(raw) &&
-    (Array.isArray((raw as any).records) || Array.isArray((raw as any).values))
-  ) {
-    const rawObj = raw as Record<string, any>;
-    const values: string[][] = Array.isArray(rawObj.values) ? rawObj.values : [];
-    const headers: string[] = Array.isArray(rawObj.headers)
-      ? rawObj.headers
-      : Array.isArray(values[0])
-        ? values[0]
-        : [];
-    const records: Array<Record<string, string>> = Array.isArray(rawObj.records) ? rawObj.records : [];
-    const kpi = analyzeSheetKpiMetrics(headers, records, values);
-    if (kpi.totalRows === 0) {
-      return { count: 0, lines: ['  (Không có mục mới)'] };
-    }
-    const sheetTitle =
-      typeof rawObj.spreadsheetTitle === 'string' && rawObj.spreadsheetTitle.trim()
-        ? `📄 ${rawObj.spreadsheetTitle.trim()}: `
-        : '';
-    return {
-      count: kpi.totalRows,
-      lines: [
-        `  📊 ${sheetTitle}${kpi.totalRows} dòng (✅ Xong: ${kpi.doneCount} · 🔄 Đang làm: ${kpi.inProgressCount} · ⚠️ Chờ/Quá hạn: ${kpi.overdueOrPendingCount})`,
-        ...kpi.highlights.map((h) => `  ${h}`),
-      ],
-    };
-  }
-
-  let items: any[] = Array.isArray(raw)
-    ? raw
-    : raw && typeof raw === 'object' && Array.isArray((raw as any).items)
-      ? (raw as any).items
-      : raw && typeof raw === 'object' && Array.isArray((raw as any).events)
-        ? (raw as any).events
-        : raw && typeof raw === 'object' && Array.isArray((raw as any).issues)
-          ? (raw as any).issues
-          : raw && typeof raw === 'object' && Array.isArray((raw as any).cards)
-            ? (raw as any).cards
-            : raw && typeof raw === 'object' && Array.isArray((raw as any).threads)
-              ? (raw as any).threads
-              : raw && typeof raw === 'object' && Array.isArray((raw as any).rows)
-                ? (raw as any).rows
-                : raw && typeof raw === 'object' && Array.isArray((raw as any).pages)
-                  ? (raw as any).pages
-                  : raw && typeof raw === 'object' && Array.isArray((raw as any).databases)
-                    ? (raw as any).databases
-                    : [];
-
-  if (
-    items.length > 1 &&
-    items.every((ev) => ev && typeof ev === 'object' && typeof ev.start === 'string' && typeof ev.end === 'string')
-  ) {
-    try {
-      items = detectCalendarConflicts(
-        items.map((ev, i) => ({
-          id: String(ev.id ?? `ev_${i}`),
-          title: String(ev.title ?? ev.summary ?? `Sự kiện #${i + 1}`),
-          start: ev.start,
-          end: ev.end,
-          url: String(ev.url ?? ''),
-          ...ev,
-        })),
-      );
-    } catch {
-      // Keep original items if date parsing fails
-    }
-  }
-
-  const notionTruncated =
-    service === 'notion' &&
-    raw != null &&
-    typeof raw === 'object' &&
-    !Array.isArray(raw) &&
-    Boolean((raw as Record<string, unknown>).truncated);
-  const truncation = notionTruncated ? { truncated: true } : {};
-
-  if (items.length === 0) {
-    return { count: 0, lines: ['  (Không có mục mới)'], ...truncation };
-  }
-
-  const nowMs = now.getTime();
-  const soonLimitMs = nowMs + 24 * 3600_000;
-  const maxItems = service === 'gmail' ? 10 : 5;
-
-  const lines = items.slice(0, maxItems).map((item, idx) => {
-    if (typeof item === 'string') return `  ${idx + 1}. ${item}`;
-    if (Array.isArray(item)) return `  ${idx + 1}. ${item.join(' | ')}`;
-    const title =
-      item?.title ??
-      item?.summary ??
-      item?.name ??
-      item?.subject ??
-      item?.key ??
-      item?.id ??
-      `Mục #${idx + 1}`;
-    if (item && typeof item === 'object' && ('dueComplete' in item || 'due' in item || Array.isArray(item.idMembers))) {
-      const badges: string[] = [];
-      if (item?.dueComplete !== true && typeof item?.due === 'string' && item.due) {
-        const dueMs = Date.parse(item.due);
-        if (!Number.isNaN(dueMs)) {
-          if (dueMs < nowMs) badges.push('🚨 [Quá hạn]');
-          else if (dueMs <= soonLimitMs) badges.push('⏰ [Sắp đến hạn]');
-        }
-      }
-      const unassigned =
-        Array.isArray(item?.idMembers) && item.idMembers.length === 0 ? ' (chưa gán)' : '';
-      const badgePrefix = badges.length > 0 ? `${badges.join(' ')} ` : '';
-      return `  - ${badgePrefix}${String(title)}${unassigned}`;
-    }
-    if (service === 'gmail' && item && typeof item === 'object') {
-      const from = typeof item.from === 'string' && item.from.trim() ? `[${item.from.trim()}] ` : '';
-      const attachmentNames = Array.isArray(item.attachmentNames) ? item.attachmentNames.filter((n: unknown) => typeof n === 'string' && n.trim()) : [];
-      const attachmentBadge =
-        attachmentNames.length > 0
-          ? ` 📎 (${attachmentNames.slice(0, 2).join(', ')})`
-          : item.hasAttachment === true
-            ? ' 📎'
-            : '';
-      const rawSnippet = typeof item.snippet === 'string' ? item.snippet.replace(/\s+/g, ' ').trim() : '';
-      const snippetSuffix = rawSnippet ? ` — ${rawSnippet.length > 80 ? `${rawSnippet.slice(0, 77)}...` : rawSnippet}` : '';
-      return `  - ${from}${String(title)}${attachmentBadge}${snippetSuffix}`;
-    }
-    if (item && typeof item === 'object' && typeof item.start === 'string') {
-      const timeRange =
-        typeof item.start === 'string' && typeof item.end === 'string'
-          ? ` (${item.start} → ${item.end})`
-          : ` (${item.start})`;
-      const conflictBadge =
-        item.conflict === true && Array.isArray(item.conflictsWith) && item.conflictsWith.length > 0
-          ? `⚠️ [Trùng lịch: ${item.conflictsWith.join(', ')}] `
-          : '';
-      const extras: string[] = [];
-      if (typeof item.meetLink === 'string' && item.meetLink) extras.push(`🎥 ${item.meetLink}`);
-      if (typeof item.location === 'string' && item.location) extras.push(`📍 ${item.location}`);
-      const extraSuffix = extras.length > 0 ? ` — ${extras.join(' | ')}` : '';
-      return `  - ${conflictBadge}${String(title)}${timeRange}${extraSuffix}`;
-    }
-    if (service === 'notion' && item && typeof item === 'object') {
-      const propBadges: string[] = [];
-      if (item.properties && typeof item.properties === 'object') {
-        for (const [k, v] of Object.entries(item.properties as Record<string, unknown>)) {
-          if (typeof v === 'string' && v.trim()) {
-            propBadges.push(`${k}: ${v.trim()}`);
-          }
-        }
-      }
-      const badgeSuffix = propBadges.length > 0 ? ` (${propBadges.slice(0, 3).join(' · ')})` : '';
-      return `  - ${String(title)}${badgeSuffix}`;
-    }
-    if (item && typeof item === 'object' && typeof item.repo === 'string' && typeof item.number === 'number') {
-      const stateTag =
-        typeof item.state === 'string' && item.state.trim()
-          ? item.draft === true
-            ? ` [${item.state.trim()} · draft]`
-            : ` [${item.state.trim()}]`
-          : '';
-      const authorTag = typeof item.author === 'string' && item.author.trim() ? ` (@${item.author.trim()})` : '';
-      return `  - [${item.repo}#${item.number}] ${String(title)}${stateTag}${authorTag}`;
-    }
-    if (service === 'myjira' && item && typeof item === 'object') {
-      const key = typeof item.key === 'string' && item.key.trim() ? `[${item.key.trim()}] ` : '';
-      const status = typeof item.status === 'string' && item.status.trim() ? ` [${item.status.trim()}]` : '';
-      const priority = typeof item.priority === 'string' && item.priority.trim() ? ` ⚡${item.priority.trim()}` : '';
-      const due = typeof item.dueDate === 'string' && item.dueDate.trim() ? ` (hạn: ${item.dueDate.trim()})` : '';
-      const overdueBadge =
-        typeof item.dueDate === 'string' &&
-        item.dueDate.trim() &&
-        !/^(done|closed|resolved|hoàn thành|đã xong)$/i.test(String(item.status ?? '').trim()) &&
-        Date.parse(item.dueDate) < nowMs
-          ? '🚨 '
-          : '';
-      return `  - ${overdueBadge}${key}${String(title)}${status}${priority}${due}`;
-    }
-    const prefix = item?.number ? `#${item.number} ` : item?.key && item?.key !== title ? `${item.key}: ` : '';
-    return `  - ${prefix}${String(title)}`;
-  });
-
-  if (items.length > maxItems) {
-    lines.push(`  ... và ${items.length - maxItems} mục khác`);
-  }
-
-  return { count: items.length, lines, ...truncation };
 }
 
 export class TelegramDigestRunner {
@@ -1243,246 +1032,43 @@ export class TelegramDigestRunner {
       }
     }
 
-    // 2b. Compute SINCE window from the last 'scheduled' digest_sent run's due_at
-    const fallbackWindowMs =
-      digestConfig.recurrence?.type === 'weekly' ? 7 * 24 * 3600_000 : 24 * 3600_000;
-    let sinceDate = new Date(run.dueAt.getTime() - fallbackWindowMs);
-    if (this.options.pool) {
-      try {
-        const lastSentRes = await this.options.pool.query(
-          `SELECT due_at FROM schedule_runs
-           WHERE schedule_id = $1 AND trigger = 'scheduled' AND status = 'digest_sent'
-           ORDER BY due_at DESC LIMIT 1`,
-          [run.scheduleId],
-        );
-        if (lastSentRes.rowCount && lastSentRes.rows[0]?.due_at) {
-          sinceDate = new Date(lastSentRes.rows[0].due_at);
-        }
-      } catch {
-        // Fallback to default window
-      }
+    // 2b. Compute SINCE window and execute read sources via shared multi-source reader
+    const { sinceIso, untilIso } = await computeDigestSinceWindow(
+      this.options.pool,
+      run.scheduleId,
+      digestConfig.recurrence,
+      run.dueAt,
+    );
+
+    const readOutcome = await executeMultiDigestReadSources({
+      sources: digestConfig.sources,
+      userId,
+      dueAt: run.dueAt,
+      sinceIso,
+      untilIso,
+      workspaceMode: run.workspaceMode,
+      workspaceId: run.workspaceId,
+      gmailBinding,
+      notionBinding,
+      notionSources: this.options.notionSources,
+      credentialRepo: this.options.credentialRepo,
+      encryptionKey: this.options.encryptionKey,
+      gmailOAuthClientId: this.options.gmailOAuthClientId,
+      pool: this.options.pool,
+      adapterFactory: this.options.adapterFactory,
+      signal,
+    });
+
+    if (readOutcome.kind === 'notion_blocked') {
+      return notionBlocked();
     }
-    const sinceIso = sinceDate.toISOString();
-    const untilIso = new Date(run.dueAt.getTime() + 24 * 3600_000).toISOString();
-
-    // 3. Execute read sources
-    const sourceStatuses: TelegramDigestDelivery['sources'] = [];
-    const sections: string[] = [];
-    const failedLabels: string[] = [];
-    let okOrEmptyCount = 0;
-
-    for (const source of digestConfig.sources) {
-      signal.throwIfAborted();
-      try {
-        const sourceAdapterContext: AdapterContext = {
-          userId,
-          phase: 'planning',
-          workspaceMode: run.workspaceMode,
-          workspaceId: run.workspaceId,
-        };
-        if (source.service === 'gmail' && gmailBinding) {
-          sourceAdapterContext.phase = 'execution';
-          sourceAdapterContext.connections = {
-            gmail: { credentialId: gmailBinding.credentialId, email: gmailBinding.email },
-          };
-        } else if (source.service === 'myjira') {
-          sourceAdapterContext.phase = 'execution';
-          sourceAdapterContext.jiraDigestBinding = source.jiraBinding;
-          sourceAdapterContext.signal = signal;
-        }
-        const adapter =
-          source.service === 'notion'
-            ? null
-            : await this.options.adapterFactory.getAdapterForService(
-                source.service,
-                sourceAdapterContext,
-              );
-        const { callArgs, repoSearchTool, sheetListTool, sheetReadTool } = buildTelegramDigestSourceArgs(source, {
-          sinceIso,
-          untilIso,
-        });
-
-        let rawResult: unknown;
-        if (source.service === 'notion') {
-          if (!notionBinding || !this.options.notionSources) return notionBlocked();
-          rawResult = await this.options.notionSources.read(userId, notionBinding, signal);
-        } else if (source.service === 'gmail') {
-          const rawQuery = (source.args as Record<string, unknown> | undefined)?.query;
-          if (!isValidGmailDigestQuery(rawQuery)) {
-            return { status: 'blocked', error: 'Bộ lọc Gmail đã duyệt không hợp lệ.', pauseSchedule: true };
-          }
-          rawResult = await adapter.execute(
-            GMAIL_DIGEST_READ_TOOL,
-            { query: rawQuery.trim() },
-            { signal },
-          );
-        } else if (source.service === 'mycalendar' && source.tool === 'mycalendar.list_events') {
-          let allowedCalendars: string[] = [];
-          try {
-            const mycalRec = await this.options.credentialRepo.getPersonalCredentials('mycalendar', userId);
-            if (mycalRec && mycalRec.status === 'active') {
-              const dec = decryptCredentials(mycalRec.config, this.options.encryptionKey);
-              allowedCalendars = Array.isArray(dec.allowedScope?.calendars)
-                ? dec.allowedScope.calendars.filter((id: unknown) => typeof id === 'string' && id)
-                : Array.isArray(dec.selectedCalendars)
-                  ? dec.selectedCalendars.map((c: any) => String(c?.id ?? '')).filter(Boolean)
-                  : [];
-            }
-          } catch {
-            // fallback to callArgs.calendarId if credential lookup is not available
-          }
-          if (allowedCalendars.length > 0) {
-            const mergedEvents: any[] = [];
-            for (const calId of allowedCalendars.slice(0, 5)) {
-              const res = await adapter.execute(
-                source.tool,
-                { ...callArgs, calendarId: calId },
-                { signal },
-              );
-              const evs = Array.isArray(res?.events) ? res.events : Array.isArray(res) ? res : [];
-              mergedEvents.push(...evs);
-            }
-            rawResult = { events: mergedEvents };
-          } else {
-            rawResult = await adapter.execute(source.tool, callArgs, { signal });
-          }
-        } else if (sheetReadTool) {
-          const listRes = await adapter.execute(source.tool, callArgs, { signal });
-          const sheets = Array.isArray(listRes)
-            ? listRes
-            : listRes && typeof listRes === 'object' && Array.isArray((listRes as any).spreadsheets)
-              ? (listRes as any).spreadsheets
-              : [];
-          if (sheets.length > 0 && sheets[0]?.id) {
-            try {
-              const readRes = await adapter.execute(
-                sheetReadTool,
-                { spreadsheetId: String(sheets[0].id), range: 'A1:Z50' },
-                { signal },
-              );
-              if (
-                readRes &&
-                typeof readRes === 'object' &&
-                !Array.isArray(readRes) &&
-                (Array.isArray((readRes as any).records) || Array.isArray((readRes as any).values))
-              ) {
-                rawResult = {
-                  ...(readRes as Record<string, unknown>),
-                  spreadsheetTitle: String(sheets[0].name ?? sheets[0].title ?? sheets[0].id),
-                };
-              } else {
-                rawResult = listRes;
-              }
-            } catch {
-              rawResult = listRes;
-            }
-          } else {
-            rawResult = listRes;
-          }
-        } else {
-          try {
-            rawResult = await adapter.execute(source.tool, callArgs, { signal });
-          } catch (innerErr: any) {
-            if (
-              repoSearchTool &&
-              !callArgs.repo &&
-              /repo/i.test(String(innerErr?.message ?? ''))
-            ) {
-              const reposRes = await adapter.execute(repoSearchTool, { query: '' }, { signal });
-              const repos = Array.isArray(reposRes) ? reposRes.slice(0, 3) : [];
-              const mergedIssues: any[] = [];
-              for (const r of repos) {
-                const repoName = String(r?.fullName ?? r?.name ?? '').trim();
-                if (!repoName) continue;
-                const issues = await adapter.execute(
-                  source.tool,
-                  { ...callArgs, repo: repoName },
-                  { signal, repo: repoName },
-                );
-                if (Array.isArray(issues)) mergedIssues.push(...issues);
-              }
-              rawResult = mergedIssues;
-            } else if (sheetListTool && !callArgs.spreadsheetId) {
-              const sheetsRes = await adapter.execute(sheetListTool, { query: '' }, { signal });
-              const sheets = Array.isArray(sheetsRes) ? sheetsRes : [];
-              if (sheets.length > 0 && sheets[0]?.id) {
-                const readRes = await adapter.execute(
-                  source.tool,
-                  { ...callArgs, spreadsheetId: String(sheets[0].id) },
-                  { signal },
-                );
-                rawResult =
-                  readRes && typeof readRes === 'object' && !Array.isArray(readRes)
-                    ? {
-                        ...(readRes as Record<string, unknown>),
-                        spreadsheetTitle: String(sheets[0].name ?? sheets[0].title ?? sheets[0].id),
-                      }
-                    : readRes;
-              } else {
-                throw innerErr;
-              }
-            } else {
-              throw innerErr;
-            }
-          }
-        }
-
-        const { count, lines, truncated } = summarizeSourceItems(source.service, rawResult, run.dueAt);
-        okOrEmptyCount++;
-        sourceStatuses.push({
-          service: source.service,
-          label: source.label,
-          status: count > 0 ? 'ok' : 'empty',
-          itemCount: count,
-          ...(truncated ? { truncated: true } : {}),
-        });
-        sections.push(`• ${source.label} (${count}):\n${lines.join('\n')}`);
-      } catch (err: any) {
-        if (signal.aborted) {
-          throw signal.reason instanceof Error ? signal.reason : err;
-        }
-        if (source.service === 'notion' && isNotionSourceDenied(err)) {
-          return notionBlocked();
-        }
-        if (source.service === 'gmail') {
-          let bindingLost = isGmailAuthOrBindingFailure(err);
-          if (!bindingLost && gmailBinding && this.options.pool) {
-            const recheck = await assertGmailDigestBinding(
-              this.options.pool,
-              userId,
-              gmailBinding,
-              this.options.gmailOAuthClientId,
-              { encryptionKey: this.options.encryptionKey },
-            ).catch(() => null);
-            if (recheck && !recheck.allowed) {
-              bindingLost = true;
-            }
-          }
-          if (bindingLost) {
-            return {
-              status: 'blocked',
-              error: 'Kết nối Gmail nguồn không còn hợp lệ hoặc đã thay đổi. Hãy kiểm tra và xác nhận lại lịch.',
-              pauseSchedule: true,
-            };
-          }
-        }
-        failedLabels.push(source.label);
-        sourceStatuses.push({
-          service: source.service,
-          label: source.label,
-          status: 'partial_error',
-          error: 'Không lấy được dữ liệu ở lượt chạy này.',
-        });
-        sections.push(`• ${source.label}:\n  (Tạm thời chưa lấy được dữ liệu ở lượt chạy này)`);
-      }
+    if (readOutcome.kind === 'blocked') {
+      return { status: 'blocked', error: readOutcome.error, pauseSchedule: true };
     }
-
-    if (okOrEmptyCount === 0) {
-      return {
-        status: 'digest_failed',
-        error: 'Không đọc được dữ liệu từ các dịch vụ nguồn để tạo báo cáo.',
-      };
+    if (readOutcome.kind === 'digest_failed') {
+      return { status: 'digest_failed', error: readOutcome.error };
     }
+    const { sourceStatuses, sections, failedLabels } = readOutcome;
 
     // 4. Optional AI highlight summary: verify bounded PostgreSQL egress authority first (and commit/release
     // all PostgreSQL locks BEFORE external LLM HTTP I/O), then execute summarizeWithAi under remaining budget.

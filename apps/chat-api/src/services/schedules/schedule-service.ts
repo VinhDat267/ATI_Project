@@ -20,6 +20,8 @@ import {
   type SheetsDigestCandidate,
   type SheetsDigestConfig,
   type SheetsDigestDelivery,
+  type SlackDigestCandidate,
+  type SlackDigestConfig,
   type TelegramDigestConfig,
   type TelegramDigestCandidate,
   type TrelloDigestConfig,
@@ -34,7 +36,7 @@ import { MessageRepo } from '../../db/repositories/message-repo.js';
 import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
 import { calendarDigestCandidateMatches, computeCalendarDigestHash, evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js';
-import { calendarOrGithubDeliveryUnknownKind, getJiraDeliveryUnknown, isNotionDeliveryUnknown, matchesDispatchedDigestConfig, runState, runView } from './run-state.js';
+import { calendarOrGithubDeliveryUnknownKind, getJiraDeliveryUnknown, getSlackDeliveryUnknown, isNotionDeliveryUnknown, matchesDispatchedDigestConfig, runState, runView } from './run-state.js';
 import { nextOccurrence, nextRuns } from './next-occurrence.js';
 import { captureScheduleArtifact, guardScheduleArtifact, prelockScheduleArtifacts, registerScheduleFields, scheduleRegistry, scheduleSourceContext, tagScheduleContext } from '../slack/slack-schedule-lineage.js';
 import { messageOutputSelectors } from '../slack/slack-message-selectors.js';
@@ -55,6 +57,11 @@ import {
   telegramNotionSource,
   type TelegramConnectionLookupResult,
 } from './telegram-digest-candidate.js';
+import {
+  computeSlackDigestConfigHash,
+  evaluateSlackDigestCandidate,
+} from './slack-digest-candidate.js';
+import { matchesSlackDigestCredentialOwner } from './multi-source-digest-candidate.js';
 import { canonicalNotionDigestBinding, lockApprovedNotionSource, NOTION_DIGEST_REAPPROVAL, type NotionDigestSourceAuthority } from '../notion/digest-source-authority.js';
 import {
   buildConfirmedTrelloDigestDelivery,
@@ -172,6 +179,7 @@ export interface ScheduleServiceOptions {
   mysheetsEnabled?: boolean;
   emitV2?: boolean;
   fetchOrgSheetsMetadata?: FetchOrgSheetsMetadataFn;
+  getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
 }
 
 const REPLANNABLE = new Set(['expired', 'planning_failed', 'interrupted', 'missed', 'digest_failed']);
@@ -466,10 +474,10 @@ export class ScheduleService {
         if (!existing || metadata.scheduleId !== existing.id) {
           throw new ScheduleConflict('STALE_PROPOSAL');
         }
-        if (existing.kind !== 'sheets_digest' && existing.kind !== 'telegram_digest') {
+        if (existing.kind !== 'sheets_digest' && existing.kind !== 'telegram_digest' && existing.kind !== 'slack_digest') {
           throw new ScheduleConflict(
             'REAUTHORIZATION_NOT_READY',
-            'Chỉ lịch tổng hợp Google Sheets hoặc Telegram mới hỗ trợ cấp quyền lại.',
+            'Chỉ lịch tổng hợp Google Sheets, Telegram hoặc Slack mới hỗ trợ cấp quyền lại.',
           );
         }
         if (metadata.proposal?.action !== 'update') {
@@ -545,6 +553,12 @@ export class ScheduleService {
       const candidateHasTelegramSources = Boolean(
         candidateConfig && typeof candidateConfig === 'object' && 'sources' in candidateConfig,
       );
+      const candidateIsSlackMultiSource = Boolean(
+        candidateConfig &&
+        typeof candidateConfig === 'object' &&
+        'sources' in candidateConfig &&
+        candidateConfig.destination === 'slack',
+      );
       const candidateHasNotionDatabases = Boolean(
         candidateConfig && typeof candidateConfig === 'object' && 'databases' in candidateConfig,
       );
@@ -557,6 +571,7 @@ export class ScheduleService {
             !hasNotionDigestCandidate &&
             !hasMyJiraDigestCandidate &&
             existing?.kind !== 'telegram_digest' &&
+            existing?.kind !== 'slack_digest' &&
             existing?.kind !== 'github_digest' &&
             existing?.kind !== 'trello_digest' &&
             existing?.kind !== 'notion_digest' &&
@@ -573,6 +588,7 @@ export class ScheduleService {
           !hasNotionDigestCandidate &&
           !hasMyJiraDigestCandidate &&
           existing?.kind !== 'telegram_digest' &&
+          existing?.kind !== 'slack_digest' &&
           existing?.kind !== 'github_digest' &&
           existing?.kind !== 'trello_digest' &&
           existing?.kind !== 'notion_digest' &&
@@ -583,6 +599,8 @@ export class ScheduleService {
         !metadata.reauthorize &&
         !isCalendarSchedule &&
         !isSheetsSchedule &&
+        !candidateIsSlackMultiSource &&
+        existing?.kind !== 'slack_digest' &&
         (hasGithubDigestCandidate ||
           (existing?.kind === 'github_digest' && !candidateHasTelegramSources) ||
           (!candidateHasTelegramSources &&
@@ -593,6 +611,8 @@ export class ScheduleService {
         !isCalendarSchedule &&
         !isSheetsSchedule &&
         !isGithubSchedule &&
+        !candidateIsSlackMultiSource &&
+        existing?.kind !== 'slack_digest' &&
         (hasTrelloDigestCandidate ||
           (existing?.kind === 'trello_digest' && !candidateHasTelegramSources) ||
           (!candidateHasTelegramSources &&
@@ -604,6 +624,8 @@ export class ScheduleService {
         !isSheetsSchedule &&
         !isGithubSchedule &&
         !isTrelloSchedule &&
+        !candidateIsSlackMultiSource &&
+        existing?.kind !== 'slack_digest' &&
         (hasNotionDigestCandidate ||
           candidateHasNotionDatabases ||
           (existing?.kind === 'notion_digest' && !candidateHasTelegramSources) ||
@@ -617,6 +639,8 @@ export class ScheduleService {
         !isGithubSchedule &&
         !isTrelloSchedule &&
         !isNotionSchedule &&
+        !candidateIsSlackMultiSource &&
+        existing?.kind !== 'slack_digest' &&
         (hasMyJiraDigestCandidate ||
           (existing?.kind === 'myjira_digest' && !candidateHasTelegramSources) ||
           (!candidateHasTelegramSources &&
@@ -630,11 +654,23 @@ export class ScheduleService {
         !isTrelloSchedule &&
         !isNotionSchedule &&
         !isMyJiraSchedule &&
+        !candidateIsSlackMultiSource &&
+        existing?.kind !== 'slack_digest' &&
         (metadata.services.includes('telegram') ||
           existing?.kind === 'telegram_digest' ||
-          candidateHasTelegramSources);
+          (candidateHasTelegramSources && !candidateIsSlackMultiSource));
+      const isSlackSchedule =
+        (!metadata.reauthorize || existing?.kind === 'slack_digest') &&
+        !isCalendarSchedule &&
+        !isSheetsSchedule &&
+        !isGithubSchedule &&
+        !isTrelloSchedule &&
+        !isNotionSchedule &&
+        !isMyJiraSchedule &&
+        !isTelegramSchedule &&
+        (candidateIsSlackMultiSource || existing?.kind === 'slack_digest');
       let digestFields: {
-        kind: 'plan' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest' | 'trello_digest' | 'notion_digest' | 'myjira_digest';
+        kind: 'plan' | 'sheets_digest' | 'calendar_digest' | 'github_digest' | 'telegram_digest' | 'slack_digest' | 'trello_digest' | 'notion_digest' | 'myjira_digest';
         digestConfig: unknown | null;
         digestConfigHash: string | null;
         digestApprovedAt: Date | null;
@@ -646,8 +682,13 @@ export class ScheduleService {
       };
       let telegramDigestConfig: TelegramDigestConfig | null = null;
       let telegramDigestHash: string | null = null;
+      let slackDigestConfig: SlackDigestConfig | null = null;
+      let slackDigestHash: string | null = null;
       const previousTelegramConfig = existing?.kind === 'telegram_digest'
         ? existing.digest_config as TelegramDigestConfig | null
+        : null;
+      const previousSlackConfig = existing?.kind === 'slack_digest'
+        ? existing.digest_config as SlackDigestConfig | null
         : null;
 
       if (wantAutoDigest && (proposal.action === 'create' || proposal.action === 'update') && !isGithubSchedule && !isTrelloSchedule && !isNotionSchedule && !isReadOnlyJiraDigestConfirm) {
@@ -692,6 +733,52 @@ export class ScheduleService {
             digestConfigHash: telegramDigestHash,
             digestApprovedAt: now,
           };
+        } else if (isSlackSchedule) {
+          const candidate = metadata.digestCandidate as SlackDigestCandidate | undefined;
+          if (!candidate || candidate.canAutoDigest !== true || !candidate.config || !candidate.configHash) {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED', candidate?.disabledReason);
+          }
+          if (
+            candidate.config.workspaceMode !== wsMode ||
+            (candidate.config.workspaceId ?? null) !== wsId
+          ) {
+            throw new ScheduleConflict('DIGEST_PREVIEW_CHANGED', 'Không gian làm việc không khớp với bản xem trước.');
+          }
+          let candidateHash: string;
+          try {
+            candidateHash = computeSlackDigestConfigHash(candidate.config);
+          } catch {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+          }
+          if (candidateHash !== candidate.configHash) {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+          }
+          const confirmedAiSetting = includeAiSummary ??
+            (metadata.reauthorize ? undefined : previousSlackConfig?.includeAiSummary);
+          const effectiveConfig: SlackDigestConfig =
+            confirmedAiSetting === undefined ? candidate.config : { ...candidate.config, includeAiSummary: confirmedAiSetting };
+          await this.verifyTelegramDigestGmailConfigInTx(client, userId, effectiveConfig as unknown as TelegramDigestConfig, metadata.services);
+          await this.verifySlackDigestConfigInTx(client, {
+            userId,
+            wsMode,
+            wsId,
+            config: effectiveConfig,
+            conflictCode: 'DIGEST_PREVIEW_CHANGED',
+          });
+          let computedHash: string;
+          try {
+            computedHash = computeSlackDigestConfigHash(effectiveConfig);
+          } catch {
+            throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+          }
+          slackDigestConfig = effectiveConfig;
+          slackDigestHash = computedHash;
+          digestFields = {
+            kind: 'slack_digest',
+            digestConfig: JSON.stringify(slackDigestConfig),
+            digestConfigHash: slackDigestHash,
+            digestApprovedAt: now,
+          };
         } else if (isCalendarSchedule) {
           const evaluated = await evaluateCalendarDigestCandidate({
             pool: client,
@@ -699,6 +786,8 @@ export class ScheduleService {
             userId,
             services: metadata.services,
             request: proposal.request!,
+            workspaceMode: wsMode,
+            workspaceId: wsId,
           });
           if (!evaluated.candidate.canAutoDigest || !evaluated.config || !evaluated.configHash) {
             throw new ScheduleConflict('AUTO_DIGEST_NOT_ELIGIBLE');
@@ -980,6 +1069,12 @@ export class ScheduleService {
         }
         await this.assertTelegramDigestCanResumeInTx(client, existing);
       }
+      if (proposal.action === 'resume' && existing.kind === 'slack_digest') {
+        if (existing.status === 'cancelled' || existing.status === 'completed') {
+          throw new ScheduleConflict('SCHEDULE_CLOSED');
+        }
+        await this.assertSlackDigestCanResumeInTx(client, existing);
+      }
       if (proposal.action === 'resume' && existing.kind === 'myjira_digest') {
         if (existing.status === 'cancelled' || existing.status === 'completed') {
           throw new ScheduleConflict('SCHEDULE_CLOSED');
@@ -1051,6 +1146,69 @@ export class ScheduleService {
         }
         return this.recordState(client, await this.saveFields(client, existing.id, fields, messageId, segments), now);
       }
+      if (proposal.action === 'update' && isSlackSchedule) {
+        if (wantAutoDigest && slackDigestConfig && slackDigestHash) {
+          fields.kind = 'slack_digest';
+          fields.digest_config = slackDigestConfig;
+          fields.digest_config_hash = slackDigestHash;
+          fields.digest_approved_at = now;
+        } else if (approvalMode === 'manual') {
+          fields.kind = 'plan';
+          fields.digest_config = null;
+          fields.digest_config_hash = null;
+          fields.digest_approved_at = null;
+        } else if (existing.kind === 'slack_digest' && existing.digest_config) {
+          const slackCandidate = metadata.digestCandidate as SlackDigestCandidate | undefined;
+          const existingGmailValidation = validateTelegramDigestGmailConfig(existing.digest_config);
+          const involvesGmail =
+            fields.services.includes('gmail') || existingGmailValidation.kind !== 'non_gmail';
+          if (slackCandidate?.canAutoDigest === false || (involvesGmail && (!slackCandidate?.canAutoDigest || !slackCandidate.config))) {
+            fields.kind = 'plan';
+            fields.digest_config = null;
+            fields.digest_config_hash = null;
+            fields.digest_approved_at = null;
+          } else {
+            const previousConfig = existing.digest_config as SlackDigestConfig;
+            let proposedConfig: SlackDigestConfig;
+            if (slackCandidate?.canAutoDigest) {
+              if (!slackCandidate.config || !slackCandidate.configHash) {
+                throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+              }
+              let candHash: string;
+              try {
+                candHash = computeSlackDigestConfigHash(slackCandidate.config);
+              } catch {
+                throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+              }
+              if (candHash !== slackCandidate.configHash) {
+                throw new ScheduleConflict('AUTO_DIGEST_NOT_ALLOWED');
+              }
+              proposedConfig = slackCandidate.config;
+            } else {
+              proposedConfig = { ...previousConfig, recurrence: fields.recurrence };
+            }
+            const updatedConfig: SlackDigestConfig =
+              previousConfig.includeAiSummary === undefined
+                ? proposedConfig
+                : { ...proposedConfig, includeAiSummary: previousConfig.includeAiSummary };
+            await this.verifySlackDigestConfigInTx(client, {
+              userId,
+              wsMode,
+              wsId,
+              config: updatedConfig,
+              conflictCode: 'DIGEST_PREVIEW_CHANGED',
+            });
+            if (involvesGmail) {
+              await this.verifyTelegramDigestGmailConfigInTx(client, userId, updatedConfig as unknown as TelegramDigestConfig, fields.services);
+            }
+            fields.kind = 'slack_digest';
+            fields.digest_config = updatedConfig;
+            fields.digest_config_hash = computeSlackDigestConfigHash(updatedConfig);
+            fields.digest_approved_at = existing.digest_approved_at ?? now;
+          }
+        }
+        return this.recordState(client, await this.saveFields(client, existing.id, fields, messageId, segments), now);
+      }
       if (proposal.action === 'update' && existing.kind === 'calendar_digest' && approvalMode !== 'manual') {
         const evaluated = await evaluateCalendarDigestCandidate({
           pool: client,
@@ -1058,6 +1216,8 @@ export class ScheduleService {
           userId,
           services: fields.services,
           request: fields.request,
+          workspaceMode: wsMode,
+          workspaceId: wsId,
         });
         if (!evaluated.candidate.canAutoDigest || !evaluated.config || !evaluated.configHash) {
           if ((metadata.digestCandidate as CalendarDigestCandidate | undefined)?.canAutoDigest) {
@@ -1439,9 +1599,10 @@ export class ScheduleService {
     scheduleId: string;
     baseVersion: number;
     expiresAt: string;
-    candidate: SheetsDigestCandidate | TelegramDigestCandidate;
+    candidate: SheetsDigestCandidate | TelegramDigestCandidate | SlackDigestCandidate;
     metadata: ScheduleProposalMetadata;
   }> {
+    // Allow SheetsDigestCandidate | TelegramDigestCandidate | SlackDigestCandidate in runtime return
     const { userId, scheduleId, scope } = input;
     const now = input.now ?? new Date();
     if (!isUuid(userId) || !isUuid(scheduleId)) throw new ScheduleNotFound();
@@ -1449,10 +1610,10 @@ export class ScheduleService {
     // Phase A (Outside DB Transaction): Snapshot read & Candidate/Metadata resolution
     const snap = await this.repo.ownedSchedule(scheduleId, userId, this.options.pool, false, scope);
     if (!snap) throw new ScheduleNotFound();
-    if (snap.kind !== 'sheets_digest' && snap.kind !== 'telegram_digest') {
+    if (snap.kind !== 'sheets_digest' && snap.kind !== 'telegram_digest' && snap.kind !== 'slack_digest') {
       throw new ScheduleConflict(
         'REAUTHORIZATION_NOT_READY',
-        'Chỉ lịch tổng hợp Google Sheets hoặc Telegram mới hỗ trợ cấp quyền lại.',
+        'Chỉ lịch tổng hợp Google Sheets, Telegram hoặc Slack mới hỗ trợ cấp quyền lại.',
       );
     }
     if (snap.status === 'cancelled' || snap.status === 'completed') {
@@ -1513,10 +1674,100 @@ export class ScheduleService {
       snap.kind === 'telegram_digest' && snap.digest_config && typeof snap.digest_config === 'object'
         ? (snap.digest_config as TelegramDigestConfig)
         : null;
+    const prevSlackConfig =
+      snap.kind === 'slack_digest' && snap.digest_config && typeof snap.digest_config === 'object'
+        ? (snap.digest_config as SlackDigestConfig)
+        : null;
     let tgCandidate: TelegramDigestCandidate | null = null;
+    let slackCandidate: SlackDigestCandidate | null = null;
     let sheetsCandidate: SheetsDigestCandidate | null = null;
 
-    if (snap.kind === 'telegram_digest') {
+    if (snap.kind === 'slack_digest') {
+      const needsGmail =
+        snap.services.includes('gmail') ||
+        Boolean(prevSlackConfig?.sources?.some((s) => s.service === 'gmail'));
+      const [gmailBinding, githubLookup, jiraLookup] = await Promise.all([
+        needsGmail
+          ? loadGmailDigestBinding(
+              this.options.pool,
+              userId,
+              this.options.gmailOAuthClientId,
+              this.options.encryptionKey,
+            )
+          : Promise.resolve(null),
+        snap.services.includes('github')
+          ? this.loadLiveGithubLookup(this.options.pool, userId)
+          : Promise.resolve(null),
+        snap.services.includes('myjira') && trustedScope.workspaceMode === 'organization'
+          ? this.options.jiraConnection?.(userId, trustedScope.workspaceId)
+          : Promise.resolve(null),
+      ]);
+      const effectiveIncludeAi =
+        typeof input.includeAiSummary === 'boolean'
+          ? input.includeAiSummary
+          : typeof prevSlackConfig?.includeAiSummary === 'boolean'
+            ? prevSlackConfig.includeAiSummary
+            : undefined;
+      const prevGmailSource = prevSlackConfig?.sources?.find((s) => s.service === 'gmail');
+      const prevGmailQuery = prevGmailSource?.args?.query;
+      const reauthorizeGmailQuery = prevGmailSource && isValidGmailDigestQuery(prevGmailQuery)
+        ? {
+            query: prevGmailQuery.trim(),
+            label: prevGmailSource.label.replace(/\s*\([^()]+\)\s*$/, '').trim() || 'Email chưa đọc',
+          }
+        : undefined;
+      const fallbackAdapter = async (serviceName: string) => {
+        if (serviceName !== 'slack') return null;
+        if (this.options.getAdapter) {
+          return this.options.getAdapter(serviceName, {
+            userId,
+            phase: 'planning',
+            workspaceMode: trustedScope.workspaceMode,
+            workspaceId: trustedScope.workspaceId,
+          });
+        }
+        return prevSlackConfig
+          ? {
+              execute: async () => [{ id: prevSlackConfig.channelId, name: prevSlackConfig.channelName }],
+            }
+          : null;
+      };
+      slackCandidate = await evaluateSlackDigestCandidate({
+        proposal: {
+          kind: 'schedule',
+          action: 'update',
+          name: snap.name,
+          request: snap.request,
+          recurrence: snap.recurrence,
+          summary: `Cấp quyền lại lịch "${snap.name}".`,
+        },
+        services: snap.services,
+        timeZone: this.options.timeZone,
+        userId,
+        pool: this.options.pool,
+        getAdapter: fallbackAdapter,
+        githubLookup,
+        jiraLookup,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
+        gmailBinding,
+        existingDigest: prevSlackConfig,
+        reauthorizeGmailQuery,
+        includeAiSummary: effectiveIncludeAi,
+      });
+      if (!slackCandidate.canAutoDigest || !slackCandidate.config || !slackCandidate.configHash) {
+        throw new ScheduleConflict(
+          'REAUTHORIZATION_NOT_READY',
+          slackCandidate.disabledReason ?? SCHEDULE_CONFLICTS.REAUTHORIZATION_NOT_READY,
+        );
+      }
+      if (prevSlackConfig?.channelId && slackCandidate.config.channelId !== prevSlackConfig.channelId) {
+        throw new ScheduleConflict(
+          'REAUTHORIZATION_NOT_READY',
+          `Kênh Slack "#${prevSlackConfig.channelName || prevSlackConfig.channelId}" không còn trong phạm vi cấp quyền hiện tại.`,
+        );
+      }
+    } else if (snap.kind === 'telegram_digest') {
       if (telegramNotionSource(prevTgConfig) || snap.services.includes('notion')) {
         throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', NOTION_DIGEST_REAPPROVAL);
       }
@@ -1789,7 +2040,7 @@ export class ScheduleService {
       );
       const current = schedRes.rows[0];
       if (!current) throw new ScheduleNotFound();
-      if (current.kind !== snap.kind || (current.kind !== 'sheets_digest' && current.kind !== 'telegram_digest')) {
+      if (current.kind !== snap.kind || (current.kind !== 'sheets_digest' && current.kind !== 'telegram_digest' && current.kind !== 'slack_digest')) {
         throw new ScheduleConflict(
           'REAUTHORIZATION_NOT_READY',
           'Loại lịch đã thay đổi hoặc không hỗ trợ cấp quyền lại.',
@@ -1816,11 +2067,39 @@ export class ScheduleService {
         ...nextRuns(current.recurrence, firstRun, this.options.timeZone, 2),
       ].map((d) => d.toISOString());
 
-      let sealedCandidate: SheetsDigestCandidate | TelegramDigestCandidate;
+      let sealedCandidate: SheetsDigestCandidate | TelegramDigestCandidate | SlackDigestCandidate;
       let proposalSummary: string;
       let metadataServices: string[];
 
-      if (current.kind === 'telegram_digest') {
+      if (current.kind === 'slack_digest') {
+        if (!slackCandidate?.config || !slackCandidate.configHash) {
+          throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', SCHEDULE_CONFLICTS.REAUTHORIZATION_NOT_READY);
+        }
+        try {
+          await this.verifyTelegramDigestGmailConfigInTx(client, userId, slackCandidate.config as unknown as TelegramDigestConfig, current.services);
+        } catch (err) {
+          if (err instanceof ScheduleConflict) {
+            throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', err.message);
+          }
+          throw err;
+        }
+        const wsCheckMode = slackCandidate.config.workspaceMode;
+        const wsCheckId =
+          wsCheckMode === 'organization'
+            ? (slackCandidate.config.workspaceId ?? null)
+            : null;
+        await this.verifySlackDigestConfigInTx(client, {
+          userId,
+          wsMode: wsCheckMode,
+          wsId: wsCheckId,
+          config: slackCandidate.config,
+          conflictCode: 'REAUTHORIZATION_NOT_READY',
+          conflictMessage: 'Kết nối Slack nhận bản tin không còn hợp lệ.',
+        });
+        sealedCandidate = slackCandidate;
+        proposalSummary = `Cấp quyền lại lịch "${current.name}" (Slack digest).`;
+        metadataServices = current.services;
+      } else if (current.kind === 'telegram_digest') {
         if (!tgCandidate?.config || !tgCandidate.configHash) {
           throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', SCHEDULE_CONFLICTS.REAUTHORIZATION_NOT_READY);
         }
@@ -2062,6 +2341,93 @@ export class ScheduleService {
     }
   }
 
+  private async assertSlackDigestCanResumeInTx(
+    client: pg.PoolClient,
+    row: ScheduleRow,
+  ): Promise<void> {
+    const gmailCheck = validateTelegramDigestGmailConfig(row.digest_config);
+    if (
+      gmailCheck.kind === 'invalid' ||
+      gmailCheck.kind === 'gmail_legacy' ||
+      (Array.isArray(row.services) && row.services.includes('gmail') && gmailCheck.kind !== 'gmail_bound')
+    ) {
+      throw new ScheduleConflict(
+        'REAUTHORIZATION_REQUIRED',
+        gmailCheck.kind === 'non_gmail' ? undefined : gmailCheck.reason,
+      );
+    }
+    const cfg = row.digest_config as SlackDigestConfig | null;
+    if (!cfg || !isUuid(cfg.slackCredentialId)) {
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+    }
+    let expectedHash: string | null = null;
+    try {
+      expectedHash = computeSlackDigestConfigHash(cfg);
+    } catch {
+      expectedHash = null;
+    }
+    if (!row.digest_config_hash || !expectedHash || expectedHash !== row.digest_config_hash) {
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+    }
+    const guard = await assertDigestScheduleLiveScopeAndAuth({
+      pool: client,
+      scheduleId: row.id,
+      encryptionKey: this.options.encryptionKey,
+      gmailOAuthClientId: this.options.gmailOAuthClientId,
+    });
+    if (!guard.allowed) {
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', guard.pauseReason);
+    }
+  }
+
+  private async verifySlackDigestConfigInTx(
+    client: pg.PoolClient,
+    input: {
+      userId: string;
+      wsMode: string;
+      wsId: string | null;
+      config: SlackDigestConfig;
+      conflictCode: 'DIGEST_PREVIEW_CHANGED' | 'REAUTHORIZATION_NOT_READY';
+      conflictMessage?: string;
+    },
+  ): Promise<void> {
+    if (
+      input.config.workspaceMode !== input.wsMode ||
+      (input.config.workspaceId ?? null) !== input.wsId ||
+      !isUuid(input.config.slackCredentialId)
+    ) {
+      throw new ScheduleConflict(
+        input.conflictCode,
+        input.conflictMessage ?? 'Không gian làm việc hoặc kết nối Slack không khớp với bản xem trước.',
+      );
+    }
+    const slackCredRes = await client.query<{
+      id: string;
+      service: string;
+      user_id: string | null;
+      workspace_id: string | null;
+      status: string;
+    }>(
+      'SELECT id, service, user_id, workspace_id, status FROM service_credentials WHERE id = $1',
+      [input.config.slackCredentialId],
+    );
+    const credRow = slackCredRes.rows[0];
+    if (
+      !credRow ||
+      credRow.status !== 'active' ||
+      !matchesSlackDigestCredentialOwner(credRow, {
+        userId: input.userId,
+        workspaceMode: input.wsMode,
+        trustedWorkspaceId: input.wsId,
+      })
+    ) {
+      throw new ScheduleConflict(
+        input.conflictCode,
+        input.conflictMessage ?? 'Kết nối Slack đã thay đổi hoặc không còn hoạt động.',
+      );
+    }
+  }
+
   private async assertJiraDigestConfigInTx(
     client: pg.PoolClient,
     userId: string,
@@ -2176,6 +2542,12 @@ export class ScheduleService {
         }
         await this.assertTelegramDigestCanResumeInTx(client, row);
       }
+      if (input.action === 'resume' && row.kind === 'slack_digest') {
+        if (row.status === 'cancelled' || row.status === 'completed') {
+          throw new ScheduleConflict('SCHEDULE_CLOSED');
+        }
+        await this.assertSlackDigestCanResumeInTx(client, row);
+      }
       if (input.action === 'resume' && row.kind === 'myjira_digest') {
         if (row.status === 'cancelled' || row.status === 'completed') {
           throw new ScheduleConflict('SCHEDULE_CLOSED');
@@ -2219,6 +2591,7 @@ export class ScheduleService {
           (typeof previous.error === 'string' &&
             (previous.error.includes('SHEETS_DELIVERY_UNKNOWN') ||
               previous.error.includes('TELEGRAM_DELIVERY_UNKNOWN') ||
+              previous.error.includes('SLACK_DELIVERY_UNKNOWN') ||
               previous.error.includes('TRELLO_DELIVERY_UNKNOWN') ||
               previous.error.includes('NOTION_DELIVERY_UNKNOWN') ||
               previous.error.includes('Chưa xác định bản tin Notion đã gửi hay chưa'))) ||
@@ -2357,7 +2730,10 @@ export class ScheduleService {
         run.error.trim().length > 0;
       const isNotionUnknown = isNotionDeliveryUnknown(run, schedule);
       const jiraUnknown = getJiraDeliveryUnknown(run);
-      const unknownDigestKind = jiraUnknown ? 'myjira_digest' : calendarOrGithubDeliveryUnknownKind(run, schedule);
+      const slackUnknown = getSlackDeliveryUnknown(run);
+      const unknownDigestKind = jiraUnknown ? 'myjira_digest'
+        : slackUnknown ? 'slack_digest'
+        : calendarOrGithubDeliveryUnknownKind(run, schedule);
       if (!isSheetsUnknown && !isTrelloOrTelegramUnknown && !isNotionUnknown && !unknownDigestKind) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
@@ -2607,6 +2983,31 @@ export class ScheduleService {
             },
           };
           deliveryPayload = delivery;
+        } else if (deliveryKind === 'slack_digest') {
+          const target = slackUnknown?.target ??
+            (schedule.kind === 'slack_digest' && matchesDispatchedDigestConfig(run, schedule)
+              ? schedule.digest_config as SlackDigestConfig
+              : null);
+          const prevDelivery =
+            run.delivery && typeof run.delivery === 'object'
+              ? (run.delivery as unknown as Record<string, unknown>)
+              : {};
+          deliveryPayload = {
+            ...prevDelivery,
+            destinationService: 'slack',
+            channelId: prevDelivery.channelId ?? target?.channelId ?? 'unknown',
+            channelName: prevDelivery.channelName ?? target?.channelName ?? 'unknown',
+            ts: typeof prevDelivery.ts === 'string' && prevDelivery.ts.trim() ? prevDelivery.ts : null,
+            sentAt: typeof prevDelivery.sentAt === 'string' ? prevDelivery.sentAt : resolvedAtIso,
+            sources: Array.isArray(prevDelivery.sources) ? prevDelivery.sources : [],
+            manualConfirmedAt: resolvedAtIso,
+            manualResolution: {
+              status: 'confirmed_sent',
+              resolvedAt: resolvedAtIso,
+              manualConfirmedAt: resolvedAtIso,
+              resolvedBy: userId,
+            },
+          };
         } else {
           const cfg =
             run.dispatched_config && typeof run.dispatched_config === 'object'
@@ -2754,6 +3155,21 @@ export class ScheduleService {
             }
           }
           await this.assertTelegramDigestCanResumeInTx(client, schedule);
+        } else if (schedule.kind === 'slack_digest') {
+          if (!matchesDispatchedDigestConfig(run, schedule)) {
+            throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
+          }
+          const cfg = schedule.digest_config as SlackDigestConfig;
+          let expectedHash: string | null = null;
+          try {
+            expectedHash = computeSlackDigestConfigHash(cfg);
+          } catch {
+            expectedHash = null;
+          }
+          if (!expectedHash || expectedHash !== schedule.digest_config_hash) {
+            throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
+          }
+          await this.assertSlackDigestCanResumeInTx(client, schedule);
         } else if (schedule.kind === 'myjira_digest') {
           if (!matchesDispatchedDigestConfig(run, schedule)) {
             throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');

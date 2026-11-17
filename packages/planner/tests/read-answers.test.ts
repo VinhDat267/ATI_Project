@@ -25,7 +25,7 @@ describe('ANS-01 read answers', () => {
     // Main's byte-for-byte baseline for the catalog without Telegram. Telegram rules have dedicated coverage.
     const nonTelegramTools = ALL_TOOLS.filter((tool) => tool.service !== 'telegram');
     expect(hash(buildSystemPrompt(nonTelegramTools, date, options)))
-      .toBe('ee6e72cdc9e94e33eea5eb6079a8fc47d76076f328604b1bbc12ef450f0da395');
+      .toBe('433e0860ee2d2222ae400e5b17a1de0442e6987c2d26f884c90b5adf96c23c03');
     expect(hash(formatSearchResults([{ tool: 'slack.search_channels', args: { query: 'frontend' }, result: [] }])))
       .toBe('1edfb5917d31a91aa046dca5ea220a6c131deed29412fa206df107eb32ef9850');
   });

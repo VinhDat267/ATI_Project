@@ -1,6 +1,6 @@
 import type pg from 'pg';
 import { decryptCredentials } from '@wap/tool-adapters';
-import { normalizeTelegramChatId, TELEGRAM_CHAT_ID_PATTERN, type TelegramDigestConfig } from '@wap/tool-schemas';
+import { normalizeTelegramChatId, TELEGRAM_CHAT_ID_PATTERN, type SlackDigestConfig, type TelegramDigestConfig } from '@wap/tool-schemas';
 import { isUuid } from '../../db/repositories/uuid.js';
 import {
   assertGmailDigestBinding,
@@ -8,6 +8,8 @@ import {
   type GmailBindingGuardCode,
 } from './gmail-digest-binding.js';
 import { computeTelegramDigestConfigHash, isJiraDigestSourceBinding } from './telegram-digest-candidate.js';
+import { computeSlackDigestConfigHash } from './slack-digest-candidate.js';
+import { matchesSlackDigestCredentialOwner } from './multi-source-digest-candidate.js';
 
 type Queryable = pg.Pool | Pick<pg.Pool, 'query'>;
 
@@ -364,7 +366,62 @@ export async function assertDigestScheduleLiveScopeAndAuth(
     }
   }
 
-  if (row.kind === 'telegram_digest') {
+  if (row.kind === 'telegram_digest' || row.kind === 'slack_digest') {
+    const isSlackMulti = row.kind === 'slack_digest';
+    const computeMultiHash = () =>
+      isSlackMulti
+        ? computeSlackDigestConfigHash(cfg as unknown as SlackDigestConfig)
+        : computeTelegramDigestConfigHash(cfg as unknown as TelegramDigestConfig);
+
+    if (isSlackMulti) {
+      const slackCredId = typeof cfg.slackCredentialId === 'string' ? cfg.slackCredentialId : '';
+      if (!slackCredId || !isUuid(slackCredId)) {
+        return deny(
+          'DIGEST_CREDENTIAL_INVALID',
+          'Kết nối Slack được ghim trong lịch không hợp lệ.',
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        );
+      }
+      const credRow = (
+        await pool.query<CredentialRow>(
+          `SELECT id, service, user_id, workspace_id, status, config
+           FROM service_credentials WHERE id = $1`,
+          [slackCredId],
+        )
+      ).rows[0];
+      if (!credRow) {
+        return deny(
+          'DIGEST_CREDENTIAL_INACTIVE',
+          'Kết nối Slack của lịch không còn tồn tại.',
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        );
+      }
+      if (
+        !matchesSlackDigestCredentialOwner(credRow, {
+          userId: row.user_id,
+          workspaceMode: trustedWorkspaceMode,
+          trustedWorkspaceId,
+        })
+      ) {
+        return deny(
+          'DIGEST_CROSS_TENANT_SCOPE_MISMATCH',
+          'Kết nối Slack thuộc không gian làm việc khác.',
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        );
+      }
+      if (credRow.status !== 'active') {
+        return deny(
+          'DIGEST_CREDENTIAL_INACTIVE',
+          'Kết nối Slack của lịch không còn hoạt động hoặc cần kết nối lại.',
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        );
+      }
+    }
+
     const gmailCheck = validateTelegramDigestGmailConfig(cfg);
     if (gmailCheck.kind === 'gmail_legacy') {
       return deny('DIGEST_GMAIL_LEGACY_UNBOUND', gmailCheck.reason, trustedWorkspaceId, trustedWorkspaceMode);
@@ -387,7 +444,7 @@ export async function assertDigestScheduleLiveScopeAndAuth(
     if (gmailCheck.kind === 'gmail_bound') {
       let expectedHash: string | null = null;
       try {
-        expectedHash = computeTelegramDigestConfigHash(cfg as unknown as TelegramDigestConfig);
+        expectedHash = computeMultiHash();
       } catch {
         expectedHash = null;
       }
@@ -423,7 +480,7 @@ export async function assertDigestScheduleLiveScopeAndAuth(
       if (trustedWorkspaceMode !== 'organization' || !trustedWorkspaceId) {
         return deny(
           'DIGEST_CROSS_TENANT_SCOPE_MISMATCH',
-          'Nguồn Jira trong bản tin Telegram chỉ khả dụng trong Workspace Tổ chức.',
+          'Nguồn Jira trong bản tin tổng hợp chỉ khả dụng trong Workspace Tổ chức.',
           trustedWorkspaceId,
           trustedWorkspaceMode,
         );
@@ -457,14 +514,14 @@ export async function assertDigestScheduleLiveScopeAndAuth(
       ) {
         return deny(
           'DIGEST_JIRA_BINDING_INVALID',
-          'Nguồn Jira trong bản tin Telegram thiếu kết nối OAuth đã duyệt. Hãy xác nhận lại lịch.',
+          'Nguồn Jira trong bản tin tổng hợp thiếu kết nối OAuth đã duyệt. Hãy xác nhận lại lịch.',
           trustedWorkspaceId,
           trustedWorkspaceMode,
         );
       }
       let expectedHash: string | null = null;
       try {
-        expectedHash = computeTelegramDigestConfigHash(cfg as unknown as TelegramDigestConfig);
+        expectedHash = computeMultiHash();
       } catch {
         // Invalid stored digest configuration.
       }
@@ -519,7 +576,7 @@ export async function assertDigestScheduleLiveScopeAndAuth(
         if (!okProj.rowCount) {
           return deny(
             'DIGEST_SCOPE_REVOKED',
-            'Chủ lịch không còn quyền truy cập đầy đủ dự án Jira trong bản tin Telegram.',
+            'Chủ lịch không còn quyền truy cập đầy đủ dự án Jira trong bản tin.',
             trustedWorkspaceId,
             trustedWorkspaceMode,
           );

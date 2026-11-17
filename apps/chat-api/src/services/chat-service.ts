@@ -24,6 +24,7 @@ import {
   type ScheduleProposalMetadata,
   type ScheduleResponse,
   type ScheduleView,
+  type SlackDigestConfig,
   type TelegramDigestConfig,
   type WorkflowContext,
 } from '@wap/tool-schemas';
@@ -34,6 +35,7 @@ import { nextRuns } from './schedules/next-occurrence.js';
 import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedule-runner.js';
 import { evaluateGithubDigestCandidate } from './schedules/github-digest-candidate.js';
 import { evaluateTelegramDigestCandidate } from './schedules/telegram-digest-candidate.js';
+import { evaluateSlackDigestCandidate } from './schedules/slack-digest-candidate.js';
 import { loadGmailDigestBinding } from './schedules/gmail-digest-binding.js';
 import { evaluateTrelloDigestCandidate } from './schedules/trello-digest-candidate.js';
 import type { NotionDigestSourceAuthority } from './notion/digest-source-authority.js';
@@ -229,7 +231,13 @@ export interface ChatServiceOptions {
     mysheetsEnabled?: boolean;
     emitV2?: boolean;
     fetchOrgSheetsMetadata?: FetchOrgSheetsMetadataFn;
-    evaluateDigestCandidate?: (input: { userId: string; services: string[]; request: string }) => Promise<CalendarDigestCandidate | undefined>;
+    evaluateDigestCandidate?: (input: {
+      userId: string;
+      services: string[];
+      request: string;
+      workspaceMode?: 'legacy' | 'personal' | 'organization';
+      workspaceId?: string | null;
+    }) => Promise<CalendarDigestCandidate | undefined>;
   };
   /** Optional adapter retriever or tool executor for live resource validation in planning. */
   getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
@@ -1725,6 +1733,8 @@ export class ChatService {
         userId: actor.userId,
         services,
         request: proposal.request,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
       });
     } else if ((proposal.action === 'create' || proposal.action === 'update') && isGithubThreeSectionOverTelegram) {
       const githubScopeId =
@@ -1734,6 +1744,8 @@ export class ChatService {
       digestCandidate = await evaluateGithubDigestCandidate({
         userId: actor.userId,
         scopeId: githubScopeId,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
         request: proposal.request,
         services,
         recurrence,
@@ -1745,6 +1757,9 @@ export class ChatService {
       (proposal.action === 'create' || proposal.action === 'update') &&
       proposal.request &&
       (services.includes('mysheets') || services.includes('sheets')) &&
+      current?.kind !== 'slack_digest' &&
+      current?.kind !== 'telegram_digest' &&
+      (current?.kind === 'sheets_digest' || uniqueServices.length <= 2) &&
       this.schedules.credentialRepo &&
       this.schedules.encryptionKey
     ) {
@@ -1814,6 +1829,80 @@ export class ChatService {
       });
     } else if (
       (proposal.action === 'create' || proposal.action === 'update') &&
+      Boolean(proposal.request) &&
+      Boolean(recurrence) &&
+      services.includes('slack') &&
+      !services.includes('telegram') &&
+      (current?.kind === 'slack_digest' ||
+        uniqueServices.filter((s) => s !== 'slack').length >= 2 ||
+        (uniqueServices.filter((s) => s !== 'slack').length === 1 && uniqueServices.includes('gmail')))
+    ) {
+      const githubScopeId =
+        trustedScope.workspaceMode === 'organization' && trustedScope.workspaceId
+          ? trustedScope.workspaceId
+          : `personal:${actor.userId}`;
+      const ghLookup = services.includes('github') && this.githubConnection
+        ? await this.githubConnection(actor.userId, githubScopeId).catch(() => null)
+        : null;
+      const scheduleQueryable = this.schedules.pool ?? (this.schedules.repo as any)?.pool ?? null;
+      const gmailBinding =
+        services.includes('gmail') && scheduleQueryable
+          ? await loadGmailDigestBinding(
+              scheduleQueryable,
+              actor.userId,
+              this.schedules.gmailOAuthClientId,
+              this.schedules.encryptionKey,
+            ).catch(() => null)
+          : null;
+      const myjiraLookup =
+        services.includes('myjira') &&
+        trustedScope.workspaceMode === 'organization' &&
+        trustedScope.workspaceId &&
+        this.myjiraDigestConnection
+          ? await this.myjiraDigestConnection(actor.userId, trustedScope.workspaceId).catch(() => null)
+          : null;
+      const slackCandidate = await evaluateSlackDigestCandidate({
+        proposal,
+        services,
+        timeZone: this.schedules.timeZone,
+        userId: actor.userId,
+        pool: scheduleQueryable,
+        getAdapter: this.getAdapter,
+        githubLookup: ghLookup,
+        jiraLookup: myjiraLookup,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
+        gmailBinding,
+        gmailUserTexts: userTexts,
+        existingDigest: current?.kind === 'slack_digest' ? current.digestConfig as SlackDigestConfig : null,
+      });
+      if (
+        !slackCandidate.canAutoDigest &&
+        current?.kind !== 'slack_digest' &&
+        services.includes('github') &&
+        Boolean(this.githubConnection) &&
+        !services.includes('mycalendar') &&
+        !services.includes('gmail') &&
+        !services.includes('myjira') &&
+        Boolean(slackCandidate.disabledReason?.includes('thao tác ghi'))
+      ) {
+        digestCandidate = await evaluateGithubDigestCandidate({
+          userId: actor.userId,
+          scopeId: githubScopeId,
+          workspaceMode: trustedScope.workspaceMode,
+          workspaceId: trustedScope.workspaceId,
+          request: proposal.request!,
+          services,
+          recurrence: recurrence!,
+          githubConnection: this.githubConnection,
+          telegramConnection: this.telegramConnection,
+          getAdapter: this.getAdapter,
+        });
+      } else {
+        digestCandidate = slackCandidate as unknown as ScheduleProposalMetadata['digestCandidate'];
+      }
+    } else if (
+      (proposal.action === 'create' || proposal.action === 'update') &&
       proposal.request &&
       recurrence &&
       (services.includes('github') || (!this.schedules.evaluateDigestCandidate && Boolean(this.githubConnection)))
@@ -1825,6 +1914,8 @@ export class ChatService {
       digestCandidate = await evaluateGithubDigestCandidate({
         userId: actor.userId,
         scopeId: githubScopeId,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
         request: proposal.request,
         services,
         recurrence,
@@ -1875,6 +1966,8 @@ export class ChatService {
         userId: actor.userId,
         services,
         request: proposal.request,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
       });
     } else if ((proposal.action === 'create' || proposal.action === 'update') && services.includes('telegram')) {
       digestCandidate = evaluateTelegramDigestCandidate({

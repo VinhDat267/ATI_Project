@@ -3,7 +3,7 @@ import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { RunCalendarDigest } from '../services/schedules/calendar-digest-runner.js';
 import { ScheduleService, type ScheduleServiceOptions } from '../services/schedules/schedule-service.js';
 import type { FetchOrgSheetsMetadataFn } from '../services/schedules/sheets-digest-candidate.js';
-import { ScheduleRunner, reconcileScheduleRuns, type ExecuteDigestRun, type PlanRun } from '../services/schedules/schedule-runner.js';
+import { ScheduleRunner, reconcileScheduleRuns, type ExecuteDigestRun, type ExecuteSlackDigestRun, type PlanRun } from '../services/schedules/schedule-runner.js';
 import {
   SheetsDigestRunner,
   type SheetsDigestRunnerOptions,
@@ -40,7 +40,9 @@ export interface ScheduleRuntimeOptions {
   jiraLlmEgressEnabled?: boolean;
   verifyNotionSource?: ScheduleServiceOptions['verifyNotionSource'];
   jiraConnection?: ScheduleServiceOptions['jiraConnection'];
+  getAdapter?: ScheduleServiceOptions['getAdapter'];
   executeDigestRun?: ExecuteDigestRun;
+  executeSlackDigestRun?: ExecuteSlackDigestRun;
   emit?: (convId: string, event: string, payload: unknown) => unknown;
   now?: () => Date;
   credentialRepo?: CredentialRepo;
@@ -73,6 +75,7 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
     mysheetsEnabled: options.mysheetsEnabled,
     emitV2: options.emitV2,
     fetchOrgSheetsMetadata: options.fetchOrgSheetsMetadata,
+    getAdapter: options.getAdapter,
   });
   const sheetsDigestRunner =
     options.sheetsDigestRunner ??
@@ -103,6 +106,7 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
     runJiraDigest: options.runJiraDigest,
     jiraLlmEgressEnabled: options.jiraLlmEgressEnabled ?? false,
     executeDigestRun: options.executeDigestRun,
+    executeSlackDigestRun: options.executeSlackDigestRun,
     emit: options.emit,
     now: options.now,
     recordState: (client, row, now) => service.recordState(client, row, now),

@@ -72,8 +72,27 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
       digestCandidate?.config?.source?.service === 'mysheets' ||
       digestCandidate?.config?.source?.service === 'sheets'
   );
-  const isTelegramCandidate = Boolean(
+  const isSlackMultiCandidate = Boolean(
     digestCandidate &&
+      (digestCandidate?.config?.destination === 'slack' ||
+        (metadata.services?.includes('slack') &&
+          !metadata.services?.includes('telegram') &&
+          !('eligible' in digestCandidate) &&
+          !('configPreview' in digestCandidate) &&
+          !digestCandidate?.config?.source &&
+          (metadata.services.filter((s) => s !== 'slack').length >= 2 ||
+            metadata.services?.includes('gmail')))) &&
+      (!digestCandidate?.config?.sources || Array.isArray(digestCandidate.config.sources)) &&
+      !Array.isArray(digestCandidate?.config?.repos) &&
+      !Array.isArray(digestCandidate?.config?.boards) &&
+      !Array.isArray(digestCandidate?.config?.databases) &&
+      !Array.isArray(digestCandidate?.config?.projects) &&
+      digestCandidate?.kind !== 'notion_digest' &&
+      digestCandidate?.kind !== 'myjira_digest'
+  );
+  const isTelegramCandidate = Boolean(
+    !isSlackMultiCandidate &&
+      digestCandidate &&
       !Array.isArray(digestCandidate?.config?.repos) &&
       !Array.isArray(digestCandidate?.config?.boards) &&
       !Array.isArray(digestCandidate?.config?.databases) &&
@@ -101,19 +120,20 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
           !('configPreview' in digestCandidate) &&
           !digestCandidate?.config?.source))
   );
+  const isMultiSourceCandidate = isTelegramCandidate || isSlackMultiCandidate;
   const isGithubCandidate = Boolean(
-    !isTelegramCandidate &&
+    !isMultiSourceCandidate &&
       digestCandidate &&
       (Array.isArray(digestCandidate?.config?.repos) || metadata.services?.includes('github'))
   );
   const isTrelloCandidate = Boolean(
-    !isTelegramCandidate &&
+    !isMultiSourceCandidate &&
       !isGithubCandidate &&
       digestCandidate &&
       (Array.isArray(digestCandidate?.config?.boards) || metadata.services?.includes('trello'))
   );
   const isNotionCandidate = Boolean(
-    !isTelegramCandidate &&
+    !isMultiSourceCandidate &&
       !isGithubCandidate &&
       !isTrelloCandidate &&
       digestCandidate &&
@@ -122,7 +142,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
         metadata.services?.includes('notion'))
   );
   const isJiraCandidate = Boolean(
-    !isTelegramCandidate &&
+    !isMultiSourceCandidate &&
       !isGithubCandidate &&
       !isTrelloCandidate &&
       !isNotionCandidate &&
@@ -133,7 +153,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
         metadata.services?.includes('jira'))
   );
   const isCalendarCandidate = Boolean(
-    !isTelegramCandidate &&
+    !isMultiSourceCandidate &&
       !isGithubCandidate &&
       !isTrelloCandidate &&
       !isNotionCandidate &&
@@ -159,7 +179,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
       (Array.isArray(digestCandidate?.config?.sources) &&
         digestCandidate.config.sources.some((source: { service?: string } | null) => source?.service === 'myjira')),
     );
-  const canConfirm = !jiraDigestOnly || ((isJiraCandidate || isTelegramCandidate) && canAutoDigest);
+  const canConfirm = !jiraDigestOnly || ((isJiraCandidate || isMultiSourceCandidate) && canAutoDigest);
   const approvalMode = jiraDigestOnly && canConfirm ? 'auto_digest' : selectedApprovalMode;
   const isEligible = Boolean(digestCandidate?.canAutoDigest ?? digestCandidate?.eligible);
   const ineligibleReason = digestCandidate?.disabledReason ?? digestCandidate?.reason;
@@ -197,13 +217,13 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
             ? await apiClient.confirmSchedule(convId, message.id, approvalMode)
             : await apiClient.confirmSchedule(convId, message.id)
           : approvalMode === 'auto_digest' || isReauthorize
-            ? (isSheetsCandidate || isTelegramCandidate) && includeAiSummary !== initialIncludeAiSummary
+            ? (isSheetsCandidate || isMultiSourceCandidate) && includeAiSummary !== initialIncludeAiSummary
               ? await apiClient.confirmSchedule(convId, message.id, {
                   approvalMode: 'auto_digest',
                   includeAiSummary,
                 })
               : await apiClient.confirmSchedule(convId, message.id, 'auto_digest')
-            : isTelegramCandidate
+            : isMultiSourceCandidate
               ? await apiClient.confirmSchedule(convId, message.id, 'manual')
               : await apiClient.confirmSchedule(convId, message.id);
       if (currentMessage.current === message.id) setConfirmed(result.schedule); schedulesChanged();
@@ -217,7 +237,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
   const manage = proposal && ['pause', 'resume', 'cancel'].includes(proposal.action);
   const title = schedule?.name ?? (manage ? `${proposal.action === 'pause' ? 'Tạm dừng' : proposal.action === 'resume' ? 'Chạy tiếp' : 'Hủy'} lịch "${previous?.name ?? ''}"?` : proposal?.name);
   const scheduleServices = schedule?.services ?? metadata.services ?? [];
-  const isAutoDigestActive = approvalMode === 'auto_digest' || schedule?.kind === 'calendar_digest' || schedule?.kind === 'sheets_digest' || schedule?.kind === 'github_digest' || schedule?.kind === 'trello_digest' || schedule?.kind === 'notion_digest' || (schedule?.kind as string) === 'myjira_digest' || schedule?.kind === 'telegram_digest';
+  const isAutoDigestActive = approvalMode === 'auto_digest' || schedule?.kind === 'calendar_digest' || schedule?.kind === 'sheets_digest' || schedule?.kind === 'github_digest' || schedule?.kind === 'trello_digest' || schedule?.kind === 'notion_digest' || (schedule?.kind as string) === 'myjira_digest' || schedule?.kind === 'telegram_digest' || schedule?.kind === 'slack_digest';
   return <section data-moment="schedule" className="w-full min-w-0 max-w-3xl mx-auto">
     <div className="bg-white border border-[#E5E5E0] rounded-2xl shadow-sm overflow-hidden min-w-0">
       <div className="px-3.5 sm:px-6 py-2 sm:py-2.5 bg-[#F8F8F6] border-b border-[#EAEAE4] flex items-center justify-between gap-2 text-xs">
@@ -239,7 +259,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
             <span data-schedule-kind="plan" data-schedule-mode="manual" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
               Mỗi lượt cần bạn duyệt
             </span>
-          ) : schedule.kind !== 'telegram_digest' ? (
+          ) : schedule.kind !== 'telegram_digest' && schedule.kind !== 'slack_digest' ? (
             <span data-schedule-kind={schedule.kind} data-schedule-mode="auto_digest" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
               Tự gửi
             </span>
@@ -250,7 +270,12 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
             Tự gửi Telegram{schedule.digest && 'chatTitle' in schedule.digest && schedule.digest.chatTitle ? ` · ${schedule.digest.chatTitle}` : ''}
           </p>
         )}
-        {schedule.kind !== 'plan' && schedule.kind !== 'telegram_digest' && (
+        {schedule.kind === 'slack_digest' && (
+          <p data-schedule-kind={schedule.kind} className="text-xs font-semibold text-emerald-700">
+            Tự gửi Slack{schedule.digest && 'channelName' in schedule.digest && schedule.digest.channelName ? ` · #${schedule.digest.channelName.replace(/^#/, '')}` : ''}
+          </p>
+        )}
+        {schedule.kind !== 'plan' && schedule.kind !== 'telegram_digest' && schedule.kind !== 'slack_digest' && (
           <p className="text-xs font-semibold text-emerald-700">
             Gửi định kỳ theo phạm vi đã xác nhận
           </p>
@@ -265,14 +290,18 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
               className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 v3-space-y-1"
             >
               <p className="font-semibold">
-                {isTelegramCandidate
-                  ? 'Đề xuất cấp quyền lại lịch bản tin Telegram'
-                  : 'Đề xuất cấp quyền lại lịch Google Sheets (v2)'}
+                {isSlackMultiCandidate
+                  ? 'Đề xuất cấp quyền lại lịch bản tin Slack'
+                  : isTelegramCandidate
+                    ? 'Đề xuất cấp quyền lại lịch bản tin Telegram'
+                    : 'Đề xuất cấp quyền lại lịch Google Sheets (v2)'}
               </p>
               <p>
-                {isTelegramCandidate
-                  ? 'Xác nhận lại tài khoản nguồn (như hộp thư Gmail) và cuộc trò chuyện Telegram nhận bản tin trước khi bật lại lịch.'
-                  : 'Xác nhận lại nguồn bảng tính, kênh nhận và phạm vi tài khoản gửi tự động trước khi bật lại lịch.'}
+                {isSlackMultiCandidate
+                  ? 'Xác nhận lại tài khoản nguồn (như hộp thư Gmail) và kênh Slack nhận bản tin trước khi bật lại lịch.'
+                  : isTelegramCandidate
+                    ? 'Xác nhận lại tài khoản nguồn (như hộp thư Gmail) và cuộc trò chuyện Telegram nhận bản tin trước khi bật lại lịch.'
+                    : 'Xác nhận lại nguồn bảng tính, kênh nhận và phạm vi tài khoản gửi tự động trước khi bật lại lịch.'}
               </p>
             </div>
           )}
@@ -281,7 +310,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
           {change('Việc sẽ làm', previous?.request, proposal.request)}
           <div className="flex flex-wrap gap-2">{metadata.services?.map(id => <span key={id} className="inline-flex items-center gap-2 text-xs text-[#4B5563]"><span aria-hidden="true" className="w-6 h-6 rounded-lg border border-[#E5E5E0] bg-[#F8F8F6] flex items-center justify-center"><ServiceLogo service={id} className="w-3.5 h-3.5" /></span>{serviceName(id, [])}</span>)}</div>
           {!!metadata.nextRuns?.length && <div className="flex flex-wrap items-center gap-1.5 text-xs text-[#4B5563]"><span className="font-semibold text-[#111827]">Lần chạy tới:</span>{metadata.nextRuns.map(time => <span key={time} className="px-2 py-0.5 rounded-md bg-[#F8F8F6] border border-[#EAEAE4] tabular-nums">{formatRunTime(time)}</span>)}</div>}
-          {isTelegramCandidate ? (
+          {isMultiSourceCandidate ? (
             <>
               <fieldset className="border border-[#E7E7E2] rounded-xl p-3.5 bg-[#F8F8F6] v3-space-y-2.5">
                 <legend className="text-xs font-semibold text-[#6B7280] px-1">Chế độ khi tới giờ</legend>
@@ -320,7 +349,11 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                         {Array.isArray(digestCandidate.config.sources) && digestCandidate.config.sources.length > 0 && (
                           <>Nguồn đọc: {digestCandidate.config.sources.map((s: { label?: string; service: string }) => s.label || s.service).join(', ')} · </>
                         )}
-                        Gửi về Telegram: <strong>{digestCandidate.config.chatTitle}</strong>
+                        {isSlackMultiCandidate ? (
+                          <>Gửi về Slack: <strong>#{String(digestCandidate.config.channelName ?? '').replace(/^#/, '')}</strong></>
+                        ) : (
+                          <>Gửi về Telegram: <strong>{digestCandidate.config.chatTitle}</strong></>
+                        )}
                       </span>
                     )}
                     {!digestCandidate.canAutoDigest && digestCandidate.disabledReason && (
@@ -354,10 +387,16 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                         <code className="px-1.5 py-0.5 rounded bg-white/80 border border-emerald-200">{gmailQuery}</code>
                       </p>
                     )}
-                    <p>• Nơi nhận: Telegram · {digestCandidate.config.chatTitle}</p>
+                    <p>
+                      {isSlackMultiCandidate
+                        ? `• Nơi nhận: Slack · #${String(digestCandidate.config.channelName ?? '').replace(/^#/, '')}`
+                        : `• Nơi nhận: Telegram · ${digestCandidate.config.chatTitle}`}
+                    </p>
                     <p>• {digestCandidate.config.sources?.some((source: { service: string }) => source.service === 'notion')
                       ? 'Lịch chỉ đọc database Notion đã duyệt và gửi bản tin vào cuộc trò chuyện đã chọn.'
-                      : 'Lịch đọc dữ liệu từ nguồn đã chọn và gửi bản tin vào cuộc trò chuyện đã chọn.'}</p>
+                      : isSlackMultiCandidate
+                        ? 'Lịch đọc dữ liệu từ nhiều nguồn đã chọn và gửi bản tin vào đúng kênh Slack đã khóa.'
+                        : 'Lịch đọc dữ liệu từ nguồn đã chọn và gửi bản tin vào cuộc trò chuyện đã chọn.'}</p>
                     {!digestCandidate.config.sources?.some((source: { service: string }) => source.service === 'notion') && (
                       <div className="pt-1.5 border-t border-emerald-200/80">
                         <label className="flex items-start gap-2 cursor-pointer text-xs text-[#111827]">
@@ -382,7 +421,9 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
               })()}
               <p className="text-sm text-[#4B5563] leading-relaxed">
                 {approvalMode === 'auto_digest'
-                  ? 'Tới giờ, Planora chỉ đọc dữ liệu từ các dịch vụ nguồn đã chọn và tự động gửi bản tin về đúng cuộc trò chuyện Telegram đã khóa.'
+                  ? isSlackMultiCandidate
+                    ? 'Tới giờ, Planora chỉ đọc dữ liệu từ các dịch vụ nguồn đã chọn và tự động gửi bản tin về đúng kênh Slack đã khóa.'
+                    : 'Tới giờ, Planora chỉ đọc dữ liệu từ các dịch vụ nguồn đã chọn và tự động gửi bản tin về đúng cuộc trò chuyện Telegram đã khóa.'
                   : 'Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.'}
               </p>
             </>

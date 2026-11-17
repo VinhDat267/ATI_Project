@@ -39,6 +39,7 @@ export function isUncertainSheetsDeliveryRun(
     (run.error.includes('SHEETS_DELIVERY_UNKNOWN') ||
       run.error.includes('TRELLO_DELIVERY_UNKNOWN') ||
       run.error.includes('TELEGRAM_DELIVERY_UNKNOWN') ||
+      run.error.includes('SLACK_DELIVERY_UNKNOWN') ||
       run.error.includes('NOTION_DELIVERY_UNKNOWN') ||
       run.error.includes('Không rõ bản tin Jira đã gửi hay chưa') ||
       run.error.includes('Chưa xác định bản tin Notion đã gửi hay chưa') ||
@@ -275,6 +276,7 @@ export function ScheduleRunRecovery({ message, navigate }: { message: ChatMessag
         (run.error.includes('SHEETS_DELIVERY_UNKNOWN') ||
           run.error.includes('TRELLO_DELIVERY_UNKNOWN') ||
           run.error.includes('TELEGRAM_DELIVERY_UNKNOWN') ||
+          run.error.includes('SLACK_DELIVERY_UNKNOWN') ||
           run.error.includes('NOTION_DELIVERY_UNKNOWN') ||
           run.error.includes('Chưa xác định bản tin Notion đã gửi hay chưa') ||
           run.error.includes('SHEETS_APPEND_UNKNOWN_OUTCOME'))

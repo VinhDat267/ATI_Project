@@ -8,6 +8,7 @@ import type {
   ScheduleRunView,
   SheetsDigestConfig,
   SheetsDigestDelivery,
+  SlackDigestDelivery,
   TelegramDigestDelivery,
   TrelloDigestDelivery,
 } from '@wap/tool-schemas';
@@ -36,6 +37,7 @@ export interface RunRow {
     | CalendarDigestDelivery
     | GithubDigestDelivery
     | TelegramDigestDelivery
+    | SlackDigestDelivery
     | TrelloDigestDelivery
     | NotionDigestDelivery
     | MyJiraDigestDelivery
@@ -119,6 +121,40 @@ export function calendarOrGithubDeliveryUnknownKind(
   return schedule?.kind === markerKind ? markerKind : null;
 }
 
+const SLACK_DELIVERY_UNKNOWN_PREFIX = 'SLACK_DELIVERY_UNKNOWN:';
+export const SLACK_DIGEST_DELIVERY_UNKNOWN =
+  `${SLACK_DELIVERY_UNKNOWN_PREFIX} Đã bắt đầu gửi bản tin Slack nhưng mất kết nối hoặc thiếu biên nhận hợp lệ từ Slack. Hệ thống tạm dừng tự động gửi lại để tránh trùng lặp.`;
+
+export function getSlackDeliveryUnknown(
+  run: RunRow,
+): { target: { channelId: string; channelName?: string } | null } | null {
+  if (
+    run.status !== 'needs_attention' ||
+    run.delivery_started_at == null ||
+    run.delivery_resolution != null
+  ) {
+    return null;
+  }
+
+  const config = run.dispatched_config;
+  // Keep the snapshot identity aligned with startup reconciliation.
+  if (run.dispatched_config_hash && config && typeof config === 'object' &&
+      'destination' in config && config.destination === 'slack' &&
+      'slackCredentialId' in config && typeof config.slackCredentialId === 'string' &&
+      'channelId' in config && typeof config.channelId === 'string' &&
+      'sources' in config && Array.isArray(config.sources)) {
+    return {
+      target: {
+        channelId: config.channelId,
+        ...('channelName' in config && typeof config.channelName === 'string'
+          ? { channelName: config.channelName }
+          : {}),
+      },
+    };
+  }
+  return run.error?.startsWith(SLACK_DELIVERY_UNKNOWN_PREFIX) ? { target: null } : null;
+}
+
 export function matchesDispatchedDigestConfig(run: RunRow, schedule: DeliverySchedule): boolean {
   return run.schedule_version === schedule.version &&
     schedule.digest_config != null &&
@@ -167,7 +203,9 @@ export function isNotionDeliveryUnknown(run: RunRow, schedule?: DeliverySchedule
 
 export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): ScheduleRunView {
   const jiraUnknown = getJiraDeliveryUnknown(row);
+  const slackUnknown = getSlackDeliveryUnknown(row);
   let error = jiraUnknown ? MYJIRA_DELIVERY_UNKNOWN
+    : slackUnknown && !row.error?.startsWith(SLACK_DELIVERY_UNKNOWN_PREFIX) ? SLACK_DIGEST_DELIVERY_UNKNOWN
     : isNotionDeliveryUnknown(row, schedule) ? NOTION_DELIVERY_UNKNOWN : row.error;
   if (row.status === 'digest_failed' && error?.startsWith(TRELLO_READ_UNAVAILABLE_PREFIX)) {
     error = error.slice(TRELLO_READ_UNAVAILABLE_PREFIX.length);
@@ -188,7 +226,7 @@ export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): Sc
     deliveryResolvedAt: row.delivery_resolved_at ? iso(row.delivery_resolved_at) : null,
     deliveryFollowupRunId: row.delivery_followup_run_id ?? null,
   };
-  const unknownKind = calendarOrGithubDeliveryUnknownKind(row, schedule);
+  const unknownKind = slackUnknown ? 'slack_digest' : calendarOrGithubDeliveryUnknownKind(row, schedule);
   if (schedule && jiraUnknown) {
     view.canRetryDelivery = schedule.kind === 'myjira_digest' && schedule.status === 'active' &&
       matchesDispatchedDigestConfig(row, schedule);

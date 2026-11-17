@@ -236,6 +236,8 @@ export interface ServiceInfo {
   connectionStatus?: 'healthy' | 'unhealthy' | 'unconfigured' | 'unchecked';
   lastCheckedAt?: string | null;
   allowedScope?: string[];
+  /** Server can list pickable scope entries (POST /api/services/:id/scope-candidates). */
+  scopeCandidates?: boolean;
   credentialFields?: Array<{ key: string; label: string; type?: 'text' | 'password' | 'multiline'; pattern?: string }>;
   scopeKey?: string;
   scopeLabel?: string;
