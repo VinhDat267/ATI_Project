@@ -280,6 +280,82 @@ export class ApiClient {
   disconnectMyCalendar() {
     return this.request<{ success: true }>('/api/connections/mycalendar', { method: 'DELETE', credentials: 'include' });
   }
+  listMyCalendarTriggers() {
+    return this.request<{
+      triggers: Array<{
+        id: string;
+        name: string;
+        triggerType: 'pre_meeting_reminder' | 'event_change_watch';
+        calendarIds: string[];
+        leadMinutes: number;
+        destination: { service: string; channelId: string; channelName?: string; credentialId?: string };
+        status: 'active' | 'paused' | 'blocked';
+        pauseReason: string | null;
+        watchActive: boolean;
+        watchExpiration: string | null;
+        lastCheckedAt: string | null;
+        lastError: string | null;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      destinations: Array<{
+        key: string;
+        service: string;
+        channelId: string;
+        channelName: string;
+        credentialId?: string;
+        label: string;
+      }>;
+    }>('/api/connections/mycalendar/triggers', { credentials: 'include' });
+  }
+  createMyCalendarTrigger(payload: {
+    name: string;
+    triggerType: 'pre_meeting_reminder' | 'event_change_watch';
+    calendarIds: string[];
+    leadMinutes?: number;
+    destination: { service: string; channelId: string; channelName?: string; credentialId?: string };
+  }) {
+    return this.request<{ trigger: any }>('/api/connections/mycalendar/triggers', {
+      method: 'POST',
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+  }
+  updateMyCalendarTrigger(
+    triggerId: string,
+    patch: { status?: 'active' | 'paused'; name?: string; leadMinutes?: number },
+  ) {
+    return this.request<{ trigger: any }>(
+      `/api/connections/mycalendar/triggers/${encodeURIComponent(triggerId)}`,
+      {
+        method: 'PATCH',
+        credentials: 'include',
+        body: JSON.stringify(patch),
+      },
+    );
+  }
+  deleteMyCalendarTrigger(triggerId: string) {
+    return this.request<{ deleted: boolean }>(
+      `/api/connections/mycalendar/triggers/${encodeURIComponent(triggerId)}`,
+      { method: 'DELETE', credentials: 'include' },
+    );
+  }
+  runMyCalendarTriggerNow(triggerId: string) {
+    return this.request<{
+      result: {
+        evaluated: boolean;
+        status: string;
+        pauseReason?: string | null;
+        notificationsSent: number;
+        baselineSeeded?: boolean;
+        checkedEvents: number;
+      };
+      trigger: any;
+    }>(`/api/connections/mycalendar/triggers/${encodeURIComponent(triggerId)}/run-now`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+  }
   startMySheetsConnection(body?: { returnTo?: string }) {
     return this.request<{ url: string }>('/api/connections/mysheets/start', {
       method: 'POST',

@@ -53,7 +53,7 @@ export function summarizeSourceItems(
   service: string,
   raw: unknown,
   now: Date = new Date(),
-  options?: { mentionIndex?: SlackMentionIndex | null; escapeText?: (value: string) => string },
+  options?: { mentionIndex?: SlackMentionIndex | null; escapeText?: (value: string) => string; timeZone?: string },
 ): { count: number; lines: string[]; truncated?: boolean } {
   const esc = options?.escapeText ?? ((v: string) => v);
   if (
@@ -121,19 +121,23 @@ export function summarizeSourceItems(
           url: String(ev.url ?? ''),
           ...ev,
         })),
+        { annotateConflicts: true, timeZone: options?.timeZone },
       );
     } catch {
       // Keep original items if date parsing fails
     }
   }
 
-  const notionTruncated =
-    service === 'notion' &&
+  const sourceTruncated =
+    (service === 'notion' || service === 'mycalendar' || service === 'calendar') &&
     raw != null &&
     typeof raw === 'object' &&
     !Array.isArray(raw) &&
-    Boolean((raw as Record<string, unknown>).truncated);
-  const truncation = notionTruncated ? { truncated: true } : {};
+    (Boolean((raw as Record<string, unknown>).truncated) ||
+      ((raw as any).coverage &&
+        typeof (raw as any).coverage === 'object' &&
+        (raw as any).coverage.complete === false));
+  const truncation = sourceTruncated ? { truncated: true } : {};
 
   if (items.length === 0) {
     return { count: 0, lines: ['  (Không có mục mới)'], ...truncation };
@@ -247,6 +251,9 @@ export function summarizeSourceItems(
   if (items.length > maxItems) {
     lines.push(`  ... và ${items.length - maxItems} mục khác`);
   }
+  if (sourceTruncated && (service === 'mycalendar' || service === 'calendar')) {
+    lines.push('  ⚠️ (Dữ liệu lịch có thể chưa đầy đủ do chạm giới hạn tải/số lịch)');
+  }
 
   return { count: items.length, lines, ...truncation };
 }
@@ -299,6 +306,7 @@ export async function executeMultiDigestReadSources(input: {
   dueAt: Date;
   sinceIso: string;
   untilIso: string;
+  timeZone?: string;
   workspaceMode?: 'legacy' | 'personal' | 'organization';
   workspaceId?: string | null;
   gmailBinding?: GmailDigestBinding | null;
@@ -367,9 +375,12 @@ export async function executeMultiDigestReadSources(input: {
         );
       } else if (source.service === 'mycalendar' && source.tool === 'mycalendar.list_events') {
         let allowedCalendars: string[] = [];
+        let mycalActive = false;
+        let decryptedOk = true;
         try {
           const mycalRec = await input.credentialRepo.getPersonalCredentials('mycalendar', userId);
           if (mycalRec && mycalRec.status === 'active') {
+            mycalActive = true;
             const dec = decryptCredentials(mycalRec.config, input.encryptionKey);
             allowedCalendars = Array.isArray(dec.allowedScope?.calendars)
               ? dec.allowedScope.calendars.filter((id: unknown) => typeof id === 'string' && id)
@@ -378,23 +389,45 @@ export async function executeMultiDigestReadSources(input: {
                 : [];
           }
         } catch {
-          // fallback to callArgs.calendarId
+          decryptedOk = false;
         }
-        if (allowedCalendars.length > 0) {
-          const mergedEvents: any[] = [];
-          for (const calId of allowedCalendars.slice(0, 5)) {
-            const res = await adapter.execute(
-              source.tool,
-              { ...callArgs, calendarId: calId },
-              { signal },
-            );
-            const evs = Array.isArray(res?.events) ? res.events : Array.isArray(res) ? res : [];
-            mergedEvents.push(...evs);
+        if (!mycalActive || !decryptedOk || allowedCalendars.length === 0) {
+          return {
+            kind: 'blocked',
+            error: 'Kết nối Google Calendar cá nhân đã bị ngắt hoặc không còn lịch nào được phép.',
+            pauseSchedule: true,
+          };
+        }
+        const targetCalendars =
+          typeof callArgs.calendarId === 'string' && callArgs.calendarId
+            ? allowedCalendars.includes(callArgs.calendarId)
+              ? [callArgs.calendarId]
+              : []
+            : allowedCalendars.slice(0, 5);
+        if (targetCalendars.length === 0) {
+          return {
+            kind: 'blocked',
+            error: 'Lịch Google Calendar trong cấu hình bản tin không còn nằm trong phạm vi cho phép.',
+            pauseSchedule: true,
+          };
+        }
+        let anyTruncated = !callArgs.calendarId && allowedCalendars.length > 5;
+        const mergedEvents: any[] = [];
+        for (const calId of targetCalendars) {
+          const res = await adapter.execute(
+            source.tool,
+            { ...callArgs, calendarId: calId },
+            { signal },
+          );
+          if (res && typeof res === 'object' && !Array.isArray(res)) {
+            if ((res as any).truncated === true || (res as any).coverage?.complete === false) {
+              anyTruncated = true;
+            }
           }
-          rawResult = { events: mergedEvents };
-        } else {
-          rawResult = await adapter.execute(source.tool, callArgs, { signal });
+          const evs = Array.isArray(res?.events) ? res.events : Array.isArray(res) ? res : [];
+          mergedEvents.push(...evs);
         }
+        rawResult = { events: mergedEvents, ...(anyTruncated ? { truncated: true } : {}) };
       } else if (sheetReadTool) {
         const listRes = await adapter.execute(source.tool, callArgs, { signal });
         const sheets = Array.isArray(listRes)
@@ -466,6 +499,38 @@ export async function executeMultiDigestReadSources(input: {
             } else {
               throw innerErr;
             }
+          } else if (
+            source.service === 'calendar' &&
+            source.tool === 'calendar.list_events' &&
+            !callArgs.calendarId &&
+            /calendarId/i.test(String(innerErr?.message ?? ''))
+          ) {
+            const calsRes = await adapter.execute('calendar.list_calendars', { query: '' }, { signal });
+            const cals = Array.isArray(calsRes) ? calsRes.slice(0, 5) : [];
+            if (cals.length === 0) throw innerErr;
+            const mergedOrgEvents: any[] = [];
+            let orgTruncated = Array.isArray(calsRes) && calsRes.length > 5;
+            for (const c of cals) {
+              const calId = String(c?.id ?? '').trim();
+              if (!calId) continue;
+              const calRes = await adapter.execute(
+                source.tool,
+                { ...callArgs, calendarId: calId },
+                { signal },
+              );
+              if (calRes && typeof calRes === 'object' && !Array.isArray(calRes)) {
+                if ((calRes as any).truncated === true || (calRes as any).coverage?.complete === false) {
+                  orgTruncated = true;
+                }
+              }
+              const evs = Array.isArray(calRes?.events)
+                ? calRes.events
+                : Array.isArray(calRes)
+                  ? calRes
+                  : [];
+              mergedOrgEvents.push(...evs);
+            }
+            rawResult = { events: mergedOrgEvents, ...(orgTruncated ? { truncated: true } : {}) };
           } else {
             throw innerErr;
           }
@@ -475,6 +540,7 @@ export async function executeMultiDigestReadSources(input: {
       const { count, lines, truncated } = summarizeSourceItems(source.service, rawResult, dueAt, {
         mentionIndex: input.mentionIndex,
         escapeText: input.escapeText,
+        timeZone: input.timeZone,
       });
       okOrEmptyCount++;
       sourceStatuses.push({
@@ -493,6 +559,13 @@ export async function executeMultiDigestReadSources(input: {
       }
       if (source.service === 'notion' && isNotionSourceDenied(err)) {
         return { kind: 'notion_blocked' };
+      }
+      if (source.service === 'mycalendar' && isGmailAuthOrBindingFailure(err)) {
+        return {
+          kind: 'blocked',
+          error: 'Kết nối Google Calendar cá nhân không còn hợp lệ hoặc cần kết nối lại.',
+          pauseSchedule: true,
+        };
       }
       if (source.service === 'gmail') {
         let bindingLost = isGmailAuthOrBindingFailure(err);

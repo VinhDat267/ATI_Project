@@ -61,7 +61,7 @@ import {
   computeSlackDigestConfigHash,
   evaluateSlackDigestCandidate,
 } from './slack-digest-candidate.js';
-import { matchesSlackDigestCredentialOwner } from './multi-source-digest-candidate.js';
+import { matchesSlackDigestCredentialOwner, findSlackDigestCredential } from './multi-source-digest-candidate.js';
 import { canonicalNotionDigestBinding, lockApprovedNotionSource, NOTION_DIGEST_REAPPROVAL, type NotionDigestSourceAuthority } from '../notion/digest-source-authority.js';
 import {
   buildConfirmedTrelloDigestDelivery,
@@ -796,10 +796,14 @@ export class ScheduleService {
           if (!calendarDigestCandidateMatches(candidate, evaluated)) {
             throw new ScheduleConflict('DIGEST_PREVIEW_CHANGED');
           }
+          const effectiveConfig: CalendarDigestConfig =
+            typeof includeAiSummary === 'boolean' && candidate?.config
+              ? { ...candidate.config, includeSummary: includeAiSummary }
+              : candidate!.config!;
           digestFields = {
             kind: 'calendar_digest',
-            digestConfig: JSON.stringify(candidate.config),
-            digestConfigHash: computeCalendarDigestHash(candidate.config),
+            digestConfig: JSON.stringify(effectiveConfig),
+            digestConfigHash: computeCalendarDigestHash(effectiveConfig),
             digestApprovedAt: now,
           };
         } else {
@@ -1081,6 +1085,12 @@ export class ScheduleService {
         }
         await this.assertMyJiraDigestCanResumeInTx(client, existing);
       }
+      if (proposal.action === 'resume' && existing.kind === 'calendar_digest') {
+        if (existing.status === 'cancelled' || existing.status === 'completed') {
+          throw new ScheduleConflict('SCHEDULE_CLOSED');
+        }
+        await this.assertCalendarDigestCanResumeInTx(client, existing);
+      }
       const fields = this.transition(existing, proposal.action, proposal, persistedServices, now);
       if (!fields) {
         await client.query('UPDATE schedules SET last_proposal_id=$2 WHERE id=$1', [existing.id, messageId]);
@@ -1237,12 +1247,23 @@ export class ScheduleService {
         if (!calendarDigestCandidateMatches(candidate, evaluated)) {
           throw new ScheduleConflict('DIGEST_PREVIEW_CHANGED');
         }
+        const prevCalendarConfig = existing.digest_config as CalendarDigestConfig | null;
+        const resolvedIncludeSummary =
+          typeof includeAiSummary === 'boolean'
+            ? includeAiSummary
+            : typeof prevCalendarConfig?.includeSummary === 'boolean'
+              ? prevCalendarConfig.includeSummary
+              : candidate!.config!.includeSummary;
+        const effectiveConfig: CalendarDigestConfig = {
+          ...candidate!.config!,
+          includeSummary: resolvedIncludeSummary,
+        };
         const updatedDigest = await client.query(
           `UPDATE schedules SET name=$2, request=$3, recurrence=$4, services=$5, status=$6, pause_reason=$7, next_run_at=$8,
              digest_config=$10::jsonb, digest_config_hash=$11, digest_approved_at=$12,
              version=version+1, updated_at=now(), last_proposal_id=COALESCE($9, last_proposal_id)
            WHERE id=$1 RETURNING *`,
-          [existing.id, fields.name, fields.request, JSON.stringify(fields.recurrence), fields.services, fields.status, fields.pause_reason, fields.next_run_at, messageId, JSON.stringify(candidate.config), computeCalendarDigestHash(candidate.config), now],
+          [existing.id, fields.name, fields.request, JSON.stringify(fields.recurrence), fields.services, fields.status, fields.pause_reason, fields.next_run_at, messageId, JSON.stringify(effectiveConfig), computeCalendarDigestHash(effectiveConfig), now],
         );
         await registerScheduleFields(client, this.registry, 'schedules', existing.id, userId, segments, ['name', 'request', 'recurrence']);
         return this.recordState(client, tagScheduleContext(updatedDigest.rows[0], segments), now);
@@ -2380,6 +2401,110 @@ export class ScheduleService {
     }
   }
 
+  private async assertCalendarDigestCanResumeInTx(
+    client: pg.PoolClient,
+    row: ScheduleRow,
+  ): Promise<void> {
+    const cfg = row.digest_config as unknown as CalendarDigestConfig | null;
+    if (!cfg || cfg.version !== 1 || cfg.source !== 'mycalendar') {
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+    }
+    let expectedHash: string | null = null;
+    try {
+      expectedHash = computeCalendarDigestHash(cfg);
+    } catch {
+      expectedHash = null;
+    }
+    if (!row.digest_config_hash || !expectedHash || expectedHash !== row.digest_config_hash) {
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+    }
+    const guard = await assertDigestScheduleLiveScopeAndAuth({
+      pool: client,
+      scheduleId: row.id,
+      encryptionKey: this.options.encryptionKey,
+    });
+    if (!guard.allowed) {
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', guard.pauseReason);
+    }
+    if (!this.options.encryptionKey) return;
+
+    const calCredRes = await client.query<{ id: string; status: string; config: any }>(
+      "SELECT id, status, config FROM service_credentials WHERE service = 'mycalendar' AND user_id = $1 LIMIT 1",
+      [row.user_id],
+    );
+    const calCred = calCredRes.rows[0];
+    if (!calCred || calCred.status !== 'active' || calCred.id !== cfg.credentialId) {
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+    }
+    try {
+      const dec = decryptCredentials(calCred.config, this.options.encryptionKey);
+      const liveCalIds = new Set<string>([
+        ...(Array.isArray(dec.selectedCalendars)
+          ? dec.selectedCalendars.map((c: any) => String(c?.id ?? '')).filter(Boolean)
+          : []),
+        ...(Array.isArray(dec.allowedScope?.calendars)
+          ? dec.allowedScope.calendars.filter((id: unknown): id is string => typeof id === 'string' && Boolean(id))
+          : []),
+      ]);
+      if (cfg.calendars.length === 0 || cfg.calendars.some((c) => !liveCalIds.has(c.id))) {
+        throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+      }
+    } catch (err) {
+      if (err instanceof ScheduleConflict) throw err;
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+    }
+
+    if (cfg.destination.service === 'slack') {
+      const slackRow = await findSlackDigestCredential(client, {
+        userId: row.user_id,
+        workspaceMode: row.workspace_mode ?? 'personal',
+        workspaceId: row.workspace_id ?? null,
+      });
+      if (!slackRow || slackRow.status !== 'active') {
+        throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+      }
+      try {
+        const decSlack =
+          typeof slackRow.config === 'string'
+            ? decryptCredentials(slackRow.config, this.options.encryptionKey)
+            : (slackRow.config as Record<string, any> | null);
+        const allowedChannels = Array.isArray(decSlack?.allowedScope?.channels)
+          ? decSlack.allowedScope.channels.filter((id: unknown): id is string => typeof id === 'string' && Boolean(id))
+          : [];
+        if (!allowedChannels.includes(cfg.destination.channelId)) {
+          throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+        }
+      } catch (err) {
+        if (err instanceof ScheduleConflict) throw err;
+        throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+      }
+    } else if (cfg.destination.service === 'telegram') {
+      const tgRes = await client.query<{ id: string; status: string; config: any }>(
+        "SELECT id, status, config FROM service_credentials WHERE service = 'telegram' AND user_id = $1 LIMIT 1",
+        [row.user_id],
+      );
+      const tgRow = tgRes.rows[0];
+      if (!tgRow || tgRow.status !== 'active' || (cfg.destination.credentialId && tgRow.id !== cfg.destination.credentialId)) {
+        throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+      }
+      try {
+        const decTg = decryptCredentials(tgRow.config, this.options.encryptionKey);
+        const scopeChats = Array.isArray(decTg.allowedScope?.chats)
+          ? decTg.allowedScope.chats.filter((id: unknown): id is string => typeof id === 'string' && Boolean(id))
+          : [];
+        const selectedChatIds = Array.isArray(decTg.selectedChats)
+          ? decTg.selectedChats.map((c: any) => String(c?.chatId ?? '')).filter(Boolean)
+          : [];
+        if (!new Set([...scopeChats, ...selectedChatIds]).has(cfg.destination.chatId)) {
+          throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+        }
+      } catch (err) {
+        if (err instanceof ScheduleConflict) throw err;
+        throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
+      }
+    }
+  }
+
   private async verifySlackDigestConfigInTx(
     client: pg.PoolClient,
     input: {
@@ -2553,6 +2678,12 @@ export class ScheduleService {
           throw new ScheduleConflict('SCHEDULE_CLOSED');
         }
         await this.assertMyJiraDigestCanResumeInTx(client, row);
+      }
+      if (input.action === 'resume' && row.kind === 'calendar_digest') {
+        if (row.status === 'cancelled' || row.status === 'completed') {
+          throw new ScheduleConflict('SCHEDULE_CLOSED');
+        }
+        await this.assertCalendarDigestCanResumeInTx(client, row);
       }
       const fields = this.transition(row, input.action, null, null, input.now);
       if (!fields) return this.unchanged(client, row, input.now);

@@ -37,6 +37,7 @@ import { evaluateGithubDigestCandidate } from './schedules/github-digest-candida
 import { evaluateTelegramDigestCandidate } from './schedules/telegram-digest-candidate.js';
 import { evaluateSlackDigestCandidate } from './schedules/slack-digest-candidate.js';
 import { loadGmailDigestBinding } from './schedules/gmail-digest-binding.js';
+import { createMyCalendarConnectionLookup } from './gmail/connection-reference.js';
 import { evaluateTrelloDigestCandidate } from './schedules/trello-digest-candidate.js';
 import type { NotionDigestSourceAuthority } from './notion/digest-source-authority.js';
 import { evaluateNotionDigestCandidate } from './schedules/notion-digest-candidate.js';
@@ -51,7 +52,15 @@ import { sandboxKeepsSharedJira } from '../config/gmail-tools-runtime.js';
 import { isWriteTool, resolveRef } from '@wap/executor';
 import type { SlackWriteRuntime } from './slack/slack-write-runtime.js';
 import type { SlackReadProposalService } from './slack/slack-read-proposals.js';
-import { eventsOverlap, StepError } from '@wap/tool-adapters';
+import {
+  DEFAULT_CALENDAR_TIMEZONE,
+  eventBusyIntervalMs,
+  eventsOverlap,
+  formatInstantInTimeZone,
+  isValidIanaTimeZone,
+  StepError,
+  zonedWallTimeToInstant,
+} from '@wap/tool-adapters';
 import { extractNotionDatabaseId } from './notion/oauth-client.js';
 import { JiraPlanBinder, JiraBindingError, createSourceRefsFromConnection } from './jira/jira-plan-binding.js';
 import type { JiraHistorySanitizer } from './jira/jira-history-sanitizer.js';
@@ -539,12 +548,19 @@ export class ChatService {
                 )
               )
             );
+            const explicitStepTz = isValidIanaTimeZone(createStep.args.timeZone)
+              ? createStep.args.timeZone.trim()
+              : undefined;
             const datePrefix = slotStart.slice(0, 10);
             const endDatePrefix = slotEnd.slice(0, 10);
             const tzSuffix = slotStart.slice(19) || 'Z';
             const endTzSuffix = slotEnd.slice(19) || tzSuffix;
-            const dayStartIso = `${datePrefix}T00:00:00${tzSuffix}`;
-            const dayEndCandidateIso = `${endDatePrefix}T23:59:59${endTzSuffix}`;
+            const dayStartIso = explicitStepTz
+              ? zonedWallTimeToInstant(datePrefix, 0, 0, 0, explicitStepTz).iso
+              : `${datePrefix}T00:00:00${tzSuffix}`;
+            const dayEndCandidateIso = explicitStepTz
+              ? zonedWallTimeToInstant(endDatePrefix, 23, 59, 59, explicitStepTz).iso
+              : `${endDatePrefix}T23:59:59${endTzSuffix}`;
             const startMs = Date.parse(slotStart);
             const endMs = Date.parse(slotEnd);
             const dayStartMs = Date.parse(dayStartIso);
@@ -672,31 +688,51 @@ export class ChatService {
               const freeSlots: string[] = [];
               if (!precheckIncompleteOrFailed) {
                 const durationMs = endMs > startMs ? endMs - startMs : 3_600_000;
-                const workdayStartMs = Date.parse(`${datePrefix}T08:00:00${tzSuffix}`);
-                const workdayEndMs = Date.parse(`${datePrefix}T18:00:00${tzSuffix}`);
+                const suggestionZone =
+                  explicitStepTz ??
+                  allEvents.find((ev) => ev.calendarId === targetCalId && isValidIanaTimeZone(ev.timeZone))?.timeZone;
+                const workdayStartMs = suggestionZone
+                  ? zonedWallTimeToInstant(datePrefix, 8, 0, 0, suggestionZone).ms
+                  : Date.parse(`${datePrefix}T08:00:00${tzSuffix}`);
+                const workdayEndMs = suggestionZone
+                  ? zonedWallTimeToInstant(datePrefix, 18, 0, 0, suggestionZone).ms
+                  : Date.parse(`${datePrefix}T18:00:00${tzSuffix}`);
                 if (Number.isFinite(workdayStartMs) && Number.isFinite(workdayEndMs)) {
-                  const latestConflictEnd = Math.max(
-                    endMs,
-                    ...overlapping.map((ev) => Date.parse(ev.end)).filter(Number.isFinite)
-                  );
-                  const formatHm = (ms: number) => {
+                  const conflictEndMs = overlapping
+                    .map(
+                      (ev) =>
+                        eventBusyIntervalMs(
+                          ev as any,
+                          ev.timeZone ?? suggestionZone ?? DEFAULT_CALENDAR_TIMEZONE,
+                        )?.endMs ?? Date.parse(ev.end),
+                    )
+                    .filter(Number.isFinite);
+                  const latestConflictEnd = Math.max(endMs, ...conflictEndMs);
+                  const formatHmFixed = (ms: number) => {
                     const totalMin = 480 + Math.round((ms - workdayStartMs) / 60_000);
                     const hh = String(Math.floor(totalMin / 60)).padStart(2, '0');
                     const mm = String(((totalMin % 60) + 60) % 60).padStart(2, '0');
                     return `${hh}:${mm}`;
                   };
+                  const formatBound = (ms: number) =>
+                    suggestionZone
+                      ? formatInstantInTimeZone(ms, suggestionZone)
+                      : {
+                          iso: `${datePrefix}T${formatHmFixed(ms)}:00${tzSuffix}`,
+                          hm: formatHmFixed(ms),
+                        };
                   for (
                     let candStart = Math.max(workdayStartMs, latestConflictEnd);
                     candStart + durationMs <= workdayEndMs && freeSlots.length < 3;
                     candStart += durationMs
                   ) {
-                    const candStartIso = `${datePrefix}T${formatHm(candStart)}:00${tzSuffix}`;
-                    const candEndIso = `${datePrefix}T${formatHm(candStart + durationMs)}:00${tzSuffix}`;
+                    const startFmt = formatBound(candStart);
+                    const endFmt = formatBound(candStart + durationMs);
                     const hasClash = allEvents.some((ev) =>
-                      eventsOverlap(ev as any, { start: candStartIso, end: candEndIso })
+                      eventsOverlap(ev as any, { start: startFmt.iso, end: endFmt.iso })
                     );
                     if (!hasClash) {
-                      freeSlots.push(`${formatHm(candStart)}–${formatHm(candStart + durationMs)}`);
+                      freeSlots.push(`${startFmt.hm}–${endFmt.hm}`);
                     }
                   }
                 }
@@ -1813,6 +1849,16 @@ export class ChatService {
         this.myjiraDigestConnection
           ? await this.myjiraDigestConnection(actor.userId, trustedScope.workspaceId).catch(() => null)
           : null;
+      const mycalLookup = services.includes('mycalendar')
+        ? this.mycalendarConnection
+          ? await this.mycalendarConnection(actor.userId).catch(() => null)
+          : this.schedules.credentialRepo && this.schedules.encryptionKey
+            ? await createMyCalendarConnectionLookup(
+                this.schedules.credentialRepo,
+                this.schedules.encryptionKey,
+              )(actor.userId).catch(() => null)
+            : undefined
+        : undefined;
       digestCandidate = evaluateTelegramDigestCandidate({
         proposal,
         services,
@@ -1821,6 +1867,7 @@ export class ChatService {
         notionBinding,
         githubLookup: ghLookup,
         jiraLookup: myjiraLookup,
+        ...(mycalLookup !== undefined ? { mycalendarLookup: mycalLookup } : {}),
         workspaceMode: trustedScope.workspaceMode,
         workspaceId: trustedScope.workspaceId,
         gmailBinding,
@@ -1861,6 +1908,16 @@ export class ChatService {
         this.myjiraDigestConnection
           ? await this.myjiraDigestConnection(actor.userId, trustedScope.workspaceId).catch(() => null)
           : null;
+      const mycalLookup = services.includes('mycalendar')
+        ? this.mycalendarConnection
+          ? await this.mycalendarConnection(actor.userId).catch(() => null)
+          : this.schedules.credentialRepo && this.schedules.encryptionKey
+            ? await createMyCalendarConnectionLookup(
+                this.schedules.credentialRepo,
+                this.schedules.encryptionKey,
+              )(actor.userId).catch(() => null)
+            : undefined
+        : undefined;
       const slackCandidate = await evaluateSlackDigestCandidate({
         proposal,
         services,
@@ -1870,6 +1927,7 @@ export class ChatService {
         getAdapter: this.getAdapter,
         githubLookup: ghLookup,
         jiraLookup: myjiraLookup,
+        ...(mycalLookup !== undefined ? { mycalendarLookup: mycalLookup } : {}),
         workspaceMode: trustedScope.workspaceMode,
         workspaceId: trustedScope.workspaceId,
         gmailBinding,

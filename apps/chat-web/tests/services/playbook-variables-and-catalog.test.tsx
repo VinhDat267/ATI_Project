@@ -17,6 +17,15 @@ import { apiClient } from '../../src/services/api-client';
 import { authStorage } from '../../src/services/auth-storage';
 import { toolDefinition } from '../../src/services/tool-definitions';
 import presentation from '../../src/assets/cockpit-services.json';
+import * as guideData from '../../src/pages/Guide/data';
+import {
+  ALL_TOOLS,
+  GMAIL_TOOLS,
+  MYCALENDAR_TOOLS,
+  MYJIRA_TOOLS,
+  MYSHEETS_TOOLS,
+  NOTION_OAUTH_TOOLS,
+} from '@wap/tool-schemas';
 import type { ActivePlan, PlanStep, ServiceInfo } from '../../src/types';
 
 describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () => {
@@ -635,5 +644,84 @@ describe('1-Click Parameterized Playbooks & Extended Slack/GitHub Catalog', () =
     expect(screen.getByRole('button', { name: /^Quy trình OFF-02:/ })).toBeDefined();
     expect(screen.getByTestId('readiness-badge-OFF-02').textContent).toContain('Gmail');
     expect(screen.getByRole('button', { name: /^Kết nối Gmail/ })).toBeDefined();
+  });
+
+  it('includes closed-loop pre-meeting and post-meeting calendar playbooks with parameterized variables and MYCALENDAR_PROMPTS catalog validity', () => {
+    const postMeeting = (presentation as any).playbooks?.find((p: any) => p.id === 'playbook-post-meeting-followup');
+    const preMeeting = (presentation as any).playbooks?.find((p: any) => p.id === 'playbook-pre-meeting-brief');
+    expect(postMeeting).toBeDefined();
+    expect(preMeeting).toBeDefined();
+    expect(extractPlaybookVariables(postMeeting.prompt)).toEqual(
+      expect.arrayContaining(['tên_cuộc_họp', 'dự_án']),
+    );
+    expect(extractPlaybookVariables(preMeeting.prompt)).toEqual(
+      expect.arrayContaining(['tên_cuộc_họp', 'kênh_slack']),
+    );
+
+    const mycalPrompts = (guideData as any).MYCALENDAR_PROMPTS as Array<{ tools: string[]; id: string }>;
+    expect(Array.isArray(mycalPrompts)).toBe(true);
+    expect(mycalPrompts.length).toBeGreaterThanOrEqual(4);
+    const allowedTools = new Set(
+      [...ALL_TOOLS, ...MYCALENDAR_TOOLS, ...MYSHEETS_TOOLS, ...MYJIRA_TOOLS, ...GMAIL_TOOLS, ...NOTION_OAUTH_TOOLS].map((t) => t.name),
+    );
+    for (const p of mycalPrompts) {
+      for (const tool of p.tools) {
+        expect(allowedTools.has(tool)).toBe(true);
+      }
+    }
+
+    let currentDraft = '';
+    const onDraft = vi.fn((v: string) => {
+      currentDraft = v;
+    });
+    const { rerender } = render(
+      <RequestMoment
+        services={[
+          { id: 'mycalendar', name: 'Google Calendar', configured: true, connected: true, connectionStatus: 'healthy' },
+          { id: 'mysheets', name: 'Google Sheets', configured: true, connected: true, connectionStatus: 'healthy' },
+          { id: 'myjira', name: 'Atlassian Jira', configured: true, connected: true, connectionStatus: 'healthy' },
+          { id: 'gmail', name: 'Gmail', configured: true, connected: true, connectionStatus: 'healthy' },
+        ]}
+        loading={false}
+        error={null}
+        draft=""
+        planning={false}
+        input={createRef<HTMLTextAreaElement>()}
+        onDraft={onDraft}
+        onSend={() => {}}
+        onKeyDown={() => {}}
+        onSettings={() => {}}
+        navigate={() => {}}
+        servicePrompt={(s) => `Dùng ${s.name}`}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Tổng kết sau cuộc họp/i }));
+    expect(onDraft).toHaveBeenCalled();
+
+    rerender(
+      <RequestMoment
+        services={[
+          { id: 'mycalendar', name: 'Google Calendar', configured: true, connected: true, connectionStatus: 'healthy' },
+          { id: 'mysheets', name: 'Google Sheets', configured: true, connected: true, connectionStatus: 'healthy' },
+          { id: 'myjira', name: 'Atlassian Jira', configured: true, connected: true, connectionStatus: 'healthy' },
+          { id: 'gmail', name: 'Gmail', configured: true, connected: true, connectionStatus: 'healthy' },
+        ]}
+        loading={false}
+        error={null}
+        draft={currentDraft}
+        planning={false}
+        input={createRef<HTMLTextAreaElement>()}
+        onDraft={onDraft}
+        onSend={() => {}}
+        onKeyDown={() => {}}
+        onSettings={() => {}}
+        navigate={() => {}}
+        servicePrompt={(s) => `Dùng ${s.name}`}
+      />,
+    );
+
+    expect(screen.getByLabelText('Biến số tên_cuộc_họp')).toBeDefined();
+    expect(screen.getByLabelText('Biến số dự_án')).toBeDefined();
   });
 });

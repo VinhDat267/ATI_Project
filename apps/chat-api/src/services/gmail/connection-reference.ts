@@ -34,10 +34,17 @@ export function createGmailConnectionLookup(
 }
 
 /** The caller's active MyCalendar connection as a plan stores it, or null when none is usable or no calendars selected. */
-export function createMyCalendarConnectionLookup(credentials: Pick<CredentialRepo, 'getPersonalCredentials'>, encryptionKey: string) {
+export function createMyCalendarConnectionLookup(
+  credentials: Pick<CredentialRepo, 'getPersonalCredentials'>,
+  encryptionKey: string,
+  oauthClientId?: string,
+) {
   return async (userId: string): Promise<MyCalendarConnectionReference | null> => {
     const record = await credentials.getPersonalCredentials('mycalendar', userId);
     if (!record || record.status !== 'active') return null;
+    if (oauthClientId && !hasGoogleCredentialOrigin(record.config, encryptionKey, oauthClientId)) {
+      return null;
+    }
     try {
       const config = decryptCredentials(record.config, encryptionKey);
       const email = config.email;

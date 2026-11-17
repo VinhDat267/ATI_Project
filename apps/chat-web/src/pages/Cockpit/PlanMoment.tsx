@@ -457,12 +457,21 @@ export function PlanMoment({
                         {(service === 'mycalendar' || service === 'calendar') &&
                           (() => {
                             const hasMeet = step.tool === 'mycalendar.schedule_meet' || step.args.createMeetLink === true;
+                            const isRsvp = step.tool.endsWith('.rsvp_event');
+                            const rsvpStatus = typeof step.args.responseStatus === 'string' ? step.args.responseStatus : null;
+                            const rsvpPill = rsvpStatus === 'accepted'
+                              ? { label: '✅ Tham gia', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' }
+                              : rsvpStatus === 'declined'
+                                ? { label: '❌ Từ chối', cls: 'bg-rose-50 text-rose-700 border-rose-200' }
+                                : rsvpStatus === 'tentative'
+                                  ? { label: '❔ Có thể tham gia', cls: 'bg-amber-50 text-amber-900 border-amber-200' }
+                                  : null;
                             const attendees = Array.isArray(step.args.attendees)
                               ? step.args.attendees.filter((a): a is string => typeof a === 'string' && a.trim().length > 0)
                               : [];
                             const notifyExisting = step.tool.endsWith('.update_event') && step.args.sendInvites === true;
-                            const sendInvites = (attendees.length > 0 || notifyExisting) && step.args.sendInvites === true;
-                            const suppressInvites = attendees.length > 0 && step.args.sendInvites !== true;
+                            const sendInvites = (attendees.length > 0 || notifyExisting || isRsvp) && step.args.sendInvites === true;
+                            const suppressInvites = (attendees.length > 0 || isRsvp) && step.args.sendInvites !== true;
                             const recurrence = formatRecurrenceLabel(step.args.recurrence);
                             const timeZone =
                               typeof step.args.timeZone === 'string' && step.args.timeZone.trim().length > 0
@@ -472,9 +481,14 @@ export function PlanMoment({
                               typeof step.args.location === 'string' && step.args.location.trim().length > 0
                                 ? step.args.location.trim()
                                 : null;
-                            if (!hasMeet && attendees.length === 0 && !recurrence && !timeZone && !loc && !notifyExisting) return null;
+                            if (!hasMeet && attendees.length === 0 && !recurrence && !timeZone && !loc && !notifyExisting && !rsvpPill && !isRsvp) return null;
                             return (
                               <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                                {rsvpPill && (
+                                  <span className={`text-[11px] font-semibold px-2 py-0.5 border rounded-full ${rsvpPill.cls}`}>
+                                    {rsvpPill.label}
+                                  </span>
+                                )}
                                 {hasMeet && (
                                   <span className="text-[11px] font-semibold px-2 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full">
                                     🎥 Google Meet
@@ -487,12 +501,12 @@ export function PlanMoment({
                                 )}
                                 {sendInvites && (
                                   <span className="text-[11px] font-medium px-2 py-0.5 bg-sky-50 text-sky-800 border border-sky-200 rounded-full">
-                                    {notifyExisting ? '📨 Gửi thông báo cập nhật cho khách mời hiện có và danh sách khách mời sau thay đổi' : '📨 Gửi email mời họp'}
+                                    {isRsvp ? '📨 Gửi thông báo phản hồi' : notifyExisting ? '📨 Gửi thông báo cập nhật cho khách mời hiện có và danh sách khách mời sau thay đổi' : '📨 Gửi email mời họp'}
                                   </span>
                                 )}
                                 {suppressInvites && (
                                   <span className="text-[11px] font-medium px-2 py-0.5 bg-neutral-100 text-neutral-700 border border-neutral-200 rounded-full">
-                                    🔕 Không gửi email mời họp
+                                    {isRsvp ? '🔕 Không gửi thông báo phản hồi' : '🔕 Không gửi email mời họp'}
                                   </span>
                                 )}
                                 {recurrence && (

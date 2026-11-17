@@ -25,6 +25,28 @@ interface CalendarItem {
   accessRole?: 'owner' | 'writer';
 }
 
+interface CalendarTriggerItem {
+  id: string;
+  name: string;
+  triggerType: 'pre_meeting_reminder' | 'event_change_watch';
+  calendarIds: string[];
+  leadMinutes: number;
+  destination: { service: string; channelId: string; channelName?: string; credentialId?: string };
+  status: 'active' | 'paused' | 'blocked';
+  pauseReason: string | null;
+  lastCheckedAt: string | null;
+  lastError: string | null;
+}
+
+interface TriggerDestinationItem {
+  key: string;
+  service: string;
+  channelId: string;
+  channelName: string;
+  credentialId?: string;
+  label: string;
+}
+
 export function PersonalMyCalendar({
   service,
   refresh,
@@ -46,6 +68,18 @@ export function PersonalMyCalendar({
   const [calendars, setCalendars] = useState<CalendarItem[]>([]);
   const [checkedIds, setCheckedIds] = useState<string[]>([]);
   const [pickerError, setPickerError] = useState('');
+  const [triggersOpen, setTriggersOpen] = useState(false);
+  const [triggersLoading, setTriggersLoading] = useState(false);
+  const [triggersBusy, setTriggersBusy] = useState(false);
+  const [triggers, setTriggers] = useState<CalendarTriggerItem[]>([]);
+  const [triggerDestinations, setTriggerDestinations] = useState<TriggerDestinationItem[]>([]);
+  const [triggerError, setTriggerError] = useState('');
+  const [triggerNotice, setTriggerNotice] = useState('');
+  const [newTriggerName, setNewTriggerName] = useState('');
+  const [newTriggerType, setNewTriggerType] = useState<'pre_meeting_reminder' | 'event_change_watch'>('pre_meeting_reminder');
+  const [newTriggerLead, setNewTriggerLead] = useState(15);
+  const [newTriggerDestKey, setNewTriggerDestKey] = useState('');
+  const [newTriggerCalIds, setNewTriggerCalIds] = useState<string[]>([]);
 
   const mounted = useRef(false);
   const pending = useRef(false);
@@ -177,6 +211,162 @@ export function PersonalMyCalendar({
       }
     } finally {
       if (mounted.current) setBusy(false);
+    }
+  };
+
+  const loadTriggers = async () => {
+    const fn = (apiClient as any).listMyCalendarTriggers;
+    if (typeof fn !== 'function') return;
+    setTriggersLoading(true);
+    setTriggerError('');
+    try {
+      const data = await fn.call(apiClient);
+      if (!mounted.current) return;
+      const destList: TriggerDestinationItem[] = Array.isArray(data?.destinations) ? data.destinations : [];
+      setTriggers(Array.isArray(data?.triggers) ? data.triggers : []);
+      setTriggerDestinations(destList);
+      if (destList.length > 0 && !destList.some((d) => d.key === newTriggerDestKey)) {
+        setNewTriggerDestKey(destList[0]!.key);
+      }
+      if (newTriggerCalIds.length === 0 && Array.isArray(service.selectedCalendars) && service.selectedCalendars.length > 0) {
+        setNewTriggerCalIds(service.selectedCalendars.map((c) => c.id));
+      }
+    } catch (err: any) {
+      if (mounted.current) {
+        setTriggerError(err?.message || 'Không tải được danh sách cảnh báo lịch.');
+      }
+    } finally {
+      if (mounted.current) setTriggersLoading(false);
+    }
+  };
+
+  const toggleTriggersPanel = async () => {
+    const next = !triggersOpen;
+    setTriggersOpen(next);
+    if (next) {
+      await loadTriggers();
+    }
+  };
+
+  const createTriggerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (triggersBusy) return;
+    const cleanName = newTriggerName.trim();
+    if (!cleanName) {
+      setTriggerError('Vui lòng nhập tên cảnh báo.');
+      return;
+    }
+    const calIds =
+      newTriggerCalIds.length > 0
+        ? newTriggerCalIds
+        : (service.selectedCalendars ?? []).map((c) => c.id);
+    if (calIds.length === 0) {
+      setTriggerError('Vui lòng chọn ít nhất 1 lịch làm việc.');
+      return;
+    }
+    const chosenDest = triggerDestinations.find((d) => d.key === newTriggerDestKey) ?? triggerDestinations[0];
+    if (!chosenDest) {
+      setTriggerError('Cần kết nối Slack hoặc Telegram trước khi tạo cảnh báo.');
+      return;
+    }
+
+    setTriggersBusy(true);
+    setTriggerError('');
+    setTriggerNotice('');
+    try {
+      const res = await (apiClient as any).createMyCalendarTrigger({
+        name: cleanName,
+        triggerType: newTriggerType,
+        calendarIds: calIds,
+        leadMinutes: newTriggerType === 'pre_meeting_reminder' ? Number(newTriggerLead) || 15 : 15,
+        destination: {
+          service: chosenDest.service,
+          channelId: chosenDest.channelId,
+          channelName: chosenDest.channelName,
+          ...(chosenDest.credentialId ? { credentialId: chosenDest.credentialId } : {}),
+        },
+      });
+      if (!mounted.current) return;
+      if (res?.trigger) {
+        setTriggers((prev) => [res.trigger, ...prev]);
+      }
+      setNewTriggerName('');
+      setTriggerNotice('Đã bật cảnh báo tự động cho Google Calendar.');
+    } catch (err: any) {
+      if (mounted.current) {
+        setTriggerError(err?.message || 'Không tạo được quy tắc cảnh báo lịch.');
+      }
+    } finally {
+      if (mounted.current) setTriggersBusy(false);
+    }
+  };
+
+  const runTriggerNow = async (triggerId: string) => {
+    if (triggersBusy) return;
+    setTriggersBusy(true);
+    setTriggerError('');
+    setTriggerNotice('');
+    try {
+      const res = await (apiClient as any).runMyCalendarTriggerNow(triggerId);
+      if (!mounted.current) return;
+      if (res?.trigger) {
+        setTriggers((prev) => prev.map((t) => (t.id === triggerId ? res.trigger : t)));
+      }
+      const sent = Number(res?.result?.notificationsSent ?? 0);
+      if (res?.result?.baselineSeeded) {
+        setTriggerNotice('Đã ghi nhận danh sách sự kiện gốc; thay đổi tiếp theo sẽ được gửi cảnh báo.');
+      } else if (sent > 0) {
+        setTriggerNotice(`Đã gửi ${sent} thông báo cảnh báo tới kênh nhận.`);
+      } else {
+        setTriggerNotice('Đã kiểm tra lịch: hiện chưa có sự kiện nào cần báo.');
+      }
+    } catch (err: any) {
+      if (mounted.current) {
+        setTriggerError(err?.message || 'Không thể chạy kiểm tra cảnh báo.');
+      }
+    } finally {
+      if (mounted.current) setTriggersBusy(false);
+    }
+  };
+
+  const toggleTriggerStatus = async (item: CalendarTriggerItem) => {
+    if (triggersBusy) return;
+    const nextStatus = item.status === 'active' ? 'paused' : 'active';
+    setTriggersBusy(true);
+    setTriggerError('');
+    setTriggerNotice('');
+    try {
+      const res = await (apiClient as any).updateMyCalendarTrigger(item.id, { status: nextStatus });
+      if (!mounted.current) return;
+      if (res?.trigger) {
+        setTriggers((prev) => prev.map((t) => (t.id === item.id ? res.trigger : t)));
+      }
+      setTriggerNotice(nextStatus === 'active' ? 'Đã bật lại cảnh báo.' : 'Đã tạm dừng cảnh báo.');
+    } catch (err: any) {
+      if (mounted.current) {
+        setTriggerError(err?.message || 'Không cập nhật được trạng thái cảnh báo.');
+      }
+    } finally {
+      if (mounted.current) setTriggersBusy(false);
+    }
+  };
+
+  const removeTrigger = async (triggerId: string) => {
+    if (triggersBusy) return;
+    setTriggersBusy(true);
+    setTriggerError('');
+    setTriggerNotice('');
+    try {
+      await (apiClient as any).deleteMyCalendarTrigger(triggerId);
+      if (!mounted.current) return;
+      setTriggers((prev) => prev.filter((t) => t.id !== triggerId));
+      setTriggerNotice('Đã xoá quy tắc cảnh báo.');
+    } catch (err: any) {
+      if (mounted.current) {
+        setTriggerError(err?.message || 'Không xoá được quy tắc cảnh báo.');
+      }
+    } finally {
+      if (mounted.current) setTriggersBusy(false);
     }
   };
 
@@ -320,6 +510,16 @@ export function PersonalMyCalendar({
         {status === 'connected' && (
           <>
             <button
+              type="button"
+              aria-expanded={triggersOpen}
+              aria-controls="mycalendar-triggers-panel"
+              className={secondary}
+              disabled={busy}
+              onClick={() => void toggleTriggersPanel()}
+            >
+              Cảnh báo & Nhắc lịch tự động{triggers.length > 0 ? ` (${triggers.length})` : ''}
+            </button>
+            <button
               id="mycalendar-action"
               type="button"
               className={secondary}
@@ -372,6 +572,253 @@ export function PersonalMyCalendar({
         <p role="alert" className="text-xs text-[#DC2626]">
           {error}
         </p>
+      )}
+
+      {status === 'connected' && triggersOpen && (
+        <div
+          id="mycalendar-triggers-panel"
+          data-testid="mycalendar-triggers-section"
+          className="mt-1 pt-3 border-t border-[#E7E7E2] dark:border-[#293653] v3-space-y-4"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h4 id="mycalendar-triggers-heading" className="text-sm font-semibold text-[#111827] dark:text-white">
+                Cảnh báo sự kiện chủ động
+              </h4>
+              <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+                Tự động nhắc trước giờ họp hoặc báo ngay khi lịch họp có thay đổi.
+              </p>
+            </div>
+          </div>
+
+          <div aria-live="polite" className="min-h-[1rem]">
+            {triggerNotice && (
+              <p className="text-xs font-medium text-[#15803D] dark:text-[#86EFAC] bg-[#F0FDF4] dark:bg-emerald-950/40 border border-[#BBF7D0] dark:border-emerald-800/60 rounded-lg px-3 py-2">
+                {triggerNotice}
+              </p>
+            )}
+          </div>
+
+          {triggerError && (
+            <p role="alert" className="text-xs text-[#DC2626] bg-[#FEF2F2] border border-[#FECACA] rounded-lg px-3 py-2">
+              {triggerError}
+            </p>
+          )}
+
+          {triggersLoading ? (
+            <progress aria-label="Đang tải danh sách cảnh báo" className="w-full h-1.5" />
+          ) : (
+            <div className="v3-space-y-2.5">
+              {triggers.length === 0 ? (
+                <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+                  Chưa có quy tắc cảnh báo nào được thiết lập.
+                </p>
+              ) : (
+                <ul className="v3-space-y-2">
+                  {triggers.map((item) => (
+                    <li
+                      key={item.id}
+                      className="p-3 rounded-xl border border-[#E7E7E2] dark:border-[#293653] bg-[#F8F8F6] dark:bg-[#0E1528] flex flex-wrap items-start justify-between gap-2"
+                    >
+                      <div className="min-w-0 v3-space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-semibold text-[#111827] dark:text-white">{item.name}</span>
+                          <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-800 border border-blue-200">
+                            {item.triggerType === 'pre_meeting_reminder'
+                              ? `Nhắc trước ${item.leadMinutes} phút`
+                              : 'Theo dõi đổi / huỷ lịch'}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+                              item.status === 'active'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : item.status === 'paused'
+                                  ? 'bg-neutral-100 text-neutral-700 border-neutral-200'
+                                  : 'bg-rose-50 text-rose-700 border-rose-200'
+                            }`}
+                          >
+                            {item.status === 'active'
+                              ? 'Đang bật'
+                              : item.status === 'paused'
+                                ? 'Tạm dừng'
+                                : 'Cần kiểm tra'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#4B5563] dark:text-[#9CA3AF]">
+                          Gửi tới: {item.destination.channelName || item.destination.channelId}
+                        </p>
+                        {item.pauseReason && (
+                          <p className="text-[11px] text-[#DC2626]">{item.pauseReason}</p>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                          type="button"
+                          className={secondary}
+                          disabled={triggersBusy}
+                          onClick={() => void runTriggerNow(item.id)}
+                        >
+                          Chạy thử ngay
+                        </button>
+                        <button
+                          type="button"
+                          className={secondary}
+                          disabled={triggersBusy}
+                          onClick={() => void toggleTriggerStatus(item)}
+                        >
+                          {item.status === 'active' ? 'Tạm dừng' : 'Bật lại'}
+                        </button>
+                        <button
+                          type="button"
+                          className={DANGER_GHOST_BTN}
+                          disabled={triggersBusy}
+                          onClick={() => void removeTrigger(item.id)}
+                        >
+                          Xoá cảnh báo
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <form
+                aria-labelledby="mycalendar-triggers-heading"
+                onSubmit={(e) => void createTriggerSubmit(e)}
+                className="p-3 rounded-xl border border-[#E7E7E2] dark:border-[#293653] bg-white dark:bg-[#11192E] v3-space-y-3"
+              >
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="mycal-trigger-name" className="text-xs font-semibold text-[#111827] dark:text-white">
+                    Tên cảnh báo <span aria-hidden="true">*</span>
+                  </label>
+                  <input
+                    id="mycal-trigger-name"
+                    name="triggerName"
+                    type="text"
+                    required
+                    maxLength={120}
+                    value={newTriggerName}
+                    onChange={(e) => setNewTriggerName(e.target.value)}
+                    placeholder="Ví dụ: Nhắc họp Sprint trước 15 phút"
+                    className="w-full rounded-lg border border-[#D1D5DB] dark:border-[#293653] bg-white dark:bg-[#0E1528] px-3 py-1.5 text-xs text-[#111827] dark:text-[#F1F5F9]"
+                  />
+                </div>
+
+                <fieldset className="v3-space-y-1.5">
+                  <legend className="text-xs font-semibold text-[#111827] dark:text-white mb-1">
+                    Chế độ theo dõi
+                  </legend>
+                  <div className="flex flex-wrap items-center gap-4 text-xs">
+                    <span className="inline-flex items-center gap-1.5">
+                      <input
+                        id="mycal-trigger-type-pre"
+                        type="radio"
+                        name="triggerType"
+                        value="pre_meeting_reminder"
+                        checked={newTriggerType === 'pre_meeting_reminder'}
+                        onChange={() => setNewTriggerType('pre_meeting_reminder')}
+                      />
+                      <label htmlFor="mycal-trigger-type-pre">Nhắc trước giờ họp</label>
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <input
+                        id="mycal-trigger-type-watch"
+                        type="radio"
+                        name="triggerType"
+                        value="event_change_watch"
+                        checked={newTriggerType === 'event_change_watch'}
+                        onChange={() => setNewTriggerType('event_change_watch')}
+                      />
+                      <label htmlFor="mycal-trigger-type-watch">Theo dõi đổi / huỷ lịch</label>
+                    </span>
+                  </div>
+                </fieldset>
+
+                {newTriggerType === 'pre_meeting_reminder' && (
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="mycal-trigger-lead" className="text-xs font-semibold text-[#111827] dark:text-white">
+                      Nhắc trước (phút)
+                    </label>
+                    <input
+                      id="mycal-trigger-lead"
+                      name="leadMinutes"
+                      type="number"
+                      min={1}
+                      max={1440}
+                      value={newTriggerLead}
+                      onChange={(e) => setNewTriggerLead(Math.max(1, Math.min(1440, Number(e.target.value) || 15)))}
+                      className="w-28 rounded-lg border border-[#D1D5DB] dark:border-[#293653] bg-white dark:bg-[#0E1528] px-3 py-1.5 text-xs text-[#111827] dark:text-[#F1F5F9]"
+                    />
+                  </div>
+                )}
+
+                {service.selectedCalendars && service.selectedCalendars.length > 1 && (
+                  <fieldset className="v3-space-y-1.5">
+                    <legend className="text-xs font-semibold text-[#111827] dark:text-white mb-1">
+                      Lịch được theo dõi
+                    </legend>
+                    <div className="flex flex-wrap items-center gap-3 text-xs">
+                      {service.selectedCalendars.map((cal) => {
+                        const checkboxId = `mycal-trig-cal-${cal.id.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+                        const checked = newTriggerCalIds.includes(cal.id);
+                        return (
+                          <span key={cal.id} className="inline-flex items-center gap-1.5">
+                            <input
+                              id={checkboxId}
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setNewTriggerCalIds((prev) =>
+                                  prev.includes(cal.id) ? prev.filter((id) => id !== cal.id) : [...prev, cal.id],
+                                )
+                              }
+                            />
+                            <label htmlFor={checkboxId}>{cal.summary}</label>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                )}
+
+                <div className="flex flex-col gap-1">
+                  <label htmlFor="mycal-trigger-dest" className="text-xs font-semibold text-[#111827] dark:text-white">
+                    Kênh nhận cảnh báo
+                  </label>
+                  {triggerDestinations.length > 0 ? (
+                    <select
+                      id="mycal-trigger-dest"
+                      name="destinationKey"
+                      value={newTriggerDestKey}
+                      onChange={(e) => setNewTriggerDestKey(e.target.value)}
+                      className="w-full rounded-lg border border-[#D1D5DB] dark:border-[#293653] bg-white dark:bg-[#0E1528] px-3 py-1.5 text-xs text-[#111827] dark:text-[#F1F5F9]"
+                    >
+                      {triggerDestinations.map((dest) => (
+                        <option key={dest.key} value={dest.key}>
+                          {dest.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+                      Hãy kết nối Slack hoặc Telegram ở trang này để chọn kênh nhận thông báo.
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="submit"
+                    className={button}
+                    disabled={triggersBusy || triggerDestinations.length === 0}
+                  >
+                    {triggersBusy ? 'Đang xử lý…' : 'Tạo cảnh báo'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

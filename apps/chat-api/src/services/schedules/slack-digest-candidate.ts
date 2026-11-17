@@ -67,6 +67,7 @@ export interface EvaluateSlackDigestInput {
   getAdapter?: (serviceName: string, context?: any) => Promise<any> | any;
   githubLookup?: Pick<GitHubConnectionLookupResult, 'status' | 'connection'> | null;
   jiraLookup?: JiraConnectionLookupResult | null;
+  mycalendarLookup?: { credentialId?: string; allowedCalendars: string[] } | null;
   workspaceMode?: 'legacy' | 'personal' | 'organization';
   workspaceId?: string | null;
   gmailBinding?: GmailDigestBinding | null;
@@ -199,6 +200,7 @@ export async function evaluateSlackDigestCandidate(
     requestText,
     githubLookup: input.githubLookup,
     jiraLookup: input.jiraLookup,
+    ...(input.mycalendarLookup !== undefined ? { mycalendarLookup: input.mycalendarLookup } : {}),
     workspaceMode: input.workspaceMode,
     workspaceId: input.workspaceId,
     gmailBinding: input.gmailBinding,

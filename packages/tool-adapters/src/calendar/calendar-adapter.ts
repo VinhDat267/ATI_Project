@@ -117,6 +117,18 @@ export function normalizedEvent(value: any, writing = false, fallbackTimeZone?: 
       : typeof value?.recurrence === 'string' && value.recurrence.trim()
         ? value.recurrence.trim()
         : undefined;
+  const recurringEventId =
+    typeof value?.recurringEventId === 'string' && value.recurringEventId.trim().length > 0
+      ? value.recurringEventId.trim()
+      : undefined;
+  const validSelfResponses = new Set(['needsAction', 'declined', 'tentative', 'accepted']);
+  const selfAttendee = Array.isArray(value?.attendees)
+    ? value.attendees.find((a: any) => a?.self === true)
+    : undefined;
+  const selfResponseStatus =
+    typeof selfAttendee?.responseStatus === 'string' && validSelfResponses.has(selfAttendee.responseStatus)
+      ? (selfAttendee.responseStatus as 'needsAction' | 'declined' | 'tentative' | 'accepted')
+      : undefined;
   const transparency = value?.transparency === 'transparent' ? ('transparent' as const) : undefined;
   const status = value?.status === 'cancelled' ? ('cancelled' as const) : undefined;
   const timeZone =
@@ -138,6 +150,8 @@ export function normalizedEvent(value: any, writing = false, fallbackTimeZone?: 
     ...(attendeesList.length > 0 ? { attendees: attendeesList } : {}),
     ...(attendeesCount !== undefined ? { attendeesCount } : {}),
     ...(recurrence ? { recurrence } : {}),
+    ...(recurringEventId ? { recurringEventId } : {}),
+    ...(selfResponseStatus ? { selfResponseStatus } : {}),
     ...(transparency ? { transparency } : {}),
     ...(status ? { status } : {}),
     ...(timeZone ? { timeZone } : {}),

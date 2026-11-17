@@ -158,12 +158,12 @@ export function buildTelegramDigestSourceArgs(
   const base = { ...(source.args ?? {}) };
   if (source.tool === 'calendar.list_events') {
     return {
-      callArgs: { timeMin: window.sinceIso, timeMax: window.untilIso, maxResults: 20, ...base },
+      callArgs: { timeMin: window.sinceIso, timeMax: window.untilIso, limit: 20, ...base },
     };
   }
   if (source.tool === 'mycalendar.list_events') {
     return {
-      callArgs: { calendarId: 'primary', timeMin: window.sinceIso, timeMax: window.untilIso, ...base },
+      callArgs: { timeMin: window.sinceIso, timeMax: window.untilIso, ...base },
     };
   }
   if (source.tool === 'sheets.read_range') {
@@ -290,6 +290,7 @@ export interface BuildMultiDigestSourcesInput {
   requestText: string;
   githubLookup?: Pick<GitHubConnectionLookupResult, 'status' | 'connection'> | null;
   jiraLookup?: JiraConnectionLookupResult | null;
+  mycalendarLookup?: { credentialId?: string; allowedCalendars: string[] } | null;
   workspaceMode?: 'legacy' | 'personal' | 'organization';
   workspaceId?: string | null;
   gmailBinding?: GmailDigestBinding | null;
@@ -430,6 +431,19 @@ export function buildMultiDigestSources(
         notionBinding: input.notionBinding,
         label: `Notion · ${input.notionBinding.workspaceName} · ${input.notionBinding.databases.map((d) => d.title).join(', ')}`,
       });
+    } else if (service === 'mycalendar' && input.mycalendarLookup !== undefined) {
+      if (
+        !input.mycalendarLookup ||
+        !input.mycalendarLookup.credentialId ||
+        input.mycalendarLookup.allowedCalendars.length === 0
+      ) {
+        return {
+          ok: false,
+          disabledReason:
+            'Hãy kết nối Google Calendar cá nhân và chọn ít nhất 1 lịch trước khi bật tự gửi báo cáo.',
+        };
+      }
+      sources.push({ ...source });
     } else {
       sources.push({ ...source });
     }

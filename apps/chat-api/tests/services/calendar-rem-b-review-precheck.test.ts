@@ -83,6 +83,32 @@ it('Codex: precheck treats malformed coverage or non-array events as incomplete 
   const warnings2=(row2.plan_json.warnings??[]).join('\n');
   expect(warnings2).toContain('NY Thanksgiving Prep');
   expect(warnings2).toContain('trùng giờ');
+
+  // 3. DST spring-forward in America/New_York (2026-03-08 switches -05:00 -> -04:00 at 02:00):
+  // Meeting proposed at 01:00-02:00 EST (-05:00) collides before workday; 08:00-09:00 EDT (-04:00) is free while 09:00-10:00 EDT is busy.
+  // Workday free-slot suggestion MUST recognize 08:00 EDT (not 08:00 fixed -05:00) and suggest 08:00-09:00!
+  const conv3=await conversations.createConversation(person.id);
+  const events3:any[]=[];
+  const svc3=new ChatService({
+   msgRepo:messages,convRepo:conversations,planRepo:plans,
+   eventEmitter:{emit:(event,payload)=>events3.push({event,payload})},
+   planner:{processMessage:async()=>({kind:'plan',thinking:'Fixture',summary:'NY Spring DST Meeting',warnings:[],steps:[{id:'create',tool:'mycalendar.create_event',description:'NY Spring DST',args:{calendarId:cal,summary:'NY Spring DST',start:'2026-03-08T01:00:00-05:00',end:'2026-03-08T02:00:00-05:00',timeZone:'America/New_York'},dependsOn:[]}]})} as any,
+   mycalendarConnection:createMyCalendarConnectionLookup(creds,key),
+   lookupTool:async()=>({
+    events:[
+      {id:'dst-early',title:'Early EST Overlap',start:'2026-03-08T01:00:00-05:00',end:'2026-03-08T02:00:00-05:00',url:'https://calendar.google.com/event?eid=dst1',timeZone:'America/New_York'},
+      {id:'dst-9am',title:'NY 9AM EDT Standup',start:'2026-03-08T09:00:00-04:00',end:'2026-03-08T10:00:00-04:00',url:'https://calendar.google.com/event?eid=dst2',timeZone:'America/New_York'},
+    ],
+    coverage:{complete:true,returned:2,totalAvailable:2},
+   }),
+  });
+  await svc3.handleUserMessage({conversationId:conv3.id,userId:person.id,content:'Create NY Spring DST'});
+  for(let n=0;n<100&&!events3.some(e=>['plan_preview','error','refusal'].includes(e.event));n++)await new Promise(r=>setTimeout(r,20));
+  const row3=(await db.pool.query('SELECT plan_json FROM plans WHERE conv_id=$1 ORDER BY created_at DESC LIMIT 1',[conv3.id])).rows[0];
+  const warnings3=(row3.plan_json.warnings??[]).join('\n');
+  expect(warnings3).toContain('Early EST Overlap');
+  expect(warnings3).toContain('08:00–09:00');
+  expect(warnings3).not.toContain('09:00–10:00');
  }finally{
   server.closeAllConnections();
   await new Promise<void>(r=>server.close(()=>r()));

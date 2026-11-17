@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_TOOLS, SERVICE_REGISTRY, MYCALENDAR_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_SCOPE } from '../src/index.js';
+import { ALL_TOOLS, SERVICE_REGISTRY, MYCALENDAR_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_SCOPE, getToolDefinition } from '../src/index.js';
 import { isWriteTool } from '../../executor/src/runner.js';
 import { validatePlan } from '../../planner/src/validator.js';
 
@@ -19,19 +19,23 @@ describe('MYCALENDAR_TOOLS and MYCALENDAR_SERVICE', () => {
       'mycalendar.update_event',
       'mycalendar.delete_event',
       'mycalendar.schedule_meet',
+      'mycalendar.list_event_instances',
+      'mycalendar.rsvp_event',
     ]);
     const listEvents = MYCALENDAR_TOOLS.find(t => t.name === 'mycalendar.list_events')!;
     expect(listEvents.discovers).toBe('myevent');
-    expect(listEvents.observedFields).toEqual(expect.arrayContaining(['id', 'title', 'start', 'end', 'meetLink', 'attendees', 'location', 'recurrence', 'calendarId']));
+    expect(listEvents.observedFields).toEqual(expect.arrayContaining(['id', 'title', 'start', 'end', 'meetLink', 'attendees', 'location', 'recurrence', 'recurringEventId', 'selfResponseStatus', 'calendarId']));
   });
 
-  it('marks mycalendar.create_event, update_event, delete_event and schedule_meet as write tools in executor and separates x-resource mycalendar from shared calendar', () => {
+  it('marks mycalendar.create_event, update_event, delete_event, schedule_meet and rsvp_event as write tools in executor and separates x-resource mycalendar from shared calendar', () => {
     expect(isWriteTool('mycalendar.create_event')).toBe(true);
     expect(isWriteTool('mycalendar.update_event')).toBe(true);
     expect(isWriteTool('mycalendar.delete_event')).toBe(true);
     expect(isWriteTool('mycalendar.schedule_meet')).toBe(true);
+    expect(isWriteTool('mycalendar.rsvp_event')).toBe(true);
     expect(isWriteTool('mycalendar.list_events')).toBe(false);
     expect(isWriteTool('mycalendar.get_event')).toBe(false);
+    expect(isWriteTool('mycalendar.list_event_instances')).toBe(false);
     expect(isWriteTool('mycalendar.find_free_slots')).toBe(false);
     expect(isWriteTool('mycalendar.list_calendars')).toBe(false);
 
@@ -137,5 +141,151 @@ describe('MYCALENDAR_TOOLS and MYCALENDAR_SERVICE', () => {
         },
       },
     });
+  });
+
+  it('exposes MYCALENDAR_TOOLS via getToolDefinition, declares attendees on get_event output, and enforces x-resource myevent grounding on eventId', () => {
+    for (const tool of MYCALENDAR_TOOLS) {
+      expect(getToolDefinition(tool.name)?.name).toBe(tool.name);
+    }
+
+    const getEvent = MYCALENDAR_TOOLS.find(t => t.name === 'mycalendar.get_event')!;
+    expect(getEvent.outputSchema).toMatchObject({
+      properties: {
+        attendees: { type: 'array' },
+      },
+    });
+
+    const deletePlan = JSON.stringify({
+      kind: 'plan',
+      thinking: 'Xoá sự kiện khỏi lịch cá nhân',
+      summary: 'Huỷ cuộc họp',
+      steps: [{
+        id: 's_del',
+        tool: 'mycalendar.delete_event',
+        description: 'Xoá sự kiện',
+        dependsOn: [],
+        args: {
+          calendarId: 'owner@example.test',
+          eventId: 'hallucinated_evt_999',
+        },
+      }],
+    });
+    const ungroundedEvent = validatePlan(deletePlan, [...ALL_TOOLS, ...MYCALENDAR_TOOLS], {
+      grounding: {
+        memory: {
+          mycalendar: [{ id: 'owner@example.test', title: 'Lịch chính' }],
+          myevent: [{ id: 'real_evt_1', title: 'Họp Sprint', calendarId: 'owner@example.test' }],
+        },
+        userTexts: ['Huỷ lịch họp giúp tôi'],
+      },
+    });
+    expect(ungroundedEvent.valid).toBe(false);
+    if (!ungroundedEvent.valid) expect(ungroundedEvent.layer).toBe('grounding');
+
+    const groundedDeletePlan = JSON.stringify({
+      kind: 'plan',
+      thinking: 'Xoá sự kiện đã tìm thấy',
+      summary: 'Huỷ Họp Sprint',
+      steps: [{
+        id: 's_del',
+        tool: 'mycalendar.delete_event',
+        description: 'Xoá sự kiện Họp Sprint',
+        dependsOn: [],
+        args: {
+          calendarId: 'owner@example.test',
+          eventId: 'real_evt_1',
+        },
+      }],
+    });
+    const groundedEvent = validatePlan(groundedDeletePlan, [...ALL_TOOLS, ...MYCALENDAR_TOOLS], {
+      grounding: {
+        memory: {
+          mycalendar: [{ id: 'owner@example.test', title: 'Lịch chính' }],
+          myevent: [{ id: 'real_evt_1', title: 'Họp Sprint', calendarId: 'owner@example.test' }],
+        },
+        userTexts: ['Huỷ lịch họp Sprint giúp tôi'],
+      },
+    });
+    expect(groundedEvent.valid).toBe(true);
+  });
+
+  it('requires myevent grounding on mycalendar.rsvp_event and mycalendar.list_event_instances and validates responseStatus enum', () => {
+    const rsvpTool = MYCALENDAR_TOOLS.find(t => t.name === 'mycalendar.rsvp_event');
+    const instancesTool = MYCALENDAR_TOOLS.find(t => t.name === 'mycalendar.list_event_instances');
+    expect(rsvpTool).toBeDefined();
+    expect(instancesTool).toBeDefined();
+    expect(instancesTool!.discovers).toBe('myevent');
+
+    const ungroundedRsvp = validatePlan(
+      JSON.stringify({
+        kind: 'plan',
+        thinking: 'Chấp nhận lời mời họp',
+        summary: 'Xác nhận tham dự',
+        steps: [{
+          id: 's_rsvp',
+          tool: 'mycalendar.rsvp_event',
+          description: 'Chấp nhận lời mời Họp Sprint',
+          dependsOn: [],
+          args: {
+            calendarId: 'owner@example.test',
+            eventId: 'hallucinated_evt_777',
+            responseStatus: 'accepted',
+          },
+        }],
+      }),
+      [...ALL_TOOLS, ...MYCALENDAR_TOOLS],
+      {
+        grounding: {
+          memory: {
+            mycalendar: [{ id: 'owner@example.test', title: 'Lịch chính' }],
+            myevent: [{ id: 'real_evt_1', title: 'Họp Sprint', calendarId: 'owner@example.test' }],
+          },
+          userTexts: ['Chấp nhận tham gia Họp Sprint'],
+        },
+      },
+    );
+    expect(ungroundedRsvp.valid).toBe(false);
+    if (!ungroundedRsvp.valid) expect(ungroundedRsvp.layer).toBe('grounding');
+
+    const groundedRsvp = validatePlan(
+      JSON.stringify({
+        kind: 'plan',
+        thinking: 'Liệt kê buổi lặp lại rồi xác nhận tham gia 1 buổi',
+        summary: 'Lấy buổi họp rồi RSVP',
+        steps: [
+          {
+            id: 's_inst',
+            tool: 'mycalendar.list_event_instances',
+            description: 'Liệt kê các buổi trong chuỗi Họp Sprint',
+            dependsOn: [],
+            args: { calendarId: 'owner@example.test', eventId: 'real_evt_1' },
+          },
+          {
+            id: 's_rsvp',
+            tool: 'mycalendar.rsvp_event',
+            description: 'Chấp nhận tham dự Họp Sprint',
+            dependsOn: ['s_inst'],
+            args: {
+              calendarId: 'owner@example.test',
+              eventId: 'real_evt_1',
+              responseStatus: 'accepted',
+              comment: 'Tôi sẽ tham gia đúng giờ',
+              sendInvites: true,
+            },
+          },
+        ],
+      }),
+      [...ALL_TOOLS, ...MYCALENDAR_TOOLS],
+      {
+        grounding: {
+          memory: {
+            mycalendar: [{ id: 'owner@example.test', title: 'Lịch chính' }],
+            myevent: [{ id: 'real_evt_1', title: 'Họp Sprint', calendarId: 'owner@example.test' }],
+          },
+          userTexts: ['Chấp nhận tham gia Họp Sprint và gửi phản hồi'],
+        },
+      },
+    );
+    expect(groundedRsvp.valid).toBe(true);
   });
 });

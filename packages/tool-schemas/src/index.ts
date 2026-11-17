@@ -5,6 +5,7 @@ import { SLACK_TOOLS, SLACK_EXTENDED_TOOLS } from './slack.js';
 import { GITHUB_TOOLS, GITHUB_OAUTH_TOOLS } from './github.js';
 import { SHEETS_TOOLS, SHEETS_EXTENDED_TOOLS } from './sheets.js';
 import { CALENDAR_TOOLS } from './calendar.js';
+import { MYCALENDAR_TOOLS } from './mycalendar.js';
 import { NOTION_TOOLS, NOTION_OAUTH_TOOLS } from './notion.js';
 import { TELEGRAM_TOOLS, TELEGRAM_OAUTH_TOOLS } from './telegram.js';
 import { JIRA_TOOLS } from './jira.js';
@@ -74,6 +75,10 @@ const MYJIRA_TOOL_MAP: Record<string, ToolDefinition> = Object.fromEntries(
   MYJIRA_TOOLS.map((tool) => [tool.name, tool])
 );
 
+const MYCALENDAR_TOOL_MAP: Record<string, ToolDefinition> = Object.fromEntries(
+  MYCALENDAR_TOOLS.map((tool) => [tool.name, tool])
+);
+
 const SLACK_EXTENDED_TOOL_MAP: Record<string, ToolDefinition> = Object.fromEntries(
   SLACK_EXTENDED_TOOLS.map((tool) => [tool.name, tool])
 );
@@ -81,6 +86,7 @@ const SLACK_EXTENDED_TOOL_MAP: Record<string, ToolDefinition> = Object.fromEntri
 export function getToolDefinition(name: string): ToolDefinition | undefined {
   return (
     TOOL_MAP[name] ??
+    MYCALENDAR_TOOL_MAP[name] ??
     GITHUB_OAUTH_TOOL_MAP[name] ??
     TRELLO_OAUTH_TOOL_MAP[name] ??
     TELEGRAM_OAUTH_TOOL_MAP[name] ??

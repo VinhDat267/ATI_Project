@@ -3,7 +3,10 @@ import pg from 'pg';
 import { randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { encryptCredentials } from '@wap/tool-adapters';
+import { encryptCredentials, StepError } from '@wap/tool-adapters';
+import { buildTelegramDigestSourceArgs } from '../../../src/services/schedules/multi-source-digest-candidate.js';
+import { executeMultiDigestReadSources } from '../../../src/services/schedules/multi-source-digest-reader.js';
+import { evaluateSlackDigestCandidate } from '../../../src/services/schedules/slack-digest-candidate.js';
 import { NotionConnectionRepo } from '../../../src/db/repositories/notion-connection-repo.js';
 import { NotionDigestSourceAuthority } from '../../../src/services/notion/digest-source-authority.js';
 import { NotionOAuthClient } from '../../../src/services/notion/oauth-client.js';
@@ -914,5 +917,181 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
     expect(text).toContain('⚠️ Chờ/Quá hạn: 1');
     expect(text).toContain('Tối ưu cổng thanh toán [Done]');
     expect(text).toContain('⚠️ [Trùng lịch: Demo Khách Hàng VIP]');
+  });
+
+  it('hardens multi-source mycalendar & calendar args, empty-scope fail-closed, auth pause, truncation, timezone conflict detection, and candidate lookup', async () => {
+    const win = { sinceIso: '2026-11-02T00:00:00.000Z', untilIso: '2026-11-03T00:00:00.000Z' };
+    const orgCalArgs = buildTelegramDigestSourceArgs(
+      { service: 'calendar', tool: 'calendar.list_events', label: 'Lịch nhóm' },
+      win,
+    );
+    expect(orgCalArgs.callArgs).toEqual({
+      timeMin: win.sinceIso,
+      timeMax: win.untilIso,
+      limit: 20,
+    });
+    expect(orgCalArgs.callArgs).not.toHaveProperty('maxResults');
+
+    const personalCalArgs = buildTelegramDigestSourceArgs(
+      { service: 'mycalendar', tool: 'mycalendar.list_events', label: 'Lịch cá nhân' },
+      win,
+    );
+    expect(personalCalArgs.callArgs).not.toHaveProperty('calendarId');
+
+    // Candidate lookup fails closed when mycalendarLookup is explicitly empty/missing
+    const noCalTg = evaluateTelegramDigestCandidate({
+      proposal: {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Digest',
+        request: 'Tổng hợp Calendar gửi Telegram',
+        recurrence: { type: 'daily', time: '08:00' },
+        summary: 'Test',
+      },
+      services: ['mycalendar', 'telegram'],
+      timeZone: 'Asia/Ho_Chi_Minh',
+      telegramLookup: {
+        status: 'connected',
+        selectedChats: [{ chatId: '777', title: 'Me', type: 'private' }],
+        connection: {
+          credentialId: 'tg-1',
+          telegramUserId: '777',
+          username: 'user',
+          chatIds: ['777'],
+        },
+      },
+      mycalendarLookup: null,
+    });
+    expect(noCalTg.canAutoDigest).toBe(false);
+
+    const emptyScopeSlack = await evaluateSlackDigestCandidate({
+      proposal: {
+        kind: 'schedule',
+        action: 'create',
+        name: 'Digest',
+        request: 'Tổng hợp Calendar gửi #general',
+        recurrence: { type: 'daily', time: '08:00' },
+        summary: 'Test',
+      },
+      services: ['mycalendar', 'slack'],
+      timeZone: 'Asia/Ho_Chi_Minh',
+      userId: USER_ID,
+      mycalendarLookup: {
+        credentialId: 'cal-1',
+        allowedCalendars: [],
+      },
+      getAdapter: async () => ({ execute: async () => [{ id: 'C_GENERAL', name: 'general' }] }),
+    });
+    expect(emptyScopeSlack.canAutoDigest).toBe(false);
+
+    // 1. Disconnected / empty-scope mycalendar in executeMultiDigestReadSources fails closed without calling adapter with 'primary'
+    let adapterCalled = false;
+    const blockedNoScope = await executeMultiDigestReadSources({
+      sources: [{ service: 'mycalendar', tool: 'mycalendar.list_events', label: 'Google Calendar cá nhân' }],
+      userId: USER_ID,
+      dueAt: new Date('2026-11-02T08:00:00.000Z'),
+      sinceIso: win.sinceIso,
+      untilIso: win.untilIso,
+      credentialRepo: credRepo,
+      encryptionKey: ENCRYPTION_KEY,
+      adapterFactory: {
+        getAdapterForService: async () => ({
+          execute: async () => {
+            adapterCalled = true;
+            return { events: [] };
+          },
+        }),
+      },
+      signal: new AbortController().signal,
+    });
+    expect(adapterCalled).toBe(false);
+    expect(blockedNoScope.kind).toBe('blocked');
+    if (blockedNoScope.kind === 'blocked') {
+      expect(blockedNoScope.pauseSchedule).toBe(true);
+    }
+
+    // Seed active mycalendar with 1 calendar & verify AUTH_ERROR -> blocked + truncated + America/New_York overlap + calendar.list_calendars fallback
+    await credRepo.saveCredentials(
+      'mycalendar',
+      encryptCredentials(
+        {
+          email: 'runner.cal@example.com',
+          refreshToken: 'refresh-cal-1',
+          allowedScope: { calendars: ['runner.cal@example.com'] },
+        },
+        ENCRYPTION_KEY,
+      ),
+      USER_ID,
+    );
+
+    const authErrOutcome = await executeMultiDigestReadSources({
+      sources: [{ service: 'mycalendar', tool: 'mycalendar.list_events', label: 'Google Calendar cá nhân' }],
+      userId: USER_ID,
+      dueAt: new Date('2026-11-02T08:00:00.000Z'),
+      sinceIso: win.sinceIso,
+      untilIso: win.untilIso,
+      credentialRepo: credRepo,
+      encryptionKey: ENCRYPTION_KEY,
+      adapterFactory: {
+        getAdapterForService: async () => ({
+          execute: async () => {
+            throw new StepError({ message: 'Google token revoked', category: 'AUTH_ERROR', statusCode: 401 });
+          },
+        }),
+      },
+      signal: new AbortController().signal,
+    });
+    expect(authErrOutcome.kind).toBe('blocked');
+
+    const nyOutcome = await executeMultiDigestReadSources({
+      sources: [
+        { service: 'mycalendar', tool: 'mycalendar.list_events', label: 'Google Calendar cá nhân' },
+        { service: 'calendar', tool: 'calendar.list_events', label: 'Lịch nhóm' },
+      ],
+      userId: USER_ID,
+      dueAt: new Date('2026-11-02T14:00:00.000Z'),
+      sinceIso: win.sinceIso,
+      untilIso: win.untilIso,
+      timeZone: 'America/New_York',
+      credentialRepo: credRepo,
+      encryptionKey: ENCRYPTION_KEY,
+      adapterFactory: {
+        getAdapterForService: async (svc: string) => {
+          if (svc === 'mycalendar') {
+            return {
+              execute: async () => ({
+                events: [
+                  { id: 'allday-1', title: 'All-Day NY', start: '2026-11-02', end: '2026-11-03' },
+                  { id: 'late-ny', title: 'Late Call NY', start: '2026-11-02T22:00:00-05:00', end: '2026-11-02T23:00:00-05:00' },
+                ],
+                coverage: { complete: false, returned: 2, totalAvailable: 50 },
+              }),
+            };
+          }
+          return {
+            execute: async (tool: string, args: any) => {
+              if (tool === 'calendar.list_events' && !args.calendarId) {
+                throw new StepError({ message: 'calendarId is required', category: 'VALIDATION', retryable: false });
+              }
+              if (tool === 'calendar.list_calendars') {
+                return [{ id: 'team@group.calendar.google.com', summary: 'Team' }];
+              }
+              if (tool === 'calendar.list_events' && args.calendarId === 'team@group.calendar.google.com') {
+                return [{ id: 'org-1', summary: 'Team Sync', start: '2026-11-02T10:00:00-05:00', end: '2026-11-02T11:00:00-05:00' }];
+              }
+              throw new Error(`Unexpected ${tool}`);
+            },
+          };
+        },
+      },
+      signal: new AbortController().signal,
+    });
+    expect(nyOutcome.kind).toBe('ok');
+    if (nyOutcome.kind === 'ok') {
+      expect(nyOutcome.sourceStatuses[0]?.truncated).toBe(true);
+      expect(nyOutcome.sections[0]).toContain('⚠️ [Trùng lịch:');
+      expect(nyOutcome.sourceStatuses[1]?.status).toBe('ok');
+      expect(nyOutcome.sections[1]).toContain('Team Sync');
+    }
   });
 });

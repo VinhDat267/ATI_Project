@@ -1,8 +1,10 @@
 import { expect, it } from 'vitest';
-import { ALL_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_TOOLS, SERVICE_REGISTRY } from '@wap/tool-schemas';
+import { ALL_TOOLS, GMAIL_TOOLS, MYCALENDAR_SERVICE, MYCALENDAR_TOOLS, MYJIRA_TOOLS, MYSHEETS_TOOLS, SERVICE_REGISTRY } from '@wap/tool-schemas';
 import { classifyIntent, routeIntent } from '../src/router.js';
-import { recordObserved } from '../src/search.js';
+import { recordObserved, type WorkingMemory } from '../src/search.js';
+import { extractWorkspaceRecipients } from '../src/recipients.js';
 import { buildSystemPrompt } from '../src/prompts/system-prompt.js';
+import { validatePlan } from '../src/validator.js';
 
 it.each([
   ['Đặt lịch họp review lúc 15h thứ Sáu và báo kênh ati-test', ['slack', 'calendar']],
@@ -87,5 +89,108 @@ it('includes Personal Google Calendar (mycalendar) Rules in buildSystemPrompt wh
   expect(prompt).toContain('createMeetLink: true');
   expect(prompt).toContain('recurrence');
   expect(prompt).toContain('mycalendar.find_free_slots');
+  expect(prompt).toContain('mycalendar.list_event_instances');
+  expect(prompt).toContain('mycalendar.rsvp_event');
+  expect(prompt).toContain('post-meeting');
+  expect(prompt).toContain('pre-meeting');
   expect(prompt).toContain('meetLink');
+  expect(prompt).toContain('preserve existing');
+  const withSchedules = buildSystemPrompt(MYCALENDAR_TOOLS, undefined, { search: true, schedules: true });
+  expect(withSchedules).toContain('mycalendar.create_event');
+});
+
+it('grounds post-meeting follow-up email recipients from observed mycalendar.get_event attendees and blocks ungrounded addresses', () => {
+  const eventDetail = {
+    id: 'evt_design_review',
+    title: 'Design Review Q4',
+    start: '2026-11-18T15:00:00+07:00',
+    end: '2026-11-18T16:00:00+07:00',
+    url: 'https://calendar.google.com/event?eid=designq4',
+    attendees: ['alice@acme.test', 'bob@acme.test'],
+    calendarId: 'owner@acme.test',
+  };
+  let memory: WorkingMemory = {};
+  memory = recordObserved(memory, 'mycalendar', [{ id: 'owner@acme.test', title: 'Lịch chính', timeZone: 'Asia/Ho_Chi_Minh' }], ['id', 'title', 'timeZone']);
+  memory = recordObserved(memory, 'myevent', [eventDetail], ['id', 'title', 'start', 'end', 'url', 'attendees', 'calendarId']);
+  memory = recordObserved(
+    memory,
+    'jira_site',
+    [{ id: 'site-1', siteId: 'site-1', cloudId: 'cloud-1', workspaceId: 'ws-1', name: 'ATI Cloud' }],
+    ['id', 'siteId', 'cloudId', 'workspaceId', 'name'],
+  );
+  memory = recordObserved(
+    memory,
+    'jira_project',
+    [{ id: '10001', key: 'ATI', name: 'ATI Platform', siteId: 'site-1', cloudId: 'cloud-1', workspaceId: 'ws-1' }],
+    ['id', 'key', 'name', 'siteId', 'cloudId', 'workspaceId'],
+  );
+  const recipients = extractWorkspaceRecipients('mycalendar', eventDetail);
+  memory = {
+    ...memory,
+    __observed: {
+      ...(memory.__observed ?? {}),
+      recipient: recipients,
+    },
+  };
+
+  const tools = [...ALL_TOOLS, ...MYCALENDAR_TOOLS, ...MYSHEETS_TOOLS, ...MYJIRA_TOOLS, ...GMAIL_TOOLS];
+  const validClosedLoopPlan = JSON.stringify({
+    kind: 'plan',
+    thinking: 'Tạo biên bản họp trên Docs, tạo ticket Jira và gửi email cho người tham dự',
+    summary: 'Follow-up sau cuộc họp Design Review Q4',
+    steps: [
+      {
+        id: 's_doc',
+        tool: 'mysheets.create_doc',
+        description: 'Tạo tài liệu biên bản cuộc họp Design Review Q4',
+        dependsOn: [],
+        args: { title: 'Biên bản Design Review Q4', content: 'Quyết định & hành động tiếp theo.' },
+      },
+      {
+        id: 's_jira',
+        tool: 'myjira.create_issue',
+        description: 'Tạo ticket theo dõi trên Jira ATI',
+        dependsOn: ['s_doc'],
+        args: {
+          siteId: 'site-1',
+          projectKey: 'ATI',
+          summary: 'Hoàn thiện test webhook Calendar',
+          description: { $template: 'Xem biên bản cuộc họp: ${s_doc.output.url}' },
+        },
+      },
+      {
+        id: 's_mail',
+        tool: 'gmail.send_message',
+        description: 'Gửi email biên bản & ticket tới người tham dự',
+        dependsOn: ['s_doc', 's_jira'],
+        args: {
+          to: ['alice@acme.test'],
+          subject: 'Biên bản & ticket Design Review Q4',
+          body: { $template: 'Biên bản: ${s_doc.output.url}\nTicket Jira: ${s_jira.output.url}' },
+        },
+      },
+    ],
+  });
+
+  const ok = validatePlan(validClosedLoopPlan, tools, {
+    grounding: {
+      memory,
+      userTexts: ['Sau cuộc họp Design Review Q4, tạo biên bản Docs, tạo ticket trên dự án Jira ATI và gửi email cho người tham dự'],
+    },
+  });
+  expect(ok).toEqual({ valid: true, parsed: expect.any(Object) });
+
+  const badPlan = JSON.stringify({
+    ...JSON.parse(validClosedLoopPlan),
+    steps: JSON.parse(validClosedLoopPlan).steps.map((s: any) =>
+      s.id === 's_mail' ? { ...s, args: { ...s.args, to: ['stranger@evil.test'] } } : s,
+    ),
+  });
+  const rejected = validatePlan(badPlan, tools, {
+    grounding: {
+      memory,
+      userTexts: ['Sau cuộc họp Design Review Q4, tạo biên bản Docs, tạo ticket trên dự án Jira ATI và gửi email cho người tham dự'],
+    },
+  });
+  expect(rejected.valid).toBe(false);
 });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { ScheduleApprovalMode, ScheduleView, SheetsDigestPreviewInfo } from '@wap/tool-schemas';
 import type { ChatMessage } from '../../types';
 import { apiClient } from '../../services/api-client';
@@ -42,9 +42,14 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
   const navigate = props.navigate ?? (() => {});
   const onEdit = props.onEdit ?? (() => {});
   const isReauthorize = Boolean((message.metadata as any)?.reauthorize);
+  const calendarAiId = useId();
+  const calendarAiDescId = useId();
   const rawCandidate = (props.digestCandidate ?? message.metadata?.digestCandidate) as any;
   const initialIncludeAiSummary = Boolean(
-    rawCandidate?.preview?.includeAiSummary ?? rawCandidate?.config?.includeAiSummary ?? true
+    rawCandidate?.preview?.includeAiSummary ??
+    rawCandidate?.config?.includeAiSummary ??
+    rawCandidate?.config?.includeSummary ??
+    true
   );
   const [ignored, setIgnored] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [confirmed, setConfirmed] = useState<ScheduleView | null>(null);
@@ -58,7 +63,12 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
     setApprovalMode((message.metadata as any)?.reauthorize ? 'auto_digest' : 'manual');
     const cand = (props.digestCandidate ?? message.metadata?.digestCandidate) as any;
     setIncludeAiSummary(
-      Boolean(cand?.preview?.includeAiSummary ?? cand?.config?.includeAiSummary ?? true)
+      Boolean(
+        cand?.preview?.includeAiSummary ??
+        cand?.config?.includeAiSummary ??
+        cand?.config?.includeSummary ??
+        true
+      )
     );
   }, [message.id, (message.metadata as any)?.reauthorize]);
   const metadata = message.metadata!;
@@ -214,7 +224,13 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
             )
         : isCalendarCandidate
           ? isEligible
-            ? await apiClient.confirmSchedule(convId, message.id, approvalMode)
+            ? await apiClient.confirmSchedule(
+                convId,
+                message.id,
+                approvalMode === 'auto_digest' && includeAiSummary !== initialIncludeAiSummary
+                  ? { approvalMode: 'auto_digest', includeAiSummary }
+                  : approvalMode,
+              )
             : await apiClient.confirmSchedule(convId, message.id)
           : approvalMode === 'auto_digest' || isReauthorize
             ? (isSheetsCandidate || isMultiSourceCandidate) && includeAiSummary !== initialIncludeAiSummary
@@ -653,13 +669,38 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                       <p>• Nguồn lịch: {previewCalendars.map((c) => c.summary).join(', ')} ({previewEmail})</p>
                       <p>• Nơi nhận: {previewDestination}</p>
                       <p>• Cam kết an toàn: Chỉ đọc Google Calendar (khung {previewWindowHours} giờ), tự động phát hiện trùng lịch, không tạo/sửa/xoá sự kiện.</p>
+                      <div className="pt-1.5 border-t border-emerald-200/80 flex items-start gap-2">
+                        <input
+                          id={calendarAiId}
+                          data-testid="checkbox-calendar-include-ai-summary"
+                          type="checkbox"
+                          checked={includeAiSummary}
+                          onChange={(e) => setIncludeAiSummary(e.target.checked)}
+                          aria-describedby={calendarAiDescId}
+                          className="mt-0.5 rounded border-emerald-400 text-[#FF5701] focus:ring-[#FF5701]"
+                        />
+                        <div className="leading-snug">
+                          <label htmlFor={calendarAiId} className="font-semibold cursor-pointer text-emerald-950">
+                            Tóm tắt bằng AI
+                          </label>
+                          <span id={calendarAiDescId} className="block text-emerald-900 mt-0.5">
+                            {includeAiSummary
+                              ? 'Tạo đoạn điểm nhấn ngắn gọn cho lịch họp trong ngày (tối đa 20 sự kiện khi đọc đủ).'
+                              : 'Chỉ gửi danh sách sự kiện và cảnh báo trùng giờ thuần túy, không gửi nội dung lịch tới mô hình AI tóm tắt.'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
               ) : ineligibleReason ? (
                 <p className="text-xs text-[#6B7280]">{ineligibleReason}</p>
               ) : null}
-              <p className="text-sm text-[#4B5563] leading-relaxed">Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
+              <p className="text-sm text-[#4B5563] leading-relaxed">
+                {approvalMode === 'auto_digest'
+                  ? 'Tới giờ, Planora tự đọc Google Calendar trong phạm vi đã khóa và gửi bản tin tới kênh đích mà không cần duyệt lại.'
+                  : 'Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.'}
+              </p>
             </>
           ) : (
             <>

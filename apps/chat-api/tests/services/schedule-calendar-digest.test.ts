@@ -575,4 +575,203 @@ describe('Calendar auto_digest schedule candidate & confirmation on PostgreSQL 1
       }),
     ).not.toBe(expectedLegacyHash);
   });
+
+  it('persists includeAiSummary on calendar_digest create and preserves or updates it on update', async () => {
+    await seedMyCalendar(alice);
+    await seedSlack(['C0123456789']);
+    const convId = (await db.pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [alice.id])).rows[0].id as string;
+
+    const evaluated1 = await evaluateCalendarDigestCandidate({
+      pool: db.pool,
+      encryptionKey: key,
+      userId: alice.id,
+      services: ['mycalendar', 'slack'],
+      request: 'Tóm tắt lịch họp hôm nay gửi lên Slack #daily-briefing',
+    });
+    expect(evaluated1.candidate.canAutoDigest).toBe(true);
+
+    const createMeta: ScheduleProposalMetadata = {
+      type: 'schedule_proposal',
+      proposal: makeProposal({ action: 'create' }),
+      services: ['mycalendar', 'slack'],
+      nextRuns: ['2026-10-26T00:30:00.000Z'],
+      scheduleId: null,
+      baseVersion: null,
+      previous: null,
+      digestCandidate: evaluated1.candidate,
+    };
+    const msg1 = (
+      await db.pool.query(
+        "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', $2, $3) RETURNING id",
+        [convId, createMeta.proposal.summary, JSON.stringify(createMeta)],
+      )
+    ).rows[0].id as string;
+
+    const createRes = await request(app)
+      .post(`/api/conversations/${convId}/schedule-proposals/${msg1}/confirm`)
+      .set('Authorization', bearer(alice))
+      .send({ approvalMode: 'auto_digest', includeAiSummary: false });
+    expect(createRes.status, JSON.stringify(createRes.body)).toBe(200);
+    expect(createRes.body.schedule.kind).toBe('calendar_digest');
+    expect(createRes.body.schedule.digestConfig.includeSummary).toBe(false);
+
+    // Update schedule omitting includeAiSummary -> preserves false
+    const updateReq = 'Cập nhật lịch gửi bản tin lịch họp lúc 8h sáng lên Slack #daily-briefing';
+    const evaluated2 = await evaluateCalendarDigestCandidate({
+      pool: db.pool,
+      encryptionKey: key,
+      userId: alice.id,
+      services: ['mycalendar', 'slack'],
+      request: updateReq,
+    });
+    const updateMeta1: ScheduleProposalMetadata = {
+      type: 'schedule_proposal',
+      proposal: makeProposal({
+        action: 'update',
+        request: updateReq,
+        recurrence: { type: 'daily', time: '08:00' },
+        summary: 'Đổi giờ sang 08:00.',
+      }),
+      services: ['mycalendar', 'slack'],
+      nextRuns: ['2026-10-26T01:00:00.000Z'],
+      scheduleId: createRes.body.schedule.id,
+      baseVersion: 1,
+      previous: null,
+      digestCandidate: evaluated2.candidate,
+    };
+    const msg2 = (
+      await db.pool.query(
+        "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', $2, $3) RETURNING id",
+        [convId, updateMeta1.proposal.summary, JSON.stringify(updateMeta1)],
+      )
+    ).rows[0].id as string;
+
+    const updateRes1 = await request(app)
+      .post(`/api/conversations/${convId}/schedule-proposals/${msg2}/confirm`)
+      .set('Authorization', bearer(alice))
+      .send({ approvalMode: 'auto_digest' });
+    expect(updateRes1.status, JSON.stringify(updateRes1.body)).toBe(200);
+    expect(updateRes1.body.schedule.digestConfig.includeSummary).toBe(false);
+
+    // Explicitly re-enabling includeAiSummary on update sets includeSummary: true
+    const updateMeta2: ScheduleProposalMetadata = {
+      ...updateMeta1,
+      baseVersion: 2,
+      proposal: makeProposal({
+        action: 'update',
+        request: updateReq,
+        recurrence: { type: 'daily', time: '08:30' },
+        summary: 'Đổi giờ sang 08:30.',
+      }),
+    };
+    const msg3 = (
+      await db.pool.query(
+        "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', $2, $3) RETURNING id",
+        [convId, updateMeta2.proposal.summary, JSON.stringify(updateMeta2)],
+      )
+    ).rows[0].id as string;
+    const updateRes2 = await request(app)
+      .post(`/api/conversations/${convId}/schedule-proposals/${msg3}/confirm`)
+      .set('Authorization', bearer(alice))
+      .send({ approvalMode: 'auto_digest', includeAiSummary: true });
+    expect(updateRes2.status, JSON.stringify(updateRes2.body)).toBe(200);
+    expect(updateRes2.body.schedule.digestConfig.includeSummary).toBe(true);
+  });
+
+  it('blocks resuming a paused calendar_digest when mycalendar scope or destination Slack channel is revoked', async () => {
+    await seedMyCalendar(alice);
+    await seedSlack(['C0123456789']);
+    const convId = (await db.pool.query('INSERT INTO conversations(user_id) VALUES($1) RETURNING id', [alice.id])).rows[0].id as string;
+    const evaluated = await evaluateCalendarDigestCandidate({
+      pool: db.pool,
+      encryptionKey: key,
+      userId: alice.id,
+      services: ['mycalendar', 'slack'],
+      request: 'Tóm tắt lịch họp hôm nay gửi lên Slack #daily-briefing',
+    });
+    const meta: ScheduleProposalMetadata = {
+      type: 'schedule_proposal',
+      proposal: makeProposal({ action: 'create' }),
+      services: ['mycalendar', 'slack'],
+      nextRuns: ['2026-10-26T00:30:00.000Z'],
+      scheduleId: null,
+      baseVersion: null,
+      previous: null,
+      digestCandidate: evaluated.candidate,
+    };
+    const msgId = (
+      await db.pool.query(
+        "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', $2, $3) RETURNING id",
+        [convId, meta.proposal.summary, JSON.stringify(meta)],
+      )
+    ).rows[0].id as string;
+
+    const created = await service.confirmProposal({
+      userId: alice.id,
+      convId,
+      messageId: msgId,
+      now: NOW,
+      approvalMode: 'auto_digest',
+    });
+    const paused = await service.setStatus({
+      userId: alice.id,
+      scheduleId: created.schedule.id,
+      action: 'pause',
+      version: 1,
+      now: NOW,
+    });
+    expect(paused.schedule.status).toBe('paused');
+
+    // Remove sprint@group.calendar.google.com from selectedCalendars / allowedScope
+    await seedMyCalendar(alice, [{ id: 'owner.calendar@example.test', summary: 'Lịch chính', primary: true }]);
+
+    await expect(
+      service.setStatus({
+        userId: alice.id,
+        scheduleId: created.schedule.id,
+        action: 'resume',
+        version: 2,
+        now: NOW,
+      }),
+    ).rejects.toMatchObject({ code: 'REAUTHORIZATION_REQUIRED' });
+
+    // Restore calendar scope, then revoke Slack destination channel
+    await seedMyCalendar(alice);
+    await seedSlack(['C_OTHER_CHANNEL']);
+    await expect(
+      service.setStatus({
+        userId: alice.id,
+        scheduleId: created.schedule.id,
+        action: 'resume',
+        version: 2,
+        now: NOW,
+      }),
+    ).rejects.toMatchObject({ code: 'REAUTHORIZATION_REQUIRED' });
+
+    // Also block confirmProposal resume
+    const resumeMeta: ScheduleProposalMetadata = {
+      type: 'schedule_proposal',
+      proposal: makeProposal({ action: 'resume', summary: 'Tiếp tục lịch.' }),
+      services: ['mycalendar', 'slack'],
+      nextRuns: ['2026-10-26T00:30:00.000Z'],
+      scheduleId: created.schedule.id,
+      baseVersion: 2,
+      previous: null,
+    };
+    const resumeMsgId = (
+      await db.pool.query(
+        "INSERT INTO messages(conv_id, role, content, metadata) VALUES($1, 'assistant', $2, $3) RETURNING id",
+        [convId, resumeMeta.proposal.summary, JSON.stringify(resumeMeta)],
+      )
+    ).rows[0].id as string;
+
+    await expect(
+      service.confirmProposal({
+        userId: alice.id,
+        convId,
+        messageId: resumeMsgId,
+        now: NOW,
+      }),
+    ).rejects.toMatchObject({ code: 'REAUTHORIZATION_REQUIRED' });
+  });
 });

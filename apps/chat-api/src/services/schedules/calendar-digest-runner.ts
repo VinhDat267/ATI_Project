@@ -7,6 +7,7 @@ import { localLabel } from './next-occurrence.js';
 import type { RunToPlan } from './schedule-runner.js';
 import { slackMrkdwnToTelegramPlain } from './telegram-plain-text.js';
 import { buildSlackMarkdownDigestBlocks } from '../slack/slack-digest-blocks.js';
+import { isGoogleConnectionChanged } from '../gmail/token-manager.js';
 import type { AdapterContext } from '../adapter-factory.js';
 
 export const CALENDAR_DELIVERY_UNKNOWN = 'Chưa xác định bản tin lịch đã gửi hay chưa. Hãy kiểm tra kênh nhận trước khi gửi thêm; lượt này không tự gửi lại.';
@@ -648,7 +649,18 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
           });
         }
       }
-    } catch {
+    } catch (err) {
+      if (
+        (err instanceof StepError &&
+          (err.category === 'AUTH_ERROR' || err.statusCode === 401 || err.statusCode === 403)) ||
+        isGoogleConnectionChanged(err)
+      ) {
+        return {
+          state: 'blocked',
+          pauseReason:
+            'Kết nối Google Calendar cá nhân không còn hợp lệ hoặc đã hết hạn. Hãy kết nối lại Google Calendar trong Cài đặt.',
+        };
+      }
       return {
         state: 'digest_failed',
         error: 'Không đọc được dữ liệu từ Google Calendar. Sẽ thử lại ở lượt tiếp theo.',
@@ -657,7 +669,10 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
       clearTimeout(readTimer);
     }
 
-    const enrichedEvents = detectCalendarConflicts(rawEvents, { annotateConflicts: true });
+    const enrichedEvents = detectCalendarConflicts(rawEvents, {
+      annotateConflicts: true,
+      timeZone: options.timeZone,
+    });
     const allCalendarsComplete =
       calendarCoverages.length === config.calendars.length &&
       calendarCoverages.every((c) => c.status === 'complete') &&
@@ -830,4 +845,275 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
       messageText: formatted.text,
     };
   };
+}
+
+export interface CalendarTriggerDestinationOption {
+  key: string;
+  service: string;
+  channelId: string;
+  channelName: string;
+  credentialId?: string;
+  label: string;
+}
+
+export interface VerifiedCalendarTriggerDestination {
+  service: string;
+  channelId: string;
+  channelName?: string;
+  credentialId?: string;
+  slackDestContext?: Pick<AdapterContext, 'workspaceMode' | 'workspaceId' | 'expectedCredential'>;
+  telegramDestBinding?: {
+    credentialId: string;
+    telegramUserId: string;
+    username: string;
+    chatIds: string[];
+  };
+}
+
+function decryptRowConfig(rawConfig: unknown, encryptionKey?: string): Record<string, any> {
+  if (typeof rawConfig !== 'string') {
+    if (rawConfig && typeof rawConfig === 'object') return rawConfig as Record<string, any>;
+    throw new Error('Malformed credential config');
+  }
+  return encryptionKey ? decryptCredentials(rawConfig, encryptionKey) : JSON.parse(rawConfig);
+}
+
+function extractSlackChannelsFromConfig(decrypted: Record<string, any>): string[] {
+  const scopeObj = decrypted?.allowedScope;
+  const rawChannels: unknown[] = Array.isArray(scopeObj?.channels)
+    ? scopeObj.channels
+    : Array.isArray(scopeObj)
+      ? scopeObj
+      : [];
+  return Array.from(
+    new Set<string>(rawChannels.filter((c): c is string => typeof c === 'string' && c.trim().length > 0)),
+  );
+}
+
+function extractTelegramChatsFromConfig(
+  decrypted: Record<string, any>,
+): Array<{ chatId: string; title: string }> {
+  const scopeObj = decrypted?.allowedScope;
+  const scopeChats: string[] = Array.isArray(scopeObj?.chats)
+    ? scopeObj.chats.filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
+    : Array.isArray(scopeObj)
+      ? scopeObj.filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
+      : [];
+  const selected = Array.isArray(decrypted?.selectedChats)
+    ? decrypted.selectedChats
+        .map((c: any) => ({
+          chatId: typeof c?.chatId === 'string' ? c.chatId.trim() : '',
+          title: typeof c?.title === 'string' && c.title.trim() ? c.title.trim() : '',
+        }))
+        .filter((c: { chatId: string; title: string }) => c.chatId.length > 0)
+    : [];
+  const map = new Map<string, string>();
+  for (const item of selected) {
+    map.set(item.chatId, item.title || item.chatId);
+  }
+  for (const chatId of scopeChats) {
+    if (!map.has(chatId)) map.set(chatId, chatId);
+  }
+  return Array.from(map.entries()).map(([chatId, title]) => ({ chatId, title }));
+}
+
+export async function listCalendarTriggerDestinations(
+  pool: pg.Pool,
+  userId: string,
+  encryptionKey?: string,
+): Promise<CalendarTriggerDestinationOption[]> {
+  const options: CalendarTriggerDestinationOption[] = [];
+  const seen = new Set<string>();
+
+  const slackRow = await findSlackDigestCredential(pool, { userId, workspaceMode: 'personal' });
+  if (slackRow && slackRow.status === 'active') {
+    try {
+      const dec = decryptRowConfig(slackRow.config, encryptionKey);
+      for (const ch of extractSlackChannelsFromConfig(dec)) {
+        const channelName = ch.startsWith('#') ? ch : `#${ch}`;
+        const key = `slack:${ch}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          options.push({
+            key,
+            service: 'slack',
+            channelId: ch,
+            channelName,
+            credentialId: String(slackRow.id),
+            label: `Slack · ${channelName}`,
+          });
+        }
+      }
+    } catch {
+      // Ignore malformed Slack credential config when listing destinations
+    }
+  }
+
+  const tgRes = await pool.query(
+    `SELECT id, user_id, config, status
+     FROM service_credentials
+     WHERE service = 'telegram' AND user_id = $1 AND status = 'active'
+     ORDER BY created_at DESC LIMIT 1`,
+    [userId],
+  );
+  const tgRow = tgRes.rows[0];
+  if (tgRow) {
+    try {
+      const dec = decryptRowConfig(tgRow.config, encryptionKey);
+      for (const chat of extractTelegramChatsFromConfig(dec)) {
+        const key = `telegram:${chat.chatId}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          options.push({
+            key,
+            service: 'telegram',
+            channelId: chat.chatId,
+            channelName: chat.title,
+            credentialId: String(tgRow.id),
+            label: `Telegram · ${chat.title}`,
+          });
+        }
+      }
+    } catch {
+      // Ignore malformed Telegram credential config when listing destinations
+    }
+  }
+
+  return options;
+}
+
+export async function verifyCalendarTriggerDestination(
+  pool: pg.Pool,
+  userId: string,
+  dest: Record<string, any> | null | undefined,
+  encryptionKey?: string,
+): Promise<{ ok: true; verified: VerifiedCalendarTriggerDestination } | { ok: false; pauseReason: string }> {
+  if (!dest || typeof dest !== 'object') {
+    return { ok: false, pauseReason: 'Thiếu thông tin kênh nhận cảnh báo.' };
+  }
+  const service = dest.service;
+  const channelId = typeof dest.channelId === 'string' && dest.channelId.trim() ? dest.channelId.trim() : '';
+  const channelName = typeof dest.channelName === 'string' && dest.channelName.trim() ? dest.channelName.trim() : undefined;
+  const pinnedCredId = typeof dest.credentialId === 'string' && dest.credentialId.trim() ? dest.credentialId.trim() : undefined;
+
+  if (service !== 'slack' && service !== 'telegram') {
+    return { ok: false, pauseReason: 'Kênh nhận cảnh báo chỉ hỗ trợ Slack hoặc Telegram.' };
+  }
+  if (!channelId) {
+    return { ok: false, pauseReason: 'Vui lòng chọn kênh hoặc nhóm nhận cảnh báo hợp lệ.' };
+  }
+
+  if (service === 'slack') {
+    const destRow = await findSlackDigestCredential(pool, { userId, workspaceMode: 'personal' });
+    if (!destRow || destRow.status !== 'active' || typeof destRow.config !== 'string') {
+      return { ok: false, pauseReason: 'Dịch vụ Slack không còn hoạt động.' };
+    }
+    const rawSlackConfig = destRow.config;
+    try {
+      const dec = decryptRowConfig(rawSlackConfig, encryptionKey);
+      const channels = extractSlackChannelsFromConfig(dec);
+      if (!channels.includes(channelId)) {
+        return { ok: false, pauseReason: 'Kênh Slack nhận cảnh báo không còn nằm trong phạm vi cho phép.' };
+      }
+      return {
+        ok: true,
+        verified: {
+          service: 'slack',
+          channelId,
+          channelName: channelName ?? (channelId.startsWith('#') ? channelId : `#${channelId}`),
+          credentialId: String(destRow.id),
+          slackDestContext: {
+            ...(destRow.workspace_id
+              ? { workspaceMode: 'organization', workspaceId: destRow.workspace_id }
+              : { workspaceMode: destRow.user_id ? 'personal' : 'legacy' }),
+            expectedCredential: { id: destRow.id, config: rawSlackConfig },
+          },
+        },
+      };
+    } catch {
+      return { ok: false, pauseReason: 'Không kiểm tra được phạm vi kênh Slack nhận cảnh báo.' };
+    }
+  }
+
+  const tgRes = await pool.query(
+    `SELECT id, user_id, config, status
+     FROM service_credentials
+     WHERE service = 'telegram' AND user_id = $1
+     ORDER BY created_at DESC LIMIT 1`,
+    [userId],
+  );
+  const tgRow = tgRes.rows[0];
+  if (!tgRow || tgRow.status !== 'active') {
+    return { ok: false, pauseReason: 'Kết nối Telegram cá nhân không còn hoạt động.' };
+  }
+  if (pinnedCredId && String(tgRow.id) !== pinnedCredId) {
+    return { ok: false, pauseReason: 'Kết nối Telegram đã thay đổi kể từ lúc thiết lập cảnh báo.' };
+  }
+  try {
+    const dec = decryptRowConfig(tgRow.config, encryptionKey);
+    const chats = extractTelegramChatsFromConfig(dec);
+    const matched = chats.find((c) => c.chatId === channelId);
+    if (!matched) {
+      return { ok: false, pauseReason: 'Nhóm Telegram nhận cảnh báo không còn nằm trong phạm vi cho phép.' };
+    }
+    return {
+      ok: true,
+      verified: {
+        service: 'telegram',
+        channelId,
+        channelName: channelName ?? matched.title,
+        credentialId: String(tgRow.id),
+        telegramDestBinding: {
+          credentialId: String(tgRow.id),
+          telegramUserId: typeof dec?.telegramUserId === 'string' ? dec.telegramUserId : '',
+          username: typeof dec?.username === 'string' ? dec.username : '',
+          chatIds: [channelId],
+        },
+      },
+    };
+  } catch {
+    return { ok: false, pauseReason: 'Không kiểm tra được phạm vi nhóm Telegram nhận cảnh báo.' };
+  }
+}
+
+export async function deliverCalendarTriggerNotification(
+  options: { getAdapter: (serviceName: string, context?: any) => Promise<any> | any },
+  input: {
+    userId: string;
+    verified: VerifiedCalendarTriggerDestination;
+    headerTitle: string;
+    messageText: string;
+    signal?: AbortSignal;
+  },
+): Promise<void> {
+  const { verified, userId, headerTitle, messageText, signal } = input;
+  const destAdapter = await options.getAdapter(verified.service, {
+    userId,
+    phase: 'execution',
+    actor: { userId },
+    ...(verified.slackDestContext ?? {}),
+    ...(verified.telegramDestBinding ? { connections: { telegram: verified.telegramDestBinding } } : {}),
+  });
+  if (!destAdapter) {
+    throw new Error(`Không khởi tạo được kết nối ${verified.service === 'slack' ? 'Slack' : 'Telegram'}.`);
+  }
+
+  if (verified.service === 'slack') {
+    const blocks = buildSlackMarkdownDigestBlocks({
+      headerTitle,
+      messageText,
+    });
+    await destAdapter.execute(
+      'slack.send_message',
+      { channel: verified.channelId, text: messageText, blocks },
+      { signal },
+    );
+    return;
+  }
+
+  await destAdapter.execute(
+    'telegram.send_message',
+    { chatId: verified.channelId, text: slackMrkdwnToTelegramPlain(messageText) },
+    { signal },
+  );
 }

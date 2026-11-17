@@ -370,7 +370,7 @@ export class SlackProposalService {
                 },
               }
             : {}),
-          ...((calendarId || override.startIso || override.endIso) && calCred?.id
+          ...(calCred?.id && calAllowed.length > 0
             ? {
                 mycalendar: {
                   credentialId: calCred.id,

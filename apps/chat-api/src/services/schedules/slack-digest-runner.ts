@@ -538,6 +538,7 @@ export class SlackDigestRunner {
       dueAt: run.dueAt,
       sinceIso,
       untilIso,
+      timeZone: digestConfig.timeZone ?? this.options.timeZone,
       workspaceMode: run.workspaceMode ?? digestConfig.workspaceMode,
       workspaceId: run.workspaceId ?? expectedWorkspaceId,
       gmailBinding,

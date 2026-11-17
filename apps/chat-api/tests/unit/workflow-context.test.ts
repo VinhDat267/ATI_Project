@@ -81,4 +81,21 @@ describe('WorkflowContext Shared DTO & API Guard (FLOW-04)', () => {
     const filtered = filterPermittedWorkflowDefaults(ctx, userConnections as any);
     expect(filtered.resourceDefaults?.trello).toBeUndefined();
   });
+
+  it('filterPermittedWorkflowDefaults drops mycalendar default "primary" when "primary" is not in allowedCalendars', () => {
+    const ctx: WorkflowContext = {
+      templateId: 'OFF-02',
+      resourceDefaults: {
+        mycalendar: { calendarId: 'primary' },
+      },
+    };
+    const filtered = filterPermittedWorkflowDefaults(ctx, {
+      mycalendar: {
+        credentialId: 'cred-1',
+        email: 'alice@example.test',
+        allowedCalendars: ['alice@example.test'],
+      },
+    });
+    expect(filtered.resourceDefaults?.mycalendar).toBeUndefined();
+  });
 });

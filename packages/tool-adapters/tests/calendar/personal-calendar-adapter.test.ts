@@ -812,4 +812,169 @@ describe('PersonalCalendarAdapter', () => {
       label: '12:00–13:00',
     });
   });
+
+  it('surfaces recurringEventId and selfResponseStatus in normalized list_events and get_event payloads', async () => {
+    const { adapter } = setup({
+      handler: (url) => {
+        if (url.pathname.endsWith('/events/series_1_20261110T020000Z')) {
+          return json({
+            id: 'series_1_20261110T020000Z',
+            recurringEventId: 'series_1',
+            summary: 'Weekly Sync',
+            htmlLink: 'https://www.google.com/calendar/event?eid=inst1',
+            start: { dateTime: '2026-11-10T09:00:00+07:00' },
+            end: { dateTime: '2026-11-10T09:30:00+07:00' },
+            attendees: [
+              { email: 'lead@example.com', responseStatus: 'accepted' },
+              { email: calendarId, self: true, responseStatus: 'needsAction' },
+            ],
+          });
+        }
+        return json({ items: [] });
+      },
+    });
+
+    const detail = await adapter.execute('mycalendar.get_event', {
+      calendarId,
+      eventId: 'series_1_20261110T020000Z',
+    });
+    expect(detail.recurringEventId).toBe('series_1');
+    expect(detail.selfResponseStatus).toBe('needsAction');
+  });
+
+  it('supports mycalendar.list_event_instances for master series and resolves occurrence eventId back to recurringEventId', async () => {
+    const { adapter, calls } = setup({
+      handler: (url) => {
+        if (url.pathname.endsWith('/events/occ_1/instances')) {
+          return json({ error: { message: 'Not Found' } }, 404);
+        }
+        if (url.pathname.endsWith('/events/occ_1')) {
+          return json({
+            id: 'occ_1',
+            recurringEventId: 'series_master_1',
+            summary: 'Weekly Sync',
+            htmlLink: 'https://www.google.com/calendar/event?eid=occ1',
+            start: { dateTime: '2026-11-03T09:00:00+07:00' },
+            end: { dateTime: '2026-11-03T09:30:00+07:00' },
+          });
+        }
+        if (url.pathname.endsWith('/events/series_master_1/instances')) {
+          return json({
+            timeZone: 'Asia/Ho_Chi_Minh',
+            items: [
+              {
+                id: 'series_master_1_20261110T020000Z',
+                recurringEventId: 'series_master_1',
+                summary: 'Weekly Sync',
+                htmlLink: 'https://www.google.com/calendar/event?eid=w2',
+                start: { dateTime: '2026-11-10T09:00:00+07:00' },
+                end: { dateTime: '2026-11-10T09:30:00+07:00' },
+              },
+              {
+                id: 'series_master_1_20261117T020000Z',
+                recurringEventId: 'series_master_1',
+                summary: 'Weekly Sync',
+                status: 'cancelled',
+                htmlLink: 'https://www.google.com/calendar/event?eid=w3',
+                start: { dateTime: '2026-11-17T09:00:00+07:00' },
+                end: { dateTime: '2026-11-17T09:30:00+07:00' },
+              },
+            ],
+          });
+        }
+        return json({ id: calendarId, summary: 'Personal', timeZone: 'Asia/Ho_Chi_Minh' });
+      },
+    });
+
+    const result = await adapter.execute('mycalendar.list_event_instances', {
+      calendarId,
+      eventId: 'occ_1',
+      timeMin: '2026-11-01T00:00:00+07:00',
+      timeMax: '2026-11-30T23:59:59+07:00',
+    });
+
+    expect(result.masterEventId).toBe('series_master_1');
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0]).toMatchObject({
+      id: 'series_master_1_20261110T020000Z',
+      recurringEventId: 'series_master_1',
+    });
+    expect(result.coverage).toEqual({ complete: true, returned: 1, totalAvailable: 1 });
+    expect(calls.some((c) => c.url.pathname.endsWith('/events/series_master_1/instances'))).toBe(true);
+  });
+
+  it('supports mycalendar.rsvp_event preserving all attendees verbatim, updating only self responseStatus & comment, and blocks non-attendee events before PATCH', async () => {
+    const existingAttendees = [
+      { email: 'organizer@example.com', organizer: true, responseStatus: 'accepted' },
+      { email: calendarId, self: true, displayName: 'Me', responseStatus: 'needsAction' },
+      { email: 'colleague@example.com', optional: true, responseStatus: 'tentative' },
+    ];
+    let patchedBody: any = null;
+
+    const { adapter, calls } = setup({
+      handler: (url, init) => {
+        if (url.pathname.endsWith('/events/evt_invite_1') && (!init.method || init.method === 'GET')) {
+          return json({
+            id: 'evt_invite_1',
+            summary: 'Product Roadmap Review',
+            htmlLink: 'https://www.google.com/calendar/event?eid=inv1',
+            start: { dateTime: '2026-11-12T10:00:00+07:00' },
+            end: { dateTime: '2026-11-12T11:00:00+07:00' },
+            attendees: existingAttendees,
+          });
+        }
+        if (url.pathname.endsWith('/events/evt_invite_1') && init.method === 'PATCH') {
+          patchedBody = JSON.parse(String(init.body));
+          return json({
+            id: 'evt_invite_1',
+            summary: 'Product Roadmap Review',
+            htmlLink: 'https://www.google.com/calendar/event?eid=inv1',
+            start: { dateTime: '2026-11-12T10:00:00+07:00' },
+            end: { dateTime: '2026-11-12T11:00:00+07:00' },
+            attendees: patchedBody.attendees,
+          });
+        }
+        if (url.pathname.endsWith('/events/evt_not_invited') && (!init.method || init.method === 'GET')) {
+          return json({
+            id: 'evt_not_invited',
+            summary: 'External Event',
+            htmlLink: 'https://www.google.com/calendar/event?eid=noinv',
+            start: { dateTime: '2026-11-12T14:00:00+07:00' },
+            end: { dateTime: '2026-11-12T15:00:00+07:00' },
+            attendees: [{ email: 'stranger@example.com', responseStatus: 'accepted' }],
+          });
+        }
+        return json({ error: { message: 'Unexpected' } }, 500);
+      },
+    });
+
+    const accepted = await adapter.execute('mycalendar.rsvp_event', {
+      calendarId,
+      eventId: 'evt_invite_1',
+      responseStatus: 'declined',
+      comment: 'Bận họp khách hàng cùng giờ',
+      sendInvites: true,
+    });
+
+    expect(accepted.selfResponseStatus).toBe('declined');
+    expect(accepted.attendees).toEqual(['organizer@example.com', calendarId, 'colleague@example.com']);
+    expect(patchedBody.attendees).toEqual([
+      { email: 'organizer@example.com', organizer: true, responseStatus: 'accepted' },
+      { email: calendarId, self: true, displayName: 'Me', responseStatus: 'declined', comment: 'Bận họp khách hàng cùng giờ' },
+      { email: 'colleague@example.com', optional: true, responseStatus: 'tentative' },
+    ]);
+    const patchCall = calls.find((c) => c.init.method === 'PATCH');
+    expect(patchCall?.url.searchParams.get('sendUpdates')).toBe('all');
+
+    const beforeCount = calls.length;
+    await expect(
+      adapter.execute('mycalendar.rsvp_event', {
+        calendarId,
+        eventId: 'evt_not_invited',
+        responseStatus: 'accepted',
+      }),
+    ).rejects.toMatchObject({ category: 'VALIDATION', details: { requestSent: false } });
+    // Only the GET lookup ran; no PATCH write was sent
+    expect(calls.slice(beforeCount).some((c) => c.init.method === 'PATCH')).toBe(false);
+  });
 });

@@ -88,6 +88,7 @@ export interface EvaluateTelegramDigestInput {
   telegramLookup?: TelegramConnectionLookupResult | null;
   githubLookup?: Pick<GitHubConnectionLookupResult, 'status' | 'connection'> | null;
   jiraLookup?: JiraConnectionLookupResult | null;
+  mycalendarLookup?: { credentialId?: string; allowedCalendars: string[] } | null;
   workspaceMode?: 'legacy' | 'personal' | 'organization';
   workspaceId?: string | null;
   gmailBinding?: GmailDigestBinding | null;
@@ -226,6 +227,7 @@ export function evaluateTelegramDigestCandidate(
     requestText,
     githubLookup: input.githubLookup,
     jiraLookup: input.jiraLookup,
+    ...(input.mycalendarLookup !== undefined ? { mycalendarLookup: input.mycalendarLookup } : {}),
     workspaceMode: input.workspaceMode,
     workspaceId: input.workspaceId,
     gmailBinding: input.gmailBinding,

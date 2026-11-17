@@ -1046,6 +1046,7 @@ export class TelegramDigestRunner {
       dueAt: run.dueAt,
       sinceIso,
       untilIso,
+      timeZone: digestConfig.timeZone ?? this.options.timeZone,
       workspaceMode: run.workspaceMode,
       workspaceId: run.workspaceId,
       gmailBinding,

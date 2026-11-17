@@ -53,6 +53,7 @@ export async function runtimeToolCatalog(
     gmailEnabled: boolean;
     gmailOAuthClientId?: string;
     mycalendarEnabled?: boolean;
+    mycalendarOAuthClientId?: string;
     mysheetsEnabled?: boolean;
     trelloEnabled?: boolean;
     trelloTeamRepo?: any;

@@ -185,9 +185,14 @@ export function planSlackProposalWorkflow(input:SlackProposalPlanInput):SlackPro
  const replyInThread=input.targets.replyInThread===true;
 
  if(targetService===SLACK_PROPOSAL_WORKFLOW_TOOLS.calendarService){
-  const calendarId=(input.targets.calendar?.calendarId??input.targets.overrideCalendarId)?.trim()||'primary';
+  const explicitCalendarId=(input.targets.calendar?.calendarId??input.targets.overrideCalendarId)?.trim();
+  const connectedCalendarId=input.targetConnections?.mycalendar?.allowedCalendars?.find((id)=>typeof id==='string'&&id.trim().length>0)?.trim();
+  const calendarId=explicitCalendarId||connectedCalendarId;
   const startIso=(input.targets.calendar?.startIso??input.targets.overrideStartIso)?.trim();
   const endIso=(input.targets.calendar?.endIso??input.targets.overrideEndIso)?.trim();
+  if(!calendarId){
+   return {kind:'needs_info',question:'Vui lòng chọn một lịch Google Calendar hợp lệ trước khi tạo lịch họp từ Slack.'};
+  }
   if(!startIso||!endIso){
    return {kind:'needs_info',question:'Vui lòng chọn thời gian bắt đầu và kết thúc hợp lệ để tạo lịch họp trên Google Calendar.'};
   }
