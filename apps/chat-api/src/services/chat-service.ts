@@ -1012,10 +1012,18 @@ export class ChatService {
                   { signal: precheckSignal }
                 );
               } else if (this.getAdapter) {
+                const convForTrello =
+                  conversationId && this.convRepo ? await this.convRepo.getConversation(conversationId) : null;
+                const trelloWorkspaceMode =
+                  convForTrello?.workspace_mode ?? (scopeId !== 'default' ? 'organization' : 'legacy');
+                const trelloWorkspaceId =
+                  convForTrello?.workspace_id ?? (scopeId !== 'default' ? scopeId : null);
                 const adapter = await this.getAdapter('trello', {
                   userId,
                   phase: 'planning',
-                  actor: { userId },
+                  workspaceMode: trelloWorkspaceMode,
+                  workspaceId: trelloWorkspaceId,
+                  actor: { userId, workspaceId: trelloWorkspaceId, workspaceMode: trelloWorkspaceMode },
                   connections: { trello: trello.connection },
                 });
                 if (adapter && typeof adapter.execute === 'function') {
@@ -2421,24 +2429,54 @@ export class ChatService {
     return { write, announce };
   }
 
-  private async loadActiveConnections(userId: string): Promise<PlanConnections> {
-    const [gmail, mycalendar, mysheets, trello, github, telegram, notion] = await Promise.all([
+  private async loadActiveConnections(
+    userId: string,
+    actor?: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' },
+  ): Promise<PlanConnections> {
+    const scopeId = actor?.workspaceMode === 'organization' && actor.workspaceId ? actor.workspaceId : 'default';
+    const githubScopeId = scopeId !== 'default' ? scopeId : `personal:${userId}`;
+    const [gmail, mycalendar, mysheets, trello, github, telegram, notion, myjiraCaps] = await Promise.all([
       this.gmailConnection?.(userId).catch(() => null),
       this.mycalendarConnection?.(userId).catch(() => null),
       this.mysheetsConnection?.(userId).catch(() => null),
-      this.trelloConnection?.(userId).catch(() => null),
-      this.githubConnection?.(userId).catch(() => null),
+      this.trelloConnection?.(userId, scopeId).catch(() => null),
+      this.githubConnection?.(userId, githubScopeId).catch(() => null),
       this.telegramConnection?.(userId).catch(() => null),
       this.notionConnection?.(userId).catch(() => null),
+      this.jiraPolicyService && typeof (this.jiraPolicyService as any).getCapabilities === 'function' && actor?.workspaceId
+        ? (this.jiraPolicyService as any).getCapabilities(actor.workspaceId, userId).catch(() => null)
+        : Promise.resolve(null),
     ]);
+    const unwrap = <T>(raw: any): T | undefined => {
+      if (!raw || typeof raw !== 'object') return undefined;
+      if (typeof raw.status === 'string') {
+        return raw.status === 'connected' && raw.connection ? (raw.connection as T) : undefined;
+      }
+      return raw as T;
+    };
     const connections: PlanConnections = {};
-    if (gmail) connections.gmail = gmail;
-    if (mycalendar) connections.mycalendar = mycalendar;
-    if (mysheets) connections.mysheets = mysheets;
-    if (trello) connections.trello = trello;
-    if (github) connections.github = github;
-    if (telegram) connections.telegram = telegram;
-    if (notion) connections.notion = notion;
+    const gmailConn = unwrap<NonNullable<PlanConnections['gmail']>>(gmail);
+    const mycalConn = unwrap<NonNullable<PlanConnections['mycalendar']>>(mycalendar);
+    const mysheetsConn = unwrap<NonNullable<PlanConnections['mysheets']>>(mysheets);
+    const trelloConn = unwrap<NonNullable<PlanConnections['trello']>>(trello);
+    const githubConn = unwrap<NonNullable<PlanConnections['github']>>(github);
+    const telegramConn = unwrap<NonNullable<PlanConnections['telegram']>>(telegram);
+    const notionConn = unwrap<NonNullable<PlanConnections['notion']>>(notion);
+    if (gmailConn) connections.gmail = gmailConn;
+    if (mycalConn) connections.mycalendar = mycalConn;
+    if (mysheetsConn) connections.mysheets = mysheetsConn;
+    if (trelloConn) connections.trello = trelloConn;
+    if (githubConn) connections.github = githubConn;
+    if (telegramConn) connections.telegram = telegramConn;
+    if (notionConn) connections.notion = notionConn;
+    if (Array.isArray(myjiraCaps?.sites)) {
+      const siteEntries = myjiraCaps.sites
+        .filter((s: any) => s && s.selected !== false && typeof s.siteId === 'string')
+        .map((s: any, idx: number) => [`s_${idx}`, { siteId: s.siteId }]);
+      if (siteEntries.length > 0) {
+        connections.myjira = { siteSteps: Object.fromEntries(siteEntries) } as any;
+      }
+    }
     if (this.slackWrites) connections.myslack = { credentialId: 'slack', scopes: [] } as any;
     return connections;
   }
@@ -2529,7 +2567,7 @@ export class ChatService {
 
     // FLOW-04: Validate workflowContext defaults against user's actual connections and seed into memory
     if (workflowContext) {
-      const activeConnections = await this.loadActiveConnections(userId);
+      const activeConnections = await this.loadActiveConnections(userId, actor);
       const filtered = filterPermittedWorkflowDefaults(workflowContext, activeConnections);
       if (filtered.resourceDefaults) {
         memory.setEntity('workflow_resource_defaults', filtered.resourceDefaults);
