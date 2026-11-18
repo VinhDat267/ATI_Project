@@ -182,24 +182,25 @@ export function analyzeSheetKpiMetrics(
     const rawDeadline = deadlineKey ? (row[deadlineKey] ?? '').trim() : '';
     const deadlineMs = rawDeadline ? parseSheetDeadlineCell(rawDeadline) : null;
     const isOverdueByDate = !isDone && deadlineMs !== null && deadlineMs < nowMs;
-    const isDueSoon = !isDone && !isOverdueByDate && deadlineMs !== null && deadlineMs <= soonWindowMs;
+    const isDueSoon = !isDone && deadlineMs !== null && deadlineMs >= nowMs && deadlineMs <= soonWindowMs;
     const isUnassignedOpen = !isDone && Boolean(assigneeKey) && !(row[assigneeKey!] ?? '').trim();
+
+    if (isBlockedStatus) blockedCount++;
+    if (isOverdueByDate || isExplicitOverdueStatus) overdueCount++;
+    if (isDueSoon) dueSoonCount++;
+    if (isUnassignedOpen) unassignedCount++;
 
     let priority = 2;
     if (isDone) {
       doneCount++;
       priority = 3;
     } else if (isBlockedStatus) {
-      blockedCount++;
       overdueOrPendingCount++;
-      if (isOverdueByDate) overdueCount++;
       priority = 0;
     } else if (isOverdueByDate) {
       overdueOrPendingCount++;
-      overdueCount++;
       priority = 0;
     } else if (isDueSoon) {
-      dueSoonCount++;
       if (isInProgressStatus) {
         inProgressCount++;
       } else {
@@ -211,12 +212,10 @@ export function analyzeSheetKpiMetrics(
       priority = 1;
     } else if (rawStatus) {
       overdueOrPendingCount++;
-      if (isExplicitOverdueStatus) overdueCount++;
       priority = 0;
     }
 
     if (isUnassignedOpen) {
-      unassignedCount++;
       priority = Math.min(priority, 1);
     }
 

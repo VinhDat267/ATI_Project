@@ -166,10 +166,11 @@ export function sheetsDigestCandidateMatches(
   return JSON.stringify(a.config) === JSON.stringify(b.config);
 }
 
-function extractSheetTabFromPrompt(
+export function extractSheetTabFromPrompt(
   request: string,
   reqLower: string,
-  availableSheets?: string[]
+  availableSheets?: string[],
+  options?: { keywordOnly?: boolean },
 ): string | undefined {
   const quotedBangMatch =
     /(?:"([^"!\n]+)"|'((?:''|[^'!\n])+)'|[“”]([^“”!\n]+)[“”]|[‘’]([^‘’!\n]+)[‘’])!\$?[A-Za-z]{1,3}\$?\d+\s*:\s*\$?[A-Za-z]{1,3}\$?\d+/u.exec(
@@ -185,7 +186,7 @@ function extractSheetTabFromPrompt(
     .trim();
 
   const quotedKeywordTabMatch =
-    /(?:^|(?<=[^\p{L}\p{N}_]))(?:tab|sheet)\s+(?:"([^"!\n]+)"|'((?:''|[^'!\n])+)'|[“”]([^“”!\n]+)[“”]|[‘’]([^‘’!\n]+)[‘’])(?=\s|$|[,.;:!?()\[\]])/iu.exec(
+    /(?:^|(?<=[^\p{L}\p{N}_]))(?:tab|sheet|worksheet|trang\s+tính)\s+(?:"([^"!\n]+)"|'((?:''|[^'!\n])+)'|[“”]([^“”!\n]+)[“”]|[‘’]([^‘’!\n]+)[‘’])(?=\s|$|[,.;:!?()\[\]])/iu.exec(
       request
     );
   const quotedKeywordTabCandidate = (
@@ -198,7 +199,7 @@ function extractSheetTabFromPrompt(
     .trim();
 
   const unquotedKeywordTabMatch =
-    /(?:^|(?<=[^\p{L}\p{N}_]))(?:tab|sheet)\s+(?![\s"'“”‘’])([^"'“”‘’,.;:!?()\[\]\n]+?)(?=\s+(?:vùng|miền|ô|range|từ|trong|của|thuộc|và|rồi|vào|lên|qua|sang|tới|đến|gửi|from|in|of|to|into|and|then|\$?[A-Za-z]{1,3}\$?\d+\s*:)(?=\s|$|[,.;:!?\n()\[\]])|!\$?[A-Za-z]{1,3}\$?\d+\s*:|[,.;:!?()\[\]\n]|$)/iu.exec(
+    /(?:^|(?<=[^\p{L}\p{N}_]))(?:tab|sheet|worksheet|trang\s+tính)\s+(?![\s"'“”‘’])([^"'“”‘’,.;:!?()\[\]\n]+?)(?=\s+(?:vùng|miền|ô|range|từ|trong|của|thuộc|và|rồi|vào|lên|qua|sang|tới|đến|gửi|from|in|of|to|into|and|then|\$?[A-Za-z]{1,3}\$?\d+\s*:)(?=\s|$|[,.;:!?\n()\[\]])|!\$?[A-Za-z]{1,3}\$?\d+\s*:|[,.;:!?()\[\]\n]|$)/iu.exec(
       request
     );
   const unquotedKeywordTabCandidate = unquotedKeywordTabMatch?.[1]?.trim();
@@ -210,10 +211,10 @@ function extractSheetTabFromPrompt(
   const unquotedBangTabCandidate = unquotedBangMatch?.[1]?.trim();
 
   const explicitTabCandidate =
-    quotedBangTabCandidate ??
+    (options?.keywordOnly ? undefined : quotedBangTabCandidate) ??
     quotedKeywordTabCandidate ??
     unquotedKeywordTabCandidate ??
-    unquotedBangTabCandidate;
+    (options?.keywordOnly ? undefined : unquotedBangTabCandidate);
 
   if (explicitTabCandidate) {
     if (Array.isArray(availableSheets) && availableSheets.length > 0) {
@@ -319,7 +320,7 @@ export function validateAndCanonicalizeDigestRange(
   };
 }
 
-function extractPromptDigestRange(
+export function extractPromptDigestRange(
   request: string,
   explicitRangeInput?: string
 ): { ok: true; canonicalRange?: string; sheetFromRange?: string } | { ok: false; reason: string } {
@@ -335,7 +336,7 @@ function extractPromptDigestRange(
 
   // Check if user explicitly wrote "vùng <token>" / "range <token>" with an invalid range token
   const explicitKeywordMatch =
-    /(?:^|(?<=[^\p{L}\p{N}_]))(?:vùng\s+ô|vùng\s+dữ\s+liệu|vùng|range)\s+["'“”‘’]?([^\s"'“”‘’,;]+)["'“”‘’]?/iu.exec(
+    /(?:^|(?<=[^\p{L}\p{N}_]))(?:vùng\s+ô|vùng\s+dữ\s+liệu|vùng|range|ô|cell)\s+["'“”‘’]?([^\s"'“”‘’,;]+)["'“”‘’]?/iu.exec(
       request
     );
   const cellRangeTokens = Array.from(
@@ -356,7 +357,7 @@ function extractPromptDigestRange(
     }
   }
 
-  if (cellRangeTokens.length === 1) {
+  if (cellRangeTokens.length > 0) {
     const validated = validateAndCanonicalizeDigestRange(cellRangeTokens[0]!);
     if (!validated.ok) return validated;
     return {

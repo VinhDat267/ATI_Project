@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { detectCalendarConflicts, GMAIL_DIGEST_READ_TOOL, StepError } from '@wap/tool-adapters';
+import { detectCalendarConflicts, GMAIL_DIGEST_READ_TOOL, quoteSheetTitle, StepError } from '@wap/tool-adapters';
 import type {
   GmailDigestBinding,
   NotionDigestSourceBinding,
@@ -12,7 +12,13 @@ import { GmailOAuthError } from '../gmail/oauth-client.js';
 import { isGoogleConnectionChanged } from '../gmail/token-manager.js';
 import { createMyCalendarConnectionLookup, createMySheetsConnectionLookup, type MySheetsConnectionLookupResult } from '../gmail/connection-reference.js';
 import { matchesMyCalendarDigestBinding, MYCALENDAR_DIGEST_REAPPROVAL, readMyCalendarDigestBinding } from './mycalendar-digest-source.js';
-import { matchesMySheetsDigestBinding, MYSHEETS_DIGEST_REAPPROVAL, readMySheetsDigestBinding } from './mysheets-digest-source.js';
+import {
+  matchesMySheetsDigestBinding,
+  MYSHEETS_DIGEST_DEFAULT_RANGE,
+  MYSHEETS_DIGEST_REAPPROVAL,
+  MYSHEETS_DIGEST_ROW_LIMIT,
+  readMySheetsDigestBinding,
+} from './mysheets-digest-source.js';
 import { analyzeSheetKpiMetrics } from './sheets-digest-runner.js';
 import { buildTelegramDigestSourceArgs } from './multi-source-digest-candidate.js';
 import { assertGmailDigestBinding, isValidGmailDigestQuery } from './gmail-digest-binding.js';
@@ -86,15 +92,13 @@ export function summarizeSourceItems(
         typeof entry.spreadsheetTitle === 'string' && entry.spreadsheetTitle.trim()
           ? esc(entry.spreadsheetTitle.trim())
           : 'Bảng tính';
+      const scope = typeof entry.scannedRange === 'string' ? ` · Phạm vi quét: ${esc(entry.scannedRange)}` : '';
       lines.push(
-        `  📊 📄 ${title}: ${kpi.totalRows} dòng (✅ Xong: ${kpi.doneCount} · 🔄 Đang làm: ${kpi.inProgressCount} · ⚠️ Chờ/Quá hạn: ${kpi.overdueOrPendingCount})`,
+        `  📊 📄 ${title}: ${kpi.totalRows} dòng (✅ Xong: ${kpi.doneCount} · 🔄 Đang làm: ${kpi.inProgressCount} · ⚠️ Chờ/Quá hạn: ${kpi.overdueOrPendingCount})${scope}`,
       );
       for (const h of kpi.highlights) {
         if (highlights.length < 6) highlights.push(`  [${title}] ${esc(h)}`);
       }
-    }
-    if (totalRows === 0) {
-      return { count: 0, lines: ['  (Không có mục mới)'], ...(anyTruncated ? { truncated: true } : {}) };
     }
     const allLines = [...lines, ...highlights];
     if (anyTruncated) {
@@ -118,17 +122,19 @@ export function summarizeSourceItems(
     const records: Array<Record<string, string>> = Array.isArray(rawObj.records) ? rawObj.records : [];
     const kpi = analyzeSheetKpiMetrics(headers, records, values, now);
     const sheetTruncated = Boolean(rawObj.truncated);
-    if (kpi.totalRows === 0) {
-      return { count: 0, lines: ['  (Không có mục mới)'], ...(sheetTruncated ? { truncated: true } : {}) };
-    }
     const sheetTitle =
       typeof rawObj.spreadsheetTitle === 'string' && rawObj.spreadsheetTitle.trim()
         ? `📄 ${esc(rawObj.spreadsheetTitle.trim())}: `
         : '';
-    const sheetLines = [
-      `  📊 ${sheetTitle}${kpi.totalRows} dòng (✅ Xong: ${kpi.doneCount} · 🔄 Đang làm: ${kpi.inProgressCount} · ⚠️ Chờ/Quá hạn: ${kpi.overdueOrPendingCount})`,
-      ...kpi.highlights.map((h) => `  ${esc(h)}`),
-    ];
+    const sheetLines = kpi.totalRows === 0
+      ? ['  (Không có mục mới)']
+      : [
+          `  📊 ${sheetTitle}${kpi.totalRows} dòng (✅ Xong: ${kpi.doneCount} · 🔄 Đang làm: ${kpi.inProgressCount} · ⚠️ Chờ/Quá hạn: ${kpi.overdueOrPendingCount})`,
+          ...kpi.highlights.map((h) => `  ${esc(h)}`),
+        ];
+    if (typeof rawObj.scannedRange === 'string') {
+      sheetLines.splice(1, 0, `  Phạm vi quét: ${esc(rawObj.scannedRange)}`);
+    }
     if (sheetTruncated) {
       sheetLines.push('  ⚠️ (Dữ liệu bảng tính có thể chưa đầy đủ do chạm giới hạn tải/số bảng tính)');
     }
@@ -487,13 +493,19 @@ export async function executeMultiDigestReadSources(input: {
         rawResult = { events: mergedEvents, ...(anyTruncated ? { truncated: true } : {}) };
       } else if (source.service === 'mysheets' && mysheets.kind === 'bound') {
         const targetSheets = mysheets.binding.spreadsheetIds;
+        const { sheetName, ...approvedArgs } = source.args ?? {};
+        const explicitRange = typeof approvedArgs.range === 'string' ? approvedArgs.range : undefined;
+        const scanRange = explicitRange ?? (typeof sheetName === 'string'
+          ? `${quoteSheetTitle(sheetName)}!${MYSHEETS_DIGEST_DEFAULT_RANGE}`
+          : MYSHEETS_DIGEST_DEFAULT_RANGE);
+        const startingRow = /(?:^|!)[A-Z]{1,3}(\d+)(?::|$)/i.exec(scanRange)?.[1];
         let anyTruncated = mysheets.binding.truncated;
         const perSheet: Array<Record<string, unknown>> = [];
         for (const sheetId of targetSheets) {
           const readArgs = {
-            range: 'A1:Z50',
-            headerAware: true,
-            ...(source.args ?? {}),
+            headerAware: startingRow === undefined || startingRow === '1',
+            ...approvedArgs,
+            range: scanRange,
             spreadsheetId: sheetId,
           };
           const readRes = await adapter.execute('mysheets.read_range', readArgs, { signal });
@@ -503,10 +515,21 @@ export async function executeMultiDigestReadSources(input: {
               ? readRes.spreadsheetTitle.trim()
               : titleFromLive || sheetId;
           if (readRes && typeof readRes === 'object' && !Array.isArray(readRes)) {
-            if ((readRes as any).truncated === true) anyTruncated = true;
+            const scannedRange = typeof readRes.range === 'string' ? readRes.range : readArgs.range;
+            const defaultWindowFilled = !explicitRange && Array.isArray(readRes.values) &&
+              readRes.values.length === (approvedArgs.limit ?? MYSHEETS_DIGEST_ROW_LIMIT);
+            if (readRes.truncated === true || defaultWindowFilled) anyTruncated = true;
+            // A range starting below row 1 contains data. Reading a separate header would exceed the approved range.
+            const rowsWithoutHeader = !readArgs.headerAware && Array.isArray(readRes.values)
+              ? (readRes.values as string[][])
+                  .filter((row) => row.some((cell) => cell.trim() !== ''))
+                  .map((row) => Object.fromEntries(row.map((cell, index) => [`Cột ${index + 1}`, cell])))
+              : undefined;
             perSheet.push({
               ...(readRes as Record<string, unknown>),
+              ...(rowsWithoutHeader ? { records: rowsWithoutHeader } : {}),
               spreadsheetTitle,
+              scannedRange,
             });
           }
         }

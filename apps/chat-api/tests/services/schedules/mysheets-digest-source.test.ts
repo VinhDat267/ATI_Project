@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { encryptCredentials } from '@wap/tool-adapters';
+import { createPersonalSheetsAdapter, encryptCredentials, GlobalRateLimiter } from '@wap/tool-adapters';
 import type { ScheduleResponse, SlackDigestConfig, TelegramDigestConfig } from '@wap/tool-schemas';
 import { ConversationRepo } from '../../../src/db/repositories/conversation-repo.js';
 import { CredentialRepo } from '../../../src/db/repositories/credential-repo.js';
@@ -45,7 +45,7 @@ describe.each(['Slack', 'Telegram'] as const)('MySheets digest source & egress p
     expect(buildMultiDigestSources({
       sourceServices: ['mysheets'],
       destinationLabel,
-      requestText: 'Gửi báo cáo Google Sheets sáng nay',
+      requestText: 'Gửi báo cáo tất cả bảng tính Google Sheets sáng nay',
       mysheetsLookup: connection,
     })).toMatchObject({
       ok: true,
@@ -58,6 +58,84 @@ describe.each(['Slack', 'Telegram'] as const)('MySheets digest source & egress p
         },
       }],
     });
+  });
+
+  it('pins the named spreadsheet, tab, and range even past the five-spreadsheet cap', () => {
+    const mysheetsLookup = {
+      ...connection,
+      selectedSpreadsheets: spreadsheets.map((id, index) => ({
+        id, title: index === 5 ? 'Sprint Review' : `Fixture ${index + 1}`, canEdit: true, sheets: ['Sprint', 'Archive'],
+      })),
+    };
+    const requestText = 'Gửi bản tin từ bảng tính Sprint Review (tab Sprint) vùng B2:C5 và Trello';
+    const result = buildMultiDigestSources({ sourceServices: ['mysheets', 'trello'], destinationLabel, requestText, mysheetsLookup });
+    expect(result).toMatchObject({
+      ok: true,
+      sources: [{
+        service: 'mysheets',
+        tool: 'mysheets.read_range',
+        args: { spreadsheetId: 'sheet-six', range: 'Sprint!B2:C5' },
+        label: expect.stringContaining('Sprint!B2:C5'),
+        mysheetsBinding: { spreadsheetIds: ['sheet-six'], truncated: false },
+      }, { service: 'trello' }],
+    });
+  });
+
+  it.each([
+    'Gửi báo cáo từ bảng tính Không tồn tại và Trello',
+    'Gửi báo cáo Google Sheets và Trello',
+    'Gửi báo cáo tất cả bảng tính Google Sheets vùng A1:B20 và Trello',
+  ])('refuses to guess the source for %s', (requestText) => {
+    expect(buildMultiDigestSources({
+      sourceServices: ['mysheets', 'trello'], destinationLabel, requestText, mysheetsLookup: connection,
+    })).toMatchObject({ ok: false });
+  });
+
+  it.each([
+    'Gửi bản tin từ bảng tính Không tồn tại và Trello vào #planning',
+    'Gửi bản tin tất cả bảng tính trừ bảng tính Planning và Trello',
+    "Gửi bản tin từ bảng tính Planning (tab Archive) vùng 'Sprint'!B2:C5 và Trello",
+    'Gửi bản tin từ bảng tính Planning tab Archive và tab Sprint cùng Trello',
+    'Gửi bản tin từ bảng tính Planning (tab Sprint) ô B2 và Trello',
+    'Gửi bản tin từ bảng tính Planning vùng Sprint!B2 và Trello',
+    'Gửi bản tin từ https://docs.google.com/spreadsheets/d/sheet-six/edit#gid=1234&range=B2 và Trello',
+  ])('does not approve an unrelated, excluded, or ambiguous spreadsheet range for %s', (requestText) => {
+    const mysheetsLookup = {
+      ...connection,
+      selectedSpreadsheets: [{ id: spreadsheets[5]!, title: 'Planning', canEdit: true, sheets: ['Sprint', 'Archive'] }],
+    };
+    expect(buildMultiDigestSources({
+      sourceServices: ['mysheets', 'trello'], destinationLabel, requestText, mysheetsLookup,
+    })).toMatchObject({ ok: false });
+  });
+
+  it('uses the named Vietnamese trang tính even when it is not the first tab', () => {
+    expect(buildMultiDigestSources({
+      sourceServices: ['mysheets', 'trello'], destinationLabel,
+      requestText: 'Gửi bản tin từ bảng tính Planning (trang tính Archive) và Trello',
+      mysheetsLookup: {
+        ...connection,
+        selectedSpreadsheets: [{ id: spreadsheets[5]!, title: 'Planning', canEdit: true, sheets: ['Sprint', 'Archive'] }],
+      },
+    })).toMatchObject({ ok: true, sources: [{ args: { spreadsheetId: 'sheet-six', sheetName: 'Archive' } }, {}] });
+  });
+
+  it('reauthorizes a previously approved multi-spreadsheet binding without silently expanding it', () => {
+    const previous = {
+      service: 'mysheets', tool: 'mysheets.list_spreadsheets', label: 'Google Sheets',
+      mysheetsBinding: { ...connection, spreadsheetIds: ['sheet-two', 'sheet-one'], truncated: false },
+    };
+    const input = {
+      sourceServices: ['mysheets', 'trello'], destinationLabel,
+      requestText: 'Gửi bản tin Google Sheets và Trello',
+      mysheetsLookup: connection,
+      existingMySheetsSources: [previous],
+      reauthorizeMySheets: true,
+    };
+    expect(buildMultiDigestSources(input))
+      .toMatchObject({ ok: true, sources: [{ mysheetsBinding: { spreadsheetIds: ['sheet-two', 'sheet-one'] } }, {}] });
+    expect(buildMultiDigestSources({ ...input, mysheetsLookup: { ...connection, allowedSpreadsheets: ['sheet-one'] } }))
+      .toMatchObject({ ok: false });
   });
 
   it('blocks org sheets in personal mode and org sheets -> Telegram egress', () => {
@@ -90,6 +168,53 @@ describe.each(['Slack', 'Telegram'] as const)('MySheets digest source & egress p
       ),
     ).toContain('SHEETS_WORKSPACE_REQUIRED');
   });
+});
+
+it.each([
+  { range: undefined, requested: 'A1:Z50', scanned: 'Tasks!A1:Z50', count: 49, truncated: true },
+  { range: 'Tasks!A1:Z50', requested: 'Tasks!A1:Z50', scanned: 'Tasks!A1:Z50', count: 49, truncated: false },
+  { range: 'Tasks!B2:C5', requested: 'Tasks!B2:C5', scanned: 'Tasks!B2:C5', count: 4, truncated: false },
+])('reports the scanned window and data count for $requested', async ({ range, requested, scanned, count, truncated }) => {
+  const spreadsheetId = 'review_spreadsheet_01';
+  const rows = [['Task', 'Status'], ...Array.from({ length: 50 }, (_, index) => [`Task ${index + 1}`, 'Done'])];
+  const adapter = createPersonalSheetsAdapter({
+    userId: 'fixture',
+    tokens: { getAccessToken: async () => 'fixture' },
+    allowedScope: { spreadsheets: [spreadsheetId] },
+    rateLimiter: new GlobalRateLimiter({ maxRequests: 100, windowMs: 60_000 }),
+    fetchFn: async (url) => {
+      expect(decodeURIComponent(String(url))).toContain(`/values/${requested}`);
+      return Response.json({ range: scanned, values: range === 'Tasks!B2:C5' ? rows.slice(1, 5) : rows.slice(0, 50) });
+    },
+  });
+  const live = encryptCredentials({
+    email: connection.email,
+    selectedSpreadsheets: [{ id: spreadsheetId, title: 'Tasks', canEdit: true }],
+  }, key);
+  const result = await executeMultiDigestReadSources({
+    sources: [{
+      service: 'mysheets', tool: 'mysheets.list_spreadsheets', label: 'Google Sheets',
+      ...(range ? { args: { spreadsheetId, range } } : {}),
+      mysheetsBinding: { credentialId: connection.credentialId, email: connection.email, spreadsheetIds: [spreadsheetId], truncated: false },
+    }],
+    userId: 'fixture',
+    dueAt: now,
+    sinceIso: now.toISOString(),
+    untilIso: now.toISOString(),
+    credentialRepo: { getPersonalCredentials: async () => ({
+      id: connection.credentialId, service: 'mysheets', user_id: 'fixture', workspace_id: null, status: 'active', config: live,
+      created_at: now, status_changed_at: null,
+    }) },
+    encryptionKey: key,
+    signal: new AbortController().signal,
+    adapterFactory: { getAdapterForService: () => adapter },
+  });
+  expect(result).toMatchObject({
+    kind: 'ok',
+    sourceStatuses: [{ itemCount: count, ...(truncated ? { truncated: true } : {}) }],
+    sections: [expect.stringContaining(scanned)],
+  });
+  expect(result.kind === 'ok' && result.sourceStatuses[0]?.truncated === true).toBe(truncated);
 });
 
 describe('MySheets multi-source schedule approval & guard on PostgreSQL', () => {
@@ -154,8 +279,8 @@ describe('MySheets multi-source schedule approval & guard on PostgreSQL', () => 
       action: 'create',
       name: 'Bản tin Sheets + Trello',
       request: destination === 'slack'
-        ? 'Gửi bản tin Google Sheets và Trello lên #work'
-        : 'Gửi bản tin Google Sheets và Trello lên Telegram',
+        ? 'Gửi bản tin tất cả bảng tính Google Sheets và Trello lên #work'
+        : 'Gửi bản tin tất cả bảng tính Google Sheets và Trello lên Telegram',
       recurrence: { type: 'daily', time: '08:00' },
       summary: 'Bản tin',
     };
@@ -287,6 +412,27 @@ describe('MySheets multi-source schedule approval & guard on PostgreSQL', () => 
       sources: [{ mysheetsBinding: { email: 'new@example.test', spreadsheetIds: spreadsheets.slice(0, 5), truncated: true } }, {}],
     });
     expect((await f.approve(reauth.proposalMessageId, 'auto_digest')).schedule.status).toBe('active');
+  });
+
+  it.each(['slack', 'telegram'] as const)('persists the exact named tab and range after %s approval', async (destination) => {
+    const f = await fixture(destination);
+    const proposal = {
+      ...f.proposal,
+      request: f.proposal.request!.replace('tất cả bảng tính Google Sheets', 'bảng tính Sheet 6 (trang tính Archive) vùng B2:C5'),
+    };
+    const candidate = await f.evaluate(proposal);
+    expect(candidate).toMatchObject({ canAutoDigest: true });
+    const message = await f.saveProposal(proposal, candidate);
+    const { schedule } = await f.approve(message.id, 'auto_digest');
+    const saved = (await db.pool.query('SELECT digest_config, digest_config_hash FROM schedules WHERE id=$1', [schedule.id])).rows[0];
+    expect(saved.digest_config.sources[0]).toMatchObject({
+      tool: 'mysheets.read_range',
+      args: { spreadsheetId: 'sheet-six', range: 'Archive!B2:C5' },
+      mysheetsBinding: { spreadsheetIds: ['sheet-six'], truncated: false },
+    });
+    const changed = structuredClone(saved.digest_config);
+    changed.sources[0].args.range = 'Archive!A1:Z50';
+    expect(digestHash(changed)).not.toBe(saved.digest_config_hash);
   });
 
   it('allows mysheets.read_range in TelegramDigestRunner read allowlist (parity with SlackDigestRunner)', async () => {

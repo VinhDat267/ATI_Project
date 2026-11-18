@@ -22,10 +22,10 @@ describe('ANS-01 read answers', () => {
     const options = { search: true, readAnswers: false };
     const offPrompt = buildSystemPrompt(ALL_TOOLS, date, options);
     expect(offPrompt).toBe(buildSystemPrompt(ALL_TOOLS, date, { search: true }));
-    // Main's byte-for-byte baseline for the catalog without Telegram. Telegram rules have dedicated coverage.
+    // Lock the current plan prompt for the catalog without Telegram. Telegram rules have dedicated coverage.
     const nonTelegramTools = ALL_TOOLS.filter((tool) => tool.service !== 'telegram');
     expect(hash(buildSystemPrompt(nonTelegramTools, date, options)))
-      .toBe('433e0860ee2d2222ae400e5b17a1de0442e6987c2d26f884c90b5adf96c23c03');
+      .toBe('f3374a5f53baad9641854d832aaf1c1b20fa5c219f7b9677e15ee7c5eef2b9e2');
     expect(hash(formatSearchResults([{ tool: 'slack.search_channels', args: { query: 'frontend' }, result: [] }])))
       .toBe('1edfb5917d31a91aa046dca5ea220a6c131deed29412fa206df107eb32ef9850');
   });

@@ -921,7 +921,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
                 ],
               },
               (dispatched) => {
-                if (dispatched) writeDispatched = true;
+                writeDispatched = sheetCreated || dispatched;
               }
             );
           } catch (headerErr) {

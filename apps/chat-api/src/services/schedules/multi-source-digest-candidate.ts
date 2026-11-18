@@ -481,17 +481,9 @@ export function buildMultiDigestSources(
       sources.push(bound);
     } else if (service === 'mysheets') {
       const previous = input.existingMySheetsSources?.filter(isMySheetsDigestSource) ?? [];
-      const bound = previous.length <= 1
-        ? bindMySheetsDigestSource(source, input.mysheetsLookup, previous[0], input.reauthorizeMySheets === true)
-        : null;
-      if (!bound) {
-        return {
-          ok: false,
-          disabledReason:
-            previous.length > 0 ? MYSHEETS_DIGEST_REAPPROVAL :
-              'Hãy kết nối Google Sheets cá nhân và chọn ít nhất 1 bảng tính trước khi bật tự gửi báo cáo.',
-        };
-      }
+      if (previous.length > 1) return { ok: false, disabledReason: MYSHEETS_DIGEST_REAPPROVAL };
+      const bound = bindMySheetsDigestSource(source, input.mysheetsLookup, previous[0], input.reauthorizeMySheets === true, requestText);
+      if ('disabledReason' in bound) return { ok: false, disabledReason: bound.disabledReason };
       sources.push(bound);
     } else {
       sources.push({ ...source });

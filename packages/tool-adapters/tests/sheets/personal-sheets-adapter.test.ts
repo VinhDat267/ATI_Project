@@ -2137,6 +2137,25 @@ describe('PersonalSheetsAdapter', () => {
     expect(calls.some((c) => c.url.pathname.includes(':append'))).toBe(false);
   });
 
+  it('marks a rejected header write on an existing blank tab as pre-dispatch when refresh fails', async () => {
+    const { adapter, calls } = setup({
+      onTokenCall(options) {
+        if (options?.forceRefresh) throw new StepError({
+          category: 'NETWORK', message: 'Refresh transport failed', retryable: false,
+        });
+      },
+      handler(url, init) {
+        if (init.method === 'POST') return json({}, 401);
+        if (url.searchParams.has('fields')) return json({ sheets: [{ properties: { sheetId: 0, title: sheet } }] });
+        return json({ range: 'Sheet1!A1:Z1' });
+      },
+    });
+
+    await expect(adapter.execute('mysheets.create_sheet', { spreadsheetId, title: sheet, headers: ['Task'] }))
+      .rejects.toMatchObject({ category: 'NETWORK', details: { requestSent: false } });
+    expect(calls.filter(({ init }) => init.method === 'POST')).toHaveLength(1);
+  });
+
   it('preserves partialWrite: true (and never stamps requestSent: false) when mysheets.create_sheet step-2 headers hit 401 and token refresh fails', async () => {
     const { adapter } = setup({
       onTokenCall: (opts) => {
