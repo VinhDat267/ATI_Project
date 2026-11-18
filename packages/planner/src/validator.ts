@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { isSlackReadTool, requiresReportEvidence, reportOutputTargets, type ToolDefinition, type PlannerResponse, type PlanStep, type ReportEvidence } from '@wap/tool-schemas';
+import { isSlackReadTool, MYCALENDAR_RECAP_READ_TOOLS, MYCALENDAR_RECAP_SEND_TOOLS, requiresReportEvidence, reportOutputTargets, type ToolDefinition, type PlannerResponse, type PlanStep, type ReportEvidence } from '@wap/tool-schemas';
 import { normalizedRecipient, observedDrafts, observedThreads, observedWorkspaceRecipients, userEmailAddresses } from './recipients.js';
 import type { ReportArtifactStore } from './reports/artifacts.js';
 
@@ -69,12 +69,11 @@ export const DEFERRED_CALENDAR_RECAP_ERROR =
   'Calendar recap needs literal message text before approval.';
 
 export function hasDeferredCalendarRecap(steps: readonly PlanStep[]): boolean {
-  const eventReadSteps = new Set(steps.filter((step) =>
-    step.tool === 'mycalendar.get_event' || step.tool === 'mycalendar.list_events' ||
-    step.tool === 'mycalendar.list_event_instances',
-  ).map((step) => step.id));
+  const eventReadSteps = new Set(
+    steps.filter((step) => MYCALENDAR_RECAP_READ_TOOLS.has(step.tool)).map((step) => step.id),
+  );
   return eventReadSteps.size > 0 && steps.some((step) => {
-    if (step.tool !== 'slack.send_message' && step.tool !== 'telegram.send_message') return false;
+    if (!MYCALENDAR_RECAP_SEND_TOOLS.has(step.tool)) return false;
     const references: string[] = [];
     collectReferenceTargets(step.args, references);
     return references.some((ref) => eventReadSteps.has(ref.split('.')[0]!));

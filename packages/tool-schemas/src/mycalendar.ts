@@ -5,6 +5,17 @@ import { GMAIL_ADDRESS_PATTERN, GMAIL_MAX_RECIPIENTS } from './gmail.js';
 export const MYCALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
 export const IANA_TIMEZONE_PATTERN = /^(?:UTC|GMT|[A-Za-z0-9_+-]+\/[A-Za-z0-9_+-]+(?:\/[A-Za-z0-9_+-]+)?)$/;
 
+// These event reads must not supply the runtime body of a Calendar recap.
+export const MYCALENDAR_RECAP_READ_TOOLS: ReadonlySet<string> = new Set([
+  'mycalendar.get_event',
+  'mycalendar.list_events',
+  'mycalendar.list_event_instances',
+]);
+export const MYCALENDAR_RECAP_SEND_TOOLS: ReadonlySet<string> = new Set([
+  'slack.send_message',
+  'telegram.send_message',
+]);
+
 const str = { type: 'string' };
 const time = { type: 'string', pattern: CALENDAR_TIME_PATTERN };
 const timeZone = {
