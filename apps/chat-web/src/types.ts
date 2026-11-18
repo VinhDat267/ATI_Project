@@ -129,6 +129,12 @@ export interface ActivePlan {
   reportEvidence?: ReportEvidence;
 }
 
+/** GET /api/conversations/attention: việc đang chờ bạn trong không gian hiện tại. */
+export interface AttentionSummary {
+  pendingPlans: Array<{ conversationId: string; title: string | null; planId: string; summary: string | null; stepCount: number; expiresAt: string }>;
+  needsAttention: Array<{ conversationId: string; title: string | null; planId: string; status: 'partial' | 'unknown' | 'reconciliation_required'; updatedAt: string }>;
+}
+
 export interface Conversation {
   id: string;
   title?: string | null;

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { ConversationRow, ConversationScope } from './conversation-repo.js';
+import type { AttentionPlan, AttentionRun, ConversationRow, ConversationScope } from './conversation-repo.js';
 import type { MessageRow } from './message-repo.js';
 import {
   encodeConversationCursor,
@@ -76,6 +76,10 @@ export function createMemoryConversationRepositories() {
       return sorted(userId, scope)
         .slice(0, limit)
         .map((row) => ({ ...row }));
+    },
+    // Bản trong bộ nhớ không lưu kế hoạch, nên không có việc nào đang chờ.
+    async listAttention(_userId: string, _scope?: ConversationScope, _limit?: number): Promise<{ pendingPlans: AttentionPlan[]; needsAttention: AttentionRun[] }> {
+      return { pendingPlans: [], needsAttention: [] };
     },
     async listConversationPage(userId: string, options: ConversationPageOptions = {}, scope?: ConversationScope) {
       const { limit, search, cursor } = validateConversationPage(options);

@@ -11,6 +11,7 @@ import type {
 } from '@wap/tool-schemas';
 import type {
   ActivePlan,
+  AttentionSummary,
   ChatMessage,
   Conversation,
   ServiceInfo,
@@ -989,6 +990,11 @@ export class ApiClient {
     if (options.cursor) query.set('cursor', options.cursor);
     if (options.search) query.set('search', options.search);
     return this.request(`/api/conversations${query.size ? `?${query}` : ''}`);
+  }
+
+  /** Việc đang chờ bạn trong không gian hiện tại: kế hoạch chờ duyệt và lượt chạy cần xử lý. */
+  async getAttention(limit?: number): Promise<AttentionSummary> {
+    return this.request(`/api/conversations/attention${limit === undefined ? '' : `?limit=${limit}`}`);
   }
 
   async renameConversation(id: string, title: string): Promise<{ conversation: Conversation }> {

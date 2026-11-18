@@ -39,6 +39,25 @@ export interface ConversationRow {
   updated_at: Date;
 }
 
+/** Kế hoạch mới nhất của một hội thoại, đang chờ duyệt và chưa hết hạn. */
+export interface AttentionPlan {
+  conversationId: string;
+  title: string | null;
+  planId: string;
+  summary: string | null;
+  stepCount: number;
+  expiresAt: string;
+}
+
+/** Lượt chạy mới nhất của một hội thoại, dừng ở trạng thái cần người xử lý. */
+export interface AttentionRun {
+  conversationId: string;
+  title: string | null;
+  planId: string;
+  status: 'partial' | 'unknown' | 'reconciliation_required';
+  updatedAt: string;
+}
+
 export class ConversationRepo {
   constructor(private pool: pg.Pool) {}
 
@@ -364,6 +383,120 @@ export class ConversationRepo {
     if (!isUuid(userId)) return { conversations: [], nextCursor: null };
     const { limit, search, cursor } = validateConversationPage(options);
     const values: unknown[] = [userId];
+    const where = this.visibleConversationConditions(values, scope);
+    if (cursor) {
+      values.push(cursor.updatedAt, cursor.id);
+      where.push(`(updated_at, id) < ($${values.length - 1}::timestamptz, $${values.length}::uuid)`);
+    }
+    values.push(search ? 500 : limit + 1);
+    try {
+      const result = await this.pool.query<ConversationRow & { cursor_updated_at: string }>(
+        `SELECT *, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_updated_at
+         FROM conversations WHERE ${where.join(' AND ')} ORDER BY updated_at DESC, id DESC LIMIT $${values.length}`,
+        values
+      );
+      const guarded = await Promise.all(
+        result.rows.map(async (row) => ({
+          ...(await this.safeReadConversation(row)),
+          cursor_updated_at: row.cursor_updated_at,
+        }))
+      );
+      const matching = search
+        ? guarded.filter((row) => row.title?.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
+        : guarded;
+      const visible = matching.slice(0, limit);
+      const last =
+        matching.length > limit
+          ? visible.at(-1)
+          : result.rows.length === 500
+            ? guarded.at(-1)
+            : undefined;
+      const nextCursor = last
+        ? encodeConversationCursor({ updatedAt: last.cursor_updated_at, id: last.id })
+        : null;
+      return { conversations: visible.map(({ cursor_updated_at: _timestamp, ...row }) => row), nextCursor };
+    } catch (err: any) {
+      if (err?.code === '42703' && scope?.workspaceMode === 'legacy') {
+        return this.listConversationPage(userId, options, undefined);
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Việc đang chờ người dùng (trang chủ, redesign 11/2026), chỉ trong các hội thoại mà listConversationPage cho thấy:
+   * kế hoạch mới nhất của hội thoại đang chờ duyệt và chưa hết hạn (cùng điều kiện với PlanRepo.getPendingPlan),
+   * hoặc lượt chạy mới nhất dừng ở trạng thái cần người xử lý (partial, unknown, reconciliation_required).
+   */
+  async listAttention(
+    userId: string,
+    scope?: ConversationScope,
+    limit = 8
+  ): Promise<{ pendingPlans: AttentionPlan[]; needsAttention: AttentionRun[] }> {
+    if (!isUuid(userId)) return { pendingPlans: [], needsAttention: [] };
+    const cap = Math.min(Math.max(Math.trunc(limit) || 8, 1), 20);
+    const values: unknown[] = [userId];
+    const where = this.visibleConversationConditions(values, scope);
+    values.push(cap * 2);
+    try {
+      const result = await this.pool.query<{
+        plan_id: string; conv_id: string; plan_status: string; expires_at: Date; plan_created_at: Date;
+        summary: string | null; step_count: number; conversation: ConversationRow;
+      }>(
+        `WITH visible AS (SELECT * FROM conversations WHERE ${where.join(' AND ')}),
+         latest AS (
+           SELECT DISTINCT ON (p.conv_id) p.id, p.conv_id, p.status, p.expires_at, p.created_at, p.plan_json
+           FROM plans p WHERE p.conv_id IN (SELECT id FROM visible)
+           ORDER BY p.conv_id, p.created_at DESC, p.id DESC
+         )
+         SELECT l.id AS plan_id, l.conv_id, l.status AS plan_status, l.expires_at, l.created_at AS plan_created_at,
+                l.plan_json->>'summary' AS summary,
+                CASE WHEN jsonb_typeof(l.plan_json->'steps') = 'array' THEN jsonb_array_length(l.plan_json->'steps') ELSE 0 END AS step_count,
+                to_jsonb(v.*) AS conversation
+         FROM latest l JOIN visible v ON v.id = l.conv_id
+         WHERE (l.status = 'pending' AND l.expires_at > now())
+            OR l.status IN ('partial', 'unknown', 'reconciliation_required')
+         ORDER BY l.created_at DESC, l.id DESC
+         LIMIT $${values.length}`,
+        values
+      );
+      const rows = await Promise.all(
+        result.rows.map(async (row) => {
+          const raw = row.conversation;
+          const conversation = await this.safeReadConversation({
+            ...raw,
+            created_at: new Date(raw.created_at),
+            updated_at: new Date(raw.updated_at),
+          });
+          return { row, title: conversation.title ?? null };
+        })
+      );
+      const pendingPlans: AttentionPlan[] = [];
+      const needsAttention: AttentionRun[] = [];
+      for (const { row, title } of rows) {
+        if (row.plan_status === 'pending') {
+          if (pendingPlans.length < cap) {
+            pendingPlans.push({
+              conversationId: row.conv_id, title, planId: row.plan_id,
+              summary: row.summary, stepCount: Number(row.step_count) || 0, expiresAt: new Date(row.expires_at).toISOString(),
+            });
+          }
+        } else if (needsAttention.length < cap) {
+          needsAttention.push({
+            conversationId: row.conv_id, title, planId: row.plan_id,
+            status: row.plan_status as AttentionRun['status'], updatedAt: new Date(row.plan_created_at).toISOString(),
+          });
+        }
+      }
+      return { pendingPlans, needsAttention };
+    } catch (err: any) {
+      if (err?.code === '42703' && scope?.workspaceMode === 'legacy') return this.listAttention(userId, undefined, limit);
+      throw err;
+    }
+  }
+
+  /** Điều kiện "người dùng được thấy hội thoại này" dùng chung cho lịch sử và việc đang chờ. values[0] phải là userId. */
+  private visibleConversationConditions(values: unknown[], scope?: ConversationScope): string[] {
     const where = ['user_id = $1'];
     if (scope) {
       if (scope.workspaceMode === 'personal') {
@@ -408,43 +541,7 @@ export class ConversationRepo {
         )
       )`);
     }
-    if (cursor) {
-      values.push(cursor.updatedAt, cursor.id);
-      where.push(`(updated_at, id) < ($${values.length - 1}::timestamptz, $${values.length}::uuid)`);
-    }
-    values.push(search ? 500 : limit + 1);
-    try {
-      const result = await this.pool.query<ConversationRow & { cursor_updated_at: string }>(
-        `SELECT *, to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_updated_at
-         FROM conversations WHERE ${where.join(' AND ')} ORDER BY updated_at DESC, id DESC LIMIT $${values.length}`,
-        values
-      );
-      const guarded = await Promise.all(
-        result.rows.map(async (row) => ({
-          ...(await this.safeReadConversation(row)),
-          cursor_updated_at: row.cursor_updated_at,
-        }))
-      );
-      const matching = search
-        ? guarded.filter((row) => row.title?.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
-        : guarded;
-      const visible = matching.slice(0, limit);
-      const last =
-        matching.length > limit
-          ? visible.at(-1)
-          : result.rows.length === 500
-            ? guarded.at(-1)
-            : undefined;
-      const nextCursor = last
-        ? encodeConversationCursor({ updatedAt: last.cursor_updated_at, id: last.id })
-        : null;
-      return { conversations: visible.map(({ cursor_updated_at: _timestamp, ...row }) => row), nextCursor };
-    } catch (err: any) {
-      if (err?.code === '42703' && scope?.workspaceMode === 'legacy') {
-        return this.listConversationPage(userId, options, undefined);
-      }
-      throw err;
-    }
+    return where;
   }
 
   async renameConversation(id: string, userId: string, title: string): Promise<ConversationRow | null> {
