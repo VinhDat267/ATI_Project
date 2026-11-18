@@ -34,13 +34,14 @@ test('FE-02: Back/Forward, direct reload restores pending plan and saved executi
       await certifyFixturePlan(db, planId);
     }
     await page.goto(`/c/${id}`); await page.reload();
-    await expect(page.getByText('FE02 saved request')).toBeVisible();
+    // Redesign 11/2026: từ 1280 px câu yêu cầu còn hiện ở cột hội thoại; kiểm tra bản trên sân khấu chính.
+    await expect(page.locator('section[data-moment]').getByText('FE02 saved request')).toBeVisible();
     await expect(page.getByText('FE02 pending preview', {exact:true})).toBeVisible();
     await expect(page.getByRole('region', { name: /Hệ thống vừa khởi động lại|Chưa rõ kết quả/ })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('FE02-direct-reload.png'), fullPage: true });
     await page.getByRole('button', {name:'Mở danh sách hội thoại'}).click(); await page.getByRole('button', {name:/Cuộc hội thoại mới/}).click();
     await expect(page).not.toHaveURL(new RegExp(`/c/${id}$`));
-    await page.goBack(); await expect(page.getByText('FE02 saved request')).toBeVisible();
+    await page.goBack(); await expect(page.locator('section[data-moment]').getByText('FE02 saved request')).toBeVisible();
     const foreignUser = (await db.query("INSERT INTO users(email,password,name) VALUES($1,'fixture-hash','Foreign fixture') RETURNING id", [`foreign-fe02-${Date.now()}@example.test`])).rows[0].id;
     const foreign = await fixtureConversation(db,foreignUser,'Foreign private title');
     await fixtureMessage(db,foreign,'user','Foreign private message');
@@ -107,7 +108,7 @@ test('FE-02: messages follow near bottom and preserve reading above', async ({ p
     await page.getByRole('textbox',{name:'Mô tả công việc bạn muốn thực hiện'}).press('Enter');
     await expect(page.getByRole('button',{name:'Duyệt kế hoạch',exact:true})).toBeVisible();
     await page.getByRole('button',{name:'Xem hội thoại',exact:true}).click(); const area = page.getByRole('log',{name:'Hội thoại'});
-    await expect(page.getByText(/Saved message 24:/)).toBeAttached();
+    await expect(area.getByText(/Saved message 24:/)).toBeAttached();
     // Programmatic positioning must deliver the scroll input before a planner
     // response can append another message; native event delivery is asynchronous.
     await area.evaluate(element => { element.scrollTop = element.scrollHeight; element.dispatchEvent(new Event('scroll')); });

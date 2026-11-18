@@ -529,7 +529,6 @@
       "receipt": "Đã gán thành viên",
       "kind": "Member",
       "link": "Mở thẻ trên Trello",
-      "titleField": "id",
       "previewStyle": "card"
     },
     "trello.remove_member": {
@@ -538,7 +537,6 @@
       "receipt": "Đã gỡ thành viên",
       "kind": "Member",
       "link": "Mở thẻ trên Trello",
-      "titleField": "id",
       "previewStyle": "card"
     },
     "trello.add_checklist": {
@@ -601,7 +599,6 @@
       "receipt": "Đã gắn nhãn cho thẻ",
       "kind": "Label",
       "link": "Mở thẻ trên Trello",
-      "titleField": "labelId",
       "previewStyle": "card"
     },
     "trello.remove_label": {
@@ -610,7 +607,6 @@
       "receipt": "Đã gỡ nhãn khỏi thẻ",
       "kind": "Label",
       "link": "Mở thẻ trên Trello",
-      "titleField": "labelId",
       "previewStyle": "card"
     },
     "trello.search_labels": {

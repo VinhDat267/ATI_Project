@@ -18,7 +18,8 @@ import { PlanMoment } from '../pages/Cockpit/PlanMoment';
 import { ExecutionMoment } from '../pages/Cockpit/ExecutionMoment';
 import { ReceiptMoment } from '../pages/Cockpit/ReceiptMoment';
 import { ChatComposer } from '../pages/Cockpit/ChatComposer';
-import { ConversationDrawer } from '../pages/Cockpit/ConversationDrawer';
+import { ConversationDrawer, ConversationLog } from '../pages/Cockpit/ConversationDrawer';
+import { useMediaQuery } from '../hooks/use-media-query';
 import { SavedConversation, latestSavedRequest } from '../pages/Cockpit/SavedConversation';
 import { HistoryDrawer } from '../pages/Cockpit/HistoryDrawer';
 import { PreviewModal } from '../pages/Cockpit/PreviewModal';
@@ -33,6 +34,7 @@ import responseCss from '../pages/Responses/page.css?inline';
 import errorCss from '../pages/Errors/page.css?inline';
 const responseMeta = { ...meta, id: 'responses', css: meta.css + responseCss };
 const errorMeta = { ...meta, id: 'errors', css: meta.css + errorCss };
+const RUN_THREAD_MOMENTS = new Set<number | string>([4, 5, 6, 7, 8, 9, 'unsuccessful']);
 
 interface Props {
   user?: User | null; onLogout?: () => void; navigate?: (path: string) => void;
@@ -233,6 +235,10 @@ export function Cockpit(props: Props) {
   const savedRequest = moment === 1 && state.conversationId && !state.isPlanning && !state.historyHydrating && !terminalError && !(waitingKey && dismissedWait === waitingKey)
     ? latestSavedRequest(state.messages) : undefined;
   const statusLoadError = state.planLoadError ?? state.executionLoadError;
+  // Redesign 11/2026: từ 1280 px, trang lượt chạy hiện sẵn hội thoại ở cột trái thay vì giấu trong ngăn kéo.
+  const wide = useMediaQuery('(min-width: 1280px)');
+  const isRunMoment = RUN_THREAD_MOMENTS.has(moment);
+  const showThread = wide && !props.contentOverride && state.messages.length > 0 && isRunMoment;
   usePrototypePage(planningError || slow ? errorMeta : moment === 'refusal' || moment === 'answer' || expanded ? responseMeta : meta);
   const editRequest = (text: string) => {
     setDraft(text); setSelected(null); setDrawer(null); setEditingResponse(responseKey);
@@ -249,7 +255,12 @@ export function Cockpit(props: Props) {
   return <>
     <div data-cockpit-background className="contents" onFocusCapture={event => { editing.current = (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLInputElement) && !drawer && !preview; }} onBlurCapture={event => { if (!(event.relatedTarget instanceof HTMLTextAreaElement || event.relatedTarget instanceof HTMLInputElement) && (event.relatedTarget !== null || (event.target as HTMLElement).isConnected)) editing.current = false; }}>
       <CockpitHeader runtimeMode={runtimeMode} historyDialogId="history-drawer" chatDialogId="chat-drawer" moment={moment} messageCount={state.messages.length} user={props.user ?? null} navigate={navigate} onLogout={props.onLogout ?? (() => {})} onSettings={props.onSettings} historyOpen={drawer === 'history'} chatOpen={drawer === 'conversation'} onHistory={() => setDrawer('history')} onConversation={() => setDrawer('conversation')} />
-      <main ref={stage} id="stage-container" className={`flex-1 w-full ${moment === 6 || moment === 'unsuccessful' ? 'max-w-[1120px]' : 'max-w-4xl'} mx-auto px-4 sm:px-6 ${moment === 'schedule' || moment === 'refusal' || expanded || slow || planningError || moment === 6 || moment === 7 || moment === 8 || moment === 9 ? 'py-4 sm:py-6' : 'py-5 sm:py-8'} flex flex-col min-w-0`}>
+      <main ref={stage} id="stage-container" className={`flex-1 w-full ${moment === 6 || moment === 'unsuccessful' ? 'max-w-[1120px]' : 'max-w-4xl'} mx-auto px-4 sm:px-6 ${moment === 'schedule' || moment === 'refusal' || expanded || slow || planningError || moment === 6 || moment === 7 || moment === 8 || moment === 9 ? 'py-4 sm:py-6' : 'py-5 sm:py-8'} flex flex-col min-w-0${showThread ? ' xl:max-w-[1240px] xl:grid xl:grid-cols-[300px_minmax(0,1fr)] xl:gap-x-8 xl:items-start' : ''}`}>
+        {showThread && <aside data-run-thread aria-label="Hội thoại của lượt chạy" className="sticky top-24 flex max-h-[calc(100dvh-6rem-var(--cockpit-bottom-space,2rem))] flex-col overflow-hidden rounded-2xl border border-[#E6DED3] bg-white dark:border-[#3a312a] dark:bg-[#1A1613]">
+          <h2 className="px-4 py-3 text-sm font-semibold text-[#1a0e08] border-b border-[#F1EBE3] dark:border-[#3a312a]">Hội thoại</h2>
+          <ConversationLog id="run-thread-log" asLog={false} label="Hội thoại của lượt chạy" messages={state.messages} streamingText={state.streamingText} isStreaming={state.isStreaming}/>
+        </aside>}
+        <div data-run-content className={showThread ? 'flex min-w-0 flex-col' : 'contents'}>
         {(moment === 1 || slackSelection !== null || slackWriteSelection !== null) && (slackEnabled || slackWritesEnabled) && (
           slackSelection === null && slackWriteSelection === null ? (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#E6DED3] bg-white px-3.5 py-2 shadow-2xs">
@@ -285,7 +296,8 @@ export function Cockpit(props: Props) {
           {state.executionLoadError && <p role="alert">Không tải được trạng thái thực thi: {state.executionLoadError}. Hãy mở lại hội thoại.</p>}
         </section>)}
         {state.executionSnapshot && state.activePlan && state.activePlan.id !== state.executionSnapshot.plan.id && moment!==6 && <details className="mt-5 text-xs text-brand-muted"><summary>Kế hoạch đang chờ: <span>{state.activePlan?.summary}</span></summary>{state.executionSnapshot.execution.status==='stopped' && <p role="status">Quy trình đã dừng.</p>}{state.executionSnapshot.execution.status==='completed' && <p role="status">Quy trình đã hoàn thành.</p>}</details>}
-        {[4,5,6,7,8,9,'unsuccessful'].includes(moment as number) && state.executionLoadError && <p role="alert">Không tải được trạng thái thực thi: {state.executionLoadError}. Hãy mở lại hội thoại.</p>}
+        {isRunMoment && state.executionLoadError && <p role="alert">Không tải được trạng thái thực thi: {state.executionLoadError}. Hãy mở lại hội thoại.</p>}
+        </div>
       </main>
       {!props.contentOverride && (![1,3,4].includes(moment as number) || expanded || planningError) && drawer !== 'conversation' && <ChatComposer variant={moment === 'refusal' || moment === 'answer' || expanded ? 'response' : 'bottom'} {...composerProps}/>}
     </div>

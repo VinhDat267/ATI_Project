@@ -14,11 +14,18 @@ const plan: ActivePlan = {id:'p1',summary:'Tạo issue rồi báo nhóm',resourc
 ]};
 const snapshot = (statuses: ExecutionSnapshot['steps'][number]['status'][]): ExecutionSnapshot => ({plan:{...plan,id:'p1',convId:'c1',status:'approved'},execution:{status:'executing'},recoveryActions:[],steps:statuses.map((status,i)=>({stepId:`step_${i+1}`,tool:plan.steps[i].tool,status,durationMs:i ? 7 : 1200,startedAt:'2026-10-07T00:00:00.000Z',completedAt:'2026-10-07T00:00:01.200Z',output:i ? {messageId:'m1',url:'https://slack.com/app_redirect?channel=ati-test'} : {number:42,title:'Sửa đăng nhập',html_url:'https://github.com/ati/test/issues/42'}}))});
 function view() { const onSendMessage=vi.fn(); render(<Cockpit services={[{id:'github',name:'GitHub',configured:true,connected:false,connectionStatus:'unchecked'},{id:'slack',name:'Slack',configured:true,connected:false,connectionStatus:'unchecked'}]} servicesLoading={false} servicesError={null} onSendMessage={onSendMessage} onNewConversation={vi.fn()} onSelectConversation={vi.fn()} onSettings={vi.fn()} onApprove={vi.fn()} onCancel={vi.fn()} recovery={null}/>); return onSendMessage; }
-it('moment 4 copies plan cards and sticky actions, with no bottom composer', async()=>{
+it('moment 4 shows the plan cards, then the approval gate after the last step, with no bottom composer', async()=>{
   useChatStore.setState({activePlan:plan,planStatus:'preview'}); view();
   expect(await screen.findByRole('heading',{level:1,name:'Tôi sẽ làm 2 việc, theo thứ tự'})).toHaveClass('text-xl','sm:text-2xl','font-semibold');
   expect(document.querySelectorAll('#plan-cards-container article')).toHaveLength(2);
-  expect(document.getElementById('moment-4-sticky-bar')).toHaveClass('sticky','bottom-0');
+  // Redesign 11/2026: Cổng duyệt đứng sau bước cuối, không dính đáy, và tóm tắt điều sắp xảy ra cạnh nút duyệt.
+  const gate = document.getElementById('moment-4-sticky-bar')!;
+  expect(gate).toHaveAttribute('data-approval-gate');
+  expect(gate).not.toHaveClass('sticky');
+  expect(document.getElementById('plan-cards-container')!.compareDocumentPosition(gate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(within(gate).getByRole('heading',{level:2,name:'Cổng duyệt'})).toBeInTheDocument();
+  expect(gate.querySelector('[data-gate-summary]')).toHaveTextContent('2 thao tác ghi · 2 công cụ · hết hạn sau 30 phút');
+  expect(within(gate).getByRole('button',{name:'Duyệt kế hoạch'})).toBeEnabled();
   expect(screen.queryAllByRole('textbox')).toHaveLength(0);
   expect(await screen.findByText(/chỉ chạy trong chế độ thử nghiệm/)).toBeInTheDocument();
 });
