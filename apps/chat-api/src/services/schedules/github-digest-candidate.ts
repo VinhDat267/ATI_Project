@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { GithubDigestConfig, ScheduleDigestCandidate, ScheduleRecurrence } from '@wap/tool-schemas';
+import { extractSlackDigestChannelHint } from './slack-digest-channel.js';
 
 export function canonicalizeDigestConfig(config: GithubDigestConfig): GithubDigestConfig {
   return {
@@ -239,8 +240,7 @@ export async function evaluateGithubDigestCandidate(
   }
 
   // Extract Slack channel from request
-  const hashMatch = request.match(/#([a-z0-9._-]+)/i) ?? request.match(/(?:kênh|slack)\s+#?([a-z0-9._-]+)/i);
-  const channelQuery = hashMatch?.[1]?.trim() ?? '';
+  const channelQuery = extractSlackDigestChannelHint(request);
 
   let matchedChannel: { id: string; name: string } | null = null;
   try {

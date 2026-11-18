@@ -157,12 +157,12 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
         if (serviceName === 'slack') {
           expect(ctx?.workspaceId ?? null).toBeNull();
           return {
-            execute: async (tool: string) => {
+            execute: async (tool: string, args: { query: string }) => {
               if (tool === 'slack.search_channels') {
                 return [
                   { id: 'C_GENERAL', name: 'general', isPrivate: false },
                   { id: 'C_OPS', name: 'ops', isPrivate: false },
-                ];
+                ].filter((channel) => channel.name.includes(args.query.toLowerCase()));
               }
               return [];
             },
@@ -176,7 +176,7 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
           kind: 'schedule',
           action: 'create',
           name: 'Bản tin sáng tổng hợp',
-          request: 'Mỗi sáng 8h tổng hợp issue GitHub và lịch họp gửi lên Slack #general',
+          request: 'Tổng hợp issue GitHub và lịch họp, rồi gửi lên Slack #general. Thêm tóm tắt.',
           recurrence: { type: 'daily', time: '08:00' },
           summary: 'Tổng hợp GitHub & Google Calendar lên Slack #general',
         }),
@@ -186,7 +186,7 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
     await chatService.handleUserMessage({
       conversationId: conv.id,
       userId: owner.id,
-      content: 'Mỗi sáng 8h tổng hợp issue GitHub và lịch họp gửi lên Slack #general',
+      content: 'Mỗi sáng 8h tổng hợp issue GitHub và lịch họp, rồi gửi lên Slack #general. Thêm tóm tắt.',
     });
 
     for (let i = 0; i < 100 && !emitted.some((e) => e.event === 'schedule_proposal' || e.event === 'error'); i++) {

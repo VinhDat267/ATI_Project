@@ -36,6 +36,7 @@ import { runMessage, type PreparedRun, type RunToPlan } from './schedules/schedu
 import { evaluateGithubDigestCandidate } from './schedules/github-digest-candidate.js';
 import { evaluateTelegramDigestCandidate } from './schedules/telegram-digest-candidate.js';
 import { evaluateSlackDigestCandidate } from './schedules/slack-digest-candidate.js';
+import { verifyMySheetsDigestPreview } from './schedules/mysheets-digest-source.js';
 import { loadGmailDigestBinding } from './schedules/gmail-digest-binding.js';
 import { createMyCalendarConnectionLookup, createMySheetsConnectionLookup } from './gmail/connection-reference.js';
 import { evaluateTrelloDigestCandidate } from './schedules/trello-digest-candidate.js';
@@ -2063,6 +2064,14 @@ export class ChatService {
         timeZone: this.schedules.timeZone,
         telegramLookup: null,
       });
+    }
+    if (proposal.action === 'create' && digestCandidate?.canAutoDigest && digestCandidate.config && 'sources' in digestCandidate.config) {
+      const disabledReason = await verifyMySheetsDigestPreview(
+        digestCandidate.config,
+        { userId: actor.userId, workspaceMode: trustedScope.workspaceMode, workspaceId: trustedScope.workspaceId },
+        this.getAdapter,
+      );
+      if (disabledReason) digestCandidate = { canAutoDigest: false, disabledReason };
     }
     return {
       type: 'schedule_proposal',

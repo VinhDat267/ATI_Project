@@ -15,7 +15,7 @@ import { fingerprintSecret, startNotionLoopbackServer, waitForOwnerLockWaiter } 
 import { CredentialRepo } from '../../../src/db/repositories/credential-repo.js';
 import { ScheduleService } from '../../../src/services/schedules/schedule-service.js';
 import type { AdapterContext } from '../../../src/services/adapter-factory.js';
-import { ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
+import { reconcileScheduleRuns, ScheduleRunner } from '../../../src/services/schedules/schedule-runner.js';
 import { computeTelegramDigestConfigHash, evaluateTelegramDigestCandidate, READ_DIGEST_SOURCE_MAP } from '../../../src/services/schedules/telegram-digest-candidate.js';
 import { TelegramDigestRunner, summarizeSourceItems } from '../../../src/services/schedules/telegram-digest-runner.js';
 import { certifyScheduleFixture } from '../../../src/services/slack/slack-schedule-origin.js';
@@ -374,7 +374,7 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
     15_000,
   );
 
-  it('executes multi-source read digest (with partial error fallback) and sends 1 Telegram message, recording digest_sent and delivery JSONB', async () => {
+  it.each([false, true])('executes multi-source read digest and records only a possible dispatch (definite rejection: %s)', async (rejected) => {
     await credRepo.saveCredentials(
       'telegram',
       encryptCredentials(
@@ -430,6 +430,11 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
             execute: async (tool: string, args: any) => {
               expect(tool).toBe('telegram.send_message');
               sentMessages.push(args);
+              if (rejected) throw new StepError({
+                message: 'Telegram rejected the message',
+                category: 'VALIDATION',
+                details: { requestSent: false },
+              });
               return { messageId: 901, chatId: args.chatId, date: 1793581230 };
             },
           };
@@ -468,7 +473,15 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
 
     const runRows = (await pool.query('SELECT * FROM schedule_runs WHERE schedule_id = $1', [sched.id])).rows;
     expect(runRows).toHaveLength(1);
+    if (rejected) {
+      expect(runRows[0]).toMatchObject({
+        status: 'digest_failed', delivery_started_at: null, dispatched_config: null, dispatched_config_hash: null,
+      });
+      return;
+    }
     expect(runRows[0].status).toBe('digest_sent');
+    expect(runRows[0].dispatched_config).toEqual(config);
+    expect(runRows[0].dispatched_config_hash).toBe(computeTelegramDigestConfigHash(config));
     expect(runRows[0].delivery).toMatchObject({
       chatId: '-100555666777',
       chatTitle: 'Đội Sản Phẩm',
@@ -478,6 +491,38 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
         { service: 'calendar', label: 'Lịch nhóm hôm nay', status: 'partial_error' },
       ],
     });
+  });
+
+  it('reconciles an interrupted Telegram dispatch after the schedule switches to manual approval', async () => {
+    const config: TelegramDigestConfig = {
+      credentialId: randomUUID(), telegramUserId: '777', username: 'fixture',
+      chatId: '-100555666777', chatTitle: 'Original Telegram destination',
+      sources: [{ service: 'github', tool: 'github.search_issues', label: 'GitHub' }],
+      recurrence: { type: 'daily', time: '08:00' }, timeZone: 'Asia/Ho_Chi_Minh',
+    };
+    const schedule = await seedDigestSchedule(config);
+    const { rows: [{ id }] } = await pool.query(
+      `INSERT INTO schedule_runs(schedule_id, schedule_version, trigger, due_at, status,
+                                 delivery_started_at, dispatched_config, dispatched_config_hash)
+       VALUES ($1, $2, 'manual', $3, 'planning', $3, $4, $5) RETURNING id`,
+      [schedule.id, schedule.version, now, JSON.stringify(config), computeTelegramDigestConfigHash(config)],
+    );
+    await pool.query(
+      `UPDATE schedules SET kind='plan', version=version+1, digest_config=NULL,
+                            digest_config_hash=NULL, digest_approved_at=NULL WHERE id=$1`,
+      [schedule.id],
+    );
+
+    await reconcileScheduleRuns(pool);
+    const runs = await service.listRuns(USER_ID, schedule.id, 10, now);
+    expect(runs[0]).toMatchObject({
+      id, state: 'needs_attention', error: expect.stringContaining('TELEGRAM_DELIVERY_UNKNOWN'), canRetryDelivery: false,
+    });
+    await expect(service.resolveRunDelivery({ userId: USER_ID, runId: id, resolution: 'retry_new_run', confirmDuplicateRisk: true, now }))
+      .rejects.toMatchObject({ code: 'CONFIG_CHANGED_SINCE_RUN' });
+    const result = await service.resolveRunDelivery({ userId: USER_ID, runId: id, resolution: 'mark_sent', now });
+    expect(result.run.delivery).toMatchObject({ chatId: config.chatId, chatTitle: config.chatTitle });
+    expect(result.followUpRun).toBeNull();
   });
 
   it('marks run as blocked and pauses schedule when digest_config_hash mismatches or user is no longer a group member, with 0 Telegram sends', async () => {

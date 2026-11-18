@@ -679,10 +679,11 @@ export class TelegramDigestRunner {
           options.onBeforeClaimSql?.();
           const claimed = await runBoundedSql<{ id: string }>(
             `UPDATE schedule_runs
-             SET delivery_started_at = now(), updated_at = now()
+             SET delivery_started_at = now(), updated_at = now(),
+                 dispatched_config = $3::jsonb, dispatched_config_hash = $4
              WHERE id = $1 AND schedule_id = $2 AND status = 'planning' AND delivery_started_at IS NULL
              RETURNING id`,
-            [run.runId, run.scheduleId],
+            [run.runId, run.scheduleId, JSON.stringify(schedule.digest_config), schedule.digest_config_hash],
           );
           if (claimed.rowCount === 0) {
             await runBoundedSql('COMMIT');
@@ -1286,7 +1287,9 @@ export class TelegramDigestRunner {
             // A retry reaches this callback only after Telegram definitively rejects the previous request.
             if ((claimSqlIssued || recheck) && this.options.pool) {
               await this.options.pool.query(
-                "UPDATE schedule_runs SET delivery_started_at = NULL, updated_at = now() WHERE id = $1 AND schedule_id = $2 AND status = 'planning'",
+                `UPDATE schedule_runs
+                 SET delivery_started_at = NULL, dispatched_config = NULL, dispatched_config_hash = NULL, updated_at = now()
+                 WHERE id = $1 AND schedule_id = $2 AND status = 'planning'`,
                 [run.runId, run.scheduleId],
               ).catch(() => undefined);
             }
@@ -1379,8 +1382,10 @@ export class TelegramDigestRunner {
         if (isDefiniteWriteRejection(err) && this.options.pool) {
           await this.options.pool
             .query(
-              "UPDATE schedule_runs SET delivery_started_at = NULL, updated_at = now() WHERE id = $1 AND status = 'planning'",
-              [run.runId],
+              `UPDATE schedule_runs
+               SET delivery_started_at = NULL, dispatched_config = NULL, dispatched_config_hash = NULL, updated_at = now()
+               WHERE id = $1 AND schedule_id = $2 AND status = 'planning'`,
+              [run.runId, run.scheduleId],
             )
             .catch(() => undefined);
           return {

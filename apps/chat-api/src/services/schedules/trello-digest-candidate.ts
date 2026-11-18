@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { TrelloDigestConfig, TrelloDigestCandidate, ScheduleRecurrence } from '@wap/tool-schemas';
 import { canonicalizeRecurrence } from './github-digest-candidate.js';
+import { extractSlackDigestChannelHint } from './slack-digest-channel.js';
 
 export function canonicalizeTrelloDigestConfig(config: TrelloDigestConfig): TrelloDigestConfig {
   return {
@@ -373,9 +374,7 @@ export async function evaluateTrelloDigestCandidate(
   }
 
   // Slack destination
-  const hashMatch =
-    request.match(/#([a-z0-9._-]+)/i) ?? request.match(/(?:kênh|slack)\s+#?([a-z0-9._-]+)/i);
-  const channelQuery = hashMatch?.[1]?.trim() ?? '';
+  const channelQuery = extractSlackDigestChannelHint(request);
 
   let matchedChannel: { id: string; name: string } | null = null;
   try {
