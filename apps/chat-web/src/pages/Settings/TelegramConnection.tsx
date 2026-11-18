@@ -260,7 +260,7 @@ export function TelegramConnection({
         )}
       </div>
 
-      <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
+      <p className="text-[13px] leading-relaxed text-[#51463E] dark:text-[#D7CEC4]">
         Liên kết tài khoản Telegram cá nhân hoặc nhóm làm việc của bạn. Chọn từ 1 đến 10 cuộc trò chuyện bằng tên hiển thị rõ ràng để gửi thông báo, đọc tin nhắn nhóm và nhận Bản tin sáng tự động.
       </p>
 

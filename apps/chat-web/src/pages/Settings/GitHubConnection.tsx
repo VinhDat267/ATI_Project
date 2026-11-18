@@ -262,7 +262,7 @@ function GitHubWorkspaceConnection({
         )}
       </div>
 
-      <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
+      <p className="text-[13px] leading-relaxed text-[#51463E] dark:text-[#D7CEC4]">
         Chỉ bạn dùng được tài khoản GitHub này để thao tác trên các repository đã được chọn.
       </p>
 

@@ -117,9 +117,9 @@ it('does not claim catalogue counts or empty groups while the first catalogue re
   await waitFor(() => expect(calls.some(call => call.url === '/api/services')).toBe(true));
   expect(screen.queryByText(/Tất cả \d+ dịch vụ đều đã được thiết lập\./)).not.toBeInTheDocument();
   expect(screen.queryByText('Chưa có dịch vụ nào được thiết lập.')).not.toBeInTheDocument();
-  expect(screen.queryByText(/\d+ \/ \d+ dịch vụ đã thiết lập/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/\d+\/\d+ đã thiết lập/)).not.toBeInTheDocument();
   releaseCatalogue();
-  expect(await screen.findByText('1 / 2 dịch vụ đã thiết lập · 0 kết nối tốt')).toBeInTheDocument();
+  expect(await screen.findByText('1/2 đã thiết lập · 0 kết nối tốt')).toBeInTheDocument();
 });
 it('does not claim catalogue counts or empty groups after the first catalogue request fails, and recovers on retry', async () => {
   catalogueStatus = 503; mount();
@@ -128,27 +128,29 @@ it('does not claim catalogue counts or empty groups after the first catalogue re
   expect(retry.closest('[role="alert"]')).toHaveTextContent(errorMessage);
   expect(screen.queryByText(/Tất cả \d+ dịch vụ đều đã được thiết lập\./)).not.toBeInTheDocument();
   expect(screen.queryByText('Chưa có dịch vụ nào được thiết lập.')).not.toBeInTheDocument();
-  expect(screen.queryByText(/\d+ \/ \d+ dịch vụ đã thiết lập/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/\d+\/\d+ đã thiết lập/)).not.toBeInTheDocument();
   catalogueStatus = 200; fireEvent.click(retry);
-  expect(await screen.findByText('1 / 2 dịch vụ đã thiết lập · 0 kết nối tốt')).toBeInTheDocument();
+  expect(await screen.findByText('1/2 đã thiết lập · 0 kết nối tốt')).toBeInTheDocument();
   expect(screen.queryByText(errorMessage)).not.toBeInTheDocument();
 });
 
 it('groups by configured, summarizes actual shared service count and presents four textual states and checked time', async () => {
   services = [service('telegram', true), service('notion', true), service('slack', true), service('jira')];
   services[0].connectionStatus = 'healthy'; services[0].lastCheckedAt = '2026-10-08T07:05:00Z'; services[1].connectionStatus = 'unhealthy';
-  mount(); expect(await screen.findByText('3 / 4 dịch vụ đã thiết lập · 1 kết nối tốt')).toBeInTheDocument();
+  mount(); expect(await screen.findByText('3/4 đã thiết lập · 1 kết nối tốt')).toBeInTheDocument();
+  // Bộ đếm nằm trong khối Khoá dịch vụ, không ở tiêu đề trang (nơi nó từng bị đọc như tổng mọi dịch vụ).
+  expect(screen.getByRole('heading', { level: 2, name: 'Khoá dịch vụ' }).parentElement?.parentElement).toContainElement(document.getElementById('summary-connected-count'));
   expect(screen.getByText(/Kết nối tốt · kiểm tra lúc/)).toBeInTheDocument();
   expect(screen.getByText('Không kết nối được')).toBeInTheDocument(); expect(screen.getByText('Chưa kiểm tra')).toBeInTheDocument(); expect(screen.getAllByText('Chưa kết nối').length).toBeGreaterThanOrEqual(1);
   expect(within(document.getElementById('list-connected-services')!).getAllByRole('button')).toHaveLength(3);
   expect(document.body.textContent).not.toMatch(/Allowed Scope|Write Safety|Least Privilege|AES|Kịch bản demo|320 ms/);
 });
-it('places service buttons inside direct listitems in both configured groups without changing row classes', async () => {
+it('places service buttons inside direct listitems in both configured groups, laid out as one card grid', async () => {
   mount(); await screen.findByRole('button', { name: /Telegram —/ });
   for (const id of ['list-connected-services', 'list-unconnected-services']) {
     const list = document.getElementById(id)!;
     expect(list).toHaveAttribute('role', 'list');
-    expect(list).toHaveClass('v3-space-y-3');
+    expect(list).toHaveClass('ps-cardgrid');
     const items = within(list).getAllByRole('listitem');
     expect(items).toHaveLength(1);
     for (const item of items) {
@@ -156,7 +158,7 @@ it('places service buttons inside direct listitems in both configured groups wit
       expect(item).not.toHaveAttribute('class');
       const button = within(item).getByRole('button');
       expect(button.parentElement).toBe(item);
-      expect(button).toHaveClass('group', 'flex', 'flex-col', 'sm:flex-row', 'sm:items-center');
+      expect(button).toHaveClass('group', 'flex', 'ps-panel');
     }
   }
 });

@@ -8,11 +8,11 @@ import { apiClient } from '../src/services/api-client';
 
 const member = { id: 'u1', name: 'Lan Nguyễn', email: 'lan@example.test', role: 'member' as const };
 const admin = { ...member, id: 'a1', name: 'Quản Trị', role: 'admin' as const };
-// Redesign 11/2026: thanh bên gồm cả Hộp thư đề xuất (trước là chip "Sự kiện" riêng ngoài danh sách).
+// Redesign 11/2026: thanh bên gồm cả trang Tự động (trước là Hộp thư đề xuất, trước nữa là chip "Sự kiện" riêng).
 const tabs = [
   ['Không gian làm việc', '/'],
   ['Nhật ký', '/history'],
-  ['Hộp thư đề xuất', '/inbox'],
+  ['Tự động', '/inbox'],
   ['Kết nối dịch vụ', '/settings'],
   ['Cẩm nang', '/guide'],
   ['Người dùng', '/admin/users'],
@@ -37,12 +37,12 @@ it('FE-12: members get five links in a fixed order and admins also get Người 
   expect(links()[5]).toHaveAttribute('href', '/admin/users');
 });
 
-it('FE-12: the inbox has one entry, inside the list, and its count is part of its name', () => {
+it('FE-12: Tự động has one entry, inside the list, and its count is part of its name', () => {
   render(<MainNav user={member} current="inbox" navigate={vi.fn()} onLogout={vi.fn()} inboxBadgeCount={3} />);
   const inbox = within(nav()).getByTestId('nav-events-inbox-link');
-  expect(inbox).toHaveAccessibleName('Hộp thư đề xuất, 3 đề xuất cần xử lý');
+  expect(inbox).toHaveAccessibleName('Tự động, 3 đề xuất cần xử lý');
   expect(inbox).toHaveAttribute('aria-current', 'page');
-  expect(screen.getAllByRole('link', { name: /Hộp thư đề xuất/ })).toHaveLength(1);
+  expect(screen.getAllByRole('link', { name: /^Tự động/ })).toHaveLength(1);
 });
 
 it('FE-12: below 1024 px the menu button opens the sidebar as a sheet; a link or Escape closes it', () => {
@@ -180,7 +180,7 @@ it('FE-12: the bar keeps the logo outside the tabs, the theme toggle, the avatar
 it('FE-12: the avatar menu still lists every page, so phones can reach all of them', () => {
   render(<MainNav user={admin} current={null} navigate={vi.fn()} onLogout={vi.fn()} />);
   fireEvent.click(screen.getByRole('button', { name: /Menu người dùng/ }));
-  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Nhật ký điều phối', 'Không gian làm việc', 'Hộp thư đề xuất', 'Kết nối dịch vụ', 'Cẩm nang', 'Tài khoản', 'Quản lý người dùng', 'Chính sách an toàn', 'Đăng xuất']);
+  expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Nhật ký điều phối', 'Không gian làm việc', 'Tự động', 'Kết nối dịch vụ', 'Cẩm nang', 'Tài khoản', 'Quản lý người dùng', 'Chính sách an toàn', 'Đăng xuất']);
 });
 
 it('FE-12: signed-in guide and privacy use the shared bar; signed out they keep the old header', () => {

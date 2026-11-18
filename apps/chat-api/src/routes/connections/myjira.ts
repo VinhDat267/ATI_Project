@@ -80,7 +80,7 @@ export function createMyJiraConnectionRoutes(options: MyJiraConnectionsOptions):
           : body
       );
     if (!isMyJiraAvailable(options)) {
-      res.status(503).json({ error: 'Kết nối Jira chưa sẵn sàng.' });
+      res.status(503).json({ error: 'Kết nối Jira chưa sẵn sàng.', code: 'JIRA_UNCONFIGURED' });
       return;
     }
     next();

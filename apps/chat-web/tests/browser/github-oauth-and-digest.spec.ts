@@ -207,8 +207,8 @@ test('GITHUB-DIGEST: [USER_FLOW_E2E] admin selects team repos, member connects f
     await expect(page.getByRole('status').filter({ hasText: 'Đã gửi · 3 mục' })).toBeVisible();
     await expect(page.getByText(/Bản tin GitHub tự động của Planora/)).toBeVisible();
 
-    // Verify in /history that the schedule shows "Tự gửi" and the latest run shows "Đã gửi" + destination (#general)
-    await page.goto('/history');
+    // Verify on Tự động (/inbox) that the schedule shows "Tự gửi" and the latest run shows "Đã gửi" + destination (#general)
+    await page.goto('/inbox');
     const scheduleRegion = page.getByRole('region', { name: 'Lịch chạy' });
     await expect(scheduleRegion).toBeVisible();
     await expect(scheduleRegion.getByText('Tự gửi')).toBeVisible();

@@ -56,6 +56,8 @@ export function JiraConnection({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [connectionError, setConnectionError] = useState('');
+  // Máy chủ chưa bật Jira: trạng thái trung tính như Trello/GitHub, không phải lỗi kết nối.
+  const [unconfigured, setUnconfigured] = useState(false);
   const [infoNotice, setInfoNotice] = useState('');
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
@@ -188,11 +190,16 @@ export function JiraConnection({
       if (mounted.current) {
         setData(res);
         setConnectionError('');
+        setUnconfigured(false);
       }
     } catch (err: any) {
       if (mounted.current) {
         const status = err?.status ?? err?.statusCode;
-        if (status === 404) {
+        if (status === 503 && (err?.data?.code ?? err?.code) === 'JIRA_UNCONFIGURED') {
+          setData(null);
+          setConnectionError('');
+          setUnconfigured(true);
+        } else if (status === 404) {
           setData({
             connected: false,
             connectionState: 'disconnected',
@@ -665,7 +672,11 @@ export function JiraConnection({
               <h3 className="font-sans font-semibold text-base text-[#1a0e08] dark:text-white">
                 Atlassian Jira Cloud
               </h3>
-              {connectionError ? (
+              {unconfigured ? (
+                <span className={connectionBadgeClass('neutral')}>
+                  Chưa kết nối
+                </span>
+              ) : connectionError ? (
                 <span className={connectionBadgeClass('error')}>
                   Lỗi kết nối
                 </span>
@@ -865,6 +876,9 @@ export function JiraConnection({
       )}
 
       {/* CONNECTION ERROR ALERT */}
+      {unconfigured && (
+        <p data-testid="jira-unconfigured" className="mt-3 text-sm text-[#6A5F56] dark:text-[#AFA59A]">Jira chưa được cấu hình trên máy chủ.</p>
+      )}
       {connectionError && (
         <div
           id="jira-connection-error-alert"
@@ -1000,6 +1014,7 @@ export function JiraConnection({
 
       {/* JIRA WORKSPACE MANAGEMENT SECTION */}
       <details
+        hidden={unconfigured || undefined}
         open={standalone === false ? false : (!isDisconnected || workspaces.length > 0)}
         className="pt-3.5 mt-3.5 border-t border-[#E8E0D6] dark:border-[#3a312a] group"
       >

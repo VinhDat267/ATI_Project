@@ -6,7 +6,6 @@ import { useState, type MouseEvent as ReactMouseEvent, type KeyboardEvent as Rea
 import type { Conversation } from '../../types';
 import { formatConversationTime } from '../../services/conversation-time';
 import { useHistory } from './useHistory';
-import { ScheduleSection } from './ScheduleSection';
 
 function statusBadgeClass(status?: string): string {
   if (status === 'completed') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
@@ -251,8 +250,7 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
             </button>
           )}
         </div>}
-        {/* Lịch chạy đứng sau danh sách: trang này trước hết là nơi tìm lại hội thoại. */}
-        <ScheduleSection user={user} navigate={navigate} />
+        {/* Bước 5b: Lịch chạy chuyển sang trang Tự động (/inbox); Nhật ký chỉ còn hội thoại. */}
       </main>
       {/* CHÂN TRANG */}
       <footer className="mt-auto border-t border-[#E6DED3] bg-[#F8F4EE] py-6 px-4 sm:px-6">

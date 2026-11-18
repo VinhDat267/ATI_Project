@@ -1,4 +1,4 @@
-// PBI-05 (Sprint 1): /history luôn có mục "Lịch chạy" khi máy chủ bật lịch chạy, kể cả khi
+// PBI-05 (Sprint 1), cập nhật ở bước 5b: trang Tự động (/inbox) luôn có mục "Lịch chạy" khi máy chủ bật lịch chạy, kể cả khi
 // GET /api/schedules trả {"schedules":[]}. Trạng thái rỗng chỉ nói điều mã nguồn làm thật:
 // lịch được lưu khi người dùng bấm "Xác nhận" trên đề xuất lịch chạy trong Không gian làm việc
 // (POST /api/conversations/:convId/schedule-proposals/:messageId/confirm).

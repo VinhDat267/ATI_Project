@@ -349,7 +349,7 @@ test('TELEGRAM-E2E-1: /guide 1-click showcase, TELEGRAM_PAIRING_PENDING auto-foc
     });
   });
 
-  await page.goto('/history');
+  await page.goto('/inbox');
   const scheduleRegion = page.getByRole('region', { name: 'Lịch chạy' });
   await expect(scheduleRegion).toBeVisible();
   await expect(scheduleRegion.getByText('Tự gửi Telegram · Nhóm Vận Hành ATI')).toBeVisible();

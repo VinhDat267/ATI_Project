@@ -6,7 +6,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { App } from '../src/App';
 import { apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
-import { getActiveWorkspaceId, resetWorkspaceStorage, setCachedOrganizations } from '../src/services/workspace-storage';
+import { getActiveWorkspaceId, resetWorkspaceStorage, setActiveWorkspaceId, setCachedOrganizations } from '../src/services/workspace-storage';
 import { useChatStore } from '../src/store/chat-store';
 import type { WorkspaceSummary } from '../src/types';
 
@@ -72,7 +72,7 @@ describe('PBI-04: chuyển không gian trên /settings', () => {
     expect(useChatStore.getState().conversationId).toBeNull();
   });
 
-  it('giữ nguyên /history và tải lại cả mục Lịch chạy lẫn danh sách hội thoại của không gian mới', async () => {
+  it('giữ nguyên trang Tự động và tải lại Lịch chạy của không gian mới; Nhật ký tải lại danh sách hội thoại', async () => {
     vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({ runtimeMode: 'sandbox', schedulesEnabled: true } as never);
     vi.spyOn(apiClient, 'getSchedules').mockImplementation(async () => ({
       schedules: getActiveWorkspaceId() === 'personal'
@@ -85,16 +85,25 @@ describe('PBI-04: chuyển không gian trên /settings', () => {
         : [{ id: 'conv-shared', title: 'Hội thoại nhóm chung' }],
     }) as never);
 
-    window.history.replaceState({}, '', '/history');
-    render(<App />);
+    window.history.replaceState({}, '', '/inbox');
+    const view = render(<App />);
     const scheduleRegion = await screen.findByRole('region', { name: 'Lịch chạy' });
     expect(await within(scheduleRegion).findByText('Lịch riêng cá nhân')).toBeInTheDocument();
-    expect(await within(screen.getByRole('main')).findByText('Hội thoại cá nhân')).toBeInTheDocument();
 
     await act(async () => { await switchTo(/^Không gian Chung$/); });
-    expect(window.location.pathname).toBe('/history');
+    expect(window.location.pathname).toBe('/inbox');
     expect(await within(scheduleRegion).findByText('Chưa có lịch chạy nào')).toBeInTheDocument();
     expect(within(scheduleRegion).queryByText('Lịch riêng cá nhân')).toBeNull();
+    view.unmount();
+
+    // Nhật ký không còn Lịch chạy, nhưng danh sách hội thoại vẫn theo không gian đang chọn.
+    act(() => setActiveWorkspaceId('personal'));
+    window.history.replaceState({}, '', '/history');
+    render(<App />);
+    expect(await within(screen.getByRole('main')).findByText('Hội thoại cá nhân')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Lịch chạy' })).toBeNull();
+    await act(async () => { await switchTo(/^Không gian Chung$/); });
+    expect(window.location.pathname).toBe('/history');
     expect(await within(screen.getByRole('main')).findByText('Hội thoại nhóm chung')).toBeInTheDocument();
     expect(within(screen.getByRole('main')).queryByText('Hội thoại cá nhân')).toBeNull();
   });

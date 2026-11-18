@@ -5,11 +5,11 @@ import pg from 'pg';
 import {fixtureConversation,fixtureMessage,certifyFixturePlan} from './persisted-artifacts.fixture.js';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
 
-// Redesign 11/2026: thanh bên trái; Hộp thư đề xuất nằm trong danh sách.
+// Redesign 11/2026: thanh bên trái; trang Tự động (trước là Hộp thư đề xuất) nằm trong danh sách.
 const TABS = [
   ['Không gian làm việc', /\/$/],
   ['Nhật ký', /\/history$/],
-  ['Hộp thư đề xuất', /\/inbox$/],
+  ['Tự động', /\/inbox$/],
   ['Kết nối dịch vụ', /\/settings$/],
   ['Cẩm nang', /\/guide$/],
   ['Người dùng', /\/admin\/users$/],
@@ -17,7 +17,7 @@ const TABS = [
 const PAGES = [
   { path: '/', current: 'Không gian làm việc' },
   { path: '/history', current: 'Nhật ký' },
-  { path: '/inbox', current: 'Hộp thư đề xuất' },
+  { path: '/inbox', current: 'Tự động' },
   { path: '/settings', current: 'Kết nối dịch vụ' },
   { path: '/account', current: null },
   { path: '/admin/users', current: 'Người dùng' },
@@ -282,7 +282,7 @@ test('FE-12: a member gets five links on desktop and reaches every page from the
     await expect(mainNav(page).getByRole('link', { name: 'Người dùng' })).toHaveCount(0);
     await page.setViewportSize({ width: 375, height: 812 });
     const menuButton = page.getByRole('button', { name: 'Mở menu điều hướng' });
-    for (const [item, url] of [['Kết nối dịch vụ', /\/settings$/], ['Cẩm nang', /\/guide$/], ['Hộp thư đề xuất', /\/inbox$/], ['Nhật ký', /\/history$/]] as const) {
+    for (const [item, url] of [['Kết nối dịch vụ', /\/settings$/], ['Cẩm nang', /\/guide$/], ['Tự động', /\/inbox$/], ['Nhật ký', /\/history$/]] as const) {
       await expect(mainNav(page)).toBeHidden();
       await menuButton.click();
       await expect(mainNav(page)).toBeVisible();

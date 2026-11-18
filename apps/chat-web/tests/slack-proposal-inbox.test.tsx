@@ -349,7 +349,8 @@ describe('SLACK-06A & SLACK-06B SlackProposalInbox UI and /inbox route', () => {
     vi.spyOn(apiClient, 'getMe').mockResolvedValue({ user });
 
     render(<App />);
-    expect(await screen.findByRole('heading', { name: 'Hộp thư đề xuất & Bản tóm tắt' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Tự động' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Hộp thư đề xuất' })).toBeInTheDocument();
     expect(await screen.findByText('Tạo thẻ theo dõi bản phát hành')).toBeInTheDocument();
 
     act(() =>
