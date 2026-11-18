@@ -200,7 +200,7 @@ export async function validateJiraApprovalBinding(
     );
 
     // 5. Check each site and project in siteSteps
-    for (const [stepId, scope] of Object.entries(siteSteps)) {
+    for (const scope of Object.values(siteSteps)) {
       if (options?.signal?.aborted) {
         return {
           valid: false,
