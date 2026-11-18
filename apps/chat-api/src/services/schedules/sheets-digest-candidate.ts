@@ -198,7 +198,7 @@ function extractSheetTabFromPrompt(
     .trim();
 
   const unquotedKeywordTabMatch =
-    /(?:^|(?<=[^\p{L}\p{N}_]))(?:tab|sheet)\s+(?![\s"'“”‘’])([^"'“”‘’,.;:!?\n]+?)(?=\s+(?:vùng|miền|ô|range|từ|trong|của|thuộc|và|rồi|vào|lên|qua|sang|tới|đến|gửi|from|in|of|to|into|and|then|\$?[A-Za-z]{1,3}\$?\d+\s*:)(?=\s|$|[,.;:!?\n()\[\]])|!\$?[A-Za-z]{1,3}\$?\d+\s*:|[,.;:\n]|$)/iu.exec(
+    /(?:^|(?<=[^\p{L}\p{N}_]))(?:tab|sheet)\s+(?![\s"'“”‘’])([^"'“”‘’,.;:!?()\[\]\n]+?)(?=\s+(?:vùng|miền|ô|range|từ|trong|của|thuộc|và|rồi|vào|lên|qua|sang|tới|đến|gửi|from|in|of|to|into|and|then|\$?[A-Za-z]{1,3}\$?\d+\s*:)(?=\s|$|[,.;:!?\n()\[\]])|!\$?[A-Za-z]{1,3}\$?\d+\s*:|[,.;:!?()\[\]\n]|$)/iu.exec(
       request
     );
   const unquotedKeywordTabCandidate = unquotedKeywordTabMatch?.[1]?.trim();
@@ -470,6 +470,7 @@ export interface AnalyzeSheetsDigestInput {
   credentialRepo?: CredentialRepo;
   encryptionKey?: string;
   gmailOAuthClientId?: string;
+  mysheetsOAuthClientId?: string;
   mysheetsEnabled?: boolean;
   fetchOrgSheetsMetadata?: FetchOrgSheetsMetadataFn;
   emitV2?: boolean;
@@ -489,6 +490,7 @@ export async function analyzeSheetsDigestCandidate(
     credentialRepo,
     encryptionKey,
     gmailOAuthClientId,
+    mysheetsOAuthClientId,
     mysheetsEnabled,
     fetchOrgSheetsMetadata,
     signal,
@@ -585,6 +587,15 @@ export async function analyzeSheetsDigestCandidate(
       return {
         ok: false,
         reason: 'Hãy kết nối Google Sheets cá nhân trước khi bật tự gửi báo cáo.',
+      };
+    }
+    if (
+      mysheetsOAuthClientId &&
+      !hasGoogleCredentialOrigin(record.config, encryptionKey, mysheetsOAuthClientId)
+    ) {
+      return {
+        ok: false,
+        reason: 'Kết nối Google Sheets cá nhân không khớp cấu hình OAuth hiện tại. Hãy kết nối lại.',
       };
     }
     let dec: any;
@@ -1255,6 +1266,7 @@ export interface VerifySheetsDigestCandidateInTxInput {
   trustedScope: { workspaceMode: SheetsDigestWorkspaceMode; workspaceId: string | null };
   encryptionKey?: string;
   gmailOAuthClientId?: string;
+  mysheetsOAuthClientId?: string;
   mysheetsEnabled?: boolean;
 }
 
@@ -1265,7 +1277,7 @@ export async function verifySheetsDigestCandidateInTx(
   | { ok: true; config: SheetsDigestConfigV2; configHash: string }
   | { ok: false; reason: string }
 > {
-  const { userId, recurrence, config, expectedHash, trustedScope, encryptionKey, gmailOAuthClientId, mysheetsEnabled } =
+  const { userId, recurrence, config, expectedHash, trustedScope, encryptionKey, gmailOAuthClientId, mysheetsOAuthClientId, mysheetsEnabled } =
     input;
 
   if (!encryptionKey || !isSheetsDigestConfigV2(config)) {
@@ -1388,6 +1400,15 @@ export async function verifySheetsDigestCandidateInTx(
       return {
         ok: false,
         reason: 'Kết nối Google Sheets cá nhân không còn hoạt động hoặc đã thay đổi.',
+      };
+    }
+    if (
+      mysheetsOAuthClientId &&
+      !hasGoogleCredentialOrigin(sourceRow.config, encryptionKey, mysheetsOAuthClientId)
+    ) {
+      return {
+        ok: false,
+        reason: 'Kết nối Google Sheets cá nhân không khớp cấu hình OAuth hiện tại. Hãy kết nối lại.',
       };
     }
     try {

@@ -12,6 +12,7 @@ import { isUuid } from '../../db/repositories/uuid.js';
 import { isValidGmailDigestBinding, isValidGmailDigestQuery } from './gmail-digest-binding.js';
 import { isNotionDigestSourceBinding, NOTION_DIGEST_REAPPROVAL } from '../notion/digest-source-authority.js';
 import { bindMyCalendarDigestSource, isMyCalendarDigestSource, MYCALENDAR_DIGEST_REAPPROVAL, type MyCalendarDigestConnection } from './mycalendar-digest-source.js';
+import { bindMySheetsDigestSource, isMySheetsDigestSource, MYSHEETS_DIGEST_REAPPROVAL, type MySheetsDigestConnection } from './mysheets-digest-source.js';
 
 export function telegramNotionSource(config: { sources?: TelegramDigestSource[] } | null | undefined) {
   return Array.isArray(config?.sources) ? config.sources.find((source) => source?.service === 'notion') : undefined;
@@ -82,12 +83,20 @@ export const DISABLED_READ_DIGEST_SERVICES: ReadonlyMap<string, string> = new Ma
 
 export function getDigestSourceDisabledReason(
   source: { service?: string; tool?: string; args?: Record<string, unknown> } | null | undefined,
-  context?: { workspaceMode?: string | null; workspaceId?: string | null },
+  context?: { workspaceMode?: string | null; workspaceId?: string | null; destination?: string | null },
 ): string | undefined {
   const service = typeof source?.service === 'string' ? source.service : '';
   const toolService = typeof source?.tool === 'string' ? source.tool.split('.')[0] ?? '' : '';
   const disabled = DISABLED_READ_DIGEST_SERVICES.get(service) ?? DISABLED_READ_DIGEST_SERVICES.get(toolService);
   if (disabled) return disabled;
+  if (service === 'sheets' || toolService === 'sheets') {
+    if (context?.workspaceMode === 'personal') {
+      return 'SHEETS_WORKSPACE_REQUIRED: Bảng tính nhóm (sheets) không khả dụng trong Không gian cá nhân; hãy dùng Google Sheets của bạn (mysheets).';
+    }
+    if (context?.workspaceMode === 'organization' && context?.destination === 'telegram') {
+      return 'SHEETS_TELEGRAM_ORG_FORBIDDEN: Dữ liệu Bảng tính nhóm trong Workspace Tổ chức không được tự động gửi ra Telegram cá nhân; hãy gửi qua Slack của tổ chức.';
+    }
+  }
   if ((service === 'myjira' || toolService === 'myjira') && service !== toolService) {
     return 'JIRA_SOURCE_MISMATCH: Công cụ myjira không khớp với dịch vụ nguồn.';
   }
@@ -294,6 +303,9 @@ export interface BuildMultiDigestSourcesInput {
   mycalendarLookup?: MyCalendarDigestConnection | null;
   existingMyCalendarSources?: TelegramDigestSource[];
   reauthorizeMyCalendar?: boolean;
+  mysheetsLookup?: MySheetsDigestConnection | null;
+  existingMySheetsSources?: TelegramDigestSource[];
+  reauthorizeMySheets?: boolean;
   workspaceMode?: 'legacy' | 'personal' | 'organization';
   workspaceId?: string | null;
   gmailBinding?: GmailDigestBinding | null;
@@ -307,8 +319,10 @@ export function validateMultiDigestSourcePreconditions(input: {
   destinationLabel: 'Telegram' | 'Slack';
   requestText: string;
   notionBinding?: NotionDigestSourceBinding;
+  workspaceMode?: 'legacy' | 'personal' | 'organization';
+  workspaceId?: string | null;
 }): { ok: true } | { ok: false; disabledReason: string } {
-  const { sourceServices, destinationLabel, requestText, notionBinding } = input;
+  const { sourceServices, destinationLabel, requestText, notionBinding, workspaceMode } = input;
   if (sourceServices.length === 0) {
     return {
       ok: false,
@@ -332,6 +346,21 @@ export function validateMultiDigestSourcePreconditions(input: {
     };
   }
 
+  if (sourceServices.includes('sheets')) {
+    if (workspaceMode === 'personal') {
+      return {
+        ok: false,
+        disabledReason: 'Bảng tính nhóm không khả dụng trong Không gian cá nhân. Hãy kết nối Google Sheets của bạn để bật Tự gửi.',
+      };
+    }
+    if (workspaceMode === 'organization' && destinationLabel === 'Telegram') {
+      return {
+        ok: false,
+        disabledReason: 'Trong Không gian làm việc Tổ chức, dữ liệu Bảng tính nhóm không được gửi tự động sang Telegram cá nhân. Hãy chọn kênh Slack của tổ chức.',
+      };
+    }
+  }
+
   if (hasWriteIntentForDigest(requestText)) {
     return {
       ok: false,
@@ -353,6 +382,8 @@ export function buildMultiDigestSources(
     destinationLabel,
     requestText,
     notionBinding: input.notionBinding,
+    workspaceMode: input.workspaceMode,
+    workspaceId: input.workspaceId,
   });
   if (!precheck.ok) return precheck;
 
@@ -445,6 +476,20 @@ export function buildMultiDigestSources(
           disabledReason:
             previous.length > 0 ? MYCALENDAR_DIGEST_REAPPROVAL :
               'Hãy kết nối Google Calendar cá nhân và chọn ít nhất 1 lịch trước khi bật tự gửi báo cáo.',
+        };
+      }
+      sources.push(bound);
+    } else if (service === 'mysheets') {
+      const previous = input.existingMySheetsSources?.filter(isMySheetsDigestSource) ?? [];
+      const bound = previous.length <= 1
+        ? bindMySheetsDigestSource(source, input.mysheetsLookup, previous[0], input.reauthorizeMySheets === true)
+        : null;
+      if (!bound) {
+        return {
+          ok: false,
+          disabledReason:
+            previous.length > 0 ? MYSHEETS_DIGEST_REAPPROVAL :
+              'Hãy kết nối Google Sheets cá nhân và chọn ít nhất 1 bảng tính trước khi bật tự gửi báo cáo.',
         };
       }
       sources.push(bound);

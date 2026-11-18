@@ -146,6 +146,7 @@ export async function getToolCatalogFor(
     mycalendarEnabled?: boolean;
     mycalendarOAuthClientId?: string;
     mysheetsEnabled?: boolean;
+    mysheetsOAuthClientId?: string;
     /** Server-owned kill-switch for the 4 MySheets Drive/Docs write tools (defaults to false). */
     enableMySheetsDriveWriteTools?: boolean;
     trelloEnabled?: boolean;
@@ -247,24 +248,34 @@ export async function getToolCatalogFor(
     if (mysheets && mysheets.status === 'active') {
       try {
         const config = decryptCredentials(mysheets.config, encryptionKey);
-        const spreadsheets: string[] = Array.isArray(config.allowedScope?.spreadsheets)
-          ? config.allowedScope.spreadsheets
-          : Array.isArray(config.selectedSpreadsheets)
-            ? config.selectedSpreadsheets.map((s: any) => s.id)
-            : [];
-        const driveWriteEnabled =
-          typeof options.enableMySheetsDriveWriteTools === 'boolean'
-            ? options.enableMySheetsDriveWriteTools
-            : process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS === 'true' ||
-              process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS === 'on';
-        const allowedMySheetsTools = MYSHEETS_TOOLS.filter(
-          (tool) => driveWriteEnabled || !MYSHEETS_DRIVE_WRITE_TOOLS.has(tool.name),
-        );
-        const driveTools = allowedMySheetsTools.filter((tool) => MYSHEETS_DRIVE_TOOLS.has(tool.name));
-        catalog = [
-          ...catalog,
-          ...(spreadsheets.length > 0 ? allowedMySheetsTools : driveTools),
-        ];
+        if (
+          options.mysheetsOAuthClientId &&
+          (!encryptionKey ||
+            !hasGoogleCredentialOrigin(mysheets.config, encryptionKey, options.mysheetsOAuthClientId))
+        ) {
+          console.warn(
+            "[registered-services] MySheets credential OAuth clientId mismatch; skipping service.",
+          );
+        } else {
+          const spreadsheets: string[] = Array.isArray(config.allowedScope?.spreadsheets)
+            ? config.allowedScope.spreadsheets
+            : Array.isArray(config.selectedSpreadsheets)
+              ? config.selectedSpreadsheets.map((s: any) => s.id)
+              : [];
+          const driveWriteEnabled =
+            typeof options.enableMySheetsDriveWriteTools === 'boolean'
+              ? options.enableMySheetsDriveWriteTools
+              : process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS === 'true' ||
+                process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS === 'on';
+          const allowedMySheetsTools = MYSHEETS_TOOLS.filter(
+            (tool) => driveWriteEnabled || !MYSHEETS_DRIVE_WRITE_TOOLS.has(tool.name),
+          );
+          const driveTools = allowedMySheetsTools.filter((tool) => MYSHEETS_DRIVE_TOOLS.has(tool.name));
+          catalog = [
+            ...catalog,
+            ...(spreadsheets.length > 0 ? allowedMySheetsTools : driveTools),
+          ];
+        }
       } catch {
         // stale or unreadable connection does not add tools
         console.warn(

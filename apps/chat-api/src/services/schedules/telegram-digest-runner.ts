@@ -13,6 +13,7 @@ import type { TelegramBotClient } from '../telegram/bot-client.js';
 import { localLabel } from './next-occurrence.js';
 import { assertGmailDigestBinding } from './gmail-digest-binding.js';
 import { MYCALENDAR_DIGEST_REAPPROVAL, readMyCalendarDigestBinding } from './mycalendar-digest-source.js';
+import { MYSHEETS_DIGEST_REAPPROVAL, readMySheetsDigestBinding } from './mysheets-digest-source.js';
 import { isNotionSourceDenied } from '../notion/digest-source-authority.js';
 import {
   approvedTelegramNotionBinding,
@@ -100,6 +101,7 @@ export interface TelegramDigestRunnerOptions {
   encryptionKey: string;
   gmailOAuthClientId?: string;
   mycalendarOAuthClientId?: string;
+  mysheetsOAuthClientId?: string;
   adapterFactory: {
     getAdapterForService(serviceName: string, context?: AdapterContext): Promise<any> | any;
   };
@@ -649,8 +651,10 @@ export class TelegramDigestRunner {
           encryptionKey: this.options.encryptionKey,
           gmailOAuthClientId: this.options.gmailOAuthClientId,
           mycalendarOAuthClientId: this.options.mycalendarOAuthClientId,
+          mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
           lockTelegramJiraAuthority: lockJiraAuthority,
           lockMyCalendarAuthority: 'nowait',
+          lockMySheetsAuthority: 'nowait',
         });
         if (
           !pinnedCtx.allowed ||
@@ -859,6 +863,7 @@ export class TelegramDigestRunner {
             getDigestSourceDisabledReason(src, {
               workspaceMode: run.workspaceMode,
               workspaceId: run.workspaceId,
+              destination: 'telegram',
             }),
           )
           .find((reason) => reason !== undefined)
@@ -889,6 +894,13 @@ export class TelegramDigestRunner {
     }
     if (mycalendar.kind === 'bound' && typeof (this.options.pool as pg.Pool | undefined)?.connect !== 'function') {
       return { status: 'blocked', error: 'Bản tin Google Calendar cần kết nối PostgreSQL.', pauseSchedule: true };
+    }
+    const mysheets = readMySheetsDigestBinding(digestConfig, null);
+    if (mysheets.kind === 'invalid') {
+      return { status: 'blocked', error: MYSHEETS_DIGEST_REAPPROVAL, pauseSchedule: true };
+    }
+    if (mysheets.kind === 'bound' && typeof (this.options.pool as pg.Pool | undefined)?.connect !== 'function') {
+      return { status: 'blocked', error: 'Bản tin Google Sheets cần kết nối PostgreSQL.', pauseSchedule: true };
     }
 
     const jiraSources = digestConfig.sources.filter((source) => source?.service === 'myjira');
@@ -962,6 +974,7 @@ export class TelegramDigestRunner {
         encryptionKey: this.options.encryptionKey,
         gmailOAuthClientId: this.options.gmailOAuthClientId,
         mycalendarOAuthClientId: this.options.mycalendarOAuthClientId,
+        mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
         expectedTelegramDigestConfigHash: hasJiraSources ? digestConfigHash : undefined,
       });
       if (
@@ -1041,7 +1054,7 @@ export class TelegramDigestRunner {
 
     for (const source of digestConfig.sources) {
       const allowed = READ_DIGEST_SOURCE_MAP[source.service];
-      if (!allowed || allowed.tool !== source.tool) {
+      if (!allowed || (allowed.tool !== source.tool && !(source.service === 'mysheets' && source.tool === 'mysheets.read_range'))) {
         return {
           status: 'blocked',
           error: `Công cụ nguồn "${source.tool}" không nằm trong danh sách chỉ đọc được phép.`,
@@ -1073,6 +1086,7 @@ export class TelegramDigestRunner {
       credentialRepo: this.options.credentialRepo,
       encryptionKey: this.options.encryptionKey,
       gmailOAuthClientId: this.options.gmailOAuthClientId,
+      mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
       pool: this.options.pool,
       adapterFactory: this.options.adapterFactory,
       signal,

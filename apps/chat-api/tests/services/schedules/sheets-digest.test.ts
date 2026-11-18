@@ -28,4 +28,30 @@ describe('Sheets Digest KPI Analyzer (Task 4: Deadline Overdue Detection & Smart
     expect(metrics.highlights[0]).toContain('🚨 [Quá hạn');
     expect(metrics.highlights.some((h) => h.includes('Triển khai Kampaign Q4'))).toBe(true);
   });
+
+  it('detects dueSoonCount (within 48h), blockedCount, unassignedCount, and overdueCount while preserving legacy fields', () => {
+    const headers = ['Công việc', 'Trạng thái', 'Hạn chót', 'Người phụ trách'];
+    const records = [
+      { 'Công việc': 'Việc đã xong', 'Trạng thái': 'Hoàn thành', 'Hạn chót': '10/10/2026', 'Người phụ trách': '' },
+      { 'Công việc': 'Chờ API đối tác', 'Trạng thái': 'Bị chặn', 'Hạn chót': '20/10/2026', 'Người phụ trách': 'Minh' },
+      { 'Công việc': 'Gửi báo giá', 'Trạng thái': 'Đang làm', 'Hạn chót': '16/10/2026', 'Người phụ trách': '' },
+      { 'Công việc': 'Đối soát công nợ', 'Trạng thái': 'Đang làm', 'Hạn chót': '01/10/2026', 'Người phụ trách': 'Lan' },
+    ];
+
+    const now = new Date('2026-10-15T09:00:00Z');
+    const metrics = analyzeSheetKpiMetrics(headers, records, [], now);
+
+    expect(metrics.totalRows).toBe(4);
+    expect(metrics.doneCount).toBe(1);
+    expect(metrics.inProgressCount).toBe(1);
+    expect(metrics.overdueOrPendingCount).toBe(2);
+    expect(metrics.overdueCount).toBe(1);
+    expect(metrics.dueSoonCount).toBe(1);
+    expect(metrics.blockedCount).toBe(1);
+    expect(metrics.unassignedCount).toBe(1);
+
+    expect(metrics.highlights.some((h) => h.includes('⛔ [Bị chặn'))).toBe(true);
+    expect(metrics.highlights.some((h) => h.includes('🚨 [Quá hạn'))).toBe(true);
+    expect(metrics.highlights.some((h) => h.includes('⏰ [Sắp đến hạn') && h.includes('👤 (chưa gán)'))).toBe(true);
+  });
 });

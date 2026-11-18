@@ -20,6 +20,7 @@ import {
 } from './multi-source-digest-reader.js';
 import { computeSlackDigestConfigHash } from './slack-digest-candidate.js';
 import { MYCALENDAR_DIGEST_REAPPROVAL, readMyCalendarDigestBinding } from './mycalendar-digest-source.js';
+import { MYSHEETS_DIGEST_REAPPROVAL, readMySheetsDigestBinding } from './mysheets-digest-source.js';
 import {
   assertDigestScheduleLiveScopeAndAuth,
 } from './digest-scope-guard.js';
@@ -86,6 +87,7 @@ export interface SlackDigestRunnerOptions {
   encryptionKey: string;
   gmailOAuthClientId?: string;
   mycalendarOAuthClientId?: string;
+  mysheetsOAuthClientId?: string;
   adapterFactory: {
     getAdapterForService(serviceName: string, context?: AdapterContext): Promise<any> | any;
   };
@@ -232,8 +234,10 @@ export class SlackDigestRunner {
         encryptionKey: this.options.encryptionKey,
         gmailOAuthClientId: this.options.gmailOAuthClientId,
         mycalendarOAuthClientId: this.options.mycalendarOAuthClientId,
+        mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
         lockTelegramJiraAuthority: hasJira,
         lockMyCalendarAuthority: 'nowait',
+        lockMySheetsAuthority: 'nowait',
       });
       if (!guard.allowed) {
         await client.query('COMMIT');
@@ -333,6 +337,13 @@ export class SlackDigestRunner {
     if (mycalendar.kind === 'bound' && typeof (this.options.pool as pg.Pool | undefined)?.connect !== 'function') {
       return { status: 'blocked', error: 'Bản tin Google Calendar cần kết nối PostgreSQL.', pauseSchedule: true };
     }
+    const mysheets = readMySheetsDigestBinding(digestConfig, run.services ?? null);
+    if (mysheets.kind === 'invalid') {
+      return { status: 'blocked', error: MYSHEETS_DIGEST_REAPPROVAL, pauseSchedule: true };
+    }
+    if (mysheets.kind === 'bound' && typeof (this.options.pool as pg.Pool | undefined)?.connect !== 'function') {
+      return { status: 'blocked', error: 'Bản tin Google Sheets cần kết nối PostgreSQL.', pauseSchedule: true };
+    }
 
     if (telegramNotionSource(digestConfig)) {
       return {
@@ -395,7 +406,7 @@ export class SlackDigestRunner {
 
     for (const source of digestConfig.sources) {
       const allowed = READ_DIGEST_SOURCE_MAP[source.service];
-      if (!allowed || allowed.tool !== source.tool) {
+      if (!allowed || (allowed.tool !== source.tool && !(source.service === 'mysheets' && source.tool === 'mysheets.read_range'))) {
         return {
           status: 'blocked',
           error: `Công cụ nguồn "${source.tool}" không nằm trong danh sách chỉ đọc được phép.`,
@@ -405,6 +416,7 @@ export class SlackDigestRunner {
       const disabledReason = getDigestSourceDisabledReason(source, {
         workspaceMode: run.workspaceMode,
         workspaceId: run.workspaceId,
+        destination: 'slack',
       });
       if (disabledReason) {
         return {
@@ -434,6 +446,7 @@ export class SlackDigestRunner {
         encryptionKey: this.options.encryptionKey,
         gmailOAuthClientId: this.options.gmailOAuthClientId,
         mycalendarOAuthClientId: this.options.mycalendarOAuthClientId,
+        mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
       });
       if (!preGuard.allowed) {
         return {
@@ -559,6 +572,7 @@ export class SlackDigestRunner {
       credentialRepo: this.options.credentialRepo,
       encryptionKey: this.options.encryptionKey,
       gmailOAuthClientId: this.options.gmailOAuthClientId,
+      mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
       pool: this.options.pool,
       adapterFactory: this.options.adapterFactory,
       signal,

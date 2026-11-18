@@ -10,6 +10,7 @@ import type { TelegramConnectionLookupResult } from '../telegram/connection-refe
 import type { GitHubConnectionLookupResult } from '../github/connection-reference.js';
 import type { JiraConnectionLookupResult } from './jira-digest-candidate.js';
 import type { MyCalendarDigestConnection } from './mycalendar-digest-source.js';
+import type { MySheetsDigestConnection } from './mysheets-digest-source.js';
 import { isNotionDigestSourceBinding, NOTION_DIGEST_REAPPROVAL } from '../notion/digest-source-authority.js';
 import { validateTelegramDigestGmailConfig } from './gmail-digest-binding.js';
 import {
@@ -76,6 +77,7 @@ export function computeTelegramDigestConfigHash(config: TelegramDigestConfig): s
       ...(s.notionBinding !== undefined ? { notionBinding: s.notionBinding } : {}),
       ...(s.jiraBinding !== undefined ? { jiraBinding: s.jiraBinding } : {}),
       ...(s.mycalendarBinding !== undefined ? { mycalendarBinding: s.mycalendarBinding } : {}),
+      ...(s.mysheetsBinding !== undefined ? { mysheetsBinding: s.mysheetsBinding } : {}),
     })),
     recurrence: config.recurrence,
     timeZone: config.timeZone,
@@ -92,6 +94,8 @@ export interface EvaluateTelegramDigestInput {
   jiraLookup?: JiraConnectionLookupResult | null;
   mycalendarLookup?: MyCalendarDigestConnection | null;
   reauthorizeMyCalendar?: boolean;
+  mysheetsLookup?: MySheetsDigestConnection | null;
+  reauthorizeMySheets?: boolean;
   workspaceMode?: 'legacy' | 'personal' | 'organization';
   workspaceId?: string | null;
   gmailBinding?: GmailDigestBinding | null;
@@ -130,6 +134,8 @@ export function evaluateTelegramDigestCandidate(
     destinationLabel: 'Telegram',
     requestText,
     notionBinding: input.notionBinding,
+    workspaceMode: input.workspaceMode,
+    workspaceId: input.workspaceId,
   });
   if (!precheck.ok) {
     return {
@@ -233,6 +239,9 @@ export function evaluateTelegramDigestCandidate(
     mycalendarLookup: input.mycalendarLookup,
     existingMyCalendarSources: Array.isArray(existingDigest?.sources) ? existingDigest.sources : undefined,
     reauthorizeMyCalendar: input.reauthorizeMyCalendar,
+    mysheetsLookup: input.mysheetsLookup,
+    existingMySheetsSources: Array.isArray(existingDigest?.sources) ? existingDigest.sources : undefined,
+    reauthorizeMySheets: input.reauthorizeMySheets,
     workspaceMode: input.workspaceMode,
     workspaceId: input.workspaceId,
     gmailBinding: input.gmailBinding,

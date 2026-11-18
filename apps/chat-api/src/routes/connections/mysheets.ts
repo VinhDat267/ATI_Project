@@ -141,6 +141,30 @@ export function createMySheetsConnectionRoutes(options: MySheetsConnectionsOptio
     return tokens.accessToken;
   };
 
+  /** Best-effort discovery of up to 20 localized tab names via Sheets v4 metadata. */
+  const discoverSpreadsheetTabs = async (accessToken: string, spreadsheetId: string): Promise<string[] | undefined> => {
+    try {
+      const sheetsRes = await fetchFn(
+        `${sheetsBase}/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=sheets.properties(sheetId,title)`,
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          signal: AbortSignal.timeout(googleTimeoutMs),
+          redirect: 'manual',
+        }
+      );
+      if (!sheetsRes.ok) return undefined;
+      const sheetsData = (await sheetsRes.json()) as any;
+      if (!Array.isArray(sheetsData?.sheets)) return undefined;
+      const titles = sheetsData.sheets
+        .map((s: any) => s?.properties?.title)
+        .filter((t: unknown): t is string => typeof t === 'string' && t.trim().length > 0)
+        .slice(0, 20);
+      return titles.length > 0 ? titles : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
   router.post('/start', async (req, res) => {
     const user = (req as any).user as AuthUser;
     try {
@@ -511,33 +535,7 @@ export function createMySheetsConnectionRoutes(options: MySheetsConnectionsOptio
           return;
         }
 
-        let discoveredSheets: string[] | undefined;
-        if (shouldIncludeSheets) {
-          try {
-            const sheetsRes = await fetchFn(
-              `${sheetsBase}/v4/spreadsheets/${encodeURIComponent(id)}?fields=sheets.properties(sheetId,title)`,
-              {
-                headers: { Authorization: `Bearer ${accessToken}` },
-                signal: AbortSignal.timeout(googleTimeoutMs),
-                redirect: 'manual',
-              }
-            );
-            if (sheetsRes.ok) {
-              const sheetsData = (await sheetsRes.json()) as any;
-              if (Array.isArray(sheetsData?.sheets)) {
-                const titles = sheetsData.sheets
-                  .map((s: any) => s?.properties?.title)
-                  .filter((t: unknown): t is string => typeof t === 'string' && t.trim().length > 0)
-                  .slice(0, 20);
-                if (titles.length > 0) {
-                  discoveredSheets = titles;
-                }
-              }
-            }
-          } catch {
-            // Best-effort tab discovery
-          }
-        }
+        const discoveredSheets = shouldIncludeSheets ? await discoverSpreadsheetTabs(accessToken, id) : undefined;
 
         items.push({
           id: fileData.id,
@@ -664,11 +662,12 @@ export function createMySheetsConnectionRoutes(options: MySheetsConnectionsOptio
         return;
       }
 
+      const discoveredSheets = await discoverSpreadsheetTabs(accessToken, created.id);
       const newItem: PersonalSpreadsheetItem = {
         id: created.id,
         title: typeof created.name === 'string' && created.name.trim() ? created.name.trim() : rawTitle,
         canEdit: true,
-        sheets: ['Sheet1'],
+        sheets: discoveredSheets ?? ['Sheet1'],
       };
 
       const existing: PersonalSpreadsheetItem[] = Array.isArray(decrypted.selectedSpreadsheets)

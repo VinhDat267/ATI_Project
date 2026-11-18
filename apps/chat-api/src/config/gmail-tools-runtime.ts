@@ -55,6 +55,7 @@ export async function runtimeToolCatalog(
     mycalendarEnabled?: boolean;
     mycalendarOAuthClientId?: string;
     mysheetsEnabled?: boolean;
+    mysheetsOAuthClientId?: string;
     trelloEnabled?: boolean;
     trelloTeamRepo?: any;
     trelloOAuthClient?: any;

@@ -25,6 +25,7 @@ import {
   getRegisteredService,
   hasValidCredentials,
   isServiceAccountService,
+  MYSHEETS_DRIVE_WRITE_TOOLS,
   normalizeAllowedScope,
 } from '../services/registered-services.js';
 import { isAdmin } from '../auth/jwt.js';
@@ -45,6 +46,8 @@ export interface ServicesRoutesOptions {
   mycalendarAvailable?: boolean;
   /** MySheets is enabled and usable (flag on, OAuth and PostgreSQL configured). */
   mysheetsAvailable?: boolean;
+  /** Server-owned kill-switch for the 4 MySheets Drive/Docs write tools (defaults to env). */
+  enableMySheetsDriveWriteTools?: boolean;
   /** Live clients only; legacy grants require consent before appearing usable. */
   googleClientIds?: Partial<Record<'gmail' | 'mycalendar' | 'mysheets', string>>;
   /** MyJira OAuth is enabled and usable (flag on, OAuth and PostgreSQL configured). */
@@ -349,6 +352,14 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
     }
 
     const connected = personalStatus === 'connected';
+    const driveWriteEnabled =
+      typeof options.enableMySheetsDriveWriteTools === 'boolean'
+        ? options.enableMySheetsDriveWriteTools
+        : process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS === 'true' ||
+          process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS === 'on';
+    const visibleMySheetsTools = MYSHEETS_TOOLS.filter(
+      (tool) => driveWriteEnabled || !MYSHEETS_DRIVE_WRITE_TOOLS.has(tool.name),
+    );
     return {
       id,
       name,
@@ -358,7 +369,7 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
       scopeLabel,
       credentialFields,
       connection: 'personal' as const,
-      tools: MYSHEETS_TOOLS.map((tool) => tool.name),
+      tools: visibleMySheetsTools.map((tool) => tool.name),
       configured: connected,
       connected,
       connectionStatus: connected ? 'healthy' : 'unconfigured',

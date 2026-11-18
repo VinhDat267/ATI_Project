@@ -1162,5 +1162,142 @@ describe('Task 4 (PR-4): Two-Phase Candidate & Confirmation, Zero-V1-Downgrade F
       ]);
       expect(schedCount.rows[0]?.n).toBe(0);
     });
+
+    it('strips closing parenthesis from parenthesized tab mentions like "(tab KPI Tháng 11)"', async () => {
+      const { personalA, orgA, credentialRepo, encryptionKey } = fixtures;
+      const candidate = await analyzeSheetsDigestCandidate({
+        userId: personalA.user.id,
+        workspaceMode: 'organization',
+        workspaceId: orgA.workspaceId,
+        request: 'Mỗi sáng tổng hợp Bảng KPI Tổ chức Alpha (tab KPI Tháng 11) gửi vào Slack #general',
+        recurrence: { type: 'daily', time: '08:00' },
+        services: ['sheets', 'slack'],
+        credentialRepo,
+        encryptionKey,
+        mysheetsEnabled: true,
+        emitV2: true,
+        fetchOrgSheetsMetadata: async () => [
+          {
+            id: orgA.spreadsheetId,
+            title: 'Bảng KPI Tổ chức Alpha',
+            sheets: ['Tasks', 'KPI Tháng 11'],
+          },
+        ],
+      });
+
+      expect(candidate.canAutoDigest).toBe(true);
+      expect(isSheetsDigestConfigV2(candidate.config)).toBe(true);
+      if (isSheetsDigestConfigV2(candidate.config)) {
+        expect(candidate.config.source.sheetName).toBe('KPI Tháng 11');
+      }
+    });
+
+    it('passes mysheetsOAuthClientId in confirmProposal and createReauthorizePreview to reject origin-mismatched mysheets grants', async () => {
+      const { personalA, orgA, credentialRepo, encryptionKey } = fixtures;
+      const convRepo = new (await import('../../src/db/repositories/conversation-repo.js')).ConversationRepo(db.pool);
+
+      const clientAConfig = encryptCredentials(
+        {
+          refreshToken: '1//personal-a-mysheets-refresh',
+          oauthClientId: 'mysheets-client-a',
+          email: 'alice@personal.test',
+          selectedSpreadsheets: [
+            { id: PERSONAL_A_SPREADSHEET_ID, title: 'Báo cáo KPI Cá nhân A', sheets: ['Sheet1'] },
+          ],
+          allowedScope: { spreadsheets: [PERSONAL_A_SPREADSHEET_ID] },
+        },
+        encryptionKey
+      );
+      await db.pool.query('UPDATE service_credentials SET config = $2 WHERE id = $1', [
+        personalA.mysheetsCred.id,
+        clientAConfig,
+      ]);
+
+      const candidate = await analyzeSheetsDigestCandidate({
+        userId: personalA.user.id,
+        workspaceMode: 'organization',
+        workspaceId: orgA.workspaceId,
+        request: 'Đọc bảng Báo cáo KPI Cá nhân A và gửi vào Slack #general',
+        recurrence: { type: 'daily', time: '08:00' },
+        services: ['mysheets', 'slack'],
+        credentialRepo,
+        encryptionKey,
+        mysheetsOAuthClientId: 'mysheets-client-a',
+        mysheetsEnabled: true,
+        emitV2: true,
+        fetchOrgSheetsMetadata: async () => [
+          { id: ORG_A_SPREADSHEET_ID, title: 'Bảng KPI Tổ chức Alpha', sheets: ['Sheet1'] },
+        ],
+      });
+      expect(candidate.canAutoDigest).toBe(true);
+
+      const conv = await convRepo.createConversation(personalA.user.id, 'Hội thoại Origin Drift', {
+        workspaceMode: 'organization',
+        workspaceId: orgA.workspaceId,
+      });
+      const metadata: ScheduleProposalMetadata = {
+        type: 'schedule_proposal',
+        proposal: {
+          kind: 'schedule',
+          action: 'create',
+          name: 'Báo cáo Origin Check',
+          request: 'Đọc bảng Báo cáo KPI Cá nhân A và gửi vào Slack #general',
+          recurrence: { type: 'daily', time: '08:00' },
+          summary: 'Mỗi ngày 08:00.',
+        },
+        scheduleId: null,
+        baseVersion: null,
+        services: ['mysheets', 'slack'],
+        nextRuns: ['2026-11-03T01:00:00.000Z'],
+        previous: null,
+        digestCandidate: candidate,
+      };
+      const msg = await messageRepo.createMessage(
+        conv.id,
+        'assistant',
+        metadata.proposal.summary,
+        metadata as unknown as Record<string, unknown>
+      );
+
+      // Swap the credential to a mismatched OAuth clientId right before confirmProposal
+      const clientBConfig = encryptCredentials(
+        {
+          refreshToken: '1//personal-a-mysheets-refresh',
+          oauthClientId: 'mysheets-client-b',
+          email: 'alice@personal.test',
+          selectedSpreadsheets: [
+            { id: PERSONAL_A_SPREADSHEET_ID, title: 'Báo cáo KPI Cá nhân A', sheets: ['Sheet1'] },
+          ],
+          allowedScope: { spreadsheets: [PERSONAL_A_SPREADSHEET_ID] },
+        },
+        encryptionKey
+      );
+      await db.pool.query('UPDATE service_credentials SET config = $2 WHERE id = $1', [
+        personalA.mysheetsCred.id,
+        clientBConfig,
+      ]);
+
+      const service = new ScheduleService({
+        pool: db.pool,
+        timeZone: TZ,
+        credentialRepo,
+        encryptionKey,
+        mysheetsOAuthClientId: 'mysheets-client-a',
+        mysheetsEnabled: true,
+        emitV2: true,
+      });
+
+      await expect(
+        service.confirmProposal({
+          userId: personalA.user.id,
+          convId: conv.id,
+          messageId: msg.id,
+          now: new Date('2026-11-02T00:00:00Z'),
+          approvalMode: 'auto_digest',
+        })
+      ).rejects.toMatchObject({
+        code: 'DIGEST_PREVIEW_CHANGED',
+      });
+    });
   });
 });

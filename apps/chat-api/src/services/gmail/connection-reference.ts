@@ -65,11 +65,15 @@ export function createMyCalendarConnectionLookup(
 export function createMySheetsConnectionLookup(
   credentials: Pick<CredentialRepo, 'getPersonalCredentials'>,
   encryptionKey: string,
-  getAdapter?: (userId: string) => Promise<any> | any
+  getAdapter?: (userId: string) => Promise<any> | any,
+  oauthClientId?: string,
 ) {
   return async (userId: string): Promise<MySheetsConnectionLookupResult | null> => {
     const record = await credentials.getPersonalCredentials('mysheets', userId);
     if (!record || record.status !== 'active') return null;
+    if (oauthClientId && !hasGoogleCredentialOrigin(record.config, encryptionKey, oauthClientId)) {
+      return null;
+    }
     try {
       const config = decryptCredentials(record.config, encryptionKey);
       const email = config.email;

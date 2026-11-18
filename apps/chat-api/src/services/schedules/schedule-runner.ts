@@ -68,6 +68,7 @@ export interface ScheduleRunnerOptions {
   encryptionKey?: string;
   gmailOAuthClientId?: string;
   mycalendarOAuthClientId?: string;
+  mysheetsOAuthClientId?: string;
   /** Writes the state message of a schedule the runner paused or completed (ScheduleService.recordState). */
   recordState: (client: Queryable, row: ScheduleRow, now: Date) => Promise<ScheduleChange>;
   emit?: (convId: string, event: string, payload: unknown) => unknown;
@@ -524,6 +525,7 @@ export class ScheduleRunner {
         encryptionKey: this.options.encryptionKey,
         gmailOAuthClientId: this.options.gmailOAuthClientId,
         mycalendarOAuthClientId: this.options.mycalendarOAuthClientId,
+        mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
       });
       if (liveGuard) {
         started.toPlan.workspaceId = liveGuard.trustedWorkspaceId;

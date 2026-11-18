@@ -2,7 +2,7 @@ import { LIVE_SERVICES } from './live-services.js';
 import { createHash } from 'node:crypto';
 import { ExecutionController, StepRunner, isWriteTool, type AdapterExecutor, type StepState } from '@wap/executor';
 import { validatePlan } from '@wap/planner';
-import { ALL_TOOLS, type AllowedScope, type PlanResponse, type PlanStep } from '@wap/tool-schemas';
+import { ALL_TOOLS, type AllowedScope, type PlanResponse, type PlanStep, type ToolDefinition } from '@wap/tool-schemas';
 
 export interface LiveService {
   credentials: Record<string, string>;
@@ -55,6 +55,8 @@ export interface ExecuteApprovedInput {
   approvedHash: string;
   /** Services enabled by readLiveConfig. */
   services: string[];
+  /** Optional explicit catalog when executing opt-in tools outside ALL_TOOLS. */
+  toolCatalog?: ToolDefinition[];
   getAdapter: (service: string) => AdapterExecutor | Promise<AdapterExecutor>;
   onStep?: (stepId: string, state: StepState) => void;
 }
@@ -78,7 +80,8 @@ export async function executeApproved(input: ExecuteApprovedInput): Promise<Exec
   }
   const missing = [...new Set(plan.steps.map((step) => step.tool.split('.')[0]!))].filter((service) => !services.includes(service));
   if (missing.length) throw new Error(`Plan uses ${missing.join(', ')}, which is not configured for live execution`);
-  const validation = validatePlan(JSON.stringify(plan), ALL_TOOLS.filter((tool) => services.includes(tool.service)));
+  const catalog = input.toolCatalog ?? ALL_TOOLS;
+  const validation = validatePlan(JSON.stringify(plan), catalog.filter((tool) => services.includes(tool.service)));
   if (!validation.valid) throw new Error(`Plan failed validation: [${validation.layer}] ${validation.error}`);
 
   const states = new Map<string, StepState>(plan.steps.map((step) => [step.id, { stepId: step.id, status: 'pending' }]));

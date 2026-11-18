@@ -13,10 +13,17 @@ import { normalizeConversationMessages } from '../../services/conversation-messa
 
 function digestSourcePreviewLabel(source: TelegramDigestSource): string {
   const calendar = source.mycalendarBinding;
+  const sheets = source.mysheetsBinding;
   const label = source.label || source.service;
-  if (!calendar || !Array.isArray(calendar.calendarIds)) return label;
-  const cap = calendar.truncated ? ` · giới hạn ${calendar.calendarIds.length} lịch` : '';
-  return `${label} (${calendar.email} · ${calendar.calendarIds.join(', ')}${cap})`;
+  if (calendar && Array.isArray(calendar.calendarIds)) {
+    const cap = calendar.truncated ? ` · giới hạn ${calendar.calendarIds.length} lịch` : '';
+    return `${label} (${calendar.email} · ${calendar.calendarIds.join(', ')}${cap})`;
+  }
+  if (sheets && Array.isArray(sheets.spreadsheetIds)) {
+    const cap = sheets.truncated ? ` · giới hạn ${sheets.spreadsheetIds.length} bảng tính` : '';
+    return `${label} (${sheets.email} · ${sheets.spreadsheetIds.join(', ')}${cap})`;
+  }
+  return label;
 }
 
 export async function reloadScheduleConversation(id: string) {

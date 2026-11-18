@@ -22,7 +22,7 @@ import { SSEManager } from './sse/sse-manager.js';
 import { ChatService } from './services/chat-service.js';
 import { ExecutionService } from './services/execution-service.js';
 import { reconcileInterruptedExecutions } from './services/startup-reconciliation.js';
-import { createScheduleRuntime } from './config/schedules-runtime.js';
+import { createScheduleRuntime, isSheetsDigestEmitV2Enabled } from './config/schedules-runtime.js';
 import { evaluateCalendarDigestCandidate } from './services/schedules/calendar-digest-candidate.js';
 import {
   createCalendarDigestExecutor,
@@ -291,6 +291,10 @@ async function bootstrap() {
   const gmailAvailable = Boolean(env.GMAIL_ENABLED && env.GMAIL_OAUTH && pool && userRepo);
   const mycalendarAvailable = Boolean(env.MYCALENDAR_ENABLED && env.MYCALENDAR_OAUTH && pool && userRepo);
   const mysheetsAvailable = Boolean(env.MYSHEETS_ENABLED && env.MYSHEETS_OAUTH && pool && userRepo);
+  const mysheetsOAuthClientId =
+    env.RUNTIME_MODE === 'live' && mysheetsAvailable ? env.MYSHEETS_OAUTH?.clientId : undefined;
+  const sheetsDigestEmitV2 =
+    process.env.SHEETS_DIGEST_EMIT_V2 !== undefined ? isSheetsDigestEmitV2Enabled() : true;
 
   // Schedules need the flag and PostgreSQL; with the flag off nothing below exists.
   // A run is planned by chatService, created below; the runner starts only after listen.
@@ -344,8 +348,10 @@ async function bootstrap() {
     encryptionKey: env.ENCRYPTION_KEY,
     gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
     mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
+    mysheetsOAuthClientId,
     credentialRepo: credRepo,
     mysheetsEnabled: mysheetsAvailable,
+    emitV2: sheetsDigestEmitV2,
     fetchOrgSheetsMetadata,
     verifyNotionSource: async (ownerId, binding, signal, check) => {
       if (!notionDigestSources) throw new NotionDigestSourceDenied();
@@ -797,6 +803,7 @@ async function bootstrap() {
       mycalendarEnabled: mycalendarAvailable,
       mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
       mysheetsEnabled: mysheetsAvailable,
+      mysheetsOAuthClientId,
       trelloEnabled: trelloAvailable,
       trelloTeamRepo,
       trelloOAuthClient,
@@ -868,8 +875,12 @@ async function bootstrap() {
         )
       : undefined,
     mysheetsConnection: mysheetsAvailable
-      ? createMySheetsConnectionLookup(credRepo, env.ENCRYPTION_KEY, (userId) =>
-          (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService('mysheets', { userId, phase: 'planning' })
+      ? createMySheetsConnectionLookup(
+          credRepo,
+          env.ENCRYPTION_KEY,
+          (userId) =>
+            (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService('mysheets', { userId, phase: 'planning' }),
+          mysheetsOAuthClientId,
         )
       : undefined,
     trelloConnection,
@@ -893,7 +904,9 @@ async function bootstrap() {
           credentialRepo: credRepo,
           encryptionKey: env.ENCRYPTION_KEY,
           gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
+          mysheetsOAuthClientId,
           mysheetsEnabled: mysheetsAvailable,
+          emitV2: sheetsDigestEmitV2,
           fetchOrgSheetsMetadata,
           evaluateDigestCandidate: pool
             ? async (input) =>
@@ -951,6 +964,7 @@ async function bootstrap() {
     mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
     createMyCalendarAdapter: mycalendarAvailable ? (input) => runtimeMyCalendarAdapter(env.RUNTIME_MODE, input, env.MYCALENDAR_OAUTH!.apiBaseUrl) : undefined,
     mysheetsTokens,
+    mysheetsOAuthClientId,
     createMySheetsAdapter: mysheetsAvailable ? (input) => runtimeMySheetsAdapter(env.RUNTIME_MODE, input, env.MYSHEETS_OAUTH!.apiBaseUrl) : undefined,
     sheetsAppendLeaseStore: pool ? new PostgresSheetsAppendLeaseStore(pool) : undefined,
     trelloTokens,
@@ -1147,6 +1161,7 @@ async function bootstrap() {
     encryptionKey: env.ENCRYPTION_KEY,
     gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
     mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
+    mysheetsOAuthClientId,
     adapterFactory,
     botClient: telegramBotClient,
     notionSources: notionDigestSources,
@@ -1168,6 +1183,7 @@ async function bootstrap() {
     encryptionKey: env.ENCRYPTION_KEY,
     gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
     mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
+    mysheetsOAuthClientId,
     adapterFactory,
     timeZone: env.APP_TIME_ZONE,
     resolveSlackMentions: true,
@@ -1311,6 +1327,7 @@ async function bootstrap() {
       picker: env.MYSHEETS_PICKER,
       ...runtimeMySheetsEndpoints(env.RUNTIME_MODE, env.MYSHEETS_OAUTH?.apiBaseUrl),
       onConnectionChanged: (userId: string) => realAdapterFactory.clearPersonal(userId, 'mysheets'),
+      enableDriveWriteTools: env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS,
     } : undefined,
     mysheetsTokens,
     trello: {

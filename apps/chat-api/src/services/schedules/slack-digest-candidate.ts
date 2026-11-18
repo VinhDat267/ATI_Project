@@ -10,6 +10,7 @@ import type {
 import type { GitHubConnectionLookupResult } from '../github/connection-reference.js';
 import type { JiraConnectionLookupResult } from './jira-digest-candidate.js';
 import type { MyCalendarDigestConnection } from './mycalendar-digest-source.js';
+import type { MySheetsDigestConnection } from './mysheets-digest-source.js';
 import { validateTelegramDigestGmailConfig } from './gmail-digest-binding.js';
 import {
   buildMultiDigestSources,
@@ -52,6 +53,7 @@ export function computeSlackDigestConfigHash(config: SlackDigestConfig): string 
       ...(s.notionBinding !== undefined ? { notionBinding: s.notionBinding } : {}),
       ...(s.jiraBinding !== undefined ? { jiraBinding: s.jiraBinding } : {}),
       ...(s.mycalendarBinding !== undefined ? { mycalendarBinding: s.mycalendarBinding } : {}),
+      ...(s.mysheetsBinding !== undefined ? { mysheetsBinding: s.mysheetsBinding } : {}),
     })),
     recurrence: config.recurrence,
     timeZone: config.timeZone,
@@ -71,6 +73,8 @@ export interface EvaluateSlackDigestInput {
   jiraLookup?: JiraConnectionLookupResult | null;
   mycalendarLookup?: MyCalendarDigestConnection | null;
   reauthorizeMyCalendar?: boolean;
+  mysheetsLookup?: MySheetsDigestConnection | null;
+  reauthorizeMySheets?: boolean;
   workspaceMode?: 'legacy' | 'personal' | 'organization';
   workspaceId?: string | null;
   gmailBinding?: GmailDigestBinding | null;
@@ -110,6 +114,8 @@ export async function evaluateSlackDigestCandidate(
     destinationLabel: 'Slack',
     requestText,
     notionBinding: input.notionBinding,
+    workspaceMode,
+    workspaceId,
   });
   if (!precheck.ok) {
     return {
@@ -206,6 +212,9 @@ export async function evaluateSlackDigestCandidate(
     mycalendarLookup: input.mycalendarLookup,
     existingMyCalendarSources: Array.isArray(existingDigest?.sources) ? existingDigest.sources : undefined,
     reauthorizeMyCalendar: input.reauthorizeMyCalendar,
+    mysheetsLookup: input.mysheetsLookup,
+    existingMySheetsSources: Array.isArray(existingDigest?.sources) ? existingDigest.sources : undefined,
+    reauthorizeMySheets: input.reauthorizeMySheets,
     workspaceMode: input.workspaceMode,
     workspaceId: input.workspaceId,
     gmailBinding: input.gmailBinding,

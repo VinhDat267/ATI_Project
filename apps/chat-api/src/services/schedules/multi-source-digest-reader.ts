@@ -10,8 +10,9 @@ import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import type { AdapterContext } from '../adapter-factory.js';
 import { GmailOAuthError } from '../gmail/oauth-client.js';
 import { isGoogleConnectionChanged } from '../gmail/token-manager.js';
-import { createMyCalendarConnectionLookup } from '../gmail/connection-reference.js';
+import { createMyCalendarConnectionLookup, createMySheetsConnectionLookup, type MySheetsConnectionLookupResult } from '../gmail/connection-reference.js';
 import { matchesMyCalendarDigestBinding, MYCALENDAR_DIGEST_REAPPROVAL, readMyCalendarDigestBinding } from './mycalendar-digest-source.js';
+import { matchesMySheetsDigestBinding, MYSHEETS_DIGEST_REAPPROVAL, readMySheetsDigestBinding } from './mysheets-digest-source.js';
 import { analyzeSheetKpiMetrics } from './sheets-digest-runner.js';
 import { buildTelegramDigestSourceArgs } from './multi-source-digest-candidate.js';
 import { assertGmailDigestBinding, isValidGmailDigestQuery } from './gmail-digest-binding.js';
@@ -62,6 +63,49 @@ export function summarizeSourceItems(
     raw &&
     typeof raw === 'object' &&
     !Array.isArray(raw) &&
+    Array.isArray((raw as any).multiSheets)
+  ) {
+    const rawObj = raw as Record<string, any>;
+    const sheetEntries = rawObj.multiSheets as Array<Record<string, any>>;
+    let totalRows = 0;
+    const lines: string[] = [];
+    const highlights: string[] = [];
+    let anyTruncated = Boolean(rawObj.truncated);
+    for (const entry of sheetEntries) {
+      const values: string[][] = Array.isArray(entry.values) ? entry.values : [];
+      const headers: string[] = Array.isArray(entry.headers)
+        ? entry.headers
+        : Array.isArray(values[0])
+          ? values[0]
+          : [];
+      const records: Array<Record<string, string>> = Array.isArray(entry.records) ? entry.records : [];
+      const kpi = analyzeSheetKpiMetrics(headers, records, values, now);
+      if (entry.truncated === true) anyTruncated = true;
+      totalRows += kpi.totalRows;
+      const title =
+        typeof entry.spreadsheetTitle === 'string' && entry.spreadsheetTitle.trim()
+          ? esc(entry.spreadsheetTitle.trim())
+          : 'Bảng tính';
+      lines.push(
+        `  📊 📄 ${title}: ${kpi.totalRows} dòng (✅ Xong: ${kpi.doneCount} · 🔄 Đang làm: ${kpi.inProgressCount} · ⚠️ Chờ/Quá hạn: ${kpi.overdueOrPendingCount})`,
+      );
+      for (const h of kpi.highlights) {
+        if (highlights.length < 6) highlights.push(`  [${title}] ${esc(h)}`);
+      }
+    }
+    if (totalRows === 0) {
+      return { count: 0, lines: ['  (Không có mục mới)'], ...(anyTruncated ? { truncated: true } : {}) };
+    }
+    const allLines = [...lines, ...highlights];
+    if (anyTruncated) {
+      allLines.push('  ⚠️ (Dữ liệu bảng tính có thể chưa đầy đủ do chạm giới hạn tải/số bảng tính)');
+    }
+    return { count: totalRows, lines: allLines, ...(anyTruncated ? { truncated: true } : {}) };
+  }
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    !Array.isArray(raw) &&
     (Array.isArray((raw as any).records) || Array.isArray((raw as any).values))
   ) {
     const rawObj = raw as Record<string, any>;
@@ -72,20 +116,26 @@ export function summarizeSourceItems(
         ? values[0]
         : [];
     const records: Array<Record<string, string>> = Array.isArray(rawObj.records) ? rawObj.records : [];
-    const kpi = analyzeSheetKpiMetrics(headers, records, values);
+    const kpi = analyzeSheetKpiMetrics(headers, records, values, now);
+    const sheetTruncated = Boolean(rawObj.truncated);
     if (kpi.totalRows === 0) {
-      return { count: 0, lines: ['  (Không có mục mới)'] };
+      return { count: 0, lines: ['  (Không có mục mới)'], ...(sheetTruncated ? { truncated: true } : {}) };
     }
     const sheetTitle =
       typeof rawObj.spreadsheetTitle === 'string' && rawObj.spreadsheetTitle.trim()
         ? `📄 ${esc(rawObj.spreadsheetTitle.trim())}: `
         : '';
+    const sheetLines = [
+      `  📊 ${sheetTitle}${kpi.totalRows} dòng (✅ Xong: ${kpi.doneCount} · 🔄 Đang làm: ${kpi.inProgressCount} · ⚠️ Chờ/Quá hạn: ${kpi.overdueOrPendingCount})`,
+      ...kpi.highlights.map((h) => `  ${esc(h)}`),
+    ];
+    if (sheetTruncated) {
+      sheetLines.push('  ⚠️ (Dữ liệu bảng tính có thể chưa đầy đủ do chạm giới hạn tải/số bảng tính)');
+    }
     return {
       count: kpi.totalRows,
-      lines: [
-        `  📊 ${sheetTitle}${kpi.totalRows} dòng (✅ Xong: ${kpi.doneCount} · 🔄 Đang làm: ${kpi.inProgressCount} · ⚠️ Chờ/Quá hạn: ${kpi.overdueOrPendingCount})`,
-        ...kpi.highlights.map((h) => `  ${esc(h)}`),
-      ],
+      lines: sheetLines,
+      ...(sheetTruncated ? { truncated: true } : {}),
     };
   }
 
@@ -317,6 +367,7 @@ export async function executeMultiDigestReadSources(input: {
   credentialRepo: Pick<CredentialRepo, 'getPersonalCredentials'>;
   encryptionKey: string;
   gmailOAuthClientId?: string;
+  mysheetsOAuthClientId?: string;
   pool?: pg.Pool | Pick<pg.Pool, 'query'> | null;
   adapterFactory: {
     getAdapterForService(serviceName: string, context?: AdapterContext): Promise<any> | any;
@@ -338,6 +389,25 @@ export async function executeMultiDigestReadSources(input: {
     signal.throwIfAborted();
     if (!matchesMyCalendarDigestBinding(live, mycalendar.binding)) {
       return { kind: 'blocked', error: MYCALENDAR_DIGEST_REAPPROVAL, pauseSchedule: true };
+    }
+  }
+  const mysheets = readMySheetsDigestBinding({ sources }, null);
+  if (mysheets.kind === 'invalid') {
+    return { kind: 'blocked', error: MYSHEETS_DIGEST_REAPPROVAL, pauseSchedule: true };
+  }
+  let mysheetsLive: MySheetsConnectionLookupResult | null = null;
+  if (mysheets.kind === 'bound') {
+    signal.throwIfAborted();
+    const lookup = createMySheetsConnectionLookup(
+      input.credentialRepo,
+      input.encryptionKey,
+      undefined,
+      input.mysheetsOAuthClientId,
+    );
+    mysheetsLive = await lookup(userId).catch(() => null);
+    signal.throwIfAborted();
+    if (!matchesMySheetsDigestBinding(mysheetsLive, mysheets.binding)) {
+      return { kind: 'blocked', error: MYSHEETS_DIGEST_REAPPROVAL, pauseSchedule: true };
     }
   }
   const sourceStatuses: DigestSourceRunStatus[] = [];
@@ -364,6 +434,10 @@ export async function executeMultiDigestReadSources(input: {
         const { credentialId, email, calendarIds } = mycalendar.binding;
         sourceAdapterContext.phase = 'execution';
         sourceAdapterContext.connections = { mycalendar: { credentialId, email, allowedCalendars: calendarIds } };
+      } else if (source.service === 'mysheets' && mysheets.kind === 'bound') {
+        const { credentialId, email, spreadsheetIds } = mysheets.binding;
+        sourceAdapterContext.phase = 'execution';
+        sourceAdapterContext.connections = { mysheets: { credentialId, email, allowedSpreadsheets: spreadsheetIds } };
       } else if (source.service === 'myjira') {
         sourceAdapterContext.phase = 'execution';
         sourceAdapterContext.jiraDigestBinding = source.jiraBinding;
@@ -411,6 +485,42 @@ export async function executeMultiDigestReadSources(input: {
           mergedEvents.push(...evs);
         }
         rawResult = { events: mergedEvents, ...(anyTruncated ? { truncated: true } : {}) };
+      } else if (source.service === 'mysheets' && mysheets.kind === 'bound') {
+        const targetSheets = mysheets.binding.spreadsheetIds;
+        let anyTruncated = mysheets.binding.truncated;
+        const perSheet: Array<Record<string, unknown>> = [];
+        for (const sheetId of targetSheets) {
+          const readArgs = {
+            range: 'A1:Z50',
+            headerAware: true,
+            ...(source.args ?? {}),
+            spreadsheetId: sheetId,
+          };
+          const readRes = await adapter.execute('mysheets.read_range', readArgs, { signal });
+          const titleFromLive = mysheetsLive?.selectedSpreadsheets?.find((s) => s.id === sheetId)?.title;
+          const spreadsheetTitle =
+            typeof readRes?.spreadsheetTitle === 'string' && readRes.spreadsheetTitle.trim()
+              ? readRes.spreadsheetTitle.trim()
+              : titleFromLive || sheetId;
+          if (readRes && typeof readRes === 'object' && !Array.isArray(readRes)) {
+            if ((readRes as any).truncated === true) anyTruncated = true;
+            perSheet.push({
+              ...(readRes as Record<string, unknown>),
+              spreadsheetTitle,
+            });
+          }
+        }
+        if (perSheet.length === 1) {
+          rawResult = {
+            ...perSheet[0],
+            ...(anyTruncated ? { truncated: true } : {}),
+          };
+        } else {
+          rawResult = {
+            multiSheets: perSheet,
+            ...(anyTruncated ? { truncated: true } : {}),
+          };
+        }
       } else if (sheetReadTool) {
         const listRes = await adapter.execute(source.tool, callArgs, { signal });
         const sheets = Array.isArray(listRes)
@@ -547,6 +657,13 @@ export async function executeMultiDigestReadSources(input: {
         return {
           kind: 'blocked',
           error: MYCALENDAR_DIGEST_REAPPROVAL,
+          pauseSchedule: true,
+        };
+      }
+      if (source.service === 'mysheets' && isGmailAuthOrBindingFailure(err)) {
+        return {
+          kind: 'blocked',
+          error: MYSHEETS_DIGEST_REAPPROVAL,
           pauseSchedule: true,
         };
       }

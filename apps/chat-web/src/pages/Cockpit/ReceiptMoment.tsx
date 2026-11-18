@@ -65,8 +65,10 @@ function SheetsReceiptMetrics({ step }: { step: ExecutionStepInfo }) {
   if (step.status !== 'succeeded') return null;
   const service = serviceId(step.tool);
   if (service !== 'mysheets' && service !== 'sheets') return null;
-  const out = resultObject(step.output);
-  if (!out) return null;
+  const rawOut = resultObject(step.output);
+  const isDriveFileArray = step.tool === 'mysheets.list_drive_files' && Array.isArray(step.output);
+  if (!rawOut && !isDriveFileArray) return null;
+  const out = rawOut ?? ({} as NonNullable<typeof rawOut>);
   const pills: Array<{ text: string; warn?: boolean }> = [];
   const rowsCount =
     typeof out.updatedRows === 'number'
@@ -115,14 +117,29 @@ function SheetsReceiptMetrics({ step }: { step: ExecutionStepInfo }) {
   if (step.tool === 'mysheets.move_drive_file') {
     pills.push({ text: '📦 Đã chuyển tệp vào thư mục' }); // taste-skill-ignore
   }
-  if (step.tool === 'mysheets.list_drive_files' && Array.isArray(out.files)) {
-    pills.push({ text: `📂 Tìm thấy ${out.files.length} tệp trên Drive` }); // taste-skill-ignore
+  const driveFiles = Array.isArray(step.output) ? step.output : Array.isArray(out.files) ? out.files : null;
+  if (step.tool === 'mysheets.list_drive_files' && driveFiles) {
+    pills.push({ text: `📂 Tìm thấy ${driveFiles.length} tệp trên Drive` }); // taste-skill-ignore
+  }
+  if ((step.tool === 'mysheets.delete_rows' || step.tool === 'sheets.delete_rows') && typeof out.deletedRows === 'number') {
+    pills.push({ text: `Đã xóa ${out.deletedRows} dòng` });
+  }
+  if (step.tool === 'mysheets.aggregate_rows' || step.tool === 'sheets.aggregate_rows') {
+    if (typeof out.matchedRows === 'number') {
+      pills.push({ text: `Tổng hợp ${out.matchedRows} dòng` });
+    }
+    if (Array.isArray(out.groups) && out.groups.length > 0) {
+      pills.push({ text: `${out.groups.length} nhóm` });
+    }
   }
   if (typeof out.updatedRange === 'string' && out.updatedRange) {
     pills.push({ text: `Phạm vi ${out.updatedRange}` });
   }
   if (Array.isArray(out.unmatchedKeys) && out.unmatchedKeys.length > 0) {
     pills.push({ text: `Chưa tìm thấy khóa: ${out.unmatchedKeys.join(', ')}`, warn: true });
+  }
+  if (out.truncated === true) {
+    pills.push({ text: 'Kết quả bị giới hạn, cần thu hẹp phạm vi', warn: true });
   }
   if (pills.length === 0) return null;
   return (

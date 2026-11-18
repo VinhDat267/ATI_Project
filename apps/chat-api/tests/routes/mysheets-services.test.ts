@@ -977,4 +977,104 @@ describe('GET /api/services, AdapterFactory, ChatService, and health check for M
       expect(result).toBe(true);
     });
   });
+
+  describe('9. OAuth client origin isolation & /api/services tool filtering', () => {
+    it('enforces mysheetsOAuthClientId across getToolCatalogFor, createMySheetsConnectionLookup, and AdapterFactory plus previewed email mismatch', async () => {
+      const legacyGrant = await credentials.saveCredentials(
+        'mysheets',
+        encryptCredentials(
+          {
+            oauthClientId: 'old-client-id',
+            refreshToken: `1//fake-mysheets-${alice.id}`,
+            email: 'alice@example.com',
+            selectedSpreadsheets: [{ id: 'sheet_alice_1', title: 'Bảng 1', canEdit: true }],
+            allowedScope: { spreadsheets: ['sheet_alice_1'] },
+          },
+          key,
+        ),
+        alice.id,
+      );
+
+      const skippedCatalog = await getToolCatalogFor(credentials, key, {
+        userId: alice.id,
+        gmailEnabled: false,
+        mysheetsEnabled: true,
+        mysheetsOAuthClientId: 'live-client-id',
+      });
+      expect(skippedCatalog.some((t) => t.name.startsWith('mysheets.'))).toBe(false);
+
+      const lookupMismatch = createMySheetsConnectionLookup(credentials, key, undefined, 'live-client-id');
+      expect(await lookupMismatch(alice.id)).toBeNull();
+
+      const lookupMatch = createMySheetsConnectionLookup(credentials, key, undefined, 'old-client-id');
+      expect(await lookupMatch(alice.id)).toMatchObject({ credentialId: legacyGrant.id, email: 'alice@example.com' });
+
+      const factoryOriginCheck = new AdapterFactory({
+        credentialRepo: credentials,
+        encryptionKey: key,
+        mysheetsOAuthClientId: 'live-client-id',
+        mysheetsTokens: { forConnection: () => ({ getAccessToken: async () => 'tok' }), clear: () => {} } as any,
+        createMySheetsAdapter: () => ({ execute: async () => ({}) }),
+      });
+      await expect(
+        factoryOriginCheck.getAdapterForService('mysheets', { userId: alice.id, phase: 'planning' }),
+      ).rejects.toThrow('Google Sheets cần được kết nối lại.');
+
+      const factoryEmailCheck = new AdapterFactory({
+        credentialRepo: credentials,
+        encryptionKey: key,
+        mysheetsOAuthClientId: 'old-client-id',
+        mysheetsTokens: { forConnection: () => ({ getAccessToken: async () => 'tok' }), clear: () => {} } as any,
+        createMySheetsAdapter: () => ({ execute: async () => ({}) }),
+      });
+      await expect(
+        factoryEmailCheck.getAdapterForService('mysheets', {
+          userId: alice.id,
+          phase: 'execution',
+          connections: {
+            mysheets: {
+              credentialId: legacyGrant.id,
+              email: 'other-email@example.com',
+              allowedSpreadsheets: ['sheet_alice_1'],
+            },
+          },
+        }),
+      ).rejects.toThrow('Kết nối hoặc danh sách bảng tính đã đổi, hãy lập lại kế hoạch.');
+    });
+
+    it('filters Drive/Docs write tools in GET /api/services unless enableDriveWriteTools is enabled', async () => {
+      const prevEnv = process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS;
+      delete process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS;
+      try {
+        const servicesDefault = await listServices(true, alice);
+        const msDefault = servicesDefault.find((s) => s.id === 'mysheets')!;
+        expect(msDefault.tools).toContain('mysheets.read_range');
+        expect(msDefault.tools).toContain('mysheets.list_drive_files');
+        expect(msDefault.tools).not.toContain('mysheets.create_doc');
+        expect(msDefault.tools).not.toContain('mysheets.move_drive_file');
+
+        const enabledApp = createApp({
+          jwtSecret: secret,
+          userRepo: db.users,
+          credentialRepo: credentials,
+          encryptionKey: key,
+          serviceAdminUserIds: [admin.id],
+          mysheets: {
+            enabled: true,
+            oauth,
+            repo: new GmailConnectionRepo(db.pool, 'mysheets', 'connect_mysheets'),
+            enableDriveWriteTools: true,
+          },
+        } as any);
+        const resEnabled = await request(enabledApp).get('/api/services').set('Authorization', bearer(alice));
+        expect(resEnabled.status).toBe(200);
+        const msEnabled = (resEnabled.body.services as Array<Record<string, any>>).find((s) => s.id === 'mysheets')!;
+        expect(msEnabled.tools).toContain('mysheets.create_doc');
+        expect(msEnabled.tools).toContain('mysheets.move_drive_file');
+      } finally {
+        if (prevEnv === undefined) delete process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS;
+        else process.env.ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS = prevEnv;
+      }
+    });
+  });
 });

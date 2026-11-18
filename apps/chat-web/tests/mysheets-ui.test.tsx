@@ -2,7 +2,12 @@
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { ALL_TOOLS, MYSHEETS_TOOLS } from '@wap/tool-schemas';
+import { ALL_TOOLS, MYJIRA_TOOLS, MYSHEETS_TOOLS } from '@wap/tool-schemas';
+import { afterEach as auditAfterEach, describe as auditDescribe, expect as auditExpect, it as auditIt, vi as auditVi } from 'vitest';
+import { cleanup as auditCleanup, render as auditRender, screen as auditScreen } from '@testing-library/react';
+import { PreviewContents as CockpitPreviewContents } from '../src/pages/Cockpit/PreviewContents';
+import { ReceiptMoment as CockpitReceiptMoment } from '../src/pages/Cockpit/ReceiptMoment';
+import { ScheduleMoment as CockpitScheduleMoment } from '../src/pages/Cockpit/ScheduleMoment';
 import { SettingsPage } from '../src/pages/Settings/SettingsPage';
 import { RefusalMoment } from '../src/pages/Responses/ResponseMoment';
 import { resourceDestination } from '../src/components/Cockpit';
@@ -588,7 +593,7 @@ describe('PrivacyPage with mysheetsEnabled', () => {
 
 describe('GuidePage and LandingPage with mysheetsEnabled', () => {
   it('uses only available tools in sample catalogues', () => {
-    const enabled = new Set([...ALL_TOOLS, ...MYSHEETS_TOOLS].map(tool => tool.name));
+    const enabled = new Set([...ALL_TOOLS, ...MYJIRA_TOOLS, ...MYSHEETS_TOOLS].map(tool => tool.name));
     for (const prompt of [...SAMPLE_PROMPTS, ...MYSHEETS_PROMPTS, MYSHEETS_SCHEDULE_PROMPT]) {
       for (const tool of prompt.tools) {
         expect(enabled.has(tool)).toBe(true);
@@ -1152,5 +1157,168 @@ describe('GuidePage and LandingPage with mysheetsEnabled', () => {
     expect(screen.getByText(/Xoá dòng dữ liệu \(Bảo vệ dòng tiêu đề 1\)/i)).toBeTruthy();
     expect(screen.getByText(/Trạng thái = Đã huỷ/i)).toBeTruthy();
     cleanup();
+  });
+});
+
+
+auditDescribe('Google Sheets Cockpit Preview, Receipt & Schedule Scope UI', () => {
+  auditAfterEach(() => {
+    auditCleanup();
+  });
+
+  auditIt('renders PreviewContents for aggregate_rows using metrics[].fn and MIN/MAX badge', () => {
+    const view = auditRender(
+      <CockpitPreviewContents
+        step={{
+          id: 'step-agg-1',
+          tool: 'mysheets.aggregate_rows',
+          description: 'Thống kê doanh thu theo nhóm',
+          args: {
+            spreadsheetId: 'sheet-kpi-1',
+            sheetName: 'DonHang',
+            groupBy: 'Phụ trách',
+            metrics: [
+              { fn: 'avg', column: 'Doanh thu' },
+              { fn: 'max', column: 'Giá trị đơn' },
+            ],
+          },
+        }}
+        destination="Báo cáo KPI → DonHang"
+      />
+    );
+
+    const preview = auditScreen.getByTestId('spreadsheet-aggregate-preview');
+    auditExpect(preview.textContent).toContain('(SUM / AVG / MIN / MAX / COUNT)');
+    auditExpect(preview.textContent).toContain('AVG(Doanh thu)');
+    auditExpect(preview.textContent).toContain('MAX(Giá trị đơn)');
+    auditExpect(view.container.textContent).toContain('Phụ trách');
+  });
+
+  auditIt('renders ReceiptMoment pills for delete_rows, aggregate_rows, array list_drive_files, and truncated outputs', () => {
+    const steps = [
+      {
+        id: 'step-del',
+        tool: 'mysheets.delete_rows',
+        description: 'Xóa các dòng hết hạn',
+        args: { spreadsheetId: 'sheet-1', sheetName: 'Data', rowNumbers: [2, 3, 4] },
+      },
+      {
+        id: 'step-agg',
+        tool: 'sheets.aggregate_rows',
+        description: 'Thống kê công việc theo trạng thái',
+        args: { spreadsheetId: 'sheet-org', sheetName: 'Tasks', groupBy: 'Status', metrics: [{ fn: 'count' }] },
+      },
+      {
+        id: 'step-drive',
+        tool: 'mysheets.list_drive_files',
+        description: 'Tìm tệp trên Google Drive',
+        args: { query: 'Q4' },
+      },
+    ];
+    const execSteps = [
+      {
+        id: 'step-del',
+        tool: 'mysheets.delete_rows',
+        description: 'Xóa các dòng hết hạn',
+        status: 'succeeded' as const,
+        output: { deletedRows: 3, updatedRange: 'Data!A2:D4' },
+      },
+      {
+        id: 'step-agg',
+        tool: 'sheets.aggregate_rows',
+        description: 'Thống kê công việc theo trạng thái',
+        status: 'succeeded' as const,
+        output: {
+          matchedRows: 42,
+          groups: [{ key: 'Done' }, { key: 'Blocked' }],
+          truncated: true,
+        },
+      },
+      {
+        id: 'step-drive',
+        tool: 'mysheets.list_drive_files',
+        description: 'Tìm tệp trên Google Drive',
+        status: 'succeeded' as const,
+        output: [
+          { id: 'f1', name: 'Q4 Report.xlsx' },
+          { id: 'f2', name: 'Q4 Budget' },
+        ] as unknown as Record<string, unknown>,
+      },
+    ];
+
+    const view = auditRender(
+      <CockpitReceiptMoment
+        services={[
+          { id: 'mysheets', name: 'Google Sheets của bạn', connected: true, tools: [] },
+          { id: 'sheets', name: 'Google Sheets (Tổ chức)', connected: true, tools: [] },
+        ]}
+        planSteps={steps}
+        steps={execSteps}
+        destination={(s) => s.tool}
+        onNewConversation={auditVi.fn()}
+        onFollowup={auditVi.fn()}
+      />
+    );
+
+    const text = view.container.textContent ?? '';
+    auditExpect(text).toContain('Đã xóa 3 dòng');
+    auditExpect(text).toContain('Tổng hợp 42 dòng');
+    auditExpect(text).toContain('2 nhóm');
+    auditExpect(text).toContain('Tìm thấy 2 tệp trên Drive');
+    auditExpect(text).toContain('Kết quả bị giới hạn, cần thu hẹp phạm vi');
+  });
+
+  auditIt('renders ScheduleMoment pinned mysheetsBinding email, spreadsheetIds, and truncation notice', () => {
+    const view = auditRender(
+      <CockpitScheduleMoment
+        convId="conv-mysheets-binding-1"
+        navigate={auditVi.fn()}
+        onEdit={auditVi.fn()}
+        message={{
+          id: 'msg-sched-mysheets-1',
+          role: 'assistant',
+          content: 'Đề xuất lịch bản tin Slack từ Google Sheets',
+          metadata: {
+            kind: 'schedule_proposal',
+            services: ['mysheets', 'slack'],
+            proposal: {
+              kind: 'schedule',
+              action: 'create',
+              name: 'Bản tin doanh số sáng',
+              request: 'Đọc bảng tính rồi gửi Slack mỗi sáng',
+              recurrence: { kind: 'daily', hour: 8, minute: 30 },
+              summary: 'Gửi bản tin doanh số từ Google Sheets về Slack',
+            },
+            digestCandidate: {
+              canAutoDigest: true,
+              configHash: 'hash-slack-mysheets-1',
+              config: {
+                destination: 'slack',
+                channelId: 'C123456',
+                channelName: 'sales-daily',
+                includeAiSummary: true,
+                sources: [
+                  {
+                    service: 'mysheets',
+                    label: 'Google Sheets cá nhân',
+                    mysheetsBinding: {
+                      credentialId: '00000000-1111-4222-8333-444444444444',
+                      email: 'owner@personal.example.com',
+                      spreadsheetIds: ['sheet-alpha', 'sheet-beta'],
+                      truncated: true,
+                    },
+                  },
+                ],
+              },
+            },
+          } as any,
+        }}
+      />
+    );
+
+    const text = view.container.textContent ?? '';
+    auditExpect(text).toContain(
+      'Google Sheets cá nhân (owner@personal.example.com · sheet-alpha, sheet-beta · giới hạn 2 bảng tính)'
+    );
   });
 });
