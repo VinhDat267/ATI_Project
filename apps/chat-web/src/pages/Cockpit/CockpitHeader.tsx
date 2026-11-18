@@ -19,6 +19,7 @@ interface Props {
   onSettings: () => void;
   onHistory: () => void;
   onConversation: () => void;
+  onNewConversation?: () => void;
 }
 export function CockpitHeader({
   moment,
@@ -34,6 +35,7 @@ export function CockpitHeader({
   onSettings,
   onHistory,
   onConversation,
+  onNewConversation,
 }: Props) {
   const [testExplainOpen, setTestExplainOpen] = useState(false);
   const hasActiveChat = !(moment === 1 && chatCount === 0);
@@ -41,6 +43,7 @@ export function CockpitHeader({
     <>
       <button
         id="btn-open-history"
+        data-shell-compact-only
         type="button"
         aria-label="Mở danh sách hội thoại"
         title="Hội thoại gần đây"
@@ -99,7 +102,7 @@ export function CockpitHeader({
     </>
   );
   return (
-    <MainNav user={user} current="workspace" navigate={navigate} onLogout={onLogout} onOpenSettings={onSettings} actions={actions}>
+    <MainNav user={user} current="workspace" navigate={navigate} onLogout={onLogout} onOpenSettings={onSettings} actions={actions} onNewRequest={onNewConversation}>
       {runtimeMode === 'sandbox' && (
         <>
           <div

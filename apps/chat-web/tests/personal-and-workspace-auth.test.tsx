@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import '@testing-library/jest-dom/vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { VerifyEmailView } from '../src/views/VerifyEmailView';
 import { AuthGate } from '../src/components/AuthGate';
 import { Workspace } from '../src/components/Workspace';
@@ -525,17 +525,18 @@ describe('Personal and Workspace Auth (Task 5)', () => {
       await waitFor(() => {
         expect(screen.getByTestId('pending-count')).toHaveTextContent('1');
       });
-      expect(await screen.findByText('Chat Cá Nhân')).toBeInTheDocument();
+      expect(await within(screen.getByRole('main')).findByText('Chat Cá Nhân')).toBeInTheDocument();
 
-      // Switch workspace to ws-team-alpha
+      // Switch workspace to ws-team-alpha. Thanh bên (bước 5a) cũng tải danh sách, nên chỉ cần thấy lượt gọi mới.
+      const callsBeforeSwitch = convSpy.mock.calls.length;
       setActiveWorkspaceId('ws-team-alpha');
 
       await waitFor(() => {
         expect(screen.getByTestId('pending-count')).toHaveTextContent('7');
       });
       await waitFor(() => {
-        expect(convSpy).toHaveBeenCalledTimes(2);
-        expect(screen.getByText('Chat Tổ Chức Alpha')).toBeInTheDocument();
+        expect(convSpy.mock.calls.length).toBeGreaterThan(callsBeforeSwitch);
+        expect(within(screen.getByRole('main')).getByText('Chat Tổ Chức Alpha')).toBeInTheDocument();
       });
       expect(countSpy).toHaveBeenCalled();
     });

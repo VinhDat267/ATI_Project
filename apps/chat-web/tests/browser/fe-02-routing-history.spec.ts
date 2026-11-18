@@ -39,7 +39,7 @@ test('FE-02: Back/Forward, direct reload restores pending plan and saved executi
     await expect(page.getByText('FE02 pending preview', {exact:true})).toBeVisible();
     await expect(page.getByRole('region', { name: /Hệ thống vừa khởi động lại|Chưa rõ kết quả/ })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath('FE02-direct-reload.png'), fullPage: true });
-    await page.getByRole('button', {name:'Mở danh sách hội thoại'}).click(); await page.getByRole('button', {name:/Cuộc hội thoại mới/}).click();
+    await page.getByRole('button', { name: 'Yêu cầu mới', exact: true }).click();
     await expect(page).not.toHaveURL(new RegExp(`/c/${id}$`));
     await page.goBack(); await expect(page.locator('section[data-moment]').getByText('FE02 saved request')).toBeVisible();
     const foreignUser = (await db.query("INSERT INTO users(email,password,name) VALUES($1,'fixture-hash','Foreign fixture') RETURNING id", [`foreign-fe02-${Date.now()}@example.test`])).rows[0].id;
@@ -60,7 +60,14 @@ test('FE-02: history cursor reaches older than 50, literal title search and rena
     const oldest = await fixtureConversation(db,userId,`${prefix} oldest %_`);
     await db.query("UPDATE conversations SET updated_at=now()-interval '60 days' WHERE id=$1",[oldest]);
     for (let index = 0; index < 55; index++) await fixtureConversation(db,userId,`${prefix} history ${index}`);
-    await page.reload(); await page.getByRole('button',{name:'Mở danh sách hội thoại'}).click(); const history = page.getByRole('region', { name: 'Danh sách hội thoại' });
+    await page.reload();
+    // Từ 1024px thanh bên giữ 6 hội thoại mới nhất; ngăn kéo có tìm kiếm và phân trang còn ở màn hẹp.
+    const recent = page.getByRole('region', { name: 'Gần đây' });
+    await expect(recent.getByRole('link', { name: `${prefix} history 54`, exact: true })).toBeVisible();
+    await expect(recent.getByRole('link')).toHaveCount(6);
+    await expect(page.getByRole('button', { name: 'Mở danh sách hội thoại' })).toBeHidden();
+    await page.setViewportSize({ width: 900, height: 800 });
+    await page.getByRole('button',{name:'Mở danh sách hội thoại'}).click(); const history = page.getByRole('region', { name: 'Danh sách hội thoại' });
     await expect(history.getByText(`${prefix} history 54`)).toBeVisible();
     await expect(history.getByText(`${prefix} oldest %_`)).toHaveCount(0);
     // Search is sent to the server; literal SQL wildcard characters must not match other titles.

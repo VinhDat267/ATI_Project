@@ -36,8 +36,8 @@ test('AUTH-05: logging out every other device sends the other browser to login o
     await expect(one.getByRole('button', { name: 'Đăng xuất phiên này' })).toHaveCount(0);
 
     // The other browser still shows the workspace until its next request meets the revoked session.
-    // Opening history makes the next authenticated request and detects revocation.
-    await two.getByRole('button', {name:'Mở danh sách hội thoại'}).click();
+    // Starting a new request makes the next authenticated request and detects revocation.
+    await two.getByRole('button', { name: 'Yêu cầu mới', exact: true }).click();
     await expect(two).toHaveURL(/\/login$/);
     await expect(two.getByRole('button', { name: 'Đăng nhập', exact: true })).toBeVisible();
 

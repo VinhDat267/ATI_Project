@@ -318,11 +318,19 @@ test('FE-12: the cockpit keeps the request on screen without a second bar and th
   const echo = page.locator('[data-request-echo]');
   await expect(echo).toContainText(`Bạn nhờ: “${request}”`);
   expect(await echo.evaluate(line => !!(line.compareDocumentPosition(document.querySelector('#heading-moment-4')!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
-  await expect(page.getByRole('banner').getByText(request)).toHaveCount(0);
+  // Bước 5a: tên hội thoại chỉ nằm trong danh sách "Gần đây" ở thanh bên; thanh trên không lặp lại yêu cầu.
+  await expect(page.locator('[data-main-nav]').getByText(request)).toHaveCount(0);
+  await expect(page.getByRole('banner').getByText(request)).toHaveCount(1);
+  await expect(page.getByRole('region', { name: 'Gần đây' }).getByText(request)).toHaveCount(1);
   await expect(page.locator('#top-bar-query-container')).toHaveCount(0);
+  // Từ 1024px hội thoại gần đây nằm ở thanh bên; ngăn kéo lịch sử vẫn mở được ở màn hẹp.
+  await expect(page.getByRole('button', { name: 'Mở danh sách hội thoại' })).toBeHidden();
+  await expect(page.getByRole('region', { name: 'Gần đây' }).locator('a[aria-current="page"]')).toBeVisible();
+  await page.setViewportSize({ width: 900, height: 900 });
   await page.getByRole('button', { name: 'Mở danh sách hội thoại' }).click();
   await expect(page.getByRole('dialog', { name: 'Lịch sử yêu cầu' })).toBeVisible();
   await page.keyboard.press('Escape');
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole('button', { name: 'Xem hội thoại', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Nhật ký hội thoại' })).toBeVisible();
   await page.keyboard.press('Escape');

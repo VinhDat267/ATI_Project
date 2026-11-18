@@ -108,8 +108,9 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     } finally { await labelsDb.end(); }
     // Reopen within the app: the SQL-only fixture edit does not change the SSE
     // buffer. A full reload replays its old label and races the updated plan read.
-    await page.locator('#btn-open-history').click();
-    await page.getByRole('button', { name: 'Cuộc hội thoại mới', exact: true }).click();
+    // From 1024px "Yêu cầu mới" sits in the sidebar; on a phone it stays in the history drawer.
+    if (width >= 1024) await page.getByRole('button', { name: 'Yêu cầu mới', exact: true }).click();
+    else { await page.locator('#btn-open-history').click(); await page.getByRole('button', { name: 'Cuộc hội thoại mới', exact: true }).click(); }
     await page.waitForURL(url => url.pathname.startsWith('/c/') && url.pathname !== conversationPath);
     await page.goBack();
     await expect(page).toHaveURL(new RegExp(`${conversationPath}$`));
