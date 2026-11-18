@@ -54,14 +54,15 @@ test('FE-04b: signed-out 404 uses the prototype layer and leaving installs the c
   expect(await gradientPropertyRules(page)).toEqual([]);
 });
 
-test('FE-04b: signed-in 404 has no app shell, and Back/Forward keep each screen in its own scope', async ({ page }) => {
+test('FE-04b: signed-in 404 renders inside the app shell, and Back/Forward keep each screen in its own scope', async ({ page }) => {
   await login(page);
   await page.goto('/khong-co-trang');
   await expect(notFound(page)).toBeVisible();
-  await expect(page.getByRole('button', { name: /Menu người dùng/ })).toHaveCount(0);
+  // Redesign 11/2026 bước 6b: 404 khi đã đăng nhập bọc trong MainNav và đổi nhãn CTA thành "Về không gian làm việc".
+  await expect(page.getByRole('button', { name: /Menu người dùng/ })).toHaveCount(1);
   await expect(prototypeStyles(page)).toHaveCount(2);
 
-  await page.getByRole('main').getByRole('link', { name: 'Về không gian làm việc chính' }).click();
+  await page.getByRole('main').getByRole('link', { name: 'Về không gian làm việc' }).click();
   const composer = page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   await expect(composer).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-proto-page','app-stage');

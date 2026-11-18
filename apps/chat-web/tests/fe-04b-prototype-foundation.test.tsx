@@ -46,14 +46,15 @@ it('FE-04b: a signed-out unknown path shows the prototype 404 inside its page sc
   expect(pageScope()).toEqual({ page: 'index', body: 'selection:bg-[#FF5701]/20 selection:text-[#111827]', theme: 1, css: 1 });
 });
 
-it('FE-04b: a signed-in unknown path shows the 404 without the app shell; Back returns to it with its scope', async () => {
+it('FE-04b: a signed-in unknown path renders inside the app shell; Back returns to it with its scope', async () => {
   authStorage.setStoredTokens({ accessToken: 'access', user });
   window.history.replaceState({}, '', '/khong-co-trang');
   render(<App />);
   await heading();
-  expect(screen.queryByRole('button', { name: /Menu người dùng/ })).not.toBeInTheDocument();
+  // Redesign 11/2026 bước 6b: 404 khi đã đăng nhập dùng khung MainNav và nút .ps-btn "Về không gian làm việc".
+  expect(screen.getByRole('button', { name: /Menu người dùng/ })).toBeInTheDocument();
 
-  fireEvent.click(within(screen.getByRole('main')).getByRole('link', { name: 'Về không gian làm việc chính' }));
+  fireEvent.click(within(screen.getByRole('main')).getByRole('link', { name: 'Về không gian làm việc' }));
   await screen.findByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   expect(pageScope()).toEqual({ page: 'app-stage', body: cockpitMeta.bodyClass, theme: 1, css: 1 });
 

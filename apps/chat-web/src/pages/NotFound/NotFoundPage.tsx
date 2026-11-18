@@ -4,9 +4,11 @@
 // - nút Sáng/Tối đặt thẳng vào cụm bên phải thanh trên (bản React gắn bằng DOM vào đúng chỗ đó);
 // - link đi bằng navigate của app (giữ href để mở tab mới vẫn đúng).
 import type { MouseEvent } from 'react';
+import { MainNav } from '../../components/layout/MainNav';
 import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePage';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import { PlanoraMark } from '../../components/PlanoraMark';
+import type { User } from '../../types';
 import css from './page.css?inline';
 
 // Đường dẫn đang mở, như script DOMContentLoaded của 404.html.
@@ -24,7 +26,17 @@ export const meta: PageMeta = {
   css,
 };
 
-export function NotFoundPage({ signedIn, navigate }: { signedIn: boolean; navigate: (path: string) => void }) {
+export function NotFoundPage({
+  signedIn,
+  navigate,
+  user = null,
+  onLogout = () => navigate('/'),
+}: {
+  signedIn: boolean;
+  navigate: (path: string) => void;
+  user?: User | null;
+  onLogout?: () => void;
+}) {
   usePrototypePage(meta);
   const go = (path: string) => (event: MouseEvent<HTMLAnchorElement>) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -37,8 +49,38 @@ export function NotFoundPage({ signedIn, navigate }: { signedIn: boolean; naviga
       else navigate('/');
     },
   };
-  const home = signedIn ? { header: 'Về không gian làm việc', title: 'Quay lại không gian làm việc', logo: 'Về sân khấu điều phối', main: 'Về không gian làm việc chính', footer: 'Không gian làm việc' }
-    : { header: 'Về trang chủ', title: 'Về trang chủ', logo: 'Về trang chủ', main: 'Về trang chủ', footer: 'Trang chủ' };
+  if (signedIn) {
+    return (
+      <>
+        <MainNav user={user} current={null} pageName="Không tìm thấy trang" navigate={navigate} onLogout={onLogout} />
+        <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-10 v3-space-y-6">
+          <div className="ps-pagehead">
+            <h1>Không tìm thấy trang</h1>
+            <p>
+              Đường dẫn bạn vừa truy cập không tồn tại, đã được đổi tên hoặc chuyển sang vị trí khác. Dữ liệu công việc của bạn vẫn giữ nguyên.
+            </p>
+          </div>
+          <div className="ps-panel p-5 sm:p-6 v3-space-y-4">
+            <div className="flex flex-wrap items-baseline gap-2 text-sm text-[var(--ps-muted)]">
+              <span>Đường dẫn:</span>
+              <code id="current-bad-path" className="font-mono text-sm text-[var(--ps-accent-text)] break-all">
+                {badPath()}
+              </code>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <a href="/" onClick={go('/')} className="ps-btn">
+                Về không gian làm việc
+              </a>
+              <button type="button" onClick={() => actions.historyBackFallback()} className="ps-btn-quiet">
+                Quay lại trang trước
+              </button>
+            </div>
+          </div>
+        </main>
+      </>
+    );
+  }
+  const home = { header: 'Về trang chủ', title: 'Về trang chủ', logo: 'Về trang chủ', main: 'Về trang chủ', footer: 'Trang chủ' };
   return (
     <>
       {/* 1. Thanh điều hướng chuẩn cockpit */}
