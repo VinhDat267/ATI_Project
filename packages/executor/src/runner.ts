@@ -102,25 +102,36 @@ export class StepRunner {
         catalog.get(step.tool)?.inputSchema as { properties?: Record<string, any> } | undefined,
       );
 
-      if (step.tool === SLACK_PROPOSAL_WORKFLOW_TOOLS.bugCreateTool && Array.isArray(step.dependsOn) && step.dependsOn.length > 0 && typeof resolvedArgs.summary === 'string') {
+      if ((step.tool === SLACK_PROPOSAL_WORKFLOW_TOOLS.bugCreateTool || step.tool === 'myjira.create_issue') && Array.isArray(step.dependsOn) && step.dependsOn.length > 0 && typeof resolvedArgs.summary === 'string') {
         const wanted = resolvedArgs.summary.trim().toLowerCase();
         const targetProjectKey = typeof resolvedArgs.projectKey === 'string' ? resolvedArgs.projectKey.trim().toUpperCase() : '';
+        const targetSiteId = typeof resolvedArgs.siteId === 'string' ? resolvedArgs.siteId.trim() : '';
         for (const depId of step.dependsOn) {
           const depOut = stepOutputs.get(depId) as any;
           const issues = Array.isArray(depOut?.issues) ? depOut.issues : Array.isArray(depOut?.output?.issues) ? depOut.output.issues : null;
           const match = issues?.find((item: any) => {
             if (typeof item?.title !== 'string' || item.title.trim().toLowerCase() !== wanted) return false;
             if (typeof item.id !== 'string' || typeof item.key !== 'string' || typeof item.url !== 'string') return false;
+            if (targetSiteId && typeof item.siteId === 'string' && item.siteId.trim() !== targetSiteId) return false;
             if (!targetProjectKey) return true;
             const itemProjectKey = typeof item.projectKey === 'string' ? item.projectKey.trim().toUpperCase() : '';
             const keyPrefix = item.key.trim().toUpperCase().split('-')[0] ?? '';
             return itemProjectKey === targetProjectKey || keyPrefix === targetProjectKey;
           });
           if (match) {
+            const matchedSiteId =
+              typeof match.siteId === 'string' && match.siteId.trim()
+                ? match.siteId
+                : targetSiteId || undefined;
             return {
               stepId: step.id,
               status: 'success',
-              output: { id: match.id, key: match.key, url: match.url },
+              output: {
+                ...(step.tool === 'myjira.create_issue' && matchedSiteId ? { siteId: matchedSiteId } : {}),
+                id: match.id,
+                key: match.key,
+                url: match.url,
+              },
               error: null,
               durationMs: Date.now() - startTime,
             };
@@ -131,10 +142,27 @@ export class StepRunner {
       // 2. Extract service name (e.g. 'trello' from 'trello.create_card')
       const dotIndex = step.tool.indexOf('.');
       const serviceName = dotIndex === -1 ? step.tool : step.tool.slice(0, dotIndex);
-      const adapter = await this.options.getAdapter(serviceName);
-      if (!adapter || typeof (adapter as any).execute !== 'function') {
-        throw new Error(`Tool adapter for service '${serviceName}' is not available or missing execute() method`);
-      }
+      const adapter = await Promise.resolve()
+        .then(() => this.options.getAdapter(serviceName))
+        .then((resolved) => {
+          if (!resolved || typeof (resolved as any).execute !== 'function') {
+            throw new Error(`Tool adapter for service '${serviceName}' is not available or missing execute() method`);
+          }
+          return resolved;
+        })
+        .catch((preDispatchErr: any) => {
+          const details =
+            preDispatchErr?.details && typeof preDispatchErr.details === 'object'
+              ? { ...preDispatchErr.details, requestSent: false }
+              : { requestSent: false };
+          if (preDispatchErr && typeof preDispatchErr === 'object') {
+            preDispatchErr.details = details;
+            throw preDispatchErr;
+          }
+          const wrapped: any = new Error(String(preDispatchErr));
+          wrapped.details = details;
+          throw wrapped;
+        });
 
       // 3. Execute adapter tool with combined signal
       const output = await adapter.execute(step.tool, resolvedArgs, {

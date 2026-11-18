@@ -543,6 +543,27 @@ export class AIPlanner {
       artifactItems = Array.isArray(rawResult) ? rawResult : [rawResult];
     }
 
+    const rawObj =
+      rawResult && typeof rawResult === 'object' && !Array.isArray(rawResult)
+        ? (rawResult as Record<string, unknown>)
+        : null;
+    const rawCoverage =
+      rawObj?.coverage && typeof rawObj.coverage === 'object' && !Array.isArray(rawObj.coverage)
+        ? (rawObj.coverage as Record<string, unknown>)
+        : null;
+    const rawPartial = Boolean(
+      rawObj &&
+      (rawObj.truncated === true ||
+        rawObj.hasMore === true ||
+        rawObj.has_more === true ||
+        rawObj.wasSliced === true ||
+        rawCoverage?.complete === false ||
+        (typeof rawCoverage?.completeness === 'string' && rawCoverage.completeness !== 'COMPLETE')),
+    );
+    if (rawPartial && rendered.coverage === 'complete') {
+      rendered = { ...rendered, coverage: 'partial' };
+    }
+
     // The user's own opening words stay in front of the grounded report and inside its content hash.
     const prefix = requestedReportPrefix(groundingUserTexts.length ? groundingUserTexts : [input.userMessage]);
     if (prefix && !rendered.text.startsWith(prefix)) rendered = { ...rendered, text: `${prefix}\n${rendered.text}` };
@@ -788,9 +809,22 @@ export class AIPlanner {
       const nextPageToken = typeof cursor === 'string' && cursorSchema?.type === 'string' &&
           cursor.length >= (cursorSchema.minLength ?? 1) && cursor.length <= (cursorSchema.maxLength ?? 2048) && !/[\r\n\x00]/.test(cursor)
         ? cursor : undefined;
-      const truncated = raw && typeof raw === 'object' && !Array.isArray(raw) &&
-          (raw as Record<string, unknown>).truncated === true
-        ? true : undefined;
+      const rawObj = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
+      const rawCov =
+        rawObj?.coverage && typeof rawObj.coverage === 'object' && !Array.isArray(rawObj.coverage)
+          ? (rawObj.coverage as Record<string, unknown>)
+          : null;
+      const truncated = Boolean(
+        rawObj &&
+        (rawObj.truncated === true ||
+          rawObj.hasMore === true ||
+          rawObj.has_more === true ||
+          rawObj.wasSliced === true ||
+          rawCov?.complete === false ||
+          (typeof rawCov?.completeness === 'string' && rawCov.completeness !== 'COMPLETE')),
+      )
+        ? true
+        : undefined;
       return {
         tool: tool.name,
         args,

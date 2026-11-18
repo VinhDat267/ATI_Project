@@ -30,6 +30,7 @@ export interface SlackProposalPlanInput {
   overrideService?:SlackIntentService;
   overrideListId?:string;
   overrideProjectKey?:string;
+  overrideSiteId?:string;
   overrideSpreadsheetId?:string;
   overrideSheet?:string;
   overrideCalendarId?:string;
@@ -38,7 +39,7 @@ export interface SlackProposalPlanInput {
   overrideRepo?:string;
   overrideToEmail?:string;
   task?:{listId?:string;boardId?:string;boardIds?:string[];allowedListIds?:string[]};
-  bug?:{projectKey?:string;allowedProjectKeys?:string[]};
+  bug?:{siteId?:string;projectKey?:string;allowedProjectKeys?:string[]};
   progress?:{spreadsheetId?:string;sheet?:string;allowedSpreadsheetIds?:string[]};
   calendar?:{calendarId?:string;startIso?:string;endIso?:string};
   github?:{repo?:string;allowedRepos?:string[]};
@@ -295,25 +296,35 @@ export function planSlackProposalWorkflow(input:SlackProposalPlanInput):SlackPro
   return {kind:'plan',plan};
  }
 
- if((!input.targets.overrideService&&intent?.action==='issue')||targetService===SLACK_PROPOSAL_WORKFLOW_TOOLS.bugService){
+ if((!input.targets.overrideService&&intent?.action==='issue')||targetService===SLACK_PROPOSAL_WORKFLOW_TOOLS.bugService||(targetService as string)==='myjira'){
   const projectKey=(input.targets.bug?.projectKey??input.targets.overrideProjectKey)?.trim();
   const allowed=input.targets.bug?.allowedProjectKeys;
   if(!projectKey||(allowed&&allowed.length>0&&!allowed.includes(projectKey))){
    return {kind:'needs_info',question:'Chưa có dự án đích hợp lệ trong phạm vi được cấp quyền để kiểm tra và tạo phiếu lỗi.'};
   }
+  const fallbackConnSiteId=input.targetConnections?.myjira?.siteSteps
+   ?Object.values(input.targetConnections.myjira.siteSteps).find((s)=>typeof s?.siteId==='string'&&s.siteId.trim())?.siteId?.trim()
+   :undefined;
+  const myjiraSiteId=(input.targets.bug?.siteId??input.targets.overrideSiteId??fallbackConnSiteId)?.trim();
+  const useMyJira=Boolean(myjiraSiteId)||(targetService as string)==='myjira';
+  if(useMyJira&&!myjiraSiteId){
+   return {kind:'needs_info',question:'Chưa có Jira site đích hợp lệ trong phạm vi được cấp quyền để kiểm tra và tạo phiếu lỗi.'};
+  }
+  const bugSearchTool=useMyJira?'myjira.search_issues':SLACK_PROPOSAL_WORKFLOW_TOOLS.bugSearchTool;
+  const bugCreateTool=useMyJira?'myjira.create_issue':SLACK_PROPOSAL_WORKFLOW_TOOLS.bugCreateTool;
   const baseSteps:PlanStep[]=[
    {
     id:'step_1',
-    tool:SLACK_PROPOSAL_WORKFLOW_TOOLS.bugSearchTool,
+    tool:bugSearchTool,
     description:'Tra cứu phiếu lỗi hiện có trước khi tạo mới',
-    args:{projectKey,query:title,limit:5},
+    args:{...(myjiraSiteId?{siteId:myjiraSiteId}:{}),projectKey,query:title,limit:5},
     dependsOn:[],
    },
    {
     id:'step_2',
-    tool:SLACK_PROPOSAL_WORKFLOW_TOOLS.bugCreateTool,
+    tool:bugCreateTool,
     description:'Tạo phiếu lỗi mới sau khi kiểm tra trùng lặp',
-    args:{projectKey,summary:title,description:summary,issueType:'Bug'},
+    args:{...(myjiraSiteId?{siteId:myjiraSiteId}:{}),projectKey,summary:title,description:summary,issueType:'Bug'},
     dependsOn:['step_1'],
    },
   ];

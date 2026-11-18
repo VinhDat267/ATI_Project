@@ -81,6 +81,7 @@ export async function runtimeToolCatalog(
   const hasMyCalendar = personal.some((t) => t.service === 'mycalendar');
   const hasMySheetsSpreadsheets = personal.some((t) => t.name === 'mysheets.read_range');
   const isOrgMode = options.workspaceMode === 'organization' && Boolean(options.workspaceId);
+  const stripSharedCalendar = hasMyCalendar && !isOrgMode;
   const stripSharedSheets = hasMySheetsSpreadsheets && !isOrgMode;
   if (mode === 'live') {
     const hasSlack = personal.some((t) => t.service === 'slack');
@@ -88,7 +89,7 @@ export async function runtimeToolCatalog(
     const unified = [
       ...personal.filter(
         (t) =>
-          (!hasMyCalendar || t.service !== 'calendar') &&
+          (!stripSharedCalendar || t.service !== 'calendar') &&
           (!stripSharedSheets || t.service !== 'sheets')
       ),
       ...(hasSlack ? SLACK_EXTENDED_TOOLS : []),
@@ -104,7 +105,7 @@ export async function runtimeToolCatalog(
         t.service !== 'github' &&
         t.service !== 'telegram' &&
         (keepSharedJira || t.service !== 'jira') &&
-        (!hasMyCalendar || t.service !== 'calendar') &&
+        (!stripSharedCalendar || t.service !== 'calendar') &&
         (!stripSharedSheets || t.service !== 'sheets')
     ),
     ...SLACK_EXTENDED_TOOLS,

@@ -88,7 +88,12 @@ export function validateSchemaValue(value: unknown, schema: Record<string, any>,
   const allowedTypes = Array.isArray(schema.type) ? schema.type : schema.type ? [schema.type] : [];
   if (isObject(value) && ('$ref' in value || '$template' in value)) {
     const key = '$ref' in value ? '$ref' : '$template';
-    if (!allowedTypes.includes('string') || Object.keys(value).length !== 1 ||
+    const refAllowedTypes = new Set(['string', 'number', 'integer', 'boolean']);
+    const supportsRefOrTemplate =
+      key === '$ref'
+        ? allowedTypes.length === 0 || allowedTypes.some((t: string) => refAllowedTypes.has(t))
+        : allowedTypes.includes('string');
+    if (!supportsRefOrTemplate || Object.keys(value).length !== 1 ||
       typeof value[key] !== 'string' || !value[key].trim()) {
       return `${path} must be a ${allowedTypes.join(' | ') || 'valid'} value or a single non-empty ${key} string`;
     }
@@ -757,7 +762,8 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
     collectReferenceTargets(args, refTargets);
 
     for (const ref of refTargets) {
-      const parts = ref.split('.');
+      const normalizedRef = ref.replace(/\[(\d+)\]/g, '.$1');
+      const parts = normalizedRef.split('.');
       const targetStepId = parts[0];
       if (!targetStepId || !processedStepIds.has(targetStepId)) {
         return {
@@ -797,18 +803,46 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
 
       // If referencing targetStepId.output.<prop>, verify prop exists in outputSchema
       if (parts[1] === 'output' && parts[2]) {
-        const propName = parts[2];
         if (targetStep) {
           const targetToolDef = catalogMap.get(targetStep.tool);
           const outSchema = targetToolDef?.outputSchema;
-          if (outSchema && outSchema.type === 'object' && outSchema.properties) {
-            if (!(propName in outSchema.properties)) {
+          let cursorSchema: Record<string, any> | undefined = outSchema;
+          for (let idx = 2; idx < parts.length && cursorSchema; idx++) {
+            const segment = parts[idx]!;
+            if (/^\d+$/.test(segment)) {
+              if (cursorSchema.type === 'array' && isObject(cursorSchema.items)) {
+                cursorSchema = cursorSchema.items;
+                continue;
+              }
+              if (cursorSchema.type && cursorSchema.type !== 'array') {
+                return {
+                  valid: false,
+                  layer: 'semantic',
+                  error: `Referenced output index '${segment}' cannot index non-array schema of tool '${targetStep.tool}'`,
+                };
+              }
+              cursorSchema = undefined;
+              break;
+            }
+            if ((cursorSchema.type === 'object' || (!cursorSchema.type && !cursorSchema.items)) && isObject(cursorSchema.properties)) {
+              if (!(segment in cursorSchema.properties)) {
+                return {
+                  valid: false,
+                  layer: 'semantic',
+                  error: `Referenced output property '${segment}' does not exist in output schema of tool '${targetStep.tool}'`,
+                };
+              }
+              cursorSchema = cursorSchema.properties[segment];
+              continue;
+            }
+            if (cursorSchema.type === 'array') {
               return {
                 valid: false,
                 layer: 'semantic',
-                error: `Referenced output property '${propName}' does not exist in output schema of tool '${targetStep.tool}'`,
+                error: `Referenced output property '${segment}' cannot be read directly from array schema of tool '${targetStep.tool}'; index with [0] first`,
               };
             }
+            cursorSchema = undefined;
           }
         }
       }
