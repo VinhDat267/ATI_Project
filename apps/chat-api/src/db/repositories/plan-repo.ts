@@ -33,6 +33,14 @@ export interface PlanJiraGuard {
   grantId: string;
 }
 
+export const EXECUTION_PLAN_STATUSES = [
+  'approved', 'executing', 'stopping', 'partial', 'unknown', 'reconciliation_required', 'completed', 'stopped', 'failed',
+];
+
+interface PlanReadOptions {
+  omitUnreadable?: boolean;
+}
+
 export class PlanRepo {
   private readonly slack:SlackDerivedLineageRepo;
   constructor(private pool: pg.Pool,slack?:SlackDerivedLineageRepo) {this.slack=slack??new SlackDerivedLineageRepo(pool,new SlackPolicyService(pool));}
@@ -139,11 +147,16 @@ export class PlanRepo {
     return res.rows[0];
   }
 
-  async getPlan(id: string,purpose:'planning'|'manual_lookup'='manual_lookup'): Promise<PlanRow | null> {
+  async getPlan(
+    id: string,
+    purpose: 'planning' | 'manual_lookup' = 'manual_lookup',
+    options?: PlanReadOptions,
+  ): Promise<PlanRow | null> {
     if (!isUuid(id)) return null;
-    return this.transaction(async client=>{
-      if(!(await client.query('SELECT id FROM plans WHERE id=$1',[id])).rowCount)return null;
-      return (await guardPlanInTransaction(client,this.slack,id,purpose)).row;
+    return this.transaction(async client => {
+      if (!(await client.query('SELECT id FROM plans WHERE id=$1', [id])).rowCount) return null;
+      const checked = await guardPlanInTransaction(client, this.slack, id, purpose);
+      return options?.omitUnreadable && !checked.allowed ? null : checked.row;
     });
   }
 
@@ -325,13 +338,13 @@ export class PlanRepo {
     });
   }
 
-  async getLatestExecutedPlan(convId: string): Promise<PlanRow | null> {
+  async getLatestExecutedPlan(convId: string, options?: PlanReadOptions): Promise<PlanRow | null> {
     const result = await this.pool.query(
       `SELECT *, xmin::text AS revision FROM plans
-       WHERE conv_id = $1 AND status IN ('approved', 'executing', 'stopping', 'partial', 'unknown', 'reconciliation_required', 'completed', 'stopped', 'failed')
+       WHERE conv_id = $1 AND status = ANY($2::text[])
        ORDER BY created_at DESC, id DESC LIMIT 1`,
-      [convId],
+      [convId, EXECUTION_PLAN_STATUSES],
     );
-    return result.rows[0]?this.getPlan(result.rows[0].id):null;
+    return result.rows[0] ? this.getPlan(result.rows[0].id, 'manual_lookup', options) : null;
   }
 }

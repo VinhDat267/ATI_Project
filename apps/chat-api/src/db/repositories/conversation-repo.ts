@@ -2,6 +2,7 @@ import {readScheduleArtifact,captureScheduleArtifact,prelockScheduleArtifacts,sc
 import {messageFingerprint} from '../../services/slack/slack-message-selectors.js';
 import type pg from 'pg';
 import { sealMessageOrigin } from '../../services/slack/slack-message-origin.js';
+import { validateJiraApprovalBinding } from '../../services/jira/jira-approval-guard.js';
 import {
   encodeConversationCursor,
   validateConversationPage,
@@ -9,6 +10,7 @@ import {
   type ConversationPageOptions,
 } from './conversation-history.js';
 import { isUuid } from './uuid.js';
+import { EXECUTION_PLAN_STATUSES, PlanRepo, type PlanRow } from './plan-repo.js';
 
 export class ConversationAccessError extends Error {
   readonly status = 404;
@@ -56,6 +58,12 @@ export interface AttentionRun {
   planId: string;
   status: 'partial' | 'unknown' | 'reconciliation_required';
   updatedAt: string;
+}
+
+const ATTENTION_RUN_STATUSES = ['partial', 'unknown', 'reconciliation_required'] as const;
+
+function isAttentionRunStatus(status: string): status is AttentionRun['status'] {
+  return ATTENTION_RUN_STATUSES.some(candidate => candidate === status);
 }
 
 export class ConversationRepo {
@@ -425,8 +433,7 @@ export class ConversationRepo {
 
   /**
    * Việc đang chờ người dùng (trang chủ, redesign 11/2026), chỉ trong các hội thoại mà listConversationPage cho thấy:
-   * kế hoạch mới nhất của hội thoại đang chờ duyệt và chưa hết hạn (cùng điều kiện với PlanRepo.getPendingPlan),
-   * hoặc lượt chạy mới nhất dừng ở trạng thái cần người xử lý (partial, unknown, reconciliation_required).
+   * kế hoạch mới nhất còn chờ duyệt, và lượt thực thi mới nhất nếu lượt đó cần người xử lý.
    */
   async listAttention(
     userId: string,
@@ -437,62 +444,99 @@ export class ConversationRepo {
     const cap = Math.min(Math.max(Math.trunc(limit) || 8, 1), 20);
     const values: unknown[] = [userId];
     const where = this.visibleConversationConditions(values, scope);
-    values.push(cap * 2);
+    const plans = new PlanRepo(this.pool);
     try {
-      const result = await this.pool.query<{
-        plan_id: string; conv_id: string; plan_status: string; expires_at: Date; plan_created_at: Date;
-        summary: string | null; step_count: number; conversation: ConversationRow;
-      }>(
-        `WITH visible AS (SELECT * FROM conversations WHERE ${where.join(' AND ')}),
-         latest AS (
-           SELECT DISTINCT ON (p.conv_id) p.id, p.conv_id, p.status, p.expires_at, p.created_at, p.plan_json
-           FROM plans p WHERE p.conv_id IN (SELECT id FROM visible)
-           ORDER BY p.conv_id, p.created_at DESC, p.id DESC
-         )
-         SELECT l.id AS plan_id, l.conv_id, l.status AS plan_status, l.expires_at, l.created_at AS plan_created_at,
-                l.plan_json->>'summary' AS summary,
-                CASE WHEN jsonb_typeof(l.plan_json->'steps') = 'array' THEN jsonb_array_length(l.plan_json->'steps') ELSE 0 END AS step_count,
-                to_jsonb(v.*) AS conversation
-         FROM latest l JOIN visible v ON v.id = l.conv_id
-         WHERE (l.status = 'pending' AND l.expires_at > now())
-            OR l.status IN ('partial', 'unknown', 'reconciliation_required')
-         ORDER BY l.created_at DESC, l.id DESC
-         LIMIT $${values.length}`,
-        values
-      );
-      const rows = await Promise.all(
-        result.rows.map(async (row) => {
-          const raw = row.conversation;
-          const conversation = await this.safeReadConversation({
-            ...raw,
-            created_at: new Date(raw.created_at),
-            updated_at: new Date(raw.updated_at),
-          });
-          return { row, title: conversation.title ?? null };
-        })
-      );
-      const pendingPlans: AttentionPlan[] = [];
-      const needsAttention: AttentionRun[] = [];
-      for (const { row, title } of rows) {
-        if (row.plan_status === 'pending') {
-          if (pendingPlans.length < cap) {
-            pendingPlans.push({
-              conversationId: row.conv_id, title, planId: row.plan_id,
-              summary: row.summary, stepCount: Number(row.step_count) || 0, expiresAt: new Date(row.expires_at).toISOString(),
-            });
+      const [pendingPlans, needsAttention] = await Promise.all([
+        this.readAttentionGroup(plans, where, values, cap, 'pending', async (plan, title): Promise<AttentionPlan | null> => {
+          if (plan.status !== 'pending' || plan.expires_at.getTime() <= Date.now()) return null;
+          let payload = plan.plan_json;
+          if (typeof payload === 'string') {
+            try {
+              payload = JSON.parse(payload);
+            } catch {
+              return null;
+            }
           }
-        } else if (needsAttention.length < cap) {
-          needsAttention.push({
-            conversationId: row.conv_id, title, planId: row.plan_id,
-            status: row.plan_status as AttentionRun['status'], updatedAt: new Date(row.plan_created_at).toISOString(),
-          });
-        }
-      }
+          if (payload?.connections?.myjira && !(await validateJiraApprovalBinding(this.pool, payload.connections.myjira)).valid) return null;
+          // Both rows would open the same conversation, where recovery takes precedence.
+          const execution = await plans.getLatestExecutedPlan(plan.conv_id, { omitUnreadable: true });
+          if (execution && isAttentionRunStatus(execution.status)) return null;
+          return {
+            conversationId: plan.conv_id,
+            title,
+            planId: plan.id,
+            summary: typeof payload?.summary === 'string' ? payload.summary : null,
+            stepCount: Array.isArray(payload?.steps) ? payload.steps.length : 0,
+            expiresAt: plan.expires_at.toISOString(),
+          };
+        }),
+        this.readAttentionGroup(plans, where, values, cap, 'execution', (plan, title): AttentionRun | null => {
+          if (!isAttentionRunStatus(plan.status)) return null;
+          return {
+            conversationId: plan.conv_id,
+            title,
+            planId: plan.id,
+            status: plan.status,
+            updatedAt: plan.created_at.toISOString(),
+          };
+        }),
+      ]);
       return { pendingPlans, needsAttention };
     } catch (err: any) {
       if (err?.code === '42703' && scope?.workspaceMode === 'legacy') return this.listAttention(userId, undefined, limit);
       throw err;
     }
+  }
+
+  private async readAttentionGroup<T>(
+    plans: PlanRepo,
+    where: string[],
+    scopeValues: unknown[],
+    limit: number,
+    group: 'pending' | 'execution',
+    toItem: (plan: PlanRow, title: string | null) => T | null | Promise<T | null>,
+  ): Promise<T[]> {
+    const pending = group === 'pending';
+    const cursor = scopeValues.length + 1;
+    const batchSize = Math.max(limit, 8);
+    const items: T[] = [];
+    let after: { id: string; timestamp: string } | undefined;
+    while (items.length < limit) {
+      // Apply the cursor after choosing the latest plan, so pagination cannot
+      // promote an older plan or execution from the same conversation.
+      const { rows } = await this.pool.query<{ id: string; timestamp: string; conversation: ConversationRow }>(
+        `WITH visible AS (SELECT * FROM conversations WHERE ${where.join(' AND ')})
+         SELECT p.id, p.created_at::text AS timestamp, to_jsonb(v.*) AS conversation
+         FROM visible v
+         CROSS JOIN LATERAL (
+           SELECT id, status, expires_at, created_at FROM plans
+           WHERE conv_id = v.id ${pending ? '' : `AND status = ANY($${cursor + 3}::text[])`}
+           ORDER BY created_at DESC, id DESC LIMIT 1
+         ) p
+         WHERE ${pending ? "p.status = 'pending' AND p.expires_at > now()" : `p.status = ANY($${cursor + 4}::text[])`}
+           AND ($${cursor}::timestamptz IS NULL OR (p.created_at, p.id) < ($${cursor}::timestamptz, $${cursor + 1}::uuid))
+         ORDER BY p.created_at DESC, p.id DESC
+         LIMIT $${cursor + 2}`,
+        [ ...scopeValues, after?.timestamp ?? null, after?.id ?? null, batchSize,
+          ...(pending ? [] : [EXECUTION_PLAN_STATUSES, ATTENTION_RUN_STATUSES]) ],
+      );
+      for (const candidate of rows) {
+        const plan = await plans.getPlan(candidate.id, 'manual_lookup', { omitUnreadable: true });
+        const raw = candidate.conversation;
+        if (!plan || plan.conv_id !== raw.id) continue;
+        const conversation = await this.safeReadConversation({
+          ...raw,
+          created_at: new Date(raw.created_at),
+          updated_at: new Date(raw.updated_at),
+        });
+        const item = await toItem(plan, conversation.title ?? null);
+        if (item !== null) items.push(item);
+        if (items.length === limit) break;
+      }
+      if (rows.length < batchSize) break;
+      after = rows.at(-1);
+    }
+    return items;
   }
 
   /** Điều kiện "người dùng được thấy hội thoại này" dùng chung cho lịch sử và việc đang chờ. values[0] phải là userId. */
