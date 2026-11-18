@@ -228,4 +228,42 @@ describe('Slack workspace connections on PostgreSQL', () => {
     const updated = await repo.save(p.id, s2!.id, input('T_MIGRATION'));
     expect(updated).toBeTruthy();
   });
+
+  it('evicts the pooled PG client when pg_advisory_unlock fails so the next withOwner call does not deadlock', async () => {
+    const ownerId = 'owner-unlock-evict';
+    const releaseArgs: unknown[] = [];
+    let failNextUnlock = true;
+    const realConnect = db.pool.connect.bind(db.pool);
+    const wrappedPool = {
+      connect: async () => {
+        const client = await realConnect();
+        const origQuery = client.query.bind(client);
+        const origRelease = client.release.bind(client);
+        (client as any).query = (sql: any, params?: any) => {
+          if (failNextUnlock && typeof sql === 'string' && sql.includes('pg_advisory_unlock')) {
+            failNextUnlock = false;
+            return Promise.reject(new Error('unlock transport dropped'));
+          }
+          return origQuery(sql, params);
+        };
+        (client as any).release = (err?: unknown) => {
+          releaseArgs.push(err);
+          return origRelease(err as any);
+        };
+        return client;
+      },
+      query: db.pool.query.bind(db.pool),
+    } as any;
+
+    const observedRepo = new SlackConnectionRepo(wrappedPool);
+    await expect(observedRepo.withOwner(ownerId, async () => 'ok')).rejects.toThrow('unlock transport dropped');
+    expect(releaseArgs[0]).toBeInstanceOf(Error);
+
+    // Next call with a bounded lock_timeout must acquire cleanly without deadlocking on the evicted session's lock.
+    const nextResult = await repo.withOwner(ownerId, async (client) => {
+      await client.query("SET LOCAL lock_timeout = '1000ms'");
+      return 'acquired';
+    });
+    expect(nextResult).toBe('acquired');
+  });
 });

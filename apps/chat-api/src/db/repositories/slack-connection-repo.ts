@@ -15,12 +15,38 @@ export class SlackConnectionRepo {
   constructor(private pool: pg.Pool, private invalidationService?: SlackInvalidationService) {}
   async withOwner<T>(userId: string, action: (client: pg.PoolClient) => Promise<T>): Promise<T> {
     const client = await this.pool.connect();
+    let lockAcquired = false;
+    let hasActionError = false;
+    let actionError: unknown;
     try {
       await client.query("SELECT pg_advisory_lock(hashtext('ati-slack-owner'),hashtext($1))", [userId]);
+      lockAcquired = true;
       return await action(client);
+    } catch (err) {
+      hasActionError = true;
+      actionError = err;
+      throw err;
     } finally {
-      try { await client.query("SELECT pg_advisory_unlock(hashtext('ati-slack-owner'),hashtext($1))", [userId]); }
-      finally { client.release(); }
+      let releaseError: Error | undefined;
+      if (lockAcquired) {
+        try {
+          const res = await client.query<{ unlocked?: boolean }>(
+            "SELECT pg_advisory_unlock(hashtext('ati-slack-owner'),hashtext($1)) AS unlocked",
+            [userId],
+          );
+          if (res?.rows?.[0]?.unlocked === false) {
+            releaseError = new Error('Failed to release Slack owner advisory lock');
+          }
+        } catch (unlockErr) {
+          releaseError = unlockErr instanceof Error ? unlockErr : new Error(String(unlockErr));
+        }
+      } else if (hasActionError) {
+        releaseError = actionError instanceof Error ? actionError : new Error(String(actionError));
+      }
+      client.release(releaseError);
+      if (lockAcquired && releaseError && !hasActionError) {
+        throw releaseError;
+      }
     }
   }
   async start(input: { userId: string; sessionId: string; stateHash: string; browserHash: string; returnTo?: string | null }, now = Date.now()): Promise<void> {
