@@ -146,9 +146,9 @@ it('read receipt collections also reject insecure output links',async()=>{
 });
 it('history drawer preserves search and rename while using the source card hierarchy',async()=>{
   const {apiClient}=await import('../src/services/api-client');
-  vi.spyOn(apiClient,'getConversations').mockResolvedValueOnce({conversations:[{id:'c1',title:'Công việc hôm nay',updatedAt:'2026-10-07T00:00:00.000Z'}]});
+  vi.spyOn(apiClient,'getConversations').mockResolvedValue({conversations:[{id:'c1',title:'Công việc hôm nay',updatedAt:'2026-10-07T00:00:00.000Z'}]});
   useChatStore.setState({activePlan:plan,planStatus:'preview'});view();fireEvent.click(await screen.findByRole('button',{name:'Mở danh sách hội thoại'}));
-  const row=await screen.findByRole('button',{name:/^Công việc hôm nay/});expect(row.querySelector('.font-medium')).not.toBeNull();
+  const row=await within(await screen.findByRole('dialog',{name:'Lịch sử yêu cầu'})).findByRole('button',{name:/^Công việc hôm nay/});expect(row.querySelector('.font-medium')).not.toBeNull();
   expect(screen.getByRole('searchbox',{name:'Tìm hội thoại theo tiêu đề'})).toBeInTheDocument();expect(screen.getByRole('button',{name:'Đổi tên Công việc hôm nay'})).toBeInTheDocument();
   fireEvent.click(document.getElementById('drawer-backdrop')!);await waitFor(()=>expect(screen.queryByRole('dialog')).toBeNull());
 });

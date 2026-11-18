@@ -5,12 +5,14 @@
 // Mỗi đích chỉ còn một lối vào: Hộp thư đề xuất nằm trong danh sách, không còn chip "Sự kiện" riêng.
 // Giao diện của khung nằm ở src/styles/app-shell.css; MainNav gắn data-app-shell lên <html> khi có mặt.
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
-import { BookOpen, History, Inbox, Menu, MessagesSquare, Plug, Users, X } from 'lucide-react';
+import { BookOpen, History, Inbox, Menu, MessagesSquare, Plug, SquarePen, Users, X } from 'lucide-react';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import { PlanoraMark } from '../PlanoraMark';
 import type { User } from '../../types';
 import { UserNavMenu } from './UserNavMenu';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
+import { SidebarRecent } from './SidebarRecent';
+import { useChatStore } from '../../store/chat-store';
 import { useSchedulePendingCount } from '../../hooks/use-schedules';
 import { getActiveWorkspaceSummary, subscribeWorkspace } from '../../services/workspace-storage';
 
@@ -48,11 +50,13 @@ export interface MainNavProps {
   inboxBadgeCount?: number;
   /** Phần nằm ngay dưới thanh trên, trong cùng header dính (cockpit: dải Chế độ thử nghiệm). */
   children?: ReactNode;
+  /** Nút "Yêu cầu mới" ở thanh bên. Cockpit truyền cách tạo hội thoại của nó; trang khác thì dọn trạng thái rồi về trang chủ. */
+  onNewRequest?: () => void;
 }
 
 const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pageName, actions, inboxBadgeCount, children }: MainNavProps) {
+export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pageName, actions, inboxBadgeCount, children, onNewRequest }: MainNavProps) {
   const pendingCount = useSchedulePendingCount(user);
   const [activeWorkspace, setActiveWorkspace] = useState(getActiveWorkspaceSummary());
   const [menuOpen, setMenuOpen] = useState(false);
@@ -118,6 +122,12 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
     setMenuOpen(false);
     navigate(path);
   };
+  const newRequest = () => {
+    setMenuOpen(false);
+    if (onNewRequest) { onNewRequest(); return; }
+    useChatStore.getState().reset({ preservePlanning: true });
+    navigate('/');
+  };
   const canManageUsers = (activeWorkspace.id !== 'personal' && activeWorkspace.role === 'admin') || (activeWorkspace.id === 'personal' && user?.role === 'admin');
   const usersPendingCount = activeWorkspace.id !== 'personal' && typeof activeWorkspace.pendingCount === 'number' ? activeWorkspace.pendingCount : 0;
   const inboxCount = typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0 ? inboxBadgeCount : 0;
@@ -161,13 +171,18 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
             <span className="ps-brand">Planora</span>
           </a>
         </div>
-        <div data-sidebar-workspace className="mt-3 mb-4">
+        <div data-sidebar-workspace className="mt-3 mb-3">
           <WorkspaceSwitcher navigate={navigate} variant="sidebar" />
         </div>
+        <button type="button" data-new-request className="ps-newrequest mb-4" onClick={newRequest}>
+          <SquarePen aria-hidden="true" strokeWidth={1.75} />
+          <span>Yêu cầu mới</span>
+        </button>
         <nav aria-label="Điều hướng chính" className="flex flex-col">
           <div className="ps-navgroup flex flex-col gap-0.5">{tabs.filter(tab => tab.group === 'work').map(link)}</div>
           <div className="ps-navgroup flex flex-col gap-0.5">{tabs.filter(tab => tab.group === 'more').map(link)}</div>
         </nav>
+        <SidebarRecent userId={user?.id} follow={follow} />
       </div>
       <div data-main-nav className="ps-topbar-row flex items-center gap-2 px-3 sm:px-5">
         <button ref={menuBtnRef} type="button" className="ps-iconbtn ps-menu-btn -ml-1" aria-label="Mở menu điều hướng" aria-expanded={menuOpen} aria-controls="app-sidebar" onClick={() => setMenuOpen(true)}>

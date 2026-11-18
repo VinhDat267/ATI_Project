@@ -558,8 +558,8 @@ describe('WorkflowFlowCanvas — Make.com Orbital Workflow Visualizer', () => {
       </SchedulesCapabilityContext.Provider>
     );
 
-    expect(await screen.findByText('Tạo thẻ Trello xong')).toBeInTheDocument();
-    expect(screen.getByText('Hỏi về lịch họp')).toBeInTheDocument();
+    expect(await within(screen.getByRole('main')).findByText('Tạo thẻ Trello xong')).toBeInTheDocument();
+    expect(within(screen.getByRole('main')).getByText('Hỏi về lịch họp')).toBeInTheDocument();
 
     // Compact WorkflowFlowCanvas inside ScheduleRow
     expect((await screen.findAllByTestId('workflow-flow-canvas')).length).toBeGreaterThanOrEqual(1);
@@ -568,8 +568,8 @@ describe('WorkflowFlowCanvas — Make.com Orbital Workflow Visualizer', () => {
     expect(screen.queryByText(/Lọc theo trạng thái/)).toBeNull();
     const filterGroup = screen.getByRole('group', { name: 'Bộ lọc trạng thái hội thoại' });
     fireEvent.click(within(filterGroup).getByRole('button', { name: /Hoàn thành/i }));
-    expect(screen.getByText('Tạo thẻ Trello xong')).toBeInTheDocument();
-    expect(screen.queryByText('Hỏi về lịch họp')).toBeNull();
+    expect(within(screen.getByRole('main')).getByText('Tạo thẻ Trello xong')).toBeInTheDocument();
+    expect(within(screen.getByRole('main')).queryByText('Hỏi về lịch họp')).toBeNull();
   });
 
   it('Round 3 Polish (#1, #2, #3): renders horizontal spreadsheet grid preview for mysheets.append_rows, prefills schedule request on Sửa click, and highlights steps in ExecutionMoment and ReceiptMoment on node click', () => {

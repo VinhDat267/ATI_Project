@@ -20,13 +20,20 @@ for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
       for(const [i,step] of plan.steps.entries()) await db.query("INSERT INTO execution_steps(plan_id,step_id,tool,args_json,status,output_json,requested_by,duration_ms,started_at,completed_at) VALUES($1,$2,$3,$4::jsonb,$5,$6::jsonb,$7,$8,now()-interval '1 second',CASE WHEN $5='succeeded' THEN now() ELSE NULL END)",[id,step.id,step.tool,JSON.stringify(step.args),i?'running':'succeeded',JSON.stringify(i?{number:999,url:'https://slack.com/app_redirect?channel=general'}:{number:42,url:'https://github.com/owner/repo/issues/42'}),owner,i?7:1200]);
       await certifyFixturePlan(db,id);
       await page.goto(`/c/${conv}`);await expect(page.locator('#moment-4')).toBeVisible();await expect(page.locator('textarea:visible')).toHaveCount(0);
-      const historyOpener=page.getByRole('button',{name:'Mở danh sách hội thoại'});await historyOpener.click();
+      const historyOpener=page.getByRole('button',{name:'Mở danh sách hội thoại'});
+      if(width>=1024){
+        // Từ 1024px danh sách gần đây ở thanh bên và đánh dấu hội thoại đang mở; ngăn kéo chỉ còn ở màn hẹp.
+        await expect(historyOpener).toBeHidden();
+        await expect(page.getByRole('region',{name:'Gần đây'}).getByRole('link',{name:title,exact:true})).toHaveAttribute('aria-current','page');
+      } else {
+      await historyOpener.click();
       const history=page.getByRole('dialog',{name:'Lịch sử yêu cầu'});
       // Keep the last focusable control stable while testing wrapping; FE-02 tests scrolling pagination separately.
       await history.getByRole('searchbox').fill(title);await expect(history.getByRole('button',{name:title,exact:true})).toBeVisible();
       const closeHistory=history.getByRole('button',{name:'Đóng Lịch sử yêu cầu'});await closeHistory.focus();
       await closeHistory.press('Shift+Tab');const lastHistoryControl=history.locator('button:not([disabled])').last();await expect(lastHistoryControl).toBeFocused();
       await lastHistoryControl.press('Tab');await expect(closeHistory).toBeFocused();await page.keyboard.press('Escape');await expect(historyOpener).toBeFocused();
+      }
       await expect(page.locator('textarea:visible')).toHaveCount(0);
       let release!:()=>void;const approval=new Promise<void>(resolve=>{release=resolve;});
       await page.route('**/api/plans/*/approve',async route=>{await approval;await route.fulfill({status:409,json:{error:'Explicit bounded approval fixture'}});});

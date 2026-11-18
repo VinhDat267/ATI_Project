@@ -89,14 +89,14 @@ describe('PBI-04: chuyển không gian trên /settings', () => {
     render(<App />);
     const scheduleRegion = await screen.findByRole('region', { name: 'Lịch chạy' });
     expect(await within(scheduleRegion).findByText('Lịch riêng cá nhân')).toBeInTheDocument();
-    expect(await screen.findByText('Hội thoại cá nhân')).toBeInTheDocument();
+    expect(await within(screen.getByRole('main')).findByText('Hội thoại cá nhân')).toBeInTheDocument();
 
     await act(async () => { await switchTo(/^Không gian Chung$/); });
     expect(window.location.pathname).toBe('/history');
     expect(await within(scheduleRegion).findByText('Chưa có lịch chạy nào')).toBeInTheDocument();
     expect(within(scheduleRegion).queryByText('Lịch riêng cá nhân')).toBeNull();
-    expect(await screen.findByText('Hội thoại nhóm chung')).toBeInTheDocument();
-    expect(screen.queryByText('Hội thoại cá nhân')).toBeNull();
+    expect(await within(screen.getByRole('main')).findByText('Hội thoại nhóm chung')).toBeInTheDocument();
+    expect(within(screen.getByRole('main')).queryByText('Hội thoại cá nhân')).toBeNull();
   });
 });
 
@@ -167,7 +167,7 @@ describe('PBI-06: tạo tổ chức mới & tham gia bằng mã mời giữ nguy
     await joinOrgViaMenu('ATI-HIST-8888');
     await waitFor(() => expect(getActiveWorkspaceId()).toBe('ws-joined-hist'));
     expect(window.location.pathname).toBe('/history');
-    expect(await screen.findByText('Hội thoại tổ chức mới')).toBeInTheDocument();
+    expect(await within(screen.getByRole('main')).findByText('Hội thoại tổ chức mới')).toBeInTheDocument();
   });
 
   it('tạo hoặc tham gia tổ chức khi đang ở /c/conv-123 vẫn điều hướng về "/"', async () => {

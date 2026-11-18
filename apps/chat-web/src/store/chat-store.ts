@@ -14,6 +14,7 @@ import type {
 export interface ChatStoreState {
   conversationId: string | null;
   conversations: Conversation[];
+  conversationRenameRevision: number;
   messages: ChatMessage[];
   streamingText: string;
   isStreaming: boolean;
@@ -46,6 +47,7 @@ export interface ChatStoreState {
   // Actions
   setConversationId: (id: string | null) => void;
   setConversations: (conversations: Conversation[]) => void;
+  applyConversationRename: (conversation: Conversation) => void;
   addMessage: (message: ChatMessage) => void;
   addOptimisticMessage: (params: { id: string; content: string }) => void;
   confirmMessage: (tempId: string, confirmedId: string) => void;
@@ -69,6 +71,7 @@ export interface ChatStoreState {
 const initialState = {
   conversationId: null,
   conversations: [],
+  conversationRenameRevision: 0,
   messages: [],
   streamingText: '',
   isStreaming: false,
@@ -96,6 +99,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
 
   setConversationId: (id) => set(state => ({ conversationId: id, isPlanning: !!state.planningByConversation[planningKey(id)] })),
   setConversations: (conversations) => set({ conversations }),
+  applyConversationRename: (conversation) => set(state => ({
+    conversations: state.conversations.map(row => row.id === conversation.id ? conversation : row),
+    conversationRenameRevision: state.conversationRenameRevision + 1,
+  })),
 
   addMessage: (message) =>
     set((state) => {

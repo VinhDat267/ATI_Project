@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { apiClient } from '../../services/api-client';
 import { userErrorMessage } from '../../services/user-error';
-import { getActiveWorkspaceId, subscribeWorkspace } from '../../services/workspace-storage';
+import { getActiveWorkspaceId, getActiveWorkspaceSelection, subscribeWorkspace } from '../../services/workspace-storage';
 import { useChatStore } from '../../store/chat-store';
 import type { Conversation, User } from '../../types';
 
@@ -44,11 +44,13 @@ export function useHistory(user: User | null) {
     if (!trimmed || Array.from(trimmed).length > 60) { setError('Tiêu đề cần từ 1 đến 60 ký tự.'); return; }
     renameBusy.current = true; setSaving(true); setError(null); setNotice(null);
     const owner = generation.current, revision = draftRevision.current;
+    const workspace = getActiveWorkspaceSelection();
     try {
       const { conversation } = await apiClient.renameConversation(id, trimmed);
+      if (workspace !== getActiveWorkspaceSelection()) return;
+      useChatStore.getState().applyConversationRename(conversation);
       if (owner !== generation.current) return;
       setRows(current => current.map(row => row.id === id ? conversation : row));
-      const store = useChatStore.getState(); store.setConversations(store.conversations.map(row => row.id === id ? conversation : row));
       // An edit, Escape, or a new rename session invalidates ownership of the old input.
       if (draftRevision.current === revision) { returnFocus.current = id; setEditing(null); }
       setNotice('Đã đổi tên hội thoại.');

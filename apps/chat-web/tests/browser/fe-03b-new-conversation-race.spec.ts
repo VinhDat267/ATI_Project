@@ -26,10 +26,12 @@ test('FE-03b: a message sent while New conversation is pending goes to that conv
     });
     await page.route('**/api/conversations/*/messages', async route => { await sendGate; await route.continue(); });
 
-    await page.getByRole('button', {name:'Mở danh sách hội thoại'}).click(); await page.getByRole('button', {name:/Cuộc hội thoại mới/}).click();
+    const input = page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
+    await input.fill('FE-03b bản nháp của yêu cầu trước');
+    await page.getByRole('button', { name: 'Yêu cầu mới', exact: true }).click();
     await expect.poll(() => creates).toBe(1);
     const content = `FE-03b gửi khi đang tạo hội thoại ${Date.now()}`;
-    const input = page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
+    await expect(input).toHaveValue('');
     await input.fill(content); await input.press('Enter');
     releaseCreate();
 

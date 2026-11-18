@@ -109,6 +109,8 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
     if (statusFilter === 'chatting') return !row.status || row.status === 'chatting' || row.status === 'planning' || row.status === 'executing';
     return true;
   });
+  const empty: false | 'search' | 'filter' | 'none' = loading || error || displayed.length > 0 ? false
+    : rows.length > 0 ? 'filter' : search ? 'search' : 'none';
   const actions: CardActions & { loadMoreRequests: () => void } = {
     startInlineRename(id, event) { event.stopPropagation(); edit(id); },
     handleRenameKey(event, id) { if (event.nativeEvent.isComposing) return; if (event.key === 'Enter') { event.preventDefault(); void rename(id); } if (event.key === 'Escape') { event.preventDefault(); cancel(); } },
@@ -155,19 +157,6 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
             </a>
           </div>
         </div>
-        {/* NGUYÊN TẮC AN TOÀN */}
-        <div className="px-4 py-3 rounded-xl bg-white border border-[#E6DED3] flex items-center gap-3">
-          <svg className="w-4 h-4 text-[#51463E] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-          </svg>
-          <div className="text-xs sm:text-sm text-[#51463E] leading-relaxed">
-            <strong className="text-[#1a0e08] font-semibold">
-              Minh bạch &amp; An toàn dữ liệu:
-            </strong>
-            {" Planora chỉ ghi khi bạn duyệt kế hoạch. Trang này chỉ hiển thị hội thoại của chính bạn; mở hội thoại để xem kế hoạch và kết quả đã lưu."}
-          </div>
-        </div>
-        <ScheduleSection user={user} navigate={navigate} />
         {/* THANH TÌM KIẾM VÀ BỘ LỌC ĐA NĂNG */}
         <div className="bg-white p-4 rounded-2xl border border-[#E6DED3] shadow-2xs v3-space-y-3.5">
           <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -243,26 +232,27 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
             Đã hiển thị toàn bộ lịch sử hội thoại
           </div>
         </div>
-        {/* TRẠNG THÁI RỖNG (EMPTY STATE KHI TÌM KHÔNG THẤY) */}
-        <div id="empty-state" className={`${!loading && rows.length === 0 ? '' : 'hidden '}p-12 text-center bg-white rounded-2xl border border-[#E6DED3] shadow-2xs v3-space-y-3`}>
-          <div className="w-11 h-11 rounded-xl bg-[#F8F4EE] border border-[#E6DED3] flex items-center justify-center mx-auto text-[#6A5F56]">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
+        {/* TRẠNG THÁI RỖNG: ba trường hợp khác nhau (chưa có gì, tìm không thấy, bộ lọc không có hội thoại). */}
+        {empty && <div id="empty-state" className="p-12 text-center bg-white rounded-2xl border border-[#E6DED3] shadow-2xs v3-space-y-3">
           <h3 className="font-sans text-base sm:text-lg font-semibold text-[#1a0e08]">
-            {search ? "Không tìm thấy hội thoại phù hợp" : "Chưa có hội thoại nào"}
+            {empty === 'search' ? "Không tìm thấy hội thoại phù hợp" : empty === 'filter' ? "Không có hội thoại nào ở bộ lọc này" : "Chưa có hội thoại nào"}
           </h3>
           <p className="text-xs sm:text-sm text-[#6A5F56] max-w-sm mx-auto">
-            Thử thay đổi từ khóa tìm kiếm theo tiêu đề hội thoại.
+            {empty === 'search' ? "Thử từ khóa khác trong tiêu đề hội thoại." : empty === 'filter' ? "Các hội thoại đã tải không thuộc trạng thái này." : "Gửi yêu cầu đầu tiên ở trang chủ; hội thoại sẽ hiện ở đây để bạn mở lại."}
           </p>
-          {' '}
-          <button type="button" onClick={() => setSearch("")} className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-neutral-100 hover:bg-neutral-200 text-[#1a0e08] transition-colors mt-2">
-            <span>
+          {empty === 'search' && (
+            <button type="button" onClick={() => setSearch("")} className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-neutral-100 hover:bg-neutral-200 text-[#1a0e08] transition-colors mt-2">
               Xoá từ khóa tìm kiếm
-            </span>
-          </button>
-        </div>
+            </button>
+          )}
+          {empty === 'filter' && (
+            <button type="button" onClick={() => setStatusFilter('all')} className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-neutral-100 hover:bg-neutral-200 text-[#1a0e08] transition-colors mt-2">
+              Xem tất cả
+            </button>
+          )}
+        </div>}
+        {/* Lịch chạy đứng sau danh sách: trang này trước hết là nơi tìm lại hội thoại. */}
+        <ScheduleSection user={user} navigate={navigate} />
       </main>
       {/* CHÂN TRANG */}
       <footer className="mt-auto border-t border-[#E6DED3] bg-[#F8F4EE] py-6 px-4 sm:px-6">
