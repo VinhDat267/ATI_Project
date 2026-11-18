@@ -76,6 +76,66 @@ function foldVietnamese(text: string): string {
     .toLowerCase();
 }
 
+const REPORT_PREFIX_PATTERN =
+  /(?:(?:giữ\s+)?(?:nguyên\s+văn\s+)?(?:mở\s+đầu|bắt\s+đầu)(?:\s+(?:nguyên\s+văn|tin(?:\s+nhắn)?|bản\s+tin|báo\s+cáo|danh\s+sách|nội\s+dung))*|(?:ở\s+)?đầu\s+tin(?:\s+nhắn)?|(?:với\s+|thêm\s+|dùng\s+|giữ\s+(?:nguyên\s+văn\s+)?)?tiền\s+tố|(?:with\s+|use\s+|keep\s+(?:literal\s+|verbatim\s+)?)?prefix(?:ed)?|start(?:ing)?(?:\s+(?:the\s+|this\s+)?(?:message|report|post|digest|summary|list|text))?\s+with|begin(?:ning)?(?:\s+(?:the\s+|this\s+)?(?:message|report|post|digest|summary|list|text))?\s+with)\s*(?:nguyên\s+văn\s+|verbatim\s+|literal\s+)?(?:bằng|là|với|by|with|is)?\s*[:：=]?\s*(?:"([^"\r\n]{1,200})"|“([^”\r\n]{1,200})”|'([^'\r\n]{1,200})'|(\[[^\]\r\n]{1,198}\]))/giu;
+
+const SOURCE_FILTER_SUBJECT =
+  /\b(?:issues?|tickets?|prs?|pull\s+requests?|cards?|thẻ|dòng|rows?|cột|columns?|ô|cells?|pages?|trang|tasks?|công\s+việc|mục|items?|tiêu\s+đề|titles?|tên|names?|mã|keys?|codes?|nhãn|labels?|subjects?)(?:\s+(?:jira|github|trello|notion|google\s+sheets?|sheets?|đang\s+mở|đã\s+đóng|quá\s+hạn|open|closed|nào|mà|whose|which|that|where|có|with|in|trong|trên|của))*\s*$/iu;
+
+function isSourceFilterPrefixMatch(text: string, matchIndex: number): boolean {
+  const clauseHead =
+    text
+      .slice(0, matchIndex)
+      .split(/[,;.\n!?]|\b(?:rồi|sau\s+đó|và\s+gửi|rồi\s+gửi|then|and\s+(?:send|post|notify))\b/iu)
+      .at(-1) ?? '';
+  return SOURCE_FILTER_SUBJECT.test(clauseHead);
+}
+
+/** Strips explicit message-prefix instructions without touching source-filter clauses. */
+export function stripRequestedReportPrefixes(text: string): string {
+  return text.replace(REPORT_PREFIX_PATTERN, (full, _g1, _g2, _g3, _g4, offset) =>
+    isSourceFilterPrefixMatch(text, offset as number) ? full : ' ',
+  );
+}
+
+/**
+ * The opening text the user asked the message to start with ("mở đầu bằng [X]"), taken verbatim
+ * from the user's own words so it can be prepended to a grounded report without model-written content.
+ */
+export function requestedReportPrefix(userTexts: readonly string[]): string | undefined {
+  for (const text of [...userTexts].reverse()) {
+    let candidate: string | undefined;
+    for (const match of text.matchAll(REPORT_PREFIX_PATTERN)) {
+      if (isSourceFilterPrefixMatch(text, match.index ?? 0)) continue;
+      const raw = (match[1] ?? match[2] ?? match[3] ?? match[4])?.replace(/[\r\n\t]+/g, ' ').trim();
+      if (raw) candidate = raw;
+    }
+    if (candidate) return candidate;
+  }
+  return undefined;
+}
+
+/**
+ * Detects whether the user asked for an aging GitHub issue report and extracts the day threshold
+ * (default 7 when an aging phrase has no explicit number).
+ */
+export function githubIssueAgingDays(userTexts: readonly string[]): number | undefined {
+  const cleaned = userTexts.map(stripRequestedReportPrefixes).join(' ');
+  const folded = foldVietnamese(cleaned);
+  const ageMatch =
+    /(?:\b(?:qua|tren|hon|older\s+than|more\s+than|over|at\s+least)\s*(\d+)\s*(?:ngay|days?)\b|\btu\s*(\d+)\s*ngay\s+tro\s+len\b|\b(\d+)\+\s*(?:ngay|days?)\b)/i.exec(
+      folded,
+    );
+  const rawDays = ageMatch?.[1] ?? ageMatch?.[2] ?? ageMatch?.[3];
+  if (rawDays !== undefined) {
+    return Number.parseInt(rawDays, 10);
+  }
+  if (/\b(?:ton\s+dong|ton\s+lau|qua\s+lau|lau\s+ngay|lau\s+roi|aging|ageing|stale|overdue)\b/i.test(folded)) {
+    return 7;
+  }
+  return undefined;
+}
+
 /** Original user context is authoritative; model-written summaries are only a fallback. */
 export function requiresReportEvidence(userTexts: readonly string[]): boolean {
   const fold = foldVietnamese;
@@ -84,13 +144,14 @@ export function requiresReportEvidence(userTexts: readonly string[]): boolean {
   const read = /\b(?:danh sach|liet ke|doc|xem|kiem tra|lay|dem|bao nhieu|may|hien co|co nhung|tim|list|read|show|find|fetch|which|how many|what)\b/;
   const send = /(?<![\p{L}\p{N}_])(?:gửi|nhắn|gui|send|post|notify)(?![\p{L}\p{N}_])/iu;
   const sourceMutation = /\b(?:tao|them|ghi|cap nhat|sua|dong|gan|mo|create|add|append|update|close|assign|delete)\s+(?:(?:moi|mot|cac|a|an|the|new|github|google|nhan|bug|cho)\s+)*(?:prs?|pull requests?|issues?|tickets?|jira|sprints?|sheets?|spreadsheets?|bang tinh|dong|rows?|cells?|the|cards?|trello)\b/;
-  const latest = fold(userTexts.at(-1) ?? '');
+  const rawLatest = userTexts.at(-1) ?? '';
+  const latest = fold(stripRequestedReportPrefixes(rawLatest));
   const outsideQuotes = latest.replace(/"[^"\n]*"|“[^”\n]*”|'[^'\n]*'/g, '');
   // A user may send their own literal words, including numbers or the word "report".
-  if (send.test(userTexts.at(-1) ?? '') && (outsideQuotes !== latest || /\b(?:nguyen van|verbatim|literal)\b/.test(latest)) &&
+  if (send.test(rawLatest) && (outsideQuotes !== latest || /\b(?:nguyen van|verbatim|literal)\b/.test(latest)) &&
       !(report.test(outsideQuotes) || read.test(outsideQuotes))) return false;
   return userTexts.some((text) => {
-    let value = fold(text);
+    let value = fold(stripRequestedReportPrefixes(text));
     if (!topic.test(value)) return false;
     // A title/body is authored payload, not a second requested action. Keep any
     // subsequent action clause so "create issue; summarize PRs" still needs evidence.
@@ -116,8 +177,10 @@ export function requiresReportEvidence(userTexts: readonly string[]): boolean {
 
 /** Detect literal instructions so a mixed report request can clarify before any write. */
 export function reportLiteralBodies(userTexts: readonly string[]): string[] {
-  return userTexts.flatMap(text => [...text.matchAll(/(?:nguyên văn|verbatim|literal|exact(?:ly)?(?: this)?(?: message| text)?)[^"'“”\n]{0,48}(?:"([^"\n]*)"|“([^”\n]*)”|'([^'\n]*)')/giu)]
-    .map(match => match[1] ?? match[2] ?? match[3] ?? ''));
+  return userTexts
+    .map(stripRequestedReportPrefixes)
+    .flatMap(text => [...text.matchAll(/(?:nguyên văn|verbatim|literal|exact(?:ly)?(?: this)?(?: message| text)?)[^"'“”\n]{0,48}(?:"([^"\n]*)"|“([^”\n]*)”|'([^'\n]*)')/giu)]
+      .map(match => match[1] ?? match[2] ?? match[3] ?? ''));
 }
 
 export const REPORT_SOURCE_TOOL_KINDS: Readonly<Record<string, ReportKind>> = {

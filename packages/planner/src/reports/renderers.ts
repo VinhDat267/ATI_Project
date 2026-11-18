@@ -4,6 +4,7 @@
  */
 
 import type { ReportKind } from '@wap/tool-schemas';
+export { requestedReportPrefix, githubIssueAgingDays } from '@wap/tool-schemas';
 
 export interface GitHubPullRequestItem {
   number: number;
@@ -73,22 +74,6 @@ export function sanitizeReportString(input: unknown): string {
     .replace(/[<>`]/g, '')
     .trim()
     .slice(0, 300);
-}
-
-const PREFIX_REQUEST =
-  /(?:mở đầu|bắt đầu|đầu tin|tiền tố|prefix|start(?:ing)? with|begin(?:ning)? with)\s*(?:bằng|là|với|by)?\s*[:：]?\s*(?:"([^"\n]{1,200})"|“([^”\n]{1,200})”|'([^'\n]{1,200})'|(\[[^\]\n]{1,198}\]))/iu;
-
-/**
- * The opening text the user asked the message to start with ("mở đầu bằng [X]"), taken verbatim
- * from the user's own words so it can be prepended to a grounded report without model-written content.
- */
-export function requestedReportPrefix(userTexts: readonly string[]): string | undefined {
-  for (const text of [...userTexts].reverse()) {
-    const match = PREFIX_REQUEST.exec(text);
-    const value = (match?.[1] ?? match?.[2] ?? match?.[3] ?? match?.[4])?.replace(/\s+/g, ' ').trim();
-    if (value) return value;
-  }
-  return undefined;
 }
 
 /**
@@ -214,6 +199,23 @@ export function renderGithubPrsReport(
   };
 }
 
+function resolveReferenceTime(clock?: string | Date): number {
+  if (!clock) return Date.now();
+  return typeof clock === 'string' ? Date.parse(clock) : clock.getTime();
+}
+
+function computeIssueAgeDays(issue: GitHubIssueItem, referenceTime: number): number | null {
+  const rawTime = issue.createdAt || issue.updatedAt;
+  const timeMs = rawTime ? Date.parse(rawTime) : Number.NaN;
+  if (Number.isNaN(timeMs)) return null;
+  return Math.max(0, Math.floor((referenceTime - timeMs) / 86400000));
+}
+
+function formatGithubIssueLine(issue: GitHubIssueItem, ageDays: number | null): string {
+  const age = ageDays !== null ? ` (tuổi: ${ageDays} ngày)` : '';
+  return `- #${issue.number}: ${sanitizeReportString(issue.title)}${age} (${issue.url})`;
+}
+
 /**
  * Deterministically renders a GitHub Issue Aging report (DEV-04).
  */
@@ -232,20 +234,12 @@ export function renderGithubIssueAgingReport(
 
   const repoLabel = options?.repo ? ` (${options.repo})` : '';
   const agingDays = options?.agingDays ?? 7;
-  const referenceTime = options?.clock
-    ? typeof options.clock === 'string'
-      ? Date.parse(options.clock)
-      : options.clock.getTime()
-    : Date.now();
+  const referenceTime = resolveReferenceTime(options?.clock);
 
-  const evaluated = issues.map((iss) => {
-    const rawTime = iss.createdAt || iss.updatedAt;
-    const timeMs = rawTime ? Date.parse(rawTime) : null;
-    const ageDays = timeMs !== null && !Number.isNaN(timeMs)
-      ? Math.max(0, Math.floor((referenceTime - timeMs) / 86400000))
-      : null;
-    return { ...iss, ageDays };
-  });
+  const evaluated = issues.map((iss) => ({
+    ...iss,
+    ageDays: computeIssueAgeDays(iss, referenceTime),
+  }));
 
   const agingIssues = evaluated
     .filter((iss) => iss.ageDays !== null && iss.ageDays >= agingDays)
@@ -266,13 +260,7 @@ export function renderGithubIssueAgingReport(
 
   const lines = [
     `Báo cáo GitHub Issue tồn đọng${repoLabel}: Hiện có ${count} issue tồn đọng quá ${agingDays} ngày (trong tổng số ${issues.length} issue đã kiểm tra)${isPartial ? ` (hiển thị ${itemsToRender.length} mục đầu tiên)` : ''}:`,
-    ...itemsToRender.map((iss) => {
-      const num = iss.number;
-      const title = sanitizeReportString(iss.title);
-      const url = iss.url;
-      const age = iss.ageDays;
-      return `- #${num}: ${title} (tuổi: ${age} ngày) (${url})`;
-    }),
+    ...itemsToRender.map((iss) => formatGithubIssueLine(iss, iss.ageDays)),
   ];
 
   return {
@@ -283,34 +271,61 @@ export function renderGithubIssueAgingReport(
 }
 
 /**
- * Deterministically renders open GitHub issues when the user asked for a list, not an aging report.
+ * Deterministically renders GitHub issues when the user asked for a list, not an aging report.
  */
 export function renderGithubIssueListReport(
   issues: GitHubIssueItem[],
-  options?: { repo?: string; clock?: string | Date; limit?: number }
+  options?: {
+    repo?: string;
+    clock?: string | Date;
+    limit?: number;
+    filters?: { state?: string; query?: string };
+  }
 ): RenderedReport {
   if (!Array.isArray(issues)) {
     throw new Error('Invalid Issues read outcome: expected an array of GitHub issue items');
   }
-  const repoLabel = options?.repo ? ` (${options.repo})` : '';
-  const referenceTime = options?.clock
-    ? typeof options.clock === 'string' ? Date.parse(options.clock) : options.clock.getTime()
-    : Date.now();
+  const rawQuery = typeof options?.filters?.query === 'string' ? sanitizeReportString(options.filters.query) : '';
+  const hasClosed = /\b(?:is|state):closed\b/i.test(rawQuery);
+  const hasOpen = /\b(?:is|state):open\b/i.test(rawQuery);
+  const cleanedQuery = rawQuery.replace(/\b(?:is|state):(?:open|closed|issue)\b/gi, '').replace(/\s+/g, ' ').trim();
+  const explicitState = options?.filters?.state;
+  const effectiveState =
+    explicitState === 'closed' || (!explicitState && hasClosed && !hasOpen)
+      ? 'closed'
+      : explicitState === 'all' || (hasClosed && hasOpen)
+        ? 'all'
+        : explicitState === 'open' || hasOpen || !cleanedQuery
+          ? 'open'
+          : 'any';
+  const stateLabel = effectiveState === 'open' ? ' đang mở' : effectiveState === 'closed' ? ' đã đóng' : '';
+  const contextLabel =
+    options?.repo && cleanedQuery
+      ? ` (${options.repo}, từ khoá: "${cleanedQuery}")`
+      : options?.repo
+        ? ` (${options.repo})`
+        : cleanedQuery
+          ? ` (từ khoá: "${cleanedQuery}")`
+          : '';
+  const headerBase = `Báo cáo GitHub Issue${stateLabel}${contextLabel}`;
+  const referenceTime = resolveReferenceTime(options?.clock);
   const count = issues.length;
   if (count === 0) {
-    return { text: `Báo cáo GitHub Issue đang mở${repoLabel}: Hiện không có issue nào đang mở.`, itemCount: 0, coverage: 'complete' };
+    const emptyTail = cleanedQuery
+      ? 'Hiện không có issue nào khớp bộ lọc.'
+      : effectiveState === 'closed'
+        ? 'Hiện không có issue nào đã đóng.'
+        : effectiveState === 'open'
+          ? 'Hiện không có issue nào đang mở.'
+          : 'Hiện không có issue nào.';
+    return { text: `${headerBase}: ${emptyTail}`, itemCount: 0, coverage: 'complete' };
   }
   const limit = options?.limit ?? count;
   const itemsToRender = issues.slice(0, limit);
   const isPartial = count > itemsToRender.length;
   const lines = [
-    `Báo cáo GitHub Issue đang mở${repoLabel}: Hiện có ${count} issue${isPartial ? ` (hiển thị ${itemsToRender.length} mục đầu tiên)` : ''}:`,
-    ...itemsToRender.map((iss) => {
-      const rawTime = iss.createdAt || iss.updatedAt;
-      const timeMs = rawTime ? Date.parse(rawTime) : Number.NaN;
-      const age = Number.isNaN(timeMs) ? '' : ` (tuổi: ${Math.max(0, Math.floor((referenceTime - timeMs) / 86400000))} ngày)`;
-      return `- #${iss.number}: ${sanitizeReportString(iss.title)}${age} (${iss.url})`;
-    }),
+    `${headerBase}: Hiện có ${count} issue${isPartial ? ` (hiển thị ${itemsToRender.length} mục đầu tiên)` : ''}:`,
+    ...itemsToRender.map((iss) => formatGithubIssueLine(iss, computeIssueAgeDays(iss, referenceTime))),
   ];
   return { text: lines.join('\n'), itemCount: count, coverage: isPartial ? 'partial' : 'complete' };
 }

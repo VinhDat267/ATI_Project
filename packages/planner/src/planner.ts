@@ -33,6 +33,7 @@ import {
 import { extractWorkspaceRecipients } from './recipients.js';
 import { ReportArtifactStore } from './reports/artifacts.js';
 import {
+  githubIssueAgingDays,
   renderGithubPrsReport,
   renderGithubIssueAgingReport,
   renderGithubIssueListReport,
@@ -459,7 +460,6 @@ export class AIPlanner {
     let sourceLabel: string;
     let artifactItems: unknown[];
 
-    const combinedText = groundingUserTexts.join(' ');
     if (readTool === 'github.list_pull_requests') {
       const items = Array.isArray(rawResult)
         ? rawResult
@@ -493,7 +493,7 @@ export class AIPlanner {
           ...(Number.isInteger(readArgs.dueWithinDays) ? { dueWithinDays: readArgs.dueWithinDays as number } : {}),
         },
       });
-      sourceLabel = projectKey ? `Jira ${projectKey}` : 'Jira Sprint';
+      sourceLabel = projectKey ? `Jira ${projectKey}` : 'Jira Issues';
       artifactItems = items;
     } else if (readTool === 'github.list_issues' || readTool.endsWith('.search_issues')) {
       const items = Array.isArray(rawResult)
@@ -506,16 +506,20 @@ export class AIPlanner {
       if (!Array.isArray(items)) return rawOutput;
       kind = 'github_issues';
       const repo = typeof readArgs.repo === 'string' ? readArgs.repo : undefined;
-      const ageMatch = combinedText.match(/(?:quá|trên|hơn)\s*(\d+)\s*ngày/i);
-      const folded = combinedText.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase();
-      // Only an aging question filters by age; "liệt kê issue đang mở" lists every open issue.
-      const agingIntent = Boolean(ageMatch) || /\b(?:ton dong|qua lau|lau ngay|lau roi|aging|stale|overdue)\b/.test(folded);
-      if (agingIntent) {
-        const agingDays = ageMatch?.[1] ? Number.parseInt(ageMatch[1], 10) : 7;
+      // Only an aging question filters by age; "liệt kê issue đang mở" lists every matching issue.
+      const agingDays = githubIssueAgingDays(groundingUserTexts.length ? groundingUserTexts : [input.userMessage]);
+      if (agingDays !== undefined) {
         rendered = renderGithubIssueAgingReport(items as any, { repo, agingDays, clock: this.now() });
         sourceLabel = repo ? `${repo} (>${agingDays}d)` : 'GitHub Issues';
       } else {
-        rendered = renderGithubIssueListReport(items as any, { repo, clock: this.now() });
+        rendered = renderGithubIssueListReport(items as any, {
+          repo,
+          clock: this.now(),
+          filters: {
+            ...(typeof readArgs.state === 'string' ? { state: readArgs.state } : {}),
+            ...(typeof readArgs.query === 'string' ? { query: readArgs.query } : {}),
+          },
+        });
         sourceLabel = repo || 'GitHub Issues';
       }
       artifactItems = items;
