@@ -145,7 +145,7 @@ export function PersonalSlack({ standalone = true }: { standalone?: boolean } = 
     >
       <div className="flex flex-col gap-1.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="myslack-title" className="font-sans text-base font-semibold text-[#111827] dark:text-white flex items-center gap-3">
+          <h2 id="myslack-title" className="font-sans text-base font-semibold text-[#1a0e08] dark:text-white flex items-center gap-3">
             <ServiceLogo service="myslack" className="w-6 h-6" />
             Slack của bạn
           </h2>
@@ -162,10 +162,10 @@ export function PersonalSlack({ standalone = true }: { standalone?: boolean } = 
             <span>{badgeLabel}</span>
           </span>
         </div>
-        <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+        <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
           Kết nối từng workspace bằng tài khoản Slack của bạn. Mỗi workspace được quản lý riêng.
         </p>
-        <p className="text-xs text-[#4B5563] dark:text-[#D1D5DB]">
+        <p className="text-xs text-[#51463E] dark:text-[#D1D5DB]">
           {getHeaderDescription()}
         </p>
       </div>
@@ -184,20 +184,20 @@ export function PersonalSlack({ standalone = true }: { standalone?: boolean } = 
           </button>
         </div>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-[#6B7280] dark:text-[#9CA3AF]">Chưa kết nối workspace nào.</p>
+        <p className="text-sm text-[#6A5F56] dark:text-[#9CA3AF]">Chưa kết nối workspace nào.</p>
       ) : (
         <ul className="v3-space-y-3">
           {rows.map((row) => (
             <li
               key={row.id}
-              className="border border-[#E7E7E2] dark:border-[#293653] rounded-lg p-3.5 break-words bg-[#FAFAFA] dark:bg-[#1A2540]"
+              className="border border-[#E8E0D6] dark:border-[#3a312a] rounded-lg p-3.5 break-words bg-[#FAFAFA] dark:bg-[#221C18]"
             >
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <h3 className="font-semibold text-base text-[#111827] dark:text-white break-all">
+                  <h3 className="font-semibold text-base text-[#1a0e08] dark:text-white break-all">
                     {row.workspaceName}
                   </h3>
-                  <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] mt-0.5 break-all font-mono">
+                  <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF] mt-0.5 break-all font-mono">
                     <span>{row.workspaceId}</span> · <span>{row.slackUserLabel}</span>
                   </p>
                 </div>
@@ -207,7 +207,7 @@ export function PersonalSlack({ standalone = true }: { standalone?: boolean } = 
                       Cần kết nối lại
                     </span>
                   ) : row.status === 'revoked' ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-700 dark:bg-[#1A2540] dark:text-[#CBD5E1]">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-neutral-100 text-neutral-700 dark:bg-[#221C18] dark:text-[#D7CEC4]">
                       Đã thu hồi
                     </span>
                   ) : row.processingReady ? (
@@ -234,7 +234,7 @@ export function PersonalSlack({ standalone = true }: { standalone?: boolean } = 
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center gap-3 mt-3 pt-2 border-t border-[#E7E7E2] dark:border-[#293653]">
+              <div className="flex flex-wrap items-center gap-3 mt-3 pt-2 border-t border-[#E8E0D6] dark:border-[#3a312a]">
                 {row.status === 'reconnect_required' && (
                   <button
                     type="button"
@@ -251,13 +251,13 @@ export function PersonalSlack({ standalone = true }: { standalone?: boolean } = 
                   disabled={!!busy}
                   aria-label={`Kiểm tra kết nối ${row.workspaceName}`}
                   onClick={() => void checkConnection(row)}
-                  className="text-xs font-medium text-[#111827] dark:text-white underline hover:text-[#FF5701] transition-colors disabled:opacity-50"
+                  className="text-xs font-medium text-[#1a0e08] dark:text-white underline hover:text-[#FF5701] transition-colors disabled:opacity-50"
                 >
                   {busy === `check-${row.id}` ? 'Đang kiểm tra…' : 'Kiểm tra kết nối'}
                 </button>
                 <a
                   href="/inbox"
-                  className="text-xs font-medium text-[#111827] dark:text-white underline hover:text-[#FF5701] transition-colors"
+                  className="text-xs font-medium text-[#1a0e08] dark:text-white underline hover:text-[#FF5701] transition-colors"
                 >
                   Mở hộp thư đề xuất
                 </a>
@@ -310,18 +310,18 @@ export function PersonalSlack({ standalone = true }: { standalone?: boolean } = 
             }}
           >
             <div className="p-5 v3-space-y-4">
-              <p className="text-sm text-[#111827] dark:text-white">
+              <p className="text-sm text-[#1a0e08] dark:text-white">
                 Bạn có chắc chắn muốn ngắt kết nối workspace <strong>{disconnectTarget.workspaceName}</strong> ({disconnectTarget.workspaceId}) khỏi tài khoản Planora?
               </p>
-              <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+              <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
                 Sau khi ngắt, Planora sẽ không thể tương tác với workspace này cho tới khi bạn kết nối lại.
               </p>
-              <div className="flex justify-end gap-3 pt-3 border-t border-[#E7E7E2] dark:border-[#293653]">
+              <div className="flex justify-end gap-3 pt-3 border-t border-[#E8E0D6] dark:border-[#3a312a]">
                 <button
                   type="button"
                   disabled={!!busy}
                   onClick={() => setDisconnectTarget(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-medium bg-white dark:bg-[#1A2540] text-[#111827] dark:text-[#F1F5F9] border border-[#E7E7E2] dark:border-[#293653] hover:bg-neutral-50 dark:hover:bg-[#24324D] transition-colors"
+                  className="px-4 py-2 rounded-xl text-xs font-medium bg-white dark:bg-[#221C18] text-[#1a0e08] dark:text-[#F3EEE8] border border-[#E8E0D6] dark:border-[#3a312a] hover:bg-neutral-50 dark:hover:bg-[#312923] transition-colors"
                 >
                   Hủy
                 </button>

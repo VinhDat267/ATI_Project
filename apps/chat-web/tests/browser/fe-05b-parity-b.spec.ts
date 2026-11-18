@@ -37,7 +37,7 @@ for(const width of [1440,375]) for(const theme of ['light','dark'] as const) {
       await expect(page.locator('textarea:visible')).toHaveCount(1);await expect(page.locator('#global-bottom-bar')).toHaveCSS('position','fixed');
       const draft=page.getByRole('textbox');await draft.fill('Một\nhai');await draft.press('Shift+Enter');await expect(draft).toHaveValue('Một\nhai\n');
       const opener=page.getByRole('button',{name:'Xem hội thoại',exact:true});await opener.click();await expect(page.locator('textarea:visible')).toHaveCount(1);await expect(page.getByRole('dialog').getByRole('textbox')).toHaveValue('Một\nhai\n');
-      await expect(page.locator('#chat-drawer')).toHaveCSS('width',`${width===375?375:420}px`);await expect(page.locator('#drawer-backdrop')).toHaveCSS('backdrop-filter','blur(4px)');
+      await expect(page.locator('#chat-drawer')).toHaveCSS('width',`${width===375?375:420}px`);/* Redesign 11/2026: lớp phủ ngăn kéo không còn kính mờ. */await expect(page.locator('#drawer-backdrop')).toHaveCSS('backdrop-filter','none');
       const close=page.getByRole('button',{name:'Đóng Nhật ký hội thoại'});await expect(close).toBeFocused();await close.press('Shift+Tab');await expect(page.getByRole('button',{name:'Gửi tin nhắn',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(opener).toBeFocused();
       release();await expect(page.locator('#moment-4')).toBeVisible();
       await db.query("UPDATE execution_steps SET status='succeeded',completed_at=now() WHERE plan_id=$1 AND step_id='step_2'",[id]);await db.query("UPDATE plans SET status='completed' WHERE id=$1",[id]);

@@ -139,7 +139,7 @@ function renderInteractiveTemplatePreview(
         className={`inline-flex items-center px-2 py-0.5 mx-0.5 rounded-md text-[15px] font-medium align-baseline transition-colors cursor-pointer ${
           filled
             ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100'
-            : 'bg-[#F4F4F1] text-[#111827] border border-dashed border-[#B8B8B0] hover:border-[#111827] hover:bg-neutral-200/60'
+            : 'bg-[#F4F4F1] text-[#1a0e08] border border-dashed border-[#B8B8B0] hover:border-[#1a0e08] hover:bg-neutral-200/60'
         }`}
       >
         {filled || formatVariableLabel(varName)}
@@ -423,12 +423,12 @@ export function RequestMoment({
 
         <h1
           id="heading-moment-1"
-          className="font-sans text-2xl sm:text-[28px] text-[#111827] font-semibold tracking-tight leading-tight"
+          className="font-sans text-2xl sm:text-[28px] text-[#1a0e08] font-semibold tracking-tight leading-tight"
           tabIndex={-1}
         >
           {resume ? 'Tiếp tục hội thoại này' : 'Hôm nay bạn muốn nhờ việc gì?'}
         </h1>
-        <p className="text-sm sm:text-[15px] text-[#6B7280] max-w-2xl leading-relaxed">
+        <p className="text-sm sm:text-[15px] text-[#6A5F56] max-w-2xl leading-relaxed">
           {resume
             ? 'Xem lại yêu cầu trước bên dưới, rồi gửi tiếp hoặc mô tả việc mới.'
             : workspace.id === 'personal'
@@ -446,27 +446,27 @@ export function RequestMoment({
           event.preventDefault();
           handleSend();
         }}
-        className="relative bg-white rounded-2xl border border-[#E5E5E0] shadow-2xs p-3.5 sm:p-4 focus-within:border-[#FF5701] transition-colors"
+        className="relative bg-white rounded-2xl border border-[#E6DED3] shadow-2xs p-3.5 sm:p-4 focus-within:border-[#FF5701] transition-colors"
       >
         <label htmlFor="prompt-input" className="sr-only">
           Nội dung bạn muốn nhờ
         </label>
         {templateVariables.length > 0 && (
           <div className="flex items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-[#F1F1EC]">
-            <div className="inline-flex items-center gap-1.5 text-xs font-medium text-[#4B5563]">
+            <div className="inline-flex items-center gap-1.5 text-xs font-medium text-[#51463E]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#FF5701]" aria-hidden="true" />
               <span>Mẫu câu lệnh điền nhanh</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="inline-flex items-center p-0.5 rounded-lg bg-[#F4F4F1] border border-[#E7E7E2]">
+              <div className="inline-flex items-center p-0.5 rounded-lg bg-[#F4F4F1] border border-[#E8E0D6]">
                 <button
                   type="button"
                   data-testid="tab-preview-mode"
                   onClick={() => setComposerTab('preview')}
                   className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
                     composerTab === 'preview'
-                      ? 'bg-white text-[#111827] shadow-2xs font-semibold'
-                      : 'text-[#4B5563] hover:text-[#111827]'
+                      ? 'bg-white text-[#1a0e08] shadow-2xs font-semibold'
+                      : 'text-[#51463E] hover:text-[#1a0e08]'
                   }`}
                 >
                   Xem câu lệnh
@@ -480,8 +480,8 @@ export function RequestMoment({
                   }}
                   className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
                     composerTab === 'template'
-                      ? 'bg-white text-[#111827] shadow-2xs font-semibold'
-                      : 'text-[#4B5563] hover:text-[#111827]'
+                      ? 'bg-white text-[#1a0e08] shadow-2xs font-semibold'
+                      : 'text-[#51463E] hover:text-[#1a0e08]'
                   }`}
                 >
                   Sửa câu gốc
@@ -499,7 +499,7 @@ export function RequestMoment({
                   onDraft('');
                   requestAnimationFrame(() => input.current?.focus());
                 }}
-                className="p-1 rounded-md text-[#6B7280] hover:text-[#111827] hover:bg-neutral-100 transition-colors cursor-pointer"
+                className="p-1 rounded-md text-[#6A5F56] hover:text-[#1a0e08] hover:bg-neutral-100 transition-colors cursor-pointer"
                 aria-label="Xoá mẫu câu lệnh"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -510,7 +510,7 @@ export function RequestMoment({
           </div>
         )}
         {!inputHidden && templateVariables.length > 0 && composerTab === 'preview' && (
-          <div className="min-h-[64px] px-1 py-1 text-[16px] sm:text-[17px] leading-relaxed text-[#111827]">
+          <div className="min-h-[64px] px-1 py-1 text-[16px] sm:text-[17px] leading-relaxed text-[#1a0e08]">
             {renderInteractiveTemplatePreview(
               templateText || draft,
               variableValues,
@@ -567,7 +567,7 @@ export function RequestMoment({
         {templateVariables.length > 0 && (
           <div
             data-testid="playbook-variables-bar"
-            className="mt-3 p-3.5 rounded-xl bg-[#F8F8F6] border border-[#EAEAE4] v3-space-y-3"
+            className="mt-3 p-3.5 rounded-xl bg-[#F8F4EE] border border-[#EAEAE4] v3-space-y-3"
           >
             {(() => {
               const filledCount = templateVariables.filter((v) =>
@@ -577,14 +577,14 @@ export function RequestMoment({
               return (
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-[#111827]">
+                    <span className="text-xs font-semibold text-[#1a0e08]">
                       Điền thông tin cụ thể
                     </span>
                     <span
                       className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${
                         allFilled
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-white text-[#6B7280] border-[#E5E5E0]'
+                          : 'bg-white text-[#6A5F56] border-[#E6DED3]'
                       }`}
                     >
                       {allFilled
@@ -600,7 +600,7 @@ export function RequestMoment({
                       setValidationError(null);
                       onDraft(templateText);
                     }}
-                    className="text-xs font-medium text-[#6B7280] hover:text-[#111827] transition-colors cursor-pointer"
+                    className="text-xs font-medium text-[#6A5F56] hover:text-[#1a0e08] transition-colors cursor-pointer"
                   >
                     Đặt lại
                   </button>
@@ -610,7 +610,7 @@ export function RequestMoment({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {templateVariables.map((varName, idx) => (
                 <label key={varName} className="flex flex-col gap-1.5 text-xs">
-                  <span className="text-xs font-medium text-[#374151]">
+                  <span className="text-xs font-medium text-[#4a4038]">
                     {formatVariableLabel(varName)}
                   </span>
                   <input
@@ -637,10 +637,10 @@ export function RequestMoment({
                         }
                       }
                     }}
-                    className={`px-3 py-2 rounded-lg text-sm bg-white text-[#111827] placeholder:text-[#9CA3AF] !outline-none focus-visible:!outline-none transition-all ${
+                    className={`px-3 py-2 rounded-lg text-sm bg-white text-[#1a0e08] placeholder:text-[#9CA3AF] !outline-none focus-visible:!outline-none transition-all ${
                       validationError && !variableValues[varName]?.trim()
                         ? 'border-2 border-rose-400 bg-rose-50/20'
-                        : 'border border-[#DEDED8] focus:border-[#111827] focus:ring-2 focus:ring-neutral-900/8'
+                        : 'border border-[#DEDED8] focus:border-[#1a0e08] focus:ring-2 focus:ring-neutral-900/8'
                     }`}
                   />
                 </label>
@@ -651,7 +651,7 @@ export function RequestMoment({
         {savingPlaybookOpen && (
           <div
             data-testid="save-playbook-modal"
-            className="mt-3 p-3 rounded-xl bg-[#F8F8F6] border border-[#EAEAE4] flex flex-col sm:flex-row sm:items-center gap-2"
+            className="mt-3 p-3 rounded-xl bg-[#F8F4EE] border border-[#EAEAE4] flex flex-col sm:flex-row sm:items-center gap-2"
           >
             <input
               type="text"
@@ -668,7 +668,7 @@ export function RequestMoment({
                   setSavingPlaybookOpen(false);
                 }
               }}
-              className="flex-1 px-3 py-1.5 rounded-lg text-xs bg-white border border-[#DEDED8] text-brand-text !outline-none focus-visible:!outline-none focus:border-[#111827] focus:ring-2 focus:ring-neutral-900/8"
+              className="flex-1 px-3 py-1.5 rounded-lg text-xs bg-white border border-[#DEDED8] text-brand-text !outline-none focus-visible:!outline-none focus:border-[#1a0e08] focus:ring-2 focus:ring-neutral-900/8"
             />
             <div className="flex items-center gap-1.5">
               <button
@@ -676,7 +676,7 @@ export function RequestMoment({
                 data-testid="btn-confirm-save-playbook"
                 disabled={!newPlaybookTitle.trim()}
                 onClick={handleConfirmSavePlaybook}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#111827] text-white hover:bg-neutral-800 disabled:opacity-50 cursor-pointer"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1a0e08] text-white hover:bg-neutral-800 disabled:opacity-50 cursor-pointer"
               >
                 Lưu mẫu công việc
               </button>
@@ -697,8 +697,8 @@ export function RequestMoment({
         )}
         <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#F1F1EC] mt-3">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="hidden sm:inline-flex text-xs text-[#6B7280] items-center gap-1 mr-1.5">
-              <kbd className="px-1.5 py-0.5 bg-[#F4F4F1] border border-[#E5E5E0] rounded text-[11px] font-mono text-[#4B5563]">
+            <span className="hidden sm:inline-flex text-xs text-[#6A5F56] items-center gap-1 mr-1.5">
+              <kbd className="px-1.5 py-0.5 bg-[#F4F4F1] border border-[#E6DED3] rounded text-[11px] font-mono text-[#51463E]">
                 Enter
               </kbd>
               <span>để gửi</span>
@@ -709,7 +709,7 @@ export function RequestMoment({
               disabled={planning}
               title="Thêm một ô điền nhanh vào câu lệnh để tái sử dụng nhiều lần"
               onClick={handleInsertVariableToken}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#4B5563] hover:text-[#111827] hover:bg-[#F4F4F1] transition-colors cursor-pointer"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#51463E] hover:text-[#1a0e08] hover:bg-[#F4F4F1] transition-colors cursor-pointer"
             >
               + Thêm ô điền nhanh
             </button>
@@ -718,7 +718,7 @@ export function RequestMoment({
               data-testid="btn-save-playbook"
               disabled={(!draft.trim() && !templateText.trim()) || planning}
               onClick={handleOpenSavePlaybook}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#4B5563] hover:text-[#111827] hover:bg-[#F4F4F1] disabled:opacity-40 transition-colors cursor-pointer"
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#51463E] hover:text-[#1a0e08] hover:bg-[#F4F4F1] disabled:opacity-40 transition-colors cursor-pointer"
             >
               Lưu làm mẫu
             </button>
@@ -807,7 +807,7 @@ export function RequestMoment({
                         <span
                           key={v}
                           data-testid="playbook-var-chip"
-                          className="px-2 py-0.5 rounded-md bg-[#F4F4F1] text-[#4B5563] border border-[#E5E5E0] text-[11px] font-medium"
+                          className="px-2 py-0.5 rounded-md bg-[#F4F4F1] text-[#51463E] border border-[#E6DED3] text-[11px] font-medium"
                         >
                           {formatVariableLabel(v)}
                         </span>
@@ -824,7 +824,7 @@ export function RequestMoment({
       {/* Quick Single-Tool Starter Pills directly below Composer */}
       {services.some((service) => service.configured) ? (
         <div className="v3-space-y-2">
-          <div className="text-xs font-semibold text-[#4B5563]">
+          <div className="text-xs font-semibold text-[#51463E]">
             Gợi ý việc phổ biến theo công cụ của bạn
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -898,8 +898,8 @@ export function RequestMoment({
         );
         return (
       <div className="v3-space-y-4 pt-1">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2.5 border-b border-[#E7E7E2]">
-          <div role="tablist" aria-label="Danh mục quy trình mẫu" className="inline-flex flex-wrap items-center gap-1 p-1 rounded-xl bg-[#F3F2EE] border border-[#E7E7E2]">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2.5 border-b border-[#E8E0D6]">
+          <div role="tablist" aria-label="Danh mục quy trình mẫu" className="inline-flex flex-wrap items-center gap-1 p-1 rounded-xl bg-[#F3F2EE] border border-[#E8E0D6]">
             {([
               { id: 'core', label: `Quy trình trọng tâm (${visibleCoreJobs.length})` },
               { id: 'multi', label: `Kịch bản liên dịch vụ (${visibleMultiPlaybooks.length})` },
@@ -913,8 +913,8 @@ export function RequestMoment({
                 onClick={() => setGalleryTab(tab.id)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   galleryTab === tab.id
-                    ? 'bg-white text-[#111827] shadow-2xs'
-                    : 'text-[#6B7280] hover:text-[#111827]'
+                    ? 'bg-white text-[#1a0e08] shadow-2xs'
+                    : 'text-[#6A5F56] hover:text-[#1a0e08]'
                 }`}
               >
                 {tab.label}
@@ -1113,7 +1113,7 @@ export function RequestMoment({
                   </div>
 
                   <div className="pt-2.5 border-t border-[#F3F4F6] flex items-center justify-between gap-2 text-xs">
-                    <span className="text-[11px] text-[#6B7280] truncate" title={job.outputDescription}>
+                    <span className="text-[11px] text-[#6A5F56] truncate" title={job.outputDescription}>
                       Đầu ra: {job.outputDescription}
                     </span>
                     {!readiness.isReady ? (
@@ -1129,7 +1129,7 @@ export function RequestMoment({
                         type="button"
                         disabled={planning}
                         onClick={() => handleSelectPlaybook(job.prompt, job.id)}
-                        className="text-xs font-semibold text-[#4B5563] group-hover:text-brand-primary shrink-0 cursor-pointer"
+                        className="text-xs font-semibold text-[#51463E] group-hover:text-brand-primary shrink-0 cursor-pointer"
                       >
                         Dùng mẫu →
                       </button>
@@ -1217,7 +1217,7 @@ export function RequestMoment({
                                 <span
                                   key={v}
                                   data-testid="playbook-var-chip"
-                                  className="px-2 py-0.5 rounded-md bg-[#F4F4F1] text-[#4B5563] border border-[#E5E5E0] text-[11px] font-medium"
+                                  className="px-2 py-0.5 rounded-md bg-[#F4F4F1] text-[#51463E] border border-[#E6DED3] text-[11px] font-medium"
                                 >
                                   {formatVariableLabel(v)}
                                 </span>
@@ -1246,13 +1246,13 @@ export function RequestMoment({
             !(service.id === 'jira' && services.some((s) => s.id === 'myjira'))
         );
         return (
-          <div className="pt-4 border-t border-[#E7E7E2] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="pt-4 border-t border-[#E8E0D6] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
             <div className="flex flex-wrap items-center gap-2.5 min-w-0">
               <div
                 className="flex items-center gap-2.5 flex-wrap"
                 aria-label="Dịch vụ đã thiết lập"
               >
-                <span className="inline-flex items-center gap-1.5 font-medium text-[#4B5563]">
+                <span className="inline-flex items-center gap-1.5 font-medium text-[#51463E]">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" aria-hidden="true" />
                   <span>Đã kết nối ({configuredServices.length})</span>
                 </span>
@@ -1271,7 +1271,7 @@ export function RequestMoment({
                         className={`w-7 h-7 rounded-full flex items-center justify-center border shadow-2xs transition-transform hover:-translate-y-0.5 ${
                           isUnhealthy
                             ? 'bg-rose-50 border-rose-300 ring-2 ring-rose-100'
-                            : 'bg-white border-[#E7E7E2]'
+                            : 'bg-white border-[#E8E0D6]'
                         }`}
                       >
                         <ServiceLogo
@@ -1291,7 +1291,7 @@ export function RequestMoment({
               </div>
 
               {unconfiguredServices.length > 0 ? (
-                <div className="inline-flex items-center gap-1.5 text-[#6B7280]">
+                <div className="inline-flex items-center gap-1.5 text-[#6A5F56]">
                   <span className="text-[#D1D5DB]" aria-hidden="true">·</span>
                   <span>Còn {unconfiguredServices.length} công cụ chưa kết nối</span>
                   <span className="sr-only">
@@ -1316,7 +1316,7 @@ export function RequestMoment({
                   event.preventDefault();
                   onSettings();
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-neutral-50 border border-[#E7E7E2] hover:border-[#D1D5DB] text-xs font-medium text-[#111827] shadow-2xs transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-neutral-50 border border-[#E8E0D6] hover:border-[#D1D5DB] text-xs font-medium text-[#1a0e08] shadow-2xs transition-colors"
               >
                 Kết nối thêm
               </a>
@@ -1327,7 +1327,7 @@ export function RequestMoment({
                   event.preventDefault();
                   navigate('/guide');
                 }}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#4B5563] hover:text-[#111827] hover:bg-neutral-100/80 transition-colors"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#51463E] hover:text-[#1a0e08] hover:bg-neutral-100/80 transition-colors"
               >
                 Cẩm nang mẫu lệnh
               </a>
@@ -1362,11 +1362,11 @@ export function DiscoveryMoment({
       data-moment="2"
       aria-label="Cockpit"
     >
-      <div className="bg-white rounded-2xl border border-[#E5E5E0] shadow-2xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#E6DED3] shadow-2xs overflow-hidden">
         {/* Top Workflow Stepper & Safety Assurance */}
-        <div className="px-5 py-3 bg-[#F8F8F6] border-b border-[#EAEAE4] flex items-center justify-between gap-3 flex-wrap">
+        <div className="px-5 py-3 bg-[#F8F4EE] border-b border-[#EAEAE4] flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 text-xs">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-[#DEDED8] font-semibold text-[#111827] shadow-2xs">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white border border-[#DEDED8] font-semibold text-[#1a0e08] shadow-2xs">
               <span
                 id="moment-2-pulse"
                 className="w-2 h-2 rounded-full bg-[#FF5701] animate-pulse"
@@ -1376,13 +1376,13 @@ export function DiscoveryMoment({
             <span className="text-[#9CA3AF] hidden sm:inline" aria-hidden="true">
               →
             </span>
-            <span className="text-[#6B7280] font-medium hidden sm:inline">
+            <span className="text-[#6A5F56] font-medium hidden sm:inline">
               2. Xem trước kế hoạch
             </span>
             <span className="text-[#9CA3AF] hidden md:inline" aria-hidden="true">
               →
             </span>
-            <span className="text-[#6B7280] font-medium hidden md:inline">
+            <span className="text-[#6A5F56] font-medium hidden md:inline">
               3. Duyệt &amp; thực thi
             </span>
           </div>
@@ -1397,14 +1397,14 @@ export function DiscoveryMoment({
         {/* User Request Header */}
         <div className="px-5 sm:px-6 pt-5 pb-4 border-b border-[#F1F1EC] v3-space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-medium text-[#6B7280]">
+            <span className="text-xs font-medium text-[#6A5F56]">
               Yêu cầu đang xử lý
             </span>
             {onCancelWait && !origin && (
               <button
                 type="button"
                 onClick={onCancelWait}
-                className="text-xs font-medium text-[#4B5563] hover:text-[#111827] px-2.5 py-1 rounded-lg hover:bg-[#F4F4F1] border border-transparent hover:border-[#E5E5E0] transition-colors cursor-pointer"
+                className="text-xs font-medium text-[#51463E] hover:text-[#1a0e08] px-2.5 py-1 rounded-lg hover:bg-[#F4F4F1] border border-transparent hover:border-[#E6DED3] transition-colors cursor-pointer"
               >
                 Sửa lại yêu cầu
               </button>
@@ -1413,7 +1413,7 @@ export function DiscoveryMoment({
           {origin && <RequestEcho request={request} />}
           <h1
             id="heading-moment-2"
-            className="text-lg sm:text-xl font-semibold text-[#111827] leading-snug [overflow-wrap:anywhere]"
+            className="text-lg sm:text-xl font-semibold text-[#1a0e08] leading-snug [overflow-wrap:anywhere]"
             tabIndex={-1}
           >
             <span id="moment-2-query-display">
@@ -1427,12 +1427,12 @@ export function DiscoveryMoment({
           <div className="flex items-center justify-between gap-2">
             <span
               id="moment-2-status-text"
-              className="text-xs font-semibold text-[#374151]"
+              className="text-xs font-semibold text-[#4a4038]"
             >
               Tiến trình kiểm tra công cụ liên quan
             </span>
             {totalSteps > 0 && (
-              <span className="text-xs text-[#6B7280] font-medium">
+              <span className="text-xs text-[#6A5F56] font-medium">
                 {completedCount}/{totalSteps} hoàn tất
               </span>
             )}
@@ -1444,7 +1444,7 @@ export function DiscoveryMoment({
             aria-live="polite"
           >
             {!gather?.steps.length ? (
-              <li className="flex items-center gap-3 p-3 rounded-xl bg-[#FAFAF8] border border-[#EAEAE4] text-[#4B5563]">
+              <li className="flex items-center gap-3 p-3 rounded-xl bg-[#FAFAF8] border border-[#EAEAE4] text-[#51463E]">
                 <svg
                   className="w-4 h-4 text-[#FF5701] animate-spin shrink-0"
                   fill="none"
@@ -1454,7 +1454,7 @@ export function DiscoveryMoment({
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
                   <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                <span className="text-sm text-[#374151]">
+                <span className="text-sm text-[#4a4038]">
                   Đang đọc yêu cầu và xác định công cụ cần kết nối…
                 </span>
               </li>
@@ -1472,20 +1472,20 @@ export function DiscoveryMoment({
                     className={`flex items-center justify-between gap-3 p-3 rounded-xl border transition-colors ${
                       found
                         ? 'bg-white border-[#EAEAE4]'
-                        : 'bg-[#FAFAF8] border-[#E5E5E0]'
+                        : 'bg-[#FAFAF8] border-[#E6DED3]'
                     }`}
                   >
                     <span className="flex items-center gap-3 min-w-0">
-                      <span className="w-8 h-8 rounded-lg bg-white border border-[#E5E5E0] shadow-2xs flex items-center justify-center flex-shrink-0">
+                      <span className="w-8 h-8 rounded-lg bg-white border border-[#E6DED3] shadow-2xs flex items-center justify-center flex-shrink-0">
                         <ServiceLogo service={service} className="w-4 h-4" />
                       </span>
                       <span className="min-w-0 [overflow-wrap:anywhere]">
-                        <span className="text-sm font-medium text-[#111827]">
+                        <span className="text-sm font-medium text-[#1a0e08]">
                           {found ? 'Đã đối chiếu trên ' : 'Tra cứu ngữ cảnh trên '}
                           {serviceLabel}
                         </span>
                         {step.result && (
-                          <strong className="ml-2 inline-flex items-center px-2 py-0.5 rounded-md bg-[#F4F4F1] border border-[#E5E5E0] text-xs font-medium text-[#111827]">
+                          <strong className="ml-2 inline-flex items-center px-2 py-0.5 rounded-md bg-[#F4F4F1] border border-[#E6DED3] text-xs font-medium text-[#1a0e08]">
                             {step.result}
                           </strong>
                         )}
@@ -1495,7 +1495,7 @@ export function DiscoveryMoment({
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium shrink-0 border ${
                         found
                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-white text-[#4B5563] border-[#E5E5E0]'
+                          : 'bg-white text-[#51463E] border-[#E6DED3]'
                       }`}
                     >
                       {found ? (

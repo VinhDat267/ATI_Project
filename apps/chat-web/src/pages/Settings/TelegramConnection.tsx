@@ -237,7 +237,7 @@ export function TelegramConnection({
       className={`${CARD_CONTAINER_CLASS} focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none`}
     >
       <div className="flex items-center justify-between gap-3">
-        <h3 className="font-sans font-semibold text-base text-[#111827] dark:text-white flex items-center gap-3">
+        <h3 className="font-sans font-semibold text-base text-[#1a0e08] dark:text-white flex items-center gap-3">
           <ServiceLogo service="telegram" className="w-6 h-6" />
           Telegram
         </h3>
@@ -260,11 +260,11 @@ export function TelegramConnection({
         )}
       </div>
 
-      <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+      <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
         Liên kết tài khoản Telegram cá nhân hoặc nhóm làm việc của bạn. Chọn từ 1 đến 10 cuộc trò chuyện bằng tên hiển thị rõ ràng để gửi thông báo, đọc tin nhắn nhóm và nhận Bản tin sáng tự động.
       </p>
 
-      <div className="text-sm text-[#111827] dark:text-neutral-200 break-words">
+      <div className="text-sm text-[#1a0e08] dark:text-neutral-200 break-words">
         {status === 'connected' ? (
           <span>
             Đã kết nối {data?.username && <>· @{data.username}</>}
@@ -278,13 +278,13 @@ export function TelegramConnection({
             Cần kết nối lại {data?.username && <>· @{data.username}</>}
           </span>
         ) : status === 'unconfigured' ? (
-          <span className="text-[#6B7280] dark:text-[#9CA3AF]">Telegram Bot chưa được cấu hình trên máy chủ.</span>
+          <span className="text-[#6A5F56] dark:text-[#9CA3AF]">Telegram Bot chưa được cấu hình trên máy chủ.</span>
         ) : null}
       </div>
 
       {status === 'connected' && selectedChats.length > 0 && (
         <div className="v3-space-y-2 border-t border-[#F3F4F6] pt-3">
-          <p className="text-xs text-[#6B7280]">Cuộc trò chuyện được phép dùng ({selectedChats.length}/10):</p>
+          <p className="text-xs text-[#6A5F56]">Cuộc trò chuyện được phép dùng ({selectedChats.length}/10):</p>
           <div className="v3-space-y-1.5">
             {selectedChats.map((chat) => (
               <div
@@ -292,9 +292,9 @@ export function TelegramConnection({
                 className="flex items-center justify-between p-2.5 bg-neutral-50 rounded-lg text-xs gap-2"
               >
                 <div className="min-w-0 truncate">
-                  <span className="font-medium text-[#111827]">{chat.title}</span>
+                  <span className="font-medium text-[#1a0e08]">{chat.title}</span>
                   {chat.username && (
-                    <span className="text-[#6B7280] ml-1.5">@{chat.username.replace(/^@/, '')}</span>
+                    <span className="text-[#6A5F56] ml-1.5">@{chat.username.replace(/^@/, '')}</span>
                   )}
                 </div>
                 <span className="text-emerald-700 font-medium flex-shrink-0">
@@ -337,14 +337,14 @@ export function TelegramConnection({
         <div
           id="telegram-scope"
           data-testid="telegram-scope"
-          className="mt-4 p-4 border border-[#E7E7E2] dark:border-[#374151] rounded-xl bg-[#F8F8F6] dark:bg-[#1F2937]/50 v3-space-y-3"
+          className="mt-4 p-4 border border-[#E8E0D6] dark:border-[#4a4038] rounded-xl bg-[#F8F4EE] dark:bg-[#2A2420]/50 v3-space-y-3"
         >
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="text-xs font-semibold text-[#374151] dark:text-[#D1D5DB]">
+              <h4 className="text-xs font-semibold text-[#4a4038] dark:text-[#D1D5DB]">
                 Chọn cuộc trò chuyện Telegram (1–10 chat)
               </h4>
-              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-white border border-[#E7E7E2] text-[#111827]">
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-white border border-[#E8E0D6] text-[#1a0e08]">
                 Đã chọn {selectedChatIds.length} / 10
               </span>
             </div>
@@ -368,7 +368,7 @@ export function TelegramConnection({
                 onChange={(event) => setChatFilter(event.target.value)}
                 placeholder="Tìm nhanh chat hoặc nhóm Telegram…"
                 aria-label="Tìm nhanh chat hoặc nhóm Telegram"
-                className="w-full px-3 py-1.5 rounded-lg border border-[#E7E7E2] bg-white text-xs text-[#111827] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#FF5701]/30 focus:border-[#FF5701]"
+                className="w-full px-3 py-1.5 rounded-lg border border-[#E8E0D6] bg-white text-xs text-[#1a0e08] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#FF5701]/30 focus:border-[#FF5701]"
               />
             </div>
           )}
@@ -383,7 +383,7 @@ export function TelegramConnection({
                   className={`flex items-center justify-between gap-2 p-2 rounded-lg text-xs cursor-pointer ${
                     checked
                       ? 'bg-[#FFF6EE]/60 border border-[#FF5701]/40'
-                      : 'bg-white border border-[#E7E7E2]'
+                      : 'bg-white border border-[#E8E0D6]'
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
@@ -392,33 +392,33 @@ export function TelegramConnection({
                       checked={checked}
                       disabled={disabled}
                       onChange={() => toggleChat(chat.chatId)}
-                      className="rounded text-[#111827] focus:ring-[#111827]"
+                      className="rounded text-[#1a0e08] focus:ring-[#1a0e08]"
                     />
-                    <span className="font-medium text-[#111827] truncate">{chat.title}</span>
+                    <span className="font-medium text-[#1a0e08] truncate">{chat.title}</span>
                     {chat.username && (
-                      <span className="text-[11px] text-[#6B7280] truncate">@{chat.username.replace(/^@/, '')}</span>
+                      <span className="text-[11px] text-[#6A5F56] truncate">@{chat.username.replace(/^@/, '')}</span>
                     )}
                   </div>
-                  <span className="text-[11px] text-[#6B7280] flex-shrink-0">
+                  <span className="text-[11px] text-[#6A5F56] flex-shrink-0">
                     {chatTypeLabel(chat.type)}
                   </span>
                 </label>
               );
             })}
             {candidateChats.length === 0 && (
-              <p className="text-xs text-[#6B7280]">
+              <p className="text-xs text-[#6A5F56]">
                 Chưa tìm thấy cuộc trò chuyện nào. Hãy bấm Start hoặc thêm bot vào nhóm rồi bấm Làm mới danh sách.
               </p>
             )}
             {candidateChats.length > 0 && visibleCandidateChats.length === 0 && (
-              <p className="text-xs text-[#6B7280]">
+              <p className="text-xs text-[#6A5F56]">
                 Không tìm thấy cuộc trò chuyện nào khớp với từ khóa &ldquo;{chatFilter}&rdquo;.
               </p>
             )}
           </div>
 
           {data?.botUsername && (
-            <p className="text-xs text-[#6B7280]">
+            <p className="text-xs text-[#6A5F56]">
               Muốn nhận tin trong nhóm mới?{' '}
               <a
                 href={`https://t.me/${encodeURIComponent(data.botUsername)}?startgroup=ati_scope`}
@@ -454,7 +454,7 @@ export function TelegramConnection({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-[#F3F4F6] dark:border-[#293653]">
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-[#F3F4F6] dark:border-[#3a312a]">
         {status === 'not_connected' || status === 'reconnect_required' || status === 'unconfigured' ? (
           <button
             id="telegram-connect"
@@ -479,7 +479,7 @@ export function TelegramConnection({
       </div>
 
       {busy && (
-        <p role="status" className="text-xs text-[#6B7280]">
+        <p role="status" className="text-xs text-[#6A5F56]">
           Đang xử lý…
         </p>
       )}

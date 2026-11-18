@@ -141,13 +141,13 @@ describe('Jira UI Responsive, Theme, Refresh, Delayed Callback & User Switch', (
     });
     const card = container.querySelector('#jira');
     expect(card?.className).toContain('bg-white');
-    expect(card?.className).toContain('dark:bg-[#131B2F]');
+    expect(card?.className).toContain('dark:bg-[#1A1613]');
 
     // 2. Dark theme
     document.documentElement.classList.add('dark');
     rerender(<JiraConnection user={userA} />);
     expect(document.documentElement.classList.contains('dark')).toBe(true);
-    expect(card?.className).toContain('dark:border-[#293653]');
+    expect(card?.className).toContain('dark:border-[#3a312a]');
   });
 
   it('handles refresh by reloading connection status and capabilities', async () => {

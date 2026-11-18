@@ -10,7 +10,7 @@ import { meta as cockpitMeta } from '../src/pages/Cockpit/meta';
 vi.mock('../src/hooks/use-sse', () => ({ useSSE: vi.fn(() => ({ disconnected: false })) }));
 const user = { id: 'u1', email: 'owner@example.test', name: 'Owner' };
 const APP_BODY = 'bg-bg-page text-text antialiased';
-const PAGE_BODY = 'min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]';
+const PAGE_BODY = 'min-h-screen flex flex-col bg-[#F8F4EE] text-[#1a0e08]';
 const heading = () => screen.findByRole('heading', { level: 1, name: 'Không tìm thấy trang' });
 const pageScope = () => ({
   page: document.documentElement.dataset.protoPage,
@@ -90,10 +90,20 @@ it('FE-04b: the 404 theme toggle uses the app theme (class, data-theme, saved ch
   expect(screen.getByRole('button', { name: 'Chuyển sang giao diện sáng' })).toHaveAttribute('aria-pressed', 'true');
 });
 
-it('FE-04b: theme.css stays a verbatim copy of the prototype theme', () => {
-  // Chỉ khác dòng ghi nguồn ở đầu file; quy tắc riêng của app không đặt vào đây.
-  const app = readFileSync('src/prototype/theme.css', 'utf8').replace(/^\/\*[^\n]*\*\/\r?\n/, '');
-  expect(app).toBe(readFileSync('../../docs/design/prototypes/theme.css', 'utf8'));
+it('FE-04b: theme.css keeps every prototype rule, recoloured to the warm palette', () => {
+  // Redesign 11/2026: app không còn chép nguyên văn bản mẫu; giữ đủ quy tắc, chỉ đổi màu lạnh và navy sang ấm.
+  const rules = (css: string) => css.split('\n').filter(line => line.trim() && !line.startsWith('/*')).length;
+  const app = readFileSync('src/prototype/theme.css', 'utf8');
+  expect(rules(app)).toBe(rules(readFileSync('../../docs/design/prototypes/theme.css', 'utf8')));
+  expect(app).not.toMatch(/#(0B1020|0E1528|131B2F|1F2A44|293653)\b|rgba?\((14,21,40|19,27,47|31,42,68|148,163,184)/i);
+  const cockpitCss = readFileSync('src/pages/Cockpit/page.css', 'utf8');
+  expect(cockpitCss).not.toMatch(/#(0B1020|0E1528|131B2F|182343|1F2A44|293653)\b|rgba?\(\s*(11,\s*16,\s*32|14,\s*21,\s*40|19,\s*27,\s*47|24,\s*35,\s*67|31,\s*42,\s*68|148,\s*163,\s*184)/i);
+  const targetsCss = readFileSync('src/prototype/styles/v3-theme-targets.css', 'utf8');
+  expect(targetsCss).not.toContain('248 248 246');
+  expect(targetsCss).not.toContain('231 231 226');
+  const shellCss = readFileSync('src/styles/app-shell.css', 'utf8');
+  expect(shellCss).toMatch(/\.ps-navlink[^}]*:focus-visible|:is\([^)]*\.ps-navlink[^)]*#app-sidebar[^)]*\):focus-visible/);
+  expect(shellCss).toMatch(/\.ps-navlink\[aria-current="page"\]\s+\.ps-navcount\s*\{[^}]*color:\s*var\(--ps-ink\)/);
 });
 
 it('FE-04b: FE-04 sizing and focus rules only apply outside prototype pages', () => {

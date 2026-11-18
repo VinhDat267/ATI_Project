@@ -110,14 +110,14 @@ export function FakeSheetsPicker({
       aria-label="Chọn bảng tính Google Drive (Thử nghiệm)"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
     >
-      <div className="bg-white rounded-2xl border border-[#E7E7E2] max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden text-[#111827]">
+      <div className="bg-white rounded-2xl border border-[#E8E0D6] max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden text-[#1a0e08]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#E7E7E2] p-4 sm:p-5">
+        <div className="flex items-center justify-between border-b border-[#E8E0D6] p-4 sm:p-5">
           <div>
             <h2 className="font-semibold text-base sm:text-lg">
               Google Drive — Chọn bảng tính
             </h2>
-            <p className="text-xs text-[#6B7280] mt-0.5">
+            <p className="text-xs text-[#6A5F56] mt-0.5">
               Môi trường thử nghiệm (Sandbox Picker)
             </p>
           </div>
@@ -125,7 +125,7 @@ export function FakeSheetsPicker({
             type="button"
             onClick={onCancel}
             aria-label="Đóng cửa sổ chọn file"
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6B7280] hover:bg-neutral-100 hover:text-[#111827] transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#6A5F56] hover:bg-neutral-100 hover:text-[#1a0e08] transition-colors"
           >
             ✕
           </button>
@@ -134,7 +134,7 @@ export function FakeSheetsPicker({
         {/* Content */}
         <div className="p-4 sm:p-5 overflow-y-auto flex-1 v3-space-y-4">
           {loading && (
-            <p role="status" className="text-sm text-[#6B7280]">
+            <p role="status" className="text-sm text-[#6A5F56]">
               Đang tải danh sách file...
             </p>
           )}
@@ -146,7 +146,7 @@ export function FakeSheetsPicker({
           )}
 
           {!loading && files.length === 0 && !error && (
-            <p className="text-sm text-[#6B7280]">
+            <p className="text-sm text-[#6A5F56]">
               Không tìm thấy bảng tính nào trong tài khoản.
             </p>
           )}
@@ -162,7 +162,7 @@ export function FakeSheetsPicker({
                     className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
                       isChecked
                         ? 'border-[#FF5701] bg-[#FF5701]/5 ring-1 ring-[#FF5701]'
-                        : 'border-[#E7E7E2] hover:border-neutral-300 bg-white'
+                        : 'border-[#E8E0D6] hover:border-neutral-300 bg-white'
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
@@ -170,14 +170,14 @@ export function FakeSheetsPicker({
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => toggleFile(file.id)}
-                        className="w-4 h-4 text-[#FF5701] rounded border-[#E7E7E2] focus:ring-[#FF5701]"
+                        className="w-4 h-4 text-[#FF5701] rounded border-[#E8E0D6] focus:ring-[#FF5701]"
                         aria-label={title}
                       />
                       <div className="min-w-0">
-                        <span className="font-medium text-sm text-[#111827] block truncate">
+                        <span className="font-medium text-sm text-[#1a0e08] block truncate">
                           {title}
                         </span>
-                        <span className="text-xs text-[#6B7280] font-mono block truncate">
+                        <span className="text-xs text-[#6A5F56] font-mono block truncate">
                           {file.id}
                         </span>
                       </div>
@@ -190,12 +190,12 @@ export function FakeSheetsPicker({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-[#E7E7E2] p-4 flex items-center justify-end gap-3 bg-[#F8F8F6]">
+        <div className="border-t border-[#E8E0D6] p-4 flex items-center justify-end gap-3 bg-[#F8F4EE]">
           <button
             type="button"
             onClick={onCancel}
             disabled={granting}
-            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#4B5563] border border-[#E7E7E2] hover:bg-neutral-50 transition-colors disabled:opacity-50"
+            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#51463E] border border-[#E8E0D6] hover:bg-neutral-50 transition-colors disabled:opacity-50"
           >
             Huỷ
           </button>

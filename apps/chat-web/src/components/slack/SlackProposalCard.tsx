@@ -7,11 +7,11 @@ import { slackSessionOwner } from '../../services/slack-connection';
 import { friendlyFieldLabel, operation, serviceId, serviceName } from '../../pages/Cockpit/presentation';
 
 const buttonClass =
-  'rounded-lg border border-[#D1D5DB] dark:border-[#293653] bg-white dark:bg-[#1A2540] px-3 py-1.5 text-xs font-medium text-[#111827] dark:text-[#F1F5F9] hover:bg-neutral-50 dark:hover:bg-[#24324D] transition-colors disabled:opacity-50';
+  'rounded-lg border border-[#D1D5DB] dark:border-[#3a312a] bg-white dark:bg-[#221C18] px-3 py-1.5 text-xs font-medium text-[#1a0e08] dark:text-[#F3EEE8] hover:bg-neutral-50 dark:hover:bg-[#312923] transition-colors disabled:opacity-50';
 const primaryClass =
   'rounded-lg bg-[#C84300] hover:bg-[#A83800] px-3 py-1.5 text-xs font-semibold text-white transition-colors disabled:opacity-50';
 const inputClass =
-  'w-full rounded-lg border border-[#D1D5DB] dark:border-[#293653] bg-white dark:bg-[#0E1528] px-2.5 py-1.5 text-xs text-[#111827] dark:text-[#F1F5F9] !outline-none focus-visible:!outline-none focus:border-[#111827]';
+  'w-full rounded-lg border border-[#D1D5DB] dark:border-[#3a312a] bg-white dark:bg-[#131010] px-2.5 py-1.5 text-xs text-[#1a0e08] dark:text-[#F3EEE8] !outline-none focus-visible:!outline-none focus:border-[#1a0e08]';
 
 const statusLabels: Record<string, string> = {
   pending: 'Đang chờ xem xét',
@@ -305,19 +305,19 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
   };
 
   return (
-    <article className="rounded-2xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] p-4 sm:p-5 space-y-3 text-[#111827] dark:text-[#F1F5F9] shadow-2xs">
+    <article className="rounded-2xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] p-4 sm:p-5 space-y-3 text-[#1a0e08] dark:text-[#F3EEE8] shadow-2xs">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="inline-flex items-center rounded-full bg-[#F8F8F6] dark:bg-[#1A2540] border border-[#E5E5E0] dark:border-[#293653] px-2.5 py-0.5 text-xs font-semibold">
+        <span className="inline-flex items-center rounded-full bg-[#F8F4EE] dark:bg-[#221C18] border border-[#E6DED3] dark:border-[#3a312a] px-2.5 py-0.5 text-xs font-semibold">
           {statusLabels[proposal.status] ?? proposal.status}
         </span>
-        <span className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+        <span className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
           Kênh {channelLabel} · Phiên bản {proposal.revision}
           {formattedTs ? ` · ${formattedTs}` : ''}
         </span>
       </div>
 
       {isStaleOrRedacted ? (
-        <p className="text-sm text-[#6B7280] dark:text-[#9CA3AF]">
+        <p className="text-sm text-[#6A5F56] dark:text-[#9CA3AF]">
           Nguồn tin nhắn đã thay đổi hoặc hết hạn xem lại. Nội dung nguồn đã được ẩn để đảm bảo an toàn dữ liệu.
         </p>
       ) : (
@@ -329,20 +329,20 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
                 {relevanceLabels[proposal.body.decision.relevance.kind] ?? proposal.body.decision.relevance.kind}
               </span>
             </div>
-            <p className="text-sm text-[#4B5563] dark:text-[#9CA3AF]">{proposal.body.decision.rationale}</p>
+            <p className="text-sm text-[#51463E] dark:text-[#9CA3AF]">{proposal.body.decision.rationale}</p>
             {proposal.body.decision.question && (
               <p className="text-xs font-medium text-amber-800 dark:text-amber-200">
                 {proposal.body.decision.question}
               </p>
             )}
             {proposal.body.context.length > 0 && (
-              <blockquote className="rounded-xl border-l-2 border-[#C84300] bg-[#F8F8F6] dark:bg-[#0E1528] p-3 text-xs text-[#374151] dark:text-[#CBD5E1] space-y-1">
+              <blockquote className="rounded-xl border-l-2 border-[#C84300] bg-[#F8F4EE] dark:bg-[#131010] p-3 text-xs text-[#4a4038] dark:text-[#D7CEC4] space-y-1">
                 {proposal.body.context.map((msg) => {
                   const msgTime = formatSlackTs(msg.ts);
                   return (
                     <p key={msg.ts}>
                       <span className="font-semibold">{msg.user}</span>
-                      {msgTime ? <span className="text-[11px] text-[#6B7280] dark:text-[#9CA3AF]"> ({msgTime})</span> : null}
+                      {msgTime ? <span className="text-[11px] text-[#6A5F56] dark:text-[#9CA3AF]"> ({msgTime})</span> : null}
                       <span>:</span> {msg.text}
                     </p>
                   );
@@ -350,10 +350,10 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
               </blockquote>
             )}
             {(proposal.body.decision.intents ?? []).length > 0 && (
-              <ul className="space-y-1 text-xs text-[#374151] dark:text-[#D1D5DB]">
+              <ul className="space-y-1 text-xs text-[#4a4038] dark:text-[#D1D5DB]">
                 {(proposal.body.decision.intents ?? []).map((intent, idx) => (
                   <li key={idx} className="flex flex-wrap items-center gap-1.5">
-                    <span className="rounded bg-[#F3F4F6] dark:bg-[#2D2D2D] px-1.5 py-0.5 text-[11px] font-medium text-[#4B5563] dark:text-[#D1D5DB]">
+                    <span className="rounded bg-[#F3F4F6] dark:bg-[#2D2D2D] px-1.5 py-0.5 text-[11px] font-medium text-[#51463E] dark:text-[#D1D5DB]">
                       {displayServiceLabel(intent.service)}
                     </span>
                     <span>{intent.summary}</span>
@@ -382,22 +382,22 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
       )}
 
       {isPreviewCurrent && planPreview && (
-        <div className="rounded-lg border border-[#D1D5DB] dark:border-[#293653] p-3 space-y-2">
+        <div className="rounded-lg border border-[#D1D5DB] dark:border-[#3a312a] p-3 space-y-2">
           <p className="text-xs font-semibold">{planPreview.summary}</p>
-          <ol className="list-decimal list-inside space-y-1.5 text-xs text-[#4B5563] dark:text-[#9CA3AF]">
+          <ol className="list-decimal list-inside space-y-1.5 text-xs text-[#51463E] dark:text-[#9CA3AF]">
             {planPreview.steps.map((step) => (
               <li key={step.id} className="space-y-1">
-                <span className="font-medium text-[#111827] dark:text-white">{step.description}</span>
+                <span className="font-medium text-[#1a0e08] dark:text-white">{step.description}</span>
                 {step.tool && (
-                  <span className="ml-1.5 rounded bg-[#F3F4F6] dark:bg-[#1A2540] px-1.5 py-0.5 text-[11px] font-medium text-[#4B5563] dark:text-[#CBD5E1]">
+                  <span className="ml-1.5 rounded bg-[#F3F4F6] dark:bg-[#221C18] px-1.5 py-0.5 text-[11px] font-medium text-[#51463E] dark:text-[#D7CEC4]">
                     {serviceName(serviceId(step.tool))} · {operation(step.tool).action}
                   </span>
                 )}
                 {step.args && Object.keys(step.args).length > 0 && (
-                  <dl className="ml-4 grid grid-cols-1 gap-0.5 rounded bg-[#F8F8F6] dark:bg-[#0E1528] p-2 text-[11px]">
+                  <dl className="ml-4 grid grid-cols-1 gap-0.5 rounded bg-[#F8F4EE] dark:bg-[#131010] p-2 text-[11px]">
                     {Object.entries(step.args).map(([key, val]) => (
                       <div key={key} className="flex flex-wrap gap-1">
-                        <dt className="font-semibold text-[#374151] dark:text-[#D1D5DB]">{friendlyFieldLabel(key)}:</dt>
+                        <dt className="font-semibold text-[#4a4038] dark:text-[#D1D5DB]">{friendlyFieldLabel(key)}:</dt>
                         <dd className="break-all">
                           {typeof val === 'string' ? val : JSON.stringify(val)}
                         </dd>
@@ -409,8 +409,8 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
             ))}
           </ol>
           {planPreview.connections && Object.keys(planPreview.connections).length > 0 && (
-            <div className="border-t border-[#E7E7E2] dark:border-[#293653] pt-2 text-[11px] text-[#4B5563] dark:text-[#9CA3AF] space-y-1">
-              <p className="font-semibold text-[#111827] dark:text-white">Tài khoản &amp; phạm vi kết nối được áp dụng:</p>
+            <div className="border-t border-[#E8E0D6] dark:border-[#3a312a] pt-2 text-[11px] text-[#51463E] dark:text-[#9CA3AF] space-y-1">
+              <p className="font-semibold text-[#1a0e08] dark:text-white">Tài khoản &amp; phạm vi kết nối được áp dụng:</p>
               {Object.entries(planPreview.connections).map(([serviceKey, connVal]) => {
                 if (!connVal || typeof connVal !== 'object') return null;
                 if (serviceKey === 'myslack') {
@@ -439,7 +439,7 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
       )}
 
       {actionable && (
-        <div className="space-y-2 pt-2 border-t border-[#E7E7E2] dark:border-[#293653]">
+        <div className="space-y-2 pt-2 border-t border-[#E8E0D6] dark:border-[#3a312a]">
           {isQuestionProposal && (
             <p className="text-xs text-[#B43E00] dark:text-[#FB923C] font-medium">
               Đề xuất phản hồi câu hỏi Slack: nhập câu trả lời vào ô bên dưới để lên kế hoạch gửi trực tiếp vào thread nguồn.
@@ -463,8 +463,8 @@ export function SlackProposalCard({ proposal, navigate, onUpdated }: SlackPropos
               }}
             />
           </label>
-          <details className="rounded-lg border border-[#E7E7E2] dark:border-[#293653] bg-[#FAFAFA] dark:bg-[#0E1528] p-2.5 text-xs">
-            <summary className="cursor-pointer font-medium text-[#374151] dark:text-[#D1D5DB]">
+          <details className="rounded-lg border border-[#E8E0D6] dark:border-[#3a312a] bg-[#FAFAFA] dark:bg-[#131010] p-2.5 text-xs">
+            <summary className="cursor-pointer font-medium text-[#4a4038] dark:text-[#D1D5DB]">
               Đổi dịch vụ đích hoặc điền tham số đích cho đề xuất này
             </summary>
             <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2.5">

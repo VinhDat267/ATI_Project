@@ -263,29 +263,29 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
       if (reason.status === 409) await reloadScheduleConversation(convId).catch(() => {});
     } finally { locked.current = false; setBusy(false); }
   };
-  if (ignored) return <p role="status" className="text-sm text-[#6B7280]">Đã bỏ qua đề xuất trong phiên này.</p>;
-  const change = (label: string, old: string | undefined, value: string | undefined) => value && <div className="v3-space-y-1"><p className="text-xs font-semibold text-[#6B7280]">{label}</p>{proposal?.action === 'update' && old !== undefined && old !== value && <del className="block text-sm text-[#6B7280] [overflow-wrap:anywhere]">{old}</del>}<p className="text-sm font-medium text-[#111827] whitespace-pre-wrap [overflow-wrap:anywhere]">{value}</p></div>;
+  if (ignored) return <p role="status" className="text-sm text-[#6A5F56]">Đã bỏ qua đề xuất trong phiên này.</p>;
+  const change = (label: string, old: string | undefined, value: string | undefined) => value && <div className="v3-space-y-1"><p className="text-xs font-semibold text-[#6A5F56]">{label}</p>{proposal?.action === 'update' && old !== undefined && old !== value && <del className="block text-sm text-[#6A5F56] [overflow-wrap:anywhere]">{old}</del>}<p className="text-sm font-medium text-[#1a0e08] whitespace-pre-wrap [overflow-wrap:anywhere]">{value}</p></div>;
   const manage = proposal && ['pause', 'resume', 'cancel'].includes(proposal.action);
   const title = schedule?.name ?? (manage ? `${proposal.action === 'pause' ? 'Tạm dừng' : proposal.action === 'resume' ? 'Chạy tiếp' : 'Hủy'} lịch "${previous?.name ?? ''}"?` : proposal?.name);
   const scheduleServices = schedule?.services ?? metadata.services ?? [];
   const isAutoDigestActive = approvalMode === 'auto_digest' || schedule?.kind === 'calendar_digest' || schedule?.kind === 'sheets_digest' || schedule?.kind === 'github_digest' || schedule?.kind === 'trello_digest' || schedule?.kind === 'notion_digest' || (schedule?.kind as string) === 'myjira_digest' || schedule?.kind === 'telegram_digest' || schedule?.kind === 'slack_digest';
   return <section data-moment="schedule" className="w-full min-w-0 max-w-3xl mx-auto">
-    <div className="bg-white border border-[#E5E5E0] rounded-2xl shadow-sm overflow-hidden min-w-0">
-      <div className="px-3.5 sm:px-6 py-2 sm:py-2.5 bg-[#F8F8F6] border-b border-[#EAEAE4] flex items-center justify-between gap-2 text-xs">
-        <span className="inline-flex items-center gap-1.5 font-semibold text-[#111827]">
+    <div className="bg-white border border-[#E6DED3] rounded-2xl shadow-sm overflow-hidden min-w-0">
+      <div className="px-3.5 sm:px-6 py-2 sm:py-2.5 bg-[#F8F4EE] border-b border-[#EAEAE4] flex items-center justify-between gap-2 text-xs">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-[#1a0e08]">
           <svg aria-hidden="true" className="w-3.5 h-3.5 text-[#B43E00]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           <span>Lịch chạy tự động</span>
         </span>
-        <span className="text-[#6B7280] font-medium">{schedule ? 'Đã xác nhận' : 'Đang xem trước đề xuất'}</span>
+        <span className="text-[#6A5F56] font-medium">{schedule ? 'Đã xác nhận' : 'Đang xem trước đề xuất'}</span>
       </div>
       <div className="p-3.5 sm:p-5 v3-space-y-2.5 sm:v3-space-y-4 min-w-0">
-        <h1 tabIndex={-1} className="font-sans text-base sm:text-2xl font-semibold tracking-tight text-[#111827] [overflow-wrap:anywhere]">{title}</h1>
+        <h1 tabIndex={-1} className="font-sans text-base sm:text-2xl font-semibold tracking-tight text-[#1a0e08] [overflow-wrap:anywhere]">{title}</h1>
       {!manage && scheduleServices.length >= 2 && (
         <WorkflowFlowCanvas services={scheduleServices} isAutoDigest={isAutoDigestActive} mode="schedule" compact />
       )}
       {schedule ? <>
         <div className="flex flex-wrap items-center gap-2">
-          <p role="status" className="text-sm font-semibold text-[#111827]">{scheduleLabel(schedule)}</p>
+          <p role="status" className="text-sm font-semibold text-[#1a0e08]">{scheduleLabel(schedule)}</p>
           {schedule.kind === 'plan' ? (
             <span data-schedule-kind="plan" data-schedule-mode="manual" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
               Mỗi lượt cần bạn duyệt
@@ -311,10 +311,10 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
             Gửi định kỳ theo phạm vi đã xác nhận
           </p>
         )}
-        <p className="text-sm text-[#4B5563]">{describeRecurrence(schedule.recurrence)}</p>
-        <p className="text-sm text-[#4B5563] [overflow-wrap:anywhere]">{schedule.request}</p>
+        <p className="text-sm text-[#51463E]">{describeRecurrence(schedule.recurrence)}</p>
+        <p className="text-sm text-[#51463E] [overflow-wrap:anywhere]">{schedule.request}</p>
         <ScheduleActions schedule={schedule} navigate={navigate} onChanged={setConfirmed} onConflict={() => reloadScheduleConversation(convId)} /></>
-        : proposal && <>{manage ? <p className="text-sm text-[#4B5563]">{proposal.action === 'cancel' ? 'Lịch đã hủy không bật lại được.' : proposal.summary}</p> : <>
+        : proposal && <>{manage ? <p className="text-sm text-[#51463E]">{proposal.action === 'cancel' ? 'Lịch đã hủy không bật lại được.' : proposal.summary}</p> : <>
           {isReauthorize && (
             <div
               data-testid="reauthorize-proposal-banner"
@@ -339,13 +339,13 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
           {proposal.action === 'update' && previous?.name !== proposal.name && change('Tên lịch', previous?.name, proposal.name)}
           {change('Thời gian', previous ? describeRecurrence(previous.recurrence) : undefined, proposal.recurrence ? describeRecurrence(proposal.recurrence) : undefined)}
           {change('Việc sẽ làm', previous?.request, proposal.request)}
-          <div className="flex flex-wrap gap-2">{metadata.services?.map(id => <span key={id} className="inline-flex items-center gap-2 text-xs text-[#4B5563]"><span aria-hidden="true" className="w-6 h-6 rounded-lg border border-[#E5E5E0] bg-[#F8F8F6] flex items-center justify-center"><ServiceLogo service={id} className="w-3.5 h-3.5" /></span>{serviceName(id, [])}</span>)}</div>
-          {!!metadata.nextRuns?.length && <div className="flex flex-wrap items-center gap-1.5 text-xs text-[#4B5563]"><span className="font-semibold text-[#111827]">Lần chạy tới:</span>{metadata.nextRuns.map(time => <span key={time} className="px-2 py-0.5 rounded-md bg-[#F8F8F6] border border-[#EAEAE4] tabular-nums">{formatRunTime(time)}</span>)}</div>}
+          <div className="flex flex-wrap gap-2">{metadata.services?.map(id => <span key={id} className="inline-flex items-center gap-2 text-xs text-[#51463E]"><span aria-hidden="true" className="w-6 h-6 rounded-lg border border-[#E6DED3] bg-[#F8F4EE] flex items-center justify-center"><ServiceLogo service={id} className="w-3.5 h-3.5" /></span>{serviceName(id, [])}</span>)}</div>
+          {!!metadata.nextRuns?.length && <div className="flex flex-wrap items-center gap-1.5 text-xs text-[#51463E]"><span className="font-semibold text-[#1a0e08]">Lần chạy tới:</span>{metadata.nextRuns.map(time => <span key={time} className="px-2 py-0.5 rounded-md bg-[#F8F4EE] border border-[#EAEAE4] tabular-nums">{formatRunTime(time)}</span>)}</div>}
           {isMultiSourceCandidate ? (
             <>
-              <fieldset className="border border-[#E7E7E2] rounded-xl p-3.5 bg-[#F8F8F6] v3-space-y-2.5">
-                <legend className="text-xs font-semibold text-[#6B7280] px-1">Chế độ khi tới giờ</legend>
-                {!jiraDigestOnly && <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm transition-colors ${isReauthorize ? 'text-[#9CA3AF] cursor-not-allowed border-[#E7E7E2] bg-neutral-50' : approvalMode === 'manual' ? 'text-[#111827] cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'text-[#111827] cursor-pointer border-[#E7E7E2] bg-white'}`}>
+              <fieldset className="border border-[#E8E0D6] rounded-xl p-3.5 bg-[#F8F4EE] v3-space-y-2.5">
+                <legend className="text-xs font-semibold text-[#6A5F56] px-1">Chế độ khi tới giờ</legend>
+                {!jiraDigestOnly && <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm transition-colors ${isReauthorize ? 'text-[#9CA3AF] cursor-not-allowed border-[#E8E0D6] bg-neutral-50' : approvalMode === 'manual' ? 'text-[#1a0e08] cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'text-[#1a0e08] cursor-pointer border-[#E8E0D6] bg-white'}`}>
                   <input
                     id="schedule-mode-manual"
                     type="radio"
@@ -360,7 +360,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                     <strong className="font-semibold">Chờ tôi duyệt mỗi lượt</strong> (Mặc định) — Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt.
                   </span>
                 </label>}
-                <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm transition-colors ${!digestCandidate.canAutoDigest ? 'text-[#6B7280] opacity-70 cursor-not-allowed border-[#E7E7E2] bg-neutral-50' : approvalMode === 'auto_digest' ? 'text-[#111827] cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'text-[#111827] cursor-pointer border-[#E7E7E2] bg-white'}`}>
+                <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm transition-colors ${!digestCandidate.canAutoDigest ? 'text-[#6A5F56] opacity-70 cursor-not-allowed border-[#E8E0D6] bg-neutral-50' : approvalMode === 'auto_digest' ? 'text-[#1a0e08] cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'text-[#1a0e08] cursor-pointer border-[#E8E0D6] bg-white'}`}>
                   <input
                     id="schedule-mode-auto-digest"
                     type="radio"
@@ -376,7 +376,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                       <strong className="font-semibold">Tự gửi bản tin, không cần duyệt lại</strong>
                     </span>
                     {digestCandidate.canAutoDigest && digestCandidate.config && (
-                      <span className="block text-xs text-[#4B5563] [overflow-wrap:anywhere]">
+                      <span className="block text-xs text-[#51463E] [overflow-wrap:anywhere]">
                         {Array.isArray(digestCandidate.config.sources) && digestCandidate.config.sources.length > 0 && (
                           <>Nguồn đọc: {digestCandidate.config.sources.map(digestSourcePreviewLabel).join(', ')} · </>
                         )}
@@ -388,7 +388,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                       </span>
                     )}
                     {!digestCandidate.canAutoDigest && digestCandidate.disabledReason && (
-                      <span className="block text-xs text-[#6B7280]">
+                      <span className="block text-xs text-[#6A5F56]">
                         {digestCandidate.disabledReason}
                       </span>
                     )}
@@ -430,7 +430,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                         : 'Lịch đọc dữ liệu từ nguồn đã chọn và gửi bản tin vào cuộc trò chuyện đã chọn.'}</p>
                     {!digestCandidate.config.sources?.some((source: { service: string }) => source.service === 'notion') && (
                       <div className="pt-1.5 border-t border-emerald-200/80">
-                        <label className="flex items-start gap-2 cursor-pointer text-xs text-[#111827]">
+                        <label className="flex items-start gap-2 cursor-pointer text-xs text-[#1a0e08]">
                           <input
                             data-testid="checkbox-telegram-include-ai-summary"
                             type="checkbox"
@@ -450,7 +450,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                   </div>
                 );
               })()}
-              <p className="text-sm text-[#4B5563] leading-relaxed">
+              <p className="text-sm text-[#51463E] leading-relaxed">
                 {approvalMode === 'auto_digest'
                   ? isSlackMultiCandidate
                     ? 'Tới giờ, Planora chỉ đọc dữ liệu từ các dịch vụ nguồn đã chọn và tự động gửi bản tin về đúng kênh Slack đã khóa.'
@@ -459,9 +459,9 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
               </p>
             </>
           ) : isGithubCandidate ? (
-            <fieldset className="v3-space-y-2 border-t border-[#E7E7E2] pt-3">
-              <legend className="text-xs font-semibold text-[#6B7280] mb-1">Chế độ khi tới giờ</legend>
-              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm cursor-pointer ${approvalMode === 'manual' ? 'border-[#FF5701] bg-[#FFF6EE]/40' : 'border-[#E7E7E2] bg-white'}`}>
+            <fieldset className="v3-space-y-2 border-t border-[#E8E0D6] pt-3">
+              <legend className="text-xs font-semibold text-[#6A5F56] mb-1">Chế độ khi tới giờ</legend>
+              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm cursor-pointer ${approvalMode === 'manual' ? 'border-[#FF5701] bg-[#FFF6EE]/40' : 'border-[#E8E0D6] bg-white'}`}>
                 <input
                   id="schedule-mode-manual"
                   type="radio"
@@ -471,11 +471,11 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                   className="mt-0.5 text-[#FF5701] focus:ring-[#FF5701]"
                 />
                 <div className="v3-space-y-0.5">
-                  <p className="font-semibold text-[#111827]">Chờ tôi duyệt mỗi lượt</p>
-                  <p className="text-xs text-[#4B5563]">Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
+                  <p className="font-semibold text-[#1a0e08]">Chờ tôi duyệt mỗi lượt</p>
+                  <p className="text-xs text-[#51463E]">Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
                 </div>
               </label>
-              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm ${!canAutoDigest ? 'opacity-60 cursor-not-allowed border-[#E7E7E2] bg-neutral-50' : approvalMode === 'auto_digest' ? 'cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'cursor-pointer border-[#E7E7E2] bg-white'}`}>
+              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm ${!canAutoDigest ? 'opacity-60 cursor-not-allowed border-[#E8E0D6] bg-neutral-50' : approvalMode === 'auto_digest' ? 'cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'cursor-pointer border-[#E8E0D6] bg-white'}`}>
                 <input
                   id="schedule-mode-auto-digest"
                   type="radio"
@@ -486,9 +486,9 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                   className="mt-0.5 text-[#FF5701] focus:ring-[#FF5701]"
                 />
                 <div className="v3-space-y-1 min-w-0">
-                  <p className="font-semibold text-[#111827]">Tự gửi bản tin, không cần duyệt lại</p>
+                  <p className="font-semibold text-[#1a0e08]">Tự gửi bản tin, không cần duyệt lại</p>
                   {canAutoDigest && digestCandidate?.config ? (
-                    <p className="text-xs text-[#4B5563] break-words">
+                    <p className="text-xs text-[#51463E] break-words">
                       {`Repo: ${digestCandidate.config.repos.join(', ')} · ${
                         digestCandidate.config.telegramChatId || digestCandidate.config.telegramChatTitle
                           ? `Telegram: ${digestCandidate.config.telegramChatTitle || digestCandidate.config.telegramChatId}`
@@ -496,7 +496,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                       } · Nội dung: Issue mới, PR chờ review quá ${digestCandidate.config.staleDays} ngày, Issue chưa ai nhận (+ tóm tắt AI)`}
                     </p>
                   ) : (
-                    <p className="text-xs text-[#6B7280] break-words">
+                    <p className="text-xs text-[#6A5F56] break-words">
                       {digestCandidate?.disabledReason || 'Chỉ bật được khi lịch chỉ đọc GitHub và gửi báo cáo vào 1 kênh Slack hoặc nhóm Telegram đã chọn.'}
                     </p>
                   )}
@@ -504,9 +504,9 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
               </label>
             </fieldset>
           ) : isTrelloCandidate ? (
-            <fieldset className="v3-space-y-2 border-t border-[#E7E7E2] pt-3">
-              <legend className="text-xs font-semibold text-[#6B7280] mb-1">Chế độ khi tới giờ</legend>
-              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm cursor-pointer ${approvalMode === 'manual' ? 'border-[#FF5701] bg-[#FFF6EE]/40' : 'border-[#E7E7E2] bg-white'}`}>
+            <fieldset className="v3-space-y-2 border-t border-[#E8E0D6] pt-3">
+              <legend className="text-xs font-semibold text-[#6A5F56] mb-1">Chế độ khi tới giờ</legend>
+              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm cursor-pointer ${approvalMode === 'manual' ? 'border-[#FF5701] bg-[#FFF6EE]/40' : 'border-[#E8E0D6] bg-white'}`}>
                 <input
                   id="schedule-mode-manual"
                   type="radio"
@@ -516,11 +516,11 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                   className="mt-0.5 text-[#FF5701] focus:ring-[#FF5701]"
                 />
                 <div className="v3-space-y-0.5">
-                  <p className="font-semibold text-[#111827]">Chờ tôi duyệt mỗi lượt</p>
-                  <p className="text-xs text-[#4B5563]">Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
+                  <p className="font-semibold text-[#1a0e08]">Chờ tôi duyệt mỗi lượt</p>
+                  <p className="text-xs text-[#51463E]">Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
                 </div>
               </label>
-              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm ${!canAutoDigest ? 'opacity-60 cursor-not-allowed border-[#E7E7E2] bg-neutral-50' : approvalMode === 'auto_digest' ? 'cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'cursor-pointer border-[#E7E7E2] bg-white'}`}>
+              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm ${!canAutoDigest ? 'opacity-60 cursor-not-allowed border-[#E8E0D6] bg-neutral-50' : approvalMode === 'auto_digest' ? 'cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'cursor-pointer border-[#E8E0D6] bg-white'}`}>
                 <input
                   id="schedule-mode-auto-digest"
                   type="radio"
@@ -531,9 +531,9 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                   className="mt-0.5 text-[#FF5701] focus:ring-[#FF5701]"
                 />
                 <div className="v3-space-y-1 min-w-0">
-                  <p className="font-semibold text-[#111827]">Tự gửi bản tin, không cần duyệt lại</p>
+                  <p className="font-semibold text-[#1a0e08]">Tự gửi bản tin, không cần duyệt lại</p>
                   {canAutoDigest && digestCandidate?.config ? (
-                    <p className="text-xs text-[#4B5563] break-words">
+                    <p className="text-xs text-[#51463E] break-words">
                       {`Bảng Trello: ${Array.isArray(digestCandidate.config.boards) ? digestCandidate.config.boards.map((b: any) => typeof b === 'string' ? b : b?.name ?? b?.boardName ?? b?.id ?? b?.boardId).join(', ') : ''} · ${
                         digestCandidate.config.telegramChatId || digestCandidate.config.telegramChatTitle
                           ? `Telegram: ${digestCandidate.config.telegramChatTitle || digestCandidate.config.telegramChatId}`
@@ -541,7 +541,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                       } · Nội dung: Thẻ quá hạn, sắp đến hạn trong ${digestCandidate.config.dueSoonHours ?? 24} giờ, thẻ chưa gán người (+ tóm tắt AI)`}
                     </p>
                   ) : (
-                    <p className="text-xs text-[#6B7280] break-words">
+                    <p className="text-xs text-[#6A5F56] break-words">
                       {digestCandidate?.disabledReason || 'Chỉ bật được khi lịch chỉ đọc Trello và gửi báo cáo vào 1 kênh Slack hoặc nhóm Telegram đã chọn.'}
                     </p>
                   )}
@@ -549,9 +549,9 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
               </label>
             </fieldset>
           ) : isNotionCandidate ? (
-            <fieldset className="v3-space-y-2 border-t border-[#E7E7E2] pt-3">
-              <legend className="text-xs font-semibold text-[#6B7280] mb-1">Chế độ khi tới giờ</legend>
-              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm cursor-pointer ${approvalMode === 'manual' ? 'border-[#FF5701] bg-[#FFF6EE]/40' : 'border-[#E7E7E2] bg-white'}`}>
+            <fieldset className="v3-space-y-2 border-t border-[#E8E0D6] pt-3">
+              <legend className="text-xs font-semibold text-[#6A5F56] mb-1">Chế độ khi tới giờ</legend>
+              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm cursor-pointer ${approvalMode === 'manual' ? 'border-[#FF5701] bg-[#FFF6EE]/40' : 'border-[#E8E0D6] bg-white'}`}>
                 <input
                   id="schedule-mode-manual"
                   type="radio"
@@ -561,11 +561,11 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                   className="mt-0.5 text-[#FF5701] focus:ring-[#FF5701]"
                 />
                 <div className="v3-space-y-0.5">
-                  <p className="font-semibold text-[#111827]">Chờ tôi duyệt mỗi lượt</p>
-                  <p className="text-xs text-[#4B5563]">Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
+                  <p className="font-semibold text-[#1a0e08]">Chờ tôi duyệt mỗi lượt</p>
+                  <p className="text-xs text-[#51463E]">Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.</p>
                 </div>
               </label>
-              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm ${!canAutoDigest ? 'opacity-60 cursor-not-allowed border-[#E7E7E2] bg-neutral-50' : approvalMode === 'auto_digest' ? 'cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'cursor-pointer border-[#E7E7E2] bg-white'}`}>
+              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm ${!canAutoDigest ? 'opacity-60 cursor-not-allowed border-[#E8E0D6] bg-neutral-50' : approvalMode === 'auto_digest' ? 'cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'cursor-pointer border-[#E8E0D6] bg-white'}`}>
                 <input
                   id="schedule-mode-auto-digest"
                   type="radio"
@@ -576,9 +576,9 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                   className="mt-0.5 text-[#FF5701] focus:ring-[#FF5701]"
                 />
                 <div className="v3-space-y-1 min-w-0">
-                  <p className="font-semibold text-[#111827]">Tự gửi bản tin, không cần duyệt lại</p>
+                  <p className="font-semibold text-[#1a0e08]">Tự gửi bản tin, không cần duyệt lại</p>
                   {canAutoDigest && digestCandidate?.config ? (
-                    <p className="text-xs text-[#4B5563] break-words">
+                    <p className="text-xs text-[#51463E] break-words">
                       {`Notion ${digestCandidate.config.workspaceName ?? ''} · Database: ${Array.isArray(digestCandidate.config.databases) ? digestCandidate.config.databases.map((d: any) => typeof d === 'string' ? d : d?.title ?? d?.id).join(', ') : ''} · ${
                         digestCandidate.config.delivery?.service === 'telegram' || digestCandidate.config.telegramChatId
                           ? `Telegram: ${digestCandidate.config.delivery?.label || digestCandidate.config.telegramChatTitle || digestCandidate.config.delivery?.chatId || digestCandidate.config.telegramChatId}`
@@ -586,7 +586,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                       } · Nội dung: Trang đọc được, trạng thái và thuộc tính`}
                     </p>
                   ) : (
-                    <p className="text-xs text-[#6B7280] break-words">
+                    <p className="text-xs text-[#6A5F56] break-words">
                       {digestCandidate?.disabledReason || 'Chỉ bật được khi lịch chỉ đọc Notion và gửi báo cáo vào 1 kênh Slack hoặc nhóm Telegram đã chọn.'}
                     </p>
                   )}
@@ -594,9 +594,9 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
               </label>
             </fieldset>
           ) : isJiraCandidate ? (
-            <fieldset className="v3-space-y-2 border-t border-[#E7E7E2] pt-3">
-              <legend className="text-xs font-semibold text-[#6B7280] mb-1">Chế độ khi tới giờ</legend>
-              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm ${!canAutoDigest ? 'opacity-60 cursor-not-allowed border-[#E7E7E2] bg-neutral-50' : approvalMode === 'auto_digest' ? 'cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'cursor-pointer border-[#E7E7E2] bg-white'}`}>
+            <fieldset className="v3-space-y-2 border-t border-[#E8E0D6] pt-3">
+              <legend className="text-xs font-semibold text-[#6A5F56] mb-1">Chế độ khi tới giờ</legend>
+              <label className={`flex items-start gap-2.5 p-3 rounded-xl border text-xs sm:text-sm ${!canAutoDigest ? 'opacity-60 cursor-not-allowed border-[#E8E0D6] bg-neutral-50' : approvalMode === 'auto_digest' ? 'cursor-pointer border-[#FF5701] bg-[#FFF6EE]/40' : 'cursor-pointer border-[#E8E0D6] bg-white'}`}>
                 <input
                   id="schedule-mode-auto-digest"
                   type="radio"
@@ -607,10 +607,10 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                   className="mt-0.5 text-[#FF5701] focus:ring-[#FF5701]"
                 />
                 <div className="v3-space-y-1 min-w-0">
-                  <p className="font-semibold text-[#111827]">Tự gửi bản tin Standup &amp; Blocker Jira, không cần duyệt lại</p>
+                  <p className="font-semibold text-[#1a0e08]">Tự gửi bản tin Standup &amp; Blocker Jira, không cần duyệt lại</p>
                   {canAutoDigest && digestCandidate?.config ? (
                     <div className="v3-space-y-1.5">
-                      <p className="text-xs text-[#4B5563] break-words">
+                      <p className="text-xs text-[#51463E] break-words">
                         {`Dự án Jira: ${Array.isArray(digestCandidate.config.projects) ? digestCandidate.config.projects.map((p: any) => typeof p === 'string' ? p : `${p?.siteName ? `${p.siteName} · ` : ''}${p?.projectKey ?? p?.projectName ?? ''}`).join(', ') : ''} · ${
                           digestCandidate.config.telegramChatId || digestCandidate.config.telegramChatTitle
                             ? `Telegram: ${digestCandidate.config.telegramChatTitle || digestCandidate.config.telegramChatId}`
@@ -618,10 +618,10 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                         } · Nội dung: Quá hạn, sắp đến hạn (${digestCandidate.config.dueSoonHours ?? 48}h), Ưu tiên cao/Chặn, Chưa gán người phụ trách, Hoàn thành`}
                       </p>
                       {approvalMode === 'auto_digest' && (preserveJiraAiSummary ? (
-                        <p className="text-xs text-[#4B5563]">Giữ tùy chọn tóm tắt AI của lịch hiện tại.</p>
+                        <p className="text-xs text-[#51463E]">Giữ tùy chọn tóm tắt AI của lịch hiện tại.</p>
                       ) : (
                         <label
-                          className="flex items-start gap-2 pt-1 cursor-pointer text-xs text-[#111827]"
+                          className="flex items-start gap-2 pt-1 cursor-pointer text-xs text-[#1a0e08]"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <input
@@ -641,7 +641,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                       ))}
                     </div>
                   ) : (
-                    <p className="text-xs text-[#6B7280] break-words">
+                    <p className="text-xs text-[#6A5F56] break-words">
                       {digestCandidate?.disabledReason || 'Chỉ bật được khi lịch chỉ đọc công việc Jira và gửi báo cáo vào 1 kênh Slack hoặc nhóm Telegram đã chọn.'}
                     </p>
                   )}
@@ -652,8 +652,8 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
             <>
               {isEligible ? (
                 <div className="v3-space-y-3 pt-1" role="radiogroup" aria-label="Chế độ chạy định kỳ">
-                  <p className="text-xs font-semibold text-[#6B7280]">Chế độ chạy mỗi lượt</p>
-                  <label className="flex items-start gap-2.5 text-sm text-[#111827] cursor-pointer">
+                  <p className="text-xs font-semibold text-[#6A5F56]">Chế độ chạy mỗi lượt</p>
+                  <label className="flex items-start gap-2.5 text-sm text-[#1a0e08] cursor-pointer">
                     <input
                       id="schedule-mode-manual"
                       type="radio"
@@ -664,7 +664,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                     />
                     <span>Lập kế hoạch & chờ duyệt từng lượt (Mặc định)</span>
                   </label>
-                  <label className="flex items-start gap-2.5 text-sm text-[#111827] cursor-pointer">
+                  <label className="flex items-start gap-2.5 text-sm text-[#1a0e08] cursor-pointer">
                     <input
                       id="schedule-mode-auto-digest"
                       type="radio"
@@ -709,9 +709,9 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                   )}
                 </div>
               ) : ineligibleReason ? (
-                <p className="text-xs text-[#6B7280]">{ineligibleReason}</p>
+                <p className="text-xs text-[#6A5F56]">{ineligibleReason}</p>
               ) : null}
-              <p className="text-sm text-[#4B5563] leading-relaxed">
+              <p className="text-sm text-[#51463E] leading-relaxed">
                 {approvalMode === 'auto_digest'
                   ? 'Tới giờ, Planora tự đọc Google Calendar trong phạm vi đã khóa và gửi bản tin tới kênh đích mà không cần duyệt lại.'
                   : 'Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.'}
@@ -720,9 +720,9 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
           ) : (
             <>
               {digestCandidate && (
-                <fieldset className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] v3-space-y-2.5">
-                  <legend className="text-xs font-semibold text-[#111827] px-1">Chế độ khi tới giờ</legend>
-                  <label className={`flex items-start gap-2.5 text-xs sm:text-sm ${isReauthorize ? 'text-[#9CA3AF] cursor-not-allowed' : 'text-[#111827] cursor-pointer'}`}>
+                <fieldset className="p-3.5 rounded-xl bg-[#F8F4EE] border border-[#E8E0D6] v3-space-y-2.5">
+                  <legend className="text-xs font-semibold text-[#1a0e08] px-1">Chế độ khi tới giờ</legend>
+                  <label className={`flex items-start gap-2.5 text-xs sm:text-sm ${isReauthorize ? 'text-[#9CA3AF] cursor-not-allowed' : 'text-[#1a0e08] cursor-pointer'}`}>
                     <input
                       type="radio"
                       name={`schedule-mode-${message.id}`}
@@ -733,7 +733,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                     />
                     <span>Chờ tôi duyệt mỗi lượt (mặc định)</span>
                   </label>
-                  <label className={`flex items-start gap-2.5 text-xs sm:text-sm ${digestCandidate.canAutoDigest ? 'text-[#111827] cursor-pointer' : 'text-[#9CA3AF] cursor-not-allowed'}`}>
+                  <label className={`flex items-start gap-2.5 text-xs sm:text-sm ${digestCandidate.canAutoDigest ? 'text-[#1a0e08] cursor-pointer' : 'text-[#9CA3AF] cursor-not-allowed'}`}>
                     <input
                       type="radio"
                       name={`schedule-mode-${message.id}`}
@@ -745,7 +745,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                     <span>
                       Tự gửi báo cáo, không cần duyệt lại
                       {digestCandidate.canAutoDigest && digestCandidate.config?.source && digestCandidate.config?.destination && (
-                        <span className="block text-xs text-[#4B5563] mt-0.5">
+                        <span className="block text-xs text-[#51463E] mt-0.5">
                           Nguồn: {digestCandidate.config.source.spreadsheetTitle}
                           {digestCandidate.config.source.sheetName ? ` (${digestCandidate.config.source.sheetName})` : ''} · Đích:{' '}
                           {digestCandidate.config.destination.service === 'slack'
@@ -756,7 +756,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                         </span>
                       )}
                       {!digestCandidate.canAutoDigest && (digestCandidate.reason || digestCandidate.disabledReason) && (
-                        <span className="block text-xs text-[#6B7280] mt-0.5">{digestCandidate.reason ?? digestCandidate.disabledReason}</span>
+                        <span className="block text-xs text-[#6A5F56] mt-0.5">{digestCandidate.reason ?? digestCandidate.disabledReason}</span>
                       )}
                     </span>
                   </label>
@@ -765,7 +765,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
               {sheetsPreview && (
                 <div
                   data-testid="sheets-digest-v2-preview"
-                  className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-[#111827] v3-space-y-1.5"
+                  className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-[#1a0e08] v3-space-y-1.5"
                 >
                   <p className="font-semibold text-emerald-950">Chi tiết phạm vi tự gửi Google Sheets:</p>
                   <p>
@@ -787,7 +787,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                     </div>
                   )}
                   <div className="pt-1.5 border-t border-emerald-200/80 v3-space-y-1">
-                    <label className="flex items-start gap-2 cursor-pointer text-xs text-[#111827]">
+                    <label className="flex items-start gap-2 cursor-pointer text-xs text-[#1a0e08]">
                       <input
                         data-testid="checkbox-sheets-include-ai-summary"
                         type="checkbox"
@@ -806,8 +806,8 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                 </div>
               )}
               {!sheetsPreview && isSheetsCandidate && (approvalMode === 'auto_digest' || isReauthorize) && (
-                <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-[#111827]">
-                  <label className="flex items-start gap-2 cursor-pointer text-xs text-[#111827]">
+                <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-xs text-[#1a0e08]">
+                  <label className="flex items-start gap-2 cursor-pointer text-xs text-[#1a0e08]">
                     <input
                       data-testid="checkbox-sheets-include-ai-summary"
                       type="checkbox"
@@ -824,7 +824,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
                   </label>
                 </div>
               )}
-              <p className="text-sm text-[#4B5563] leading-relaxed">
+              <p className="text-sm text-[#51463E] leading-relaxed">
                 {approvalMode === 'auto_digest'
                   ? 'Tới giờ, Planora tự đọc bảng tính đã khóa và gửi báo cáo tới kênh đích đã khóa mà không ghi thêm dữ liệu.'
                   : 'Tới giờ, Planora lập kế hoạch mới và chờ bạn duyệt. Chưa có gì được ghi lên công cụ nào.'}
@@ -832,7 +832,7 @@ export function ScheduleMoment(props: { message?: ChatMessage; convId?: string; 
             </>
           )}
         </>}
-        {!canConfirm && !ineligibleReason && <p role="status" className="text-sm text-[#4B5563]">Lịch Jira cần một bản tin tự gửi tới Slack hoặc Telegram.</p>}
+        {!canConfirm && !ineligibleReason && <p role="status" className="text-sm text-[#51463E]">Lịch Jira cần một bản tin tự gửi tới Slack hoặc Telegram.</p>}
         <div className="flex flex-wrap gap-2"><button type="button" disabled={busy || !canConfirm} className={primaryScheduleButton} onClick={() => void confirm()}>{(isGithubCandidate || isTrelloCandidate || jiraDigestOnly) && !manage && approvalMode === 'auto_digest' ? 'Xác nhận và bật tự gửi' : 'Xác nhận'}</button><button type="button" disabled={busy} className={scheduleButton} onClick={() => { try { if (proposal?.request) sessionStorage.setItem('ati_prefill_prompt', proposal.request); } catch { /* ignore */ } onEdit(); }}>Sửa</button><button type="button" disabled={busy} className={scheduleButton} onClick={() => setIgnored(true)}>Bỏ qua</button></div>
       </>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}

@@ -15,7 +15,7 @@ const eyeClosed = <path strokeLinecap="round" strokeLinejoin="round" strokeWidth
 // Độ mạnh mật khẩu như validatePasswordStrength của bản mẫu: màu từng vạch và dòng chữ.
 function strength(password: string): { bars: string[]; text: string; className: string } {
   const empty = [BAR_EMPTY, BAR_EMPTY, BAR_EMPTY, BAR_EMPTY];
-  if (!password) return { bars: empty, text: 'Tối thiểu 12 ký tự', className: 'text-[11px] text-[#6B7280]' };
+  if (!password) return { bars: empty, text: 'Tối thiểu 12 ký tự', className: 'text-[11px] text-[#6A5F56]' };
   if (password.length < 12) return { bars: [BAR('bg-[#DC2626]'), BAR_EMPTY, BAR_EMPTY, BAR_EMPTY], text: 'Mật khẩu cần ít nhất 12 ký tự', className: 'text-[11px] text-[#DC2626] font-medium' };
   let score = 1;
   if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
@@ -31,7 +31,7 @@ const meta: PageMeta = {
   id: "auth-action",
   title: "Xác thực & Hành động tài khoản — Planora",
   htmlClass: "",
-  bodyClass: "min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]",
+  bodyClass: "min-h-screen flex flex-col bg-[#F8F4EE] text-[#1a0e08]",
   css,
 };
 
@@ -53,7 +53,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
  const [googleRetryError, setGoogleRetryError] = useState<string | null>(null);
  const googleRetryMounted = useRef(false);
  useEffect(() => { googleRetryMounted.current = true; return () => { googleRetryMounted.current = false; }; }, []);
- const [matchMessage, setMatchMessage] = useState({ text: '', className: 'text-[11px] text-[#6B7280] mt-1' });
+ const [matchMessage, setMatchMessage] = useState({ text: '', className: 'text-[11px] text-[#6A5F56] mt-1' });
  const [visible, setVisible] = useState({ 'new-password-input': false, 'confirm-password-input': false });
  const resendInputRef = useRef<HTMLInputElement>(null), newPasswordRef = useRef<HTMLInputElement>(null), confirmPasswordRef = useRef<HTMLInputElement>(null);
  const remaining = () => deadline == null ? null : Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
@@ -61,7 +61,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
  useEffect(() => { setBlockedSeconds(remaining()); if (deadline == null) return; const timer = window.setInterval(() => setBlockedSeconds(remaining()), 1000); return () => window.clearInterval(timer); }, [deadline]);
  const checkPasswordMatch = () => {
   const password = newPasswordRef.current?.value ?? '', confirm = confirmPasswordRef.current?.value ?? '';
-  setMatchMessage(!confirm ? { text: '', className: 'text-[11px] text-[#6B7280] mt-1' } : password === confirm
+  setMatchMessage(!confirm ? { text: '', className: 'text-[11px] text-[#6A5F56] mt-1' } : password === confirm
    ? { text: '✓ Mật khẩu khớp nhau', className: 'text-[11px] text-[#16A34A] mt-1 font-medium' }
    : { text: 'Mật khẩu xác nhận chưa trùng khớp', className: 'text-[11px] text-[#DC2626] mt-1' });
  };
@@ -81,18 +81,18 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
   return (
     <>
       {/* THANH TRÊN (COCKPIT HEADER) */}
-      <header className="sticky top-0 z-40 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2] px-4 sm:px-6 py-3">
+      <header className="sticky top-0 z-40 w-full bg-[#F8F4EE]/90 backdrop-blur-md border-b border-[#E8E0D6] px-4 sm:px-6 py-3">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           {/* Cụm Logo & Điều hướng quay lại */}
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <a onClick={followLink} href="/" className="flex items-center gap-2.5 group flex-shrink-0" title="Về trang chủ Planora">
-              <PlanoraMark className="w-7 h-7 text-[#111827] dark:text-[#F1F5F9] flex-shrink-0 group-hover:scale-105 transition-transform" />
-              <span className="font-display font-bold text-lg tracking-tight text-[#111827]">
+              <PlanoraMark className="w-7 h-7 text-[#1a0e08] dark:text-[#F3EEE8] flex-shrink-0 group-hover:scale-105 transition-transform" />
+              <span className="font-display font-bold text-lg tracking-tight text-[#1a0e08]">
                 Planora
               </span>
             </a>
-            <div className="h-4 w-px bg-[#E7E7E2] flex-shrink-0" />
-            <a onClick={followLink} href="/" className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Quay lại trang chủ">
+            <div className="h-4 w-px bg-[#E8E0D6] flex-shrink-0" />
+            <a onClick={followLink} href="/" className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#51463E] hover:text-[#1a0e08] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Quay lại trang chủ">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
@@ -107,7 +107,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
           {/* Cụm Điều khiển Demo & Liên kết không gian làm việc */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <ThemeToggle />
-            <a onClick={followLink} href="/" className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-[#4B5563] hover:text-[#FF5701] transition-colors px-2.5 py-1.5 rounded-lg border border-transparent hover:border-[#E7E7E2] bg-transparent hover:bg-white">
+            <a onClick={followLink} href="/" className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-[#51463E] hover:text-[#FF5701] transition-colors px-2.5 py-1.5 rounded-lg border border-transparent hover:border-[#E8E0D6] bg-transparent hover:bg-white">
               <span>
                 Không gian làm việc
               </span>
@@ -122,10 +122,10 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 md:p-8" role="main">
         <div className="w-full max-w-2xl mx-auto">
           {/* Card trung tâm */}
-          <div id="action-card" className="bg-white border border-[#E7E7E2] rounded-3xl p-6 sm:p-8 shadow-soft relative overflow-hidden transition-all duration-200">
+          <div id="action-card" className="bg-white border border-[#E8E0D6] rounded-3xl p-6 sm:p-8 shadow-soft relative overflow-hidden transition-all duration-200">
             {busy && mode === 'loading' && <p role="status">Đang xác minh tài khoản…</p>}
             {error && <p role="alert" className="p-3.5 mb-4 bg-[#FEF2F2] border border-[#FECACA] rounded-xl text-xs text-[#DC2626]">{error}</p>}
-            {message && <p role="status" className="text-xs text-[#4B5563] mb-4">{message}</p>}
+            {message && <p role="status" className="text-xs text-[#51463E] mb-4">{message}</p>}
             {onAccount && <button type="button" onClick={onAccount} className="w-full py-3 px-4 rounded-xl bg-[#FF5701] text-white font-medium text-sm">Về trang tài khoản</button>}
             {/* ========================================== */}
             {/* MÀN 1: XÁC MINH EMAIL — THÀNH CÔNG */}
@@ -143,21 +143,21 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     {" Hoàn tất 2 / 2 bước "}
                   </span>
                   {' '}
-                  <h1 id="title-verify-success" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
+                  <h1 id="title-verify-success" className="font-display font-semibold text-2xl sm:text-[26px] text-[#1a0e08] tracking-tight">
                     Email của bạn đã được xác minh
                   </h1>
                 </div>
-                <p className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
+                <p className="text-sm text-[#51463E] leading-relaxed max-w-md mx-auto">
                   {"Địa chỉ "}
-                  <strong className="text-[#111827] font-semibold user-email-placeholder">
+                  <strong className="text-[#1a0e08] font-semibold user-email-placeholder">
                     {email || "email của bạn"}
                   </strong>
                   {" đã được xác thực thành công. Yêu cầu của bạn đã sẵn sàng cho bước tiếp theo."}
                 </p>
               </div>
               {/* Thẻ quy trình 2 bước (Sự thật sản phẩm v3) */}
-              <div className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-4 sm:p-5 v3-space-y-3">
-                <div className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+              <div className="bg-[#F8F4EE] border border-[#E8E0D6] rounded-2xl p-4 sm:p-5 v3-space-y-3">
+                <div className="text-xs font-semibold uppercase tracking-wider text-[#6A5F56]">
                   Tiến trình kích hoạt tài khoản
                 </div>
                 <div className="v3-space-y-3 text-xs sm:text-sm">
@@ -167,10 +167,10 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                       ✓
                     </div>
                     <div className="min-w-0">
-                      <div className="font-semibold text-[#111827]">
+                      <div className="font-semibold text-[#1a0e08]">
                         Bước 1: Xác minh địa chỉ email
                       </div>
-                      <div className="text-[#6B7280] text-xs">
+                      <div className="text-[#6A5F56] text-xs">
                         Đã xác minh qua liên kết trong thư điện tử.
                       </div>
                     </div>
@@ -184,7 +184,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                       <div className="font-semibold text-[#16A34A]">
                         Bước 2: Sẵn sàng sử dụng Không gian Cá nhân
                       </div>
-                      <div className="text-[#4B5563] text-xs leading-relaxed mt-0.5">
+                      <div className="text-[#51463E] text-xs leading-relaxed mt-0.5">
                         Tài khoản của bạn đã được kích hoạt. Bạn có thể kết nối công cụ và bắt đầu giao việc ngay lập tức.
                       </div>
                     </div>
@@ -192,7 +192,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                 </div>
               </div>
               {/* Lời nhắc an toàn */}
-              <div className="text-xs text-[#6B7280] text-center leading-relaxed">
+              <div className="text-xs text-[#6A5F56] text-center leading-relaxed">
                 Hệ thống chỉ gửi thông báo xác thực từ địa chỉ chính thức của nhóm. Bạn có thể an tâm đóng trang này hoặc quay về trang chủ.
               </div>
               {/* Nút hành động */}
@@ -205,7 +205,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
                 </a>
-                <a onClick={followLink} href="/login" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E7E7E2] hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] font-medium text-xs sm:text-sm transition-colors focus-visible:v3-outline-none">
+                <a onClick={followLink} href="/login" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E8E0D6] hover:bg-neutral-50 text-[#51463E] hover:text-[#1a0e08] font-medium text-xs sm:text-sm transition-colors focus-visible:v3-outline-none">
                   Thử đăng nhập lại
                 </a>
               </div>
@@ -225,26 +225,26 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     {" Xác minh email "}
                   </span>
                   {' '}
-                  <h1 id="title-verify-expired" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
+                  <h1 id="title-verify-expired" className="font-display font-semibold text-2xl sm:text-[26px] text-[#1a0e08] tracking-tight">
                     Link xác minh không còn hiệu lực
                   </h1>
                 </div>
-                <p className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
+                <p className="text-sm text-[#51463E] leading-relaxed max-w-md mx-auto">
                   {"Vì lý do an toàn, các đường link xác minh email chỉ có hiệu lực trong vòng "}
-                  <strong className="text-[#111827]">
+                  <strong className="text-[#1a0e08]">
                     24 giờ
                   </strong>
                   {" kể từ lúc gửi. Link có thể không hợp lệ, đã được sử dụng hoặc đã hết hạn. Bạn có thể yêu cầu một link mới."}
                 </p>
               </div>
               {/* Form yêu cầu gửi lại link */}
-              <form id="form-resend-verification" onSubmit={(event) => actions.handleResendVerification(event)} className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-5 v3-space-y-4">
+              <form id="form-resend-verification" onSubmit={(event) => actions.handleResendVerification(event)} className="bg-[#F8F4EE] border border-[#E8E0D6] rounded-2xl p-5 v3-space-y-4">
                 <div>
-                  <label htmlFor="resend-email-input" className="block text-xs font-semibold text-[#111827] uppercase tracking-wider mb-1.5">
+                  <label htmlFor="resend-email-input" className="block text-xs font-semibold text-[#1a0e08] uppercase tracking-wider mb-1.5">
                     Nhập email để nhận link xác minh mới
                   </label>
                   {' '}
-                  <input ref={resendInputRef} type="email" id="resend-email-input" required defaultValue={email} aria-label="Email" autoComplete="email" maxLength={254} className="w-full px-3.5 py-2.5 bg-white border border-[#E7E7E2] rounded-xl text-sm text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all" />
+                  <input ref={resendInputRef} type="email" id="resend-email-input" required defaultValue={email} aria-label="Email" autoComplete="email" maxLength={254} className="w-full px-3.5 py-2.5 bg-white border border-[#E8E0D6] rounded-xl text-sm text-[#1a0e08] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all" />
                 </div>
                 <button type="submit" id="btn-submit-resend" className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#FF5701] hover:bg-[#E04C00] text-white font-medium text-sm transition-colors shadow-sm focus-visible:v3-outline-none" disabled={resendBusy}>
                   {resendBusy ? <>{spinner}<span>Đang gửi lại…</span></> : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg><span>Gửi lại link xác minh mới</span></>}
@@ -253,7 +253,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
               {/* Hộp kết quả sau khi gửi lại */}
               {resendSent && <div id="resend-success-box" className="p-4 rounded-xl bg-[#16A34A]/10 border border-[#16A34A]/20 text-xs text-[#16A34A] leading-relaxed">Nếu email này có tài khoản, bạn sẽ nhận được link xác minh mới.</div>}
               <div className="text-center pt-2">
-                <a onClick={followLink} href="/" className="inline-flex items-center gap-1.5 text-xs font-medium text-[#6B7280] hover:text-[#111827] transition-colors">
+                <a onClick={followLink} href="/" className="inline-flex items-center gap-1.5 text-xs font-medium text-[#6A5F56] hover:text-[#1a0e08] transition-colors">
                   <span>
                     ← Quay lại trang chủ
                   </span>
@@ -275,23 +275,23 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     {" Cần xác minh email "}
                   </span>
                   {' '}
-                  <h1 id="title-email-not-verified" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
+                  <h1 id="title-email-not-verified" className="font-display font-semibold text-2xl sm:text-[26px] text-[#1a0e08] tracking-tight">
                     Tài khoản đang chờ duyệt
                   </h1>
                   <p className="text-sm font-semibold text-[#D97706] mt-1">
                     Bạn cần xác minh địa chỉ email
                   </p>
                 </div>
-                <p className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
+                <p className="text-sm text-[#51463E] leading-relaxed max-w-md mx-auto">
                   {error || `Địa chỉ email ${email || 'của bạn'} chưa được xác minh. Hãy kiểm tra hộp thư hoặc bấm gửi lại link xác minh mới bên dưới.`}
                 </p>
               </div>
-              <div className="flex items-center justify-between text-xs text-[#16A34A] bg-white p-2.5 rounded-xl border border-[#E7E7E2]">
+              <div className="flex items-center justify-between text-xs text-[#16A34A] bg-white p-2.5 rounded-xl border border-[#E8E0D6]">
                 <div className="flex items-center gap-2">
                   <span className="w-5 h-5 rounded-full bg-[#16A34A]/10 flex items-center justify-center font-bold text-[11px]">
                     1
                   </span>
-                  <span className="font-medium text-[#111827]">
+                  <span className="font-medium text-[#1a0e08]">
                     1. Đăng ký &amp; xác thực email
                   </span>
                 </div>
@@ -300,13 +300,13 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                 </span>
               </div>
               {/* Form yêu cầu gửi lại link */}
-              <form id="form-resend-verification" onSubmit={(event) => actions.handleResendVerification(event)} className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-5 v3-space-y-4">
+              <form id="form-resend-verification" onSubmit={(event) => actions.handleResendVerification(event)} className="bg-[#F8F4EE] border border-[#E8E0D6] rounded-2xl p-5 v3-space-y-4">
                 <div>
-                  <label htmlFor="resend-email-input" className="block text-xs font-semibold text-[#111827] uppercase tracking-wider mb-1.5">
+                  <label htmlFor="resend-email-input" className="block text-xs font-semibold text-[#1a0e08] uppercase tracking-wider mb-1.5">
                     Nhập email để nhận link xác minh mới
                   </label>
                   {' '}
-                  <input ref={resendInputRef} type="email" id="resend-email-input" required defaultValue={email} aria-label="Email" autoComplete="email" maxLength={254} className="w-full px-3.5 py-2.5 bg-white border border-[#E7E7E2] rounded-xl text-sm text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all" />
+                  <input ref={resendInputRef} type="email" id="resend-email-input" required defaultValue={email} aria-label="Email" autoComplete="email" maxLength={254} className="w-full px-3.5 py-2.5 bg-white border border-[#E8E0D6] rounded-xl text-sm text-[#1a0e08] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all" />
                 </div>
                 <button type="submit" id="btn-submit-resend" className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-[#FF5701] hover:bg-[#E04C00] text-white font-medium text-sm transition-colors shadow-sm focus-visible:v3-outline-none" disabled={resendBusy}>
                   {resendBusy ? <>{spinner}<span>Đang gửi lại…</span></> : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg><span>Gửi lại link xác minh mới</span></>}
@@ -315,7 +315,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
               {/* Hộp kết quả sau khi gửi lại */}
               {resendSent && <div id="resend-success-box" className="p-4 rounded-xl bg-[#16A34A]/10 border border-[#16A34A]/20 text-xs text-[#16A34A] leading-relaxed">{resendSent}</div>}
               <div className="v3-space-y-2.5 pt-1">
-                <a onClick={followLink} href="/login" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E7E7E2] hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] font-medium text-xs sm:text-sm transition-colors">
+                <a onClick={followLink} href="/login" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E8E0D6] hover:bg-neutral-50 text-[#51463E] hover:text-[#1a0e08] font-medium text-xs sm:text-sm transition-colors">
                   Thử đăng nhập lại
                 </a>
               </div>
@@ -335,29 +335,29 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     {" Đã xác thực trước đó "}
                   </span>
                   {' '}
-                  <h1 id="title-verify-used" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
+                  <h1 id="title-verify-used" className="font-display font-semibold text-2xl sm:text-[26px] text-[#1a0e08] tracking-tight">
                     Link này đã được sử dụng
                   </h1>
                 </div>
-                <p className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
+                <p className="text-sm text-[#51463E] leading-relaxed max-w-md mx-auto">
                   {"Địa chỉ "}
-                  <strong className="text-[#111827] font-semibold user-email-placeholder">
+                  <strong className="text-[#1a0e08] font-semibold user-email-placeholder">
                     {email || "địa chỉ email của bạn"}
                   </strong>
                   {" đã được xác minh thành công trước đó. Bạn không cần xác minh lại địa chỉ email này."}
                 </p>
               </div>
               {/* Thông tin trạng thái tài khoản */}
-              <div className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-5 v3-space-y-3">
-                <div className="flex items-center justify-between text-xs border-b border-[#E7E7E2] pb-3">
-                  <span className="text-[#6B7280]">
+              <div className="bg-[#F8F4EE] border border-[#E8E0D6] rounded-2xl p-5 v3-space-y-3">
+                <div className="flex items-center justify-between text-xs border-b border-[#E8E0D6] pb-3">
+                  <span className="text-[#6A5F56]">
                     Trạng thái tài khoản:
                   </span>
                   <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-[#D97706]/10 text-[#D97706]">
                     {" Đang chờ duyệt "}
                   </span>
                 </div>
-                <p className="text-xs text-[#4B5563] leading-relaxed">
+                <p className="text-xs text-[#51463E] leading-relaxed">
                   Yêu cầu của bạn hiện đang chờ Quản trị viên nhóm xem xét và cấp quyền. Ngay sau khi được phê duyệt, hệ thống sẽ gửi email kèm thông tin bắt đầu sử dụng.
                 </p>
               </div>
@@ -371,7 +371,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
                 </a>
-                <a onClick={followLink} href="/login" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E7E7E2] hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] font-medium text-xs sm:text-sm transition-colors focus-visible:v3-outline-none">
+                <a onClick={followLink} href="/login" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E8E0D6] hover:bg-neutral-50 text-[#51463E] hover:text-[#1a0e08] font-medium text-xs sm:text-sm transition-colors focus-visible:v3-outline-none">
                   Thử đăng nhập lại
                 </a>
               </div>
@@ -391,13 +391,13 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     {" Bảo mật tài khoản "}
                   </span>
                   {' '}
-                  <h1 id="title-reset-password" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
+                  <h1 id="title-reset-password" className="font-display font-semibold text-2xl sm:text-[26px] text-[#1a0e08] tracking-tight">
                     Tạo mật khẩu mới
                   </h1>
                 </div>
-                <p className="text-sm text-[#4B5563] leading-relaxed">
+                <p className="text-sm text-[#51463E] leading-relaxed">
                   {"Đặt mật khẩu mới cho tài khoản "}
-                  <strong className="text-[#111827] user-email-placeholder">
+                  <strong className="text-[#1a0e08] user-email-placeholder">
                     {email || "địa chỉ email của bạn"}
                   </strong>
                   .
@@ -407,13 +407,13 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
               <form id="form-reset-password" onSubmit={(event) => actions.handleResetPasswordSubmit(event)} className="v3-space-y-4">
                 {/* Mật khẩu mới */}
                 <div>
-                  <label htmlFor="new-password-input" className="block text-xs font-semibold text-[#111827] uppercase tracking-wider mb-1.5">
+                  <label htmlFor="new-password-input" className="block text-xs font-semibold text-[#1a0e08] uppercase tracking-wider mb-1.5">
                     Mật khẩu mới
                   </label>
                   <div className="relative">
-                    <input ref={newPasswordRef} type={visible['new-password-input'] ? 'text' : 'password'} id="new-password-input" autoComplete="new-password" maxLength={128} required minLength={12} placeholder="Ít nhất 12 ký tự" onInput={(event) => actions.validatePasswordStrength(event.currentTarget.value)} className="w-full px-3.5 py-2.5 pr-10 bg-white border border-[#E7E7E2] rounded-xl text-sm text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all" />
+                    <input ref={newPasswordRef} type={visible['new-password-input'] ? 'text' : 'password'} id="new-password-input" autoComplete="new-password" maxLength={128} required minLength={12} placeholder="Ít nhất 12 ký tự" onInput={(event) => actions.validatePasswordStrength(event.currentTarget.value)} className="w-full px-3.5 py-2.5 pr-10 bg-white border border-[#E8E0D6] rounded-xl text-sm text-[#1a0e08] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all" />
                     {' '}
-                    <button type="button" onClick={() => actions.togglePasswordVisibility('new-password-input')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#9CA3AF] hover:text-[#4B5563] focus-visible:v3-outline-none" aria-label="Ẩn hiện mật khẩu">
+                    <button type="button" onClick={() => actions.togglePasswordVisibility('new-password-input')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#9CA3AF] hover:text-[#51463E] focus-visible:v3-outline-none" aria-label="Ẩn hiện mật khẩu">
                       <svg id="icon-eye-new" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         {visible['new-password-input'] ? eyeClosed : eyeOpen}
                       </svg>
@@ -427,7 +427,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                       <div id="strength-bar-3" className={power.bars[3 - 1]} />
                       <div id="strength-bar-4" className={power.bars[4 - 1]} />
                     </div>
-                    <div className="flex items-center justify-between text-[11px] text-[#6B7280]">
+                    <div className="flex items-center justify-between text-[11px] text-[#6A5F56]">
                       <span id="strength-text" className={strengthTouched ? power.className : undefined}>
                         {power.text}
                       </span>
@@ -439,13 +439,13 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                 </div>
                 {/* Xác nhận mật khẩu mới */}
                 <div>
-                  <label htmlFor="confirm-password-input" className="block text-xs font-semibold text-[#111827] uppercase tracking-wider mb-1.5">
+                  <label htmlFor="confirm-password-input" className="block text-xs font-semibold text-[#1a0e08] uppercase tracking-wider mb-1.5">
                     Xác nhận mật khẩu mới
                   </label>
                   <div className="relative">
-                    <input ref={confirmPasswordRef} type={visible['confirm-password-input'] ? 'text' : 'password'} id="confirm-password-input" aria-label="Nhập lại mật khẩu" autoComplete="new-password" maxLength={128} required minLength={12} placeholder="Nhập lại mật khẩu mới" onInput={() => actions.checkPasswordMatch()} className="w-full px-3.5 py-2.5 pr-10 bg-white border border-[#E7E7E2] rounded-xl text-sm text-[#111827] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all" />
+                    <input ref={confirmPasswordRef} type={visible['confirm-password-input'] ? 'text' : 'password'} id="confirm-password-input" aria-label="Nhập lại mật khẩu" autoComplete="new-password" maxLength={128} required minLength={12} placeholder="Nhập lại mật khẩu mới" onInput={() => actions.checkPasswordMatch()} className="w-full px-3.5 py-2.5 pr-10 bg-white border border-[#E8E0D6] rounded-xl text-sm text-[#1a0e08] placeholder-[#9CA3AF] focus:border-[#FF5701] focus:ring-1 focus:ring-[#FF5701] transition-all" />
                     {' '}
-                    <button type="button" onClick={() => actions.togglePasswordVisibility('confirm-password-input')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#9CA3AF] hover:text-[#4B5563] focus-visible:v3-outline-none" aria-label="Ẩn hiện mật khẩu xác nhận">
+                    <button type="button" onClick={() => actions.togglePasswordVisibility('confirm-password-input')} className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#9CA3AF] hover:text-[#51463E] focus-visible:v3-outline-none" aria-label="Ẩn hiện mật khẩu xác nhận">
                       <svg id="icon-eye-confirm" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         {visible['confirm-password-input'] ? eyeClosed : eyeOpen}
                       </svg>
@@ -459,8 +459,8 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                 </button>
               </form>
               {/* Lưu ý an toàn */}
-              <div className="text-[11px] text-[#6B7280] text-center leading-relaxed v3-space-y-1">
-                <p className="font-medium text-[#4B5563]">
+              <div className="text-[11px] text-[#6A5F56] text-center leading-relaxed v3-space-y-1">
+                <p className="font-medium text-[#51463E]">
                   Link đặt lại mật khẩu có hiệu lực 30 phút và chỉ dùng được một lần.
                 </p>
                 <p>
@@ -483,20 +483,20 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     {" Cập nhật thành công "}
                   </span>
                   {' '}
-                  <h1 id="title-reset-success" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
+                  <h1 id="title-reset-success" className="font-display font-semibold text-2xl sm:text-[26px] text-[#1a0e08] tracking-tight">
                     Mật khẩu đã được thay đổi
                   </h1>
                 </div>
-                <p className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
+                <p className="text-sm text-[#51463E] leading-relaxed max-w-md mx-auto">
                   {"Mật khẩu mới của tài khoản "}
-                  <strong className="text-[#111827] user-email-placeholder">
+                  <strong className="text-[#1a0e08] user-email-placeholder">
                     {email || "địa chỉ email của bạn"}
                   </strong>
                   {" đã được lưu thành công. Các phiên làm việc cũ đã được thu hồi an toàn."}
                 </p>
               </div>
-              <div className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-4 text-xs text-[#4B5563] v3-space-y-2">
-                <div className="font-semibold text-[#111827] flex items-center gap-1.5">
+              <div className="bg-[#F8F4EE] border border-[#E8E0D6] rounded-2xl p-4 text-xs text-[#51463E] v3-space-y-2">
+                <div className="font-semibold text-[#1a0e08] flex items-center gap-1.5">
                   <svg className="w-4 h-4 text-[#16A34A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
@@ -517,7 +517,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
                 </a>
-                <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E7E7E2] hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] font-medium text-xs sm:text-sm transition-colors">
+                <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E8E0D6] hover:bg-neutral-50 text-[#51463E] hover:text-[#1a0e08] font-medium text-xs sm:text-sm transition-colors">
                   Về trang chủ Planora
                 </a>
               </div>
@@ -527,7 +527,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
             {/* ========================================== */}
             {mode === 'google-pending' && <section id="view-google-pending" className={viewClass('google-pending')} aria-labelledby="title-google-pending">
               <div className="text-center v3-space-y-3">
-                <div className="w-14 h-14 rounded-2xl bg-white border border-[#E7E7E2] flex items-center justify-center mx-auto shadow-sm">
+                <div className="w-14 h-14 rounded-2xl bg-white border border-[#E8E0D6] flex items-center justify-center mx-auto shadow-sm">
                   <svg className="w-7 h-7" viewBox="0 0 24 24">
                     {' '}
                     <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z" />
@@ -545,21 +545,21 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     {" Đăng ký với Google · Chờ phê duyệt "}
                   </span>
                   {' '}
-                  <h1 id="title-google-pending" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
+                  <h1 id="title-google-pending" className="font-display font-semibold text-2xl sm:text-[26px] text-[#1a0e08] tracking-tight">
                     Đang chờ quản trị viên duyệt
                   </h1>
                 </div>
-                <p className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
+                <p className="text-sm text-[#51463E] leading-relaxed max-w-md mx-auto">
                   {"Tài khoản Google "}
-                  <strong className="text-[#111827] font-semibold user-email-placeholder">
+                  <strong className="text-[#1a0e08] font-semibold user-email-placeholder">
                     {email || "địa chỉ email của bạn"}
                   </strong>
                   {" đã được kết nối an toàn với nền tảng Planora."}
                 </p>
               </div>
               {/* Giải thích quy định an toàn */}
-              <div className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-5 v3-space-y-3.5">
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#111827]">
+              <div className="bg-[#F8F4EE] border border-[#E8E0D6] rounded-2xl p-5 v3-space-y-3.5">
+                <div className="flex items-center gap-2 text-xs font-semibold text-[#1a0e08]">
                   <svg className="w-4 h-4 text-[#D97706]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
@@ -567,19 +567,19 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     Quy định an toàn của nhóm
                   </span>
                 </div>
-                <p className="text-xs text-[#4B5563] leading-relaxed">
+                <p className="text-xs text-[#51463E] leading-relaxed">
                   {"Theo quy định bảo mật của nhóm, mọi tài khoản mới (kể cả đăng ký bằng Google) đều cần "}
-                  <strong className="text-[#111827]">
+                  <strong className="text-[#1a0e08]">
                     Quản trị viên phê duyệt
                   </strong>
                   {" trước khi có thể truy cập các công cụ Trello, Slack, GitHub hay Google Sheets dùng chung."}
                 </p>
-                <div className="pt-2 border-t border-[#E7E7E2] text-xs text-[#6B7280] v3-space-y-1.5">
+                <div className="pt-2 border-t border-[#E8E0D6] text-xs text-[#6A5F56] v3-space-y-1.5">
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
                     <span>
                       {"Thông tin Google đã được ghi nhận: "}
-                      <span className="font-medium text-[#111827] user-name-placeholder">
+                      <span className="font-medium text-[#1a0e08] user-name-placeholder">
                     {name || "Bạn"}
                   </span>
                     </span>
@@ -612,7 +612,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
                 </a>
-                <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E7E7E2] hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] font-medium text-xs sm:text-sm transition-colors">
+                <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E8E0D6] hover:bg-neutral-50 text-[#51463E] hover:text-[#1a0e08] font-medium text-xs sm:text-sm transition-colors">
                   Về trang chủ Planora
                 </a>
               </div>
@@ -622,7 +622,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
             {/* ========================================== */}
             {mode === 'google-ready' && <section id="view-google-ready" className={viewClass('google-ready')} aria-labelledby="title-google-ready">
               <div className="text-center v3-space-y-3">
-                <div className="w-14 h-14 rounded-2xl bg-white border border-[#E7E7E2] flex items-center justify-center mx-auto shadow-sm relative">
+                <div className="w-14 h-14 rounded-2xl bg-white border border-[#E8E0D6] flex items-center justify-center mx-auto shadow-sm relative">
                   <svg className="w-7 h-7" viewBox="0 0 24 24">
                     {' '}
                     <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z" />
@@ -647,20 +647,20 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     {" Đăng nhập thành công "}
                   </span>
                   {' '}
-                  <h1 id="title-google-ready" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
+                  <h1 id="title-google-ready" className="font-display font-semibold text-2xl sm:text-[26px] text-[#1a0e08] tracking-tight">
                     Đang vào không gian làm việc…
                   </h1>
                 </div>
-                <p className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
+                <p className="text-sm text-[#51463E] leading-relaxed max-w-md mx-auto">
                   {"Chào mừng bạn quay lại, "}
-                  <strong className="text-[#111827] font-semibold user-name-placeholder">
+                  <strong className="text-[#1a0e08] font-semibold user-name-placeholder">
                     {name || "Bạn"}
                   </strong>
                   !
                 </p>
               </div>
               {/* Trạng thái chuyển trang */}
-              <div className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-6 flex items-center justify-center gap-3 text-sm font-medium text-[#4B5563]">
+              <div className="bg-[#F8F4EE] border border-[#E8E0D6] rounded-2xl p-6 flex items-center justify-center gap-3 text-sm font-medium text-[#51463E]">
                 <svg className="w-4 h-4 text-[#FF5701] animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   {' '}
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -697,19 +697,19 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     {" Chưa hoàn tất "}
                   </span>
                   {' '}
-                  <h1 id="title-google-error" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
+                  <h1 id="title-google-error" className="font-display font-semibold text-2xl sm:text-[26px] text-[#1a0e08] tracking-tight">
                     Đăng nhập Google chưa hoàn tất
                   </h1>
                 </div>
-                <p className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
+                <p className="text-sm text-[#51463E] leading-relaxed max-w-md mx-auto">
                   Phiên xác thực với Google đã bị huỷ hoặc quyền truy cập chưa được cấp. Không có dữ liệu nào của bạn bị thay đổi.
                 </p>
               </div>
-              <div className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-4 text-xs text-[#4B5563] v3-space-y-1.5">
-                <div className="font-semibold text-[#111827]">
+              <div className="bg-[#F8F4EE] border border-[#E8E0D6] rounded-2xl p-4 text-xs text-[#51463E] v3-space-y-1.5">
+                <div className="font-semibold text-[#1a0e08]">
                   Bạn có thể chọn một trong các cách sau:
                 </div>
-                <ul className="list-disc list-inside v3-space-y-1 text-[#6B7280]">
+                <ul className="list-disc list-inside v3-space-y-1 text-[#6A5F56]">
                   <li>
                     Bấm thử lại để kết nối lại tài khoản Google.
                   </li>
@@ -752,10 +752,10 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     </svg>
                   )}
                 </button>
-                <a onClick={followLink} href="/login" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E7E7E2] hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] font-medium text-xs sm:text-sm transition-colors">
+                <a onClick={followLink} href="/login" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E8E0D6] hover:bg-neutral-50 text-[#51463E] hover:text-[#1a0e08] font-medium text-xs sm:text-sm transition-colors">
                   Đăng nhập bằng Email &amp; Mật khẩu
                 </a>
-                <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2 px-4 rounded-xl text-[#4B5563] hover:text-[#111827] hover:bg-neutral-100/70 font-medium text-xs sm:text-sm transition-colors">
+                <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2 px-4 rounded-xl text-[#51463E] hover:text-[#1a0e08] hover:bg-neutral-100/70 font-medium text-xs sm:text-sm transition-colors">
                   ← Quay về trang chủ
                 </a>
               </div>
@@ -777,21 +777,21 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     {" Đăng nhập tạm thời bị chặn · Đang chờ duyệt "}
                   </span>
                   {' '}
-                  <h1 id="title-blocked-pending" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
+                  <h1 id="title-blocked-pending" className="font-display font-semibold text-2xl sm:text-[26px] text-[#1a0e08] tracking-tight">
                     Tài khoản đang chờ duyệt
                   </h1>
                 </div>
-                <p className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
+                <p className="text-sm text-[#51463E] leading-relaxed max-w-md mx-auto">
                   {"Tài khoản "}
-                  <strong className="text-[#111827] font-semibold user-email-placeholder">
+                  <strong className="text-[#1a0e08] font-semibold user-email-placeholder">
                     {email || "địa chỉ email của bạn"}
                   </strong>
                   {" chưa được kích hoạt vào không gian làm việc. Hãy xác minh email và chờ quản trị viên duyệt."}
                 </p>
               </div>
               {/* Thẻ giải thích lý do và quy trình */}
-              <div className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-5 v3-space-y-4">
-                <div className="flex items-center gap-2 text-xs font-semibold text-[#111827]">
+              <div className="bg-[#F8F4EE] border border-[#E8E0D6] rounded-2xl p-5 v3-space-y-4">
+                <div className="flex items-center gap-2 text-xs font-semibold text-[#1a0e08]">
                   <svg className="w-4 h-4 text-[#D97706]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
@@ -799,21 +799,21 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     Quy trình bảo vệ không gian làm việc
                   </span>
                 </div>
-                <p className="text-xs text-[#4B5563] leading-relaxed">
+                <p className="text-xs text-[#51463E] leading-relaxed">
                   {"Planora điều phối trực tiếp các công cụ dùng chung của nhóm (Trello, Slack, GitHub, Google Sheets). Để bảo đảm an toàn dữ liệu, tài khoản cần được "}
-                  <strong className="text-[#111827]">
+                  <strong className="text-[#1a0e08]">
                     Quản trị viên nhóm xem xét và phê duyệt
                   </strong>
                   {" trước khi đăng nhập."}
                 </p>
                 {/* Tiến trình 3 bước trực quan */}
-                <div className="pt-2 border-t border-[#E7E7E2] v3-space-y-2 text-xs">
-                  <div className="flex items-center justify-between text-[#16A34A] bg-white p-2.5 rounded-xl border border-[#E7E7E2]">
+                <div className="pt-2 border-t border-[#E8E0D6] v3-space-y-2 text-xs">
+                  <div className="flex items-center justify-between text-[#16A34A] bg-white p-2.5 rounded-xl border border-[#E8E0D6]">
                     <div className="flex items-center gap-2">
                       <span className="w-5 h-5 rounded-full bg-[#16A34A]/10 flex items-center justify-center font-bold text-[11px]">
                         1
                       </span>
-                      <span className="font-medium text-[#111827]">
+                      <span className="font-medium text-[#1a0e08]">
                         1. Đăng ký &amp; xác thực email
                       </span>
                     </div>
@@ -834,12 +834,12 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                       Đang chờ duyệt
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-[#9CA3AF] bg-white/60 p-2.5 rounded-xl border border-[#E7E7E2]">
+                  <div className="flex items-center justify-between text-[#9CA3AF] bg-white/60 p-2.5 rounded-xl border border-[#E8E0D6]">
                     <div className="flex items-center gap-2">
                       <span className="w-5 h-5 rounded-full bg-neutral-100 flex items-center justify-center font-bold text-[11px] text-[#9CA3AF]">
                         3
                       </span>
-                      <span className="font-medium text-[#6B7280]">
+                      <span className="font-medium text-[#6A5F56]">
                         3. Nhận email thông báo &amp; vào làm việc
                       </span>
                     </div>
@@ -859,7 +859,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
                 </a>
-                <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E7E7E2] hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] font-medium text-xs sm:text-sm transition-colors">
+                <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E8E0D6] hover:bg-neutral-50 text-[#51463E] hover:text-[#1a0e08] font-medium text-xs sm:text-sm transition-colors">
                   ← Về trang chủ Planora
                 </a>
               </div>
@@ -881,20 +881,20 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     {" Đăng nhập bị từ chối · Tài khoản bị khóa "}
                   </span>
                   {' '}
-                  <h1 id="title-blocked-locked" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
+                  <h1 id="title-blocked-locked" className="font-display font-semibold text-2xl sm:text-[26px] text-[#1a0e08] tracking-tight">
                     Tài khoản đã bị tạm khóa
                   </h1>
                 </div>
-                <p className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
+                <p className="text-sm text-[#51463E] leading-relaxed max-w-md mx-auto">
                   {"Quyền truy cập của "}
-                  <strong className="text-[#111827] font-semibold user-email-placeholder">
+                  <strong className="text-[#1a0e08] font-semibold user-email-placeholder">
                     {email || "địa chỉ email của bạn"}
                   </strong>
                   {" vào không gian làm việc Planora đã bị tạm dừng bởi quản trị viên."}
                 </p>
               </div>
               {/* Chi tiết về việc khóa */}
-              <div className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-5 v3-space-y-3.5">
+              <div className="bg-[#F8F4EE] border border-[#E8E0D6] rounded-2xl p-5 v3-space-y-3.5">
                 <div className="flex items-center gap-2 text-xs font-semibold text-[#DC2626]">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -903,7 +903,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     Thông tin an toàn tài khoản
                   </span>
                 </div>
-                <div className="v3-space-y-2 pt-2 border-t border-[#E7E7E2] text-xs text-[#4B5563]">
+                <div className="v3-space-y-2 pt-2 border-t border-[#E8E0D6] text-xs text-[#51463E]">
                   <div className="flex items-start gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#DC2626] mt-1.5 flex-shrink-0" />
                     <span>
@@ -917,7 +917,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     </span>
                   </div>
                 </div>
-                <div className="pt-3 border-t border-[#E7E7E2] text-xs text-[#4B5563] flex items-center gap-2">
+                <div className="pt-3 border-t border-[#E8E0D6] text-xs text-[#51463E] flex items-center gap-2">
                   <svg className="w-4 h-4 text-[#FF5701] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     {' '}
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -930,10 +930,10 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
               </div>
               {/* Nút hành động */}
               <div className="v3-space-y-2.5 pt-1">
-                <a onClick={followLink} href="/login" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E7E7E2] hover:bg-neutral-50 text-[#111827] font-medium text-xs sm:text-sm transition-colors">
+                <a onClick={followLink} href="/login" className="w-full flex items-center justify-center py-2.5 px-4 rounded-xl border border-[#E8E0D6] hover:bg-neutral-50 text-[#1a0e08] font-medium text-xs sm:text-sm transition-colors">
                   Đăng nhập bằng tài khoản khác
                 </a>
-                <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2 px-4 text-[#6B7280] hover:text-[#111827] font-medium text-xs transition-colors">
+                <a onClick={followLink} href="/" className="w-full flex items-center justify-center py-2 px-4 text-[#6A5F56] hover:text-[#1a0e08] font-medium text-xs transition-colors">
                   Quay về trang chủ Planora
                 </a>
               </div>
@@ -955,13 +955,13 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                     {" Bảo vệ tài khoản · Tạm khóa 15 phút "}
                   </span>
                   {' '}
-                  <h1 id="title-blocked-attempts" className="font-display font-semibold text-2xl sm:text-[26px] text-[#111827] tracking-tight">
+                  <h1 id="title-blocked-attempts" className="font-display font-semibold text-2xl sm:text-[26px] text-[#1a0e08] tracking-tight">
                     Sai mật khẩu quá nhiều lần
                   </h1>
                 </div>
-                <p className="text-sm text-[#4B5563] leading-relaxed max-w-md mx-auto">
+                <p className="text-sm text-[#51463E] leading-relaxed max-w-md mx-auto">
                   {"Tài khoản "}
-                  <strong className="text-[#111827] font-semibold user-email-placeholder">
+                  <strong className="text-[#1a0e08] font-semibold user-email-placeholder">
                     {email || "địa chỉ email của bạn"}
                   </strong>
                   {" đã nhập sai mật khẩu "}
@@ -972,27 +972,27 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
                 </p>
               </div>
               {/* Đồng hồ đếm ngược trực quan */}
-              <div className="bg-[#F8F8F6] border border-[#E7E7E2] rounded-2xl p-5 v3-space-y-3.5">
+              <div className="bg-[#F8F4EE] border border-[#E8E0D6] rounded-2xl p-5 v3-space-y-3.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-[#4B5563]">
+                  <span className="text-xs font-semibold text-[#51463E]">
                     Thời gian tự động mở khóa:
                   </span>
                   <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#EA580C]/10 text-[#EA580C]">
                     Tự mở khóa
                   </span>
                 </div>
-                <div className="text-center py-3 bg-white rounded-xl border border-[#E7E7E2]">
-                  <div id="blocked-timer-display" className={`font-mono font-bold text-3xl sm:text-4xl text-[#111827] tracking-wider${blockedDone ? ' text-[#16A34A]' : ''}`}>
+                <div className="text-center py-3 bg-white rounded-xl border border-[#E8E0D6]">
+                  <div id="blocked-timer-display" className={`font-mono font-bold text-3xl sm:text-4xl text-[#1a0e08] tracking-wider${blockedDone ? ' text-[#16A34A]' : ''}`}>
                     {blockedText}
                   </div>
-                  <p className="text-[11px] text-[#6B7280] mt-1">
+                  <p className="text-[11px] text-[#6A5F56] mt-1">
                     phút : giây
                   </p>
                 </div>
-                <div className="w-full h-2 bg-[#E7E7E2] rounded-full overflow-hidden">
+                <div className="w-full h-2 bg-[#E8E0D6] rounded-full overflow-hidden">
                   <div id="blocked-timer-bar" className="h-full bg-[#EA580C] rounded-full transition-all duration-1000" style={{ width: blockedWidth }} />
                 </div>
-                <p className="text-[11px] text-[#6B7280] text-center">
+                <p className="text-[11px] text-[#6A5F56] text-center">
                   Sau khi hết thời gian đếm ngược, bạn có thể thử nhập lại mật khẩu bình thường.
                 </p>
               </div>
@@ -1020,7 +1020,7 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
               </div>
               {/* Nút hành động phụ */}
               <div className="v3-space-y-2 pt-1 text-center">
-                <a onClick={followLink} href="/login" className="inline-block text-xs font-medium text-[#4B5563] hover:text-[#111827] hover:underline">
+                <a onClick={followLink} href="/login" className="inline-block text-xs font-medium text-[#51463E] hover:text-[#1a0e08] hover:underline">
                   {" ← Quay lại trang đăng nhập (thử lại sau) "}
                 </a>
               </div>
@@ -1031,8 +1031,8 @@ export function AuthActionPage({ mode, email = '', name = '', busy = false, erro
             <p>
               Planora — AI Workflow Automation Platform · 2026 · Xác thực tài khoản và phân quyền quản trị
             </p>
-            <div className="flex items-center justify-center gap-3 text-xs text-[#6B7280]">
-              <a onClick={followLink} href="/" className="hover:text-[#111827] transition-colors">
+            <div className="flex items-center justify-center gap-3 text-xs text-[#6A5F56]">
+              <a onClick={followLink} href="/" className="hover:text-[#1a0e08] transition-colors">
                 Trang chủ
               </a>
               <span className="text-[#D1D5DB]" aria-hidden="true">

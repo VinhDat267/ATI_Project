@@ -15,8 +15,8 @@ export interface RecoveryControls {
   onEdit: (stepId: string, args: Record<string, unknown>, prompt?: string) => void;
 }
 const primary='px-4 py-2.5 bg-[#C84300] hover:bg-[#A83800] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-colors disabled:opacity-50';
-const secondary='px-4 py-2.5 bg-white hover:bg-neutral-50 border border-[#E5E5E0] text-[#111827] text-xs sm:text-sm font-medium rounded-xl transition-colors disabled:opacity-50';
-const card='bg-[#F8F8F6] rounded-xl border border-[#EAEAE4] p-3.5 sm:p-5 v3-space-y-3 sm:v3-space-y-4';
+const secondary='px-4 py-2.5 bg-white hover:bg-neutral-50 border border-[#E6DED3] text-[#1a0e08] text-xs sm:text-sm font-medium rounded-xl transition-colors disabled:opacity-50';
+const card='bg-[#F8F4EE] rounded-xl border border-[#EAEAE4] p-3.5 sm:p-5 v3-space-y-3 sm:v3-space-y-4';
 
 /** Reference values shown for manual inspection come only from saved successful outputs. */
 export function savedArguments(value: unknown, snapshot: ExecutionSnapshot): unknown {
@@ -88,9 +88,9 @@ function formatThreadIdWithLabel(id: string, labels?: Record<string, string>): s
   return title && title !== id ? `${title} (${id})` : id;
 }
 function SavedWork({steps}:{steps:ExecutionStepInfo[]}) { return <div className="v3-space-y-2 pt-2">{steps.map((step,index)=>
-  <div key={step.id} className={step.status==='succeeded' ? 'p-3 rounded-xl bg-white border border-[#E5E5E0] flex items-center justify-between text-xs sm:text-sm gap-3' : 'p-3 rounded-xl bg-white/80 border border-dashed border-[#D6D6D0] flex items-center justify-between text-xs sm:text-sm text-[#6B7280] gap-3'}>
-    <div className="flex items-center gap-2.5 min-w-0"><span className={`w-5 h-5 rounded-full ${step.status==='succeeded'?'bg-emerald-100 text-emerald-800':'bg-neutral-200 text-[#4B5563]'} flex items-center justify-center font-bold text-xs flex-shrink-0`}>{step.status==='succeeded'?<svg aria-hidden="true" className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>:index+1}</span><span className={step.status==='succeeded'?'font-medium text-[#111827] break-words min-w-0':'break-words min-w-0'}>Việc {index+1}: {step.description}</span></div>
-    <div className="flex-shrink-0">{step.status==='succeeded' && step.duration && <span className="text-xs text-[#6B7280] mr-2">{step.duration}</span>}<OutcomeLink step={step} className="text-[#B43E00] hover:underline font-medium inline-flex items-center gap-1"/>{step.status!=='succeeded' && <span className="text-[#6B7280] italic">{step.status==='pending'?'Chưa làm':statusLabel(step.status)}</span>}</div>
+  <div key={step.id} className={step.status==='succeeded' ? 'p-3 rounded-xl bg-white border border-[#E6DED3] flex items-center justify-between text-xs sm:text-sm gap-3' : 'p-3 rounded-xl bg-white/80 border border-dashed border-[#D6D6D0] flex items-center justify-between text-xs sm:text-sm text-[#6A5F56] gap-3'}>
+    <div className="flex items-center gap-2.5 min-w-0"><span className={`w-5 h-5 rounded-full ${step.status==='succeeded'?'bg-emerald-100 text-emerald-800':'bg-neutral-200 text-[#51463E]'} flex items-center justify-center font-bold text-xs flex-shrink-0`}>{step.status==='succeeded'?<svg aria-hidden="true" className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>:index+1}</span><span className={step.status==='succeeded'?'font-medium text-[#1a0e08] break-words min-w-0':'break-words min-w-0'}>Việc {index+1}: {step.description}</span></div>
+    <div className="flex-shrink-0">{step.status==='succeeded' && step.duration && <span className="text-xs text-[#6A5F56] mr-2">{step.duration}</span>}<OutcomeLink step={step} className="text-[#B43E00] hover:underline font-medium inline-flex items-center gap-1"/>{step.status!=='succeeded' && <span className="text-[#6A5F56] italic">{step.status==='pending'?'Chưa làm':statusLabel(step.status)}</span>}</div>
   </div>)}</div>; }
 export function RecoveryMoment({request,moment,snapshot,steps,services,controls}:{request?:string;moment:7|8|9;snapshot:ExecutionSnapshot|null;steps:ExecutionStepInfo[];services:ServiceInfo[];controls:RecoveryControls|null}) {
   const [dialog,setDialog]=useState<'stop'|'edit'|null>(null);
@@ -131,27 +131,27 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
   const unknownInstructions=<>
     <p className="text-base text-brand-text leading-relaxed">Tôi không chắc lệnh đã tới {service || 'dịch vụ'} hay chưa. Hãy kiểm tra trên {service || 'dịch vụ'} trước khi quyết định.</p>
     {batchUnknown.isBatchUnknown && (
-      <div data-testid="batch-unknown-details" className="v3-space-y-2.5 p-4 rounded-xl bg-amber-50/70 border border-amber-200 text-xs sm:text-sm text-[#111827]">
+      <div data-testid="batch-unknown-details" className="v3-space-y-2.5 p-4 rounded-xl bg-amber-50/70 border border-amber-200 text-xs sm:text-sm text-[#1a0e08]">
         <div className="font-semibold text-amber-900">Trạng thái xử lý từng phần của lô luồng thư:</div>
         <div className="v3-space-y-1">
-          <div className="font-medium text-[#374151]">Luồng thư đã xác nhận cập nhật:</div>
+          <div className="font-medium text-[#4a4038]">Luồng thư đã xác nhận cập nhật:</div>
           {batchUnknown.completedThreadIds.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {batchUnknown.completedThreadIds.map(id => (
-                <span key={id} className="px-2.5 py-1 rounded-lg bg-white border border-amber-200 text-[#111827] font-medium max-w-full break-words [overflow-wrap:anywhere]">
+                <span key={id} className="px-2.5 py-1 rounded-lg bg-white border border-amber-200 text-[#1a0e08] font-medium max-w-full break-words [overflow-wrap:anywhere]">
                   {formatThreadIdWithLabel(id, resourceLabels)}
                 </span>
               ))}
             </div>
           ) : batchUnknown.hasCompletedList ? (
-            <p className="text-[#4B5563]">Chưa có luồng thư nào được xác nhận hoàn tất trước khi gián đoạn.</p>
+            <p className="text-[#51463E]">Chưa có luồng thư nào được xác nhận hoàn tất trước khi gián đoạn.</p>
           ) : (
-            <p className="text-[#4B5563]">Chưa nhận được danh sách mã luồng thư đã xác nhận từ máy chủ; hãy đối chiếu trực tiếp trên Gmail.</p>
+            <p className="text-[#51463E]">Chưa nhận được danh sách mã luồng thư đã xác nhận từ máy chủ; hãy đối chiếu trực tiếp trên Gmail.</p>
           )}
         </div>
         <div className="v3-space-y-1">
-          <div className="font-medium text-[#374151]">Luồng thư gián đoạn / chưa rõ kết quả:</div>
-          <p className="text-[#111827] break-words [overflow-wrap:anywhere]">
+          <div className="font-medium text-[#4a4038]">Luồng thư gián đoạn / chưa rõ kết quả:</div>
+          <p className="text-[#1a0e08] break-words [overflow-wrap:anywhere]">
             {batchUnknown.failedThreadId
               ? `${formatThreadIdWithLabel(batchUnknown.failedThreadId, resourceLabels)} (các luồng thư tiếp theo trong lô chưa được xử lý tiếp)`
               : 'Chưa xác định được luồng thư dừng cụ thể; một phần lô có thể đã được cập nhật.'}
@@ -171,9 +171,9 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
     </ul></div><div className="text-xs text-neutral-500 italic">* Lưu ý an toàn: Để tránh ghi lặp, hệ thống không thử lại ở bước chưa rõ kết quả.</div>
   </>;
   return <section id={`moment-${moment}`} className="stage-section is-active w-full max-w-3xl mx-auto" aria-label="Cockpit" data-moment={moment} aria-labelledby={`heading-moment-${moment}`} aria-busy={busy}>
-    <div className="rounded-2xl border border-[#E5E5E0] bg-white shadow-sm overflow-hidden">
-      <div className="px-5 sm:px-6 py-3 bg-[#F8F8F6] border-b border-[#EAEAE4] flex items-center justify-between gap-2 text-xs">
-        <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 ${moment===7?'bg-red-50 text-red-800 border-red-200':moment===8?'bg-amber-50 text-amber-800 border-amber-200':'bg-white text-[#111827] border-[#D6D6D0]'} text-xs font-semibold rounded-full border`}>
+    <div className="rounded-2xl border border-[#E6DED3] bg-white shadow-sm overflow-hidden">
+      <div className="px-5 sm:px-6 py-3 bg-[#F8F4EE] border-b border-[#EAEAE4] flex items-center justify-between gap-2 text-xs">
+        <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 ${moment===7?'bg-red-50 text-red-800 border-red-200':moment===8?'bg-amber-50 text-amber-800 border-amber-200':'bg-white text-[#1a0e08] border-[#D6D6D0]'} text-xs font-semibold rounded-full border`}>
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={moment===7?'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z':moment===8?'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z':'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'}/></svg>
           <span>{moment===7?'Cần bạn xử lý · Lỗi đã biết':moment===8?'Cần bạn xử lý · Chưa chắc kết quả':'Khôi phục phiên làm việc'}</span>
         </div>
@@ -181,40 +181,40 @@ export function RecoveryMoment({request,moment,snapshot,steps,services,controls}
       <div className="p-5 sm:p-6 v3-space-y-5">
         <div className="v3-space-y-1">
           <RequestEcho request={request} />
-          <h1 id={`heading-moment-${moment}`} className="font-sans text-xl sm:text-2xl text-[#111827] font-semibold tracking-tight leading-snug" tabIndex={-1}>{moment===7?`${service} chưa hoàn thành việc này`:moment===8?`Chưa rõ kết quả trên ${service}`:'Hệ thống vừa khởi động lại'}</h1>
-          {moment===7 && <p className="text-sm text-[#4B5563]">{paused?.description}</p>}
+          <h1 id={`heading-moment-${moment}`} className="font-sans text-xl sm:text-2xl text-[#1a0e08] font-semibold tracking-tight leading-snug" tabIndex={-1}>{moment===7?`${service} chưa hoàn thành việc này`:moment===8?`Chưa rõ kết quả trên ${service}`:'Hệ thống vừa khởi động lại'}</h1>
+          {moment===7 && <p className="text-sm text-[#51463E]">{paused?.description}</p>}
         </div>
         <div className={card}>
           {moment===7 ? <>
-            <div className="v3-space-y-1"><div className="text-xs font-semibold text-[#6B7280]">Chuyện gì đã xảy ra</div><p className="text-sm text-[#111827] leading-relaxed">{error}</p></div>
-            <div className="v3-space-y-1.5 pt-3 border-t border-[#EAEAE4]"><div className="text-xs font-semibold text-[#6B7280]">Ảnh hưởng hiện tại</div><div className="text-sm text-[#111827] v3-space-y-1.5">{steps.filter(step=>step.status==='succeeded' || step.status==='pending').map(step=><div key={step.id} className={`flex items-start gap-2 ${step.status==='succeeded'?'text-emerald-800':'text-amber-800'}`}>{step.status==='succeeded'?<svg aria-hidden="true" className="w-4 h-4 text-emerald-700 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>:<svg aria-hidden="true" className="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>}<span>Việc {steps.indexOf(step)+1} ({serviceName(serviceId(step.tool),services)}): {step.status==='succeeded'?'đã xong và được giữ nguyên.':'tạm thời chưa làm.'} <OutcomeLink step={step} className="text-[#B43E00] hover:underline font-medium inline-flex items-center gap-1"/></span></div>)}</div></div>
-            <div className="p-3.5 rounded-xl bg-white border border-[#E5E5E0] text-xs sm:text-sm text-[#111827] v3-space-y-1"><span className="font-semibold text-[#B43E00]">Cần làm gì:</span>{' '}<p className="text-[#4B5563]">Kiểm tra quyền truy cập và nội dung của việc chưa làm, rồi chọn cách xử lý dưới đây.</p></div>
+            <div className="v3-space-y-1"><div className="text-xs font-semibold text-[#6A5F56]">Chuyện gì đã xảy ra</div><p className="text-sm text-[#1a0e08] leading-relaxed">{error}</p></div>
+            <div className="v3-space-y-1.5 pt-3 border-t border-[#EAEAE4]"><div className="text-xs font-semibold text-[#6A5F56]">Ảnh hưởng hiện tại</div><div className="text-sm text-[#1a0e08] v3-space-y-1.5">{steps.filter(step=>step.status==='succeeded' || step.status==='pending').map(step=><div key={step.id} className={`flex items-start gap-2 ${step.status==='succeeded'?'text-emerald-800':'text-amber-800'}`}>{step.status==='succeeded'?<svg aria-hidden="true" className="w-4 h-4 text-emerald-700 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/></svg>:<svg aria-hidden="true" className="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>}<span>Việc {steps.indexOf(step)+1} ({serviceName(serviceId(step.tool),services)}): {step.status==='succeeded'?'đã xong và được giữ nguyên.':'tạm thời chưa làm.'} <OutcomeLink step={step} className="text-[#B43E00] hover:underline font-medium inline-flex items-center gap-1"/></span></div>)}</div></div>
+            <div className="p-3.5 rounded-xl bg-white border border-[#E6DED3] text-xs sm:text-sm text-[#1a0e08] v3-space-y-1"><span className="font-semibold text-[#B43E00]">Cần làm gì:</span>{' '}<p className="text-[#51463E]">Kiểm tra quyền truy cập và nội dung của việc chưa làm, rồi chọn cách xử lý dưới đây.</p></div>
           </> : moment===8 ? unknownInstructions : <>
-            <p className="text-sm sm:text-base text-[#111827] leading-relaxed">Hệ thống vừa khởi động lại trong lúc đang làm việc của bạn. Các kết quả đã lưu được giữ nguyên; các việc còn chờ chưa từng được gửi tới dịch vụ.</p>
+            <p className="text-sm sm:text-base text-[#1a0e08] leading-relaxed">Hệ thống vừa khởi động lại trong lúc đang làm việc của bạn. Các kết quả đã lưu được giữ nguyên; các việc còn chờ chưa từng được gửi tới dịch vụ.</p>
             <SavedWork steps={steps}/>
-            {hasUnknown ? unknownInstructions : !canContinue && <p className="text-xs text-[#6B7280]">Chưa đủ dữ liệu để làm tiếp an toàn. Bạn chỉ có thể dừng kế hoạch này.</p>}
+            {hasUnknown ? unknownInstructions : !canContinue && <p className="text-xs text-[#6A5F56]">Chưa đủ dữ liệu để làm tiếp an toàn. Bạn chỉ có thể dừng kế hoạch này.</p>}
           </>}
-          {paused && <details className="text-xs text-[#6B7280]"><summary className="cursor-pointer hover:text-[#111827]">Chi tiết để đối chiếu</summary><div className="mt-1.5 p-2.5 rounded-lg bg-white border border-[#E5E5E0] v3-space-y-1"><code className="text-[11px] text-[#111827]">{paused.tool}</code><p>{paused.description}</p>{planStep && snapshot && <pre className="whitespace-pre-wrap break-all text-[11px]">{JSON.stringify(savedArguments(planStep.args,snapshot),null,2)}</pre>}{paused.duration && <p>{paused.duration}</p>}</div></details>}
+          {paused && <details className="text-xs text-[#6A5F56]"><summary className="cursor-pointer hover:text-[#1a0e08]">Chi tiết để đối chiếu</summary><div className="mt-1.5 p-2.5 rounded-lg bg-white border border-[#E6DED3] v3-space-y-1"><code className="text-[11px] text-[#1a0e08]">{paused.tool}</code><p>{paused.description}</p>{planStep && snapshot && <pre className="whitespace-pre-wrap break-all text-[11px]">{JSON.stringify(savedArguments(planStep.args,snapshot),null,2)}</pre>}{paused.duration && <p>{paused.duration}</p>}</div></details>}
         </div>
-        {sentFolder && <p className="text-sm text-[#111827]">Hãy tự kiểm tra thư đã gửi rồi chọn Bỏ qua hoặc Dừng. <a href={sentFolder} target="_blank" rel="noopener noreferrer" className="text-[#B43E00] font-medium underline">Mở thư mục Đã gửi</a></p>}
-        {calendarCheckUrl && <p className="text-sm text-[#111827]">Hãy tự kiểm tra trên Google Calendar của {mycalendarEmail} rồi chọn Bỏ qua hoặc Dừng. <a href={calendarCheckUrl} target="_blank" rel="noopener noreferrer" className="text-[#B43E00] font-medium underline">Mở Google Calendar</a></p>}
-        {spreadsheetCheckUrl && <p className="text-sm text-[#111827]">Hãy tự kiểm tra trên Google Sheets{mysheetsEmail ? ` của ${mysheetsEmail}` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={spreadsheetCheckUrl} target="_blank" rel="noopener noreferrer" className="text-[#B43E00] font-medium underline">Mở Google Sheets</a></p>}
-        {notionCheckUrl && <p className="text-sm text-[#111827]">Hãy tự kiểm tra trên Notion{notionWorkspace ? ` (${notionWorkspace})` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={notionCheckUrl} target="_blank" rel="noopener noreferrer" className="text-[#B43E00] font-medium underline">Mở Notion kiểm tra</a></p>}
-        {trelloCheckUrl && <p className="text-sm text-[#111827]">Hãy tự kiểm tra trên Trello{trelloUsername ? ` (@${trelloUsername})` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={trelloCheckUrl} target="_blank" rel="noopener noreferrer" className="text-[#B43E00] font-medium underline">Mở Trello kiểm tra</a></p>}
-        {myjiraCheckUrl && <p className="text-sm text-[#111827]">Hãy tự kiểm tra trên Jira{myjiraAccount ? ` (${myjiraAccount})` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={myjiraCheckUrl} target="_blank" rel="noopener noreferrer" className="text-[#B43E00] font-medium underline">Mở Jira kiểm tra</a></p>}
+        {sentFolder && <p className="text-sm text-[#1a0e08]">Hãy tự kiểm tra thư đã gửi rồi chọn Bỏ qua hoặc Dừng. <a href={sentFolder} target="_blank" rel="noopener noreferrer" className="text-[#B43E00] font-medium underline">Mở thư mục Đã gửi</a></p>}
+        {calendarCheckUrl && <p className="text-sm text-[#1a0e08]">Hãy tự kiểm tra trên Google Calendar của {mycalendarEmail} rồi chọn Bỏ qua hoặc Dừng. <a href={calendarCheckUrl} target="_blank" rel="noopener noreferrer" className="text-[#B43E00] font-medium underline">Mở Google Calendar</a></p>}
+        {spreadsheetCheckUrl && <p className="text-sm text-[#1a0e08]">Hãy tự kiểm tra trên Google Sheets{mysheetsEmail ? ` của ${mysheetsEmail}` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={spreadsheetCheckUrl} target="_blank" rel="noopener noreferrer" className="text-[#B43E00] font-medium underline">Mở Google Sheets</a></p>}
+        {notionCheckUrl && <p className="text-sm text-[#1a0e08]">Hãy tự kiểm tra trên Notion{notionWorkspace ? ` (${notionWorkspace})` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={notionCheckUrl} target="_blank" rel="noopener noreferrer" className="text-[#B43E00] font-medium underline">Mở Notion kiểm tra</a></p>}
+        {trelloCheckUrl && <p className="text-sm text-[#1a0e08]">Hãy tự kiểm tra trên Trello{trelloUsername ? ` (@${trelloUsername})` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={trelloCheckUrl} target="_blank" rel="noopener noreferrer" className="text-[#B43E00] font-medium underline">Mở Trello kiểm tra</a></p>}
+        {myjiraCheckUrl && <p className="text-sm text-[#1a0e08]">Hãy tự kiểm tra trên Jira{myjiraAccount ? ` (${myjiraAccount})` : ''} rồi chọn Bỏ qua hoặc Dừng. <a href={myjiraCheckUrl} target="_blank" rel="noopener noreferrer" className="text-[#B43E00] font-medium underline">Mở Jira kiểm tra</a></p>}
         {controls?.error && <p role="alert" className="text-sm text-brand-danger">{controls.error}</p>}
       </div>
-      <div className="px-4 sm:px-6 py-3 sm:py-4 bg-[#F8F8F6] border-t border-[#EAEAE4] flex flex-wrap items-center gap-2.5">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 bg-[#F8F4EE] border-t border-[#EAEAE4] flex flex-wrap items-center gap-2.5">
         {paused&&actions.includes('slack-reconcile')&&<button type="button" disabled={busy} onClick={()=>controls?.onSlackReconcile?.(paused.id)} className={primary}>Đối soát Slack</button>}
         {canRetry && <><button type="button" disabled={busy} onClick={()=>paused && controls?.onRetry(paused.id)} className={primary}>Thử lại việc {steps.findIndex(step=>step.id===paused?.id)+1}</button><button id="btn-recovery-edit" type="button" disabled={busy || !actions.includes('stop')} onClick={()=>setDialog('edit')} className={secondary}>Sửa rồi thử lại</button></>}
         {canContinue && <button type="button" disabled={busy} onClick={()=>controls?.onContinue()} className={primary}>Làm tiếp các việc còn lại</button>}
         {paused && actions.includes('skip') && <button type="button" disabled={busy} onClick={()=>controls?.onSkip(paused.id)} className={hasUnknown?primary:secondary}>{hasUnknown?'Đã thấy kết quả → Bỏ qua bước này và làm tiếp':'Bỏ qua việc này'}</button>}
-        {actions.includes('stop') && <button id="btn-recovery-stop" type="button" disabled={busy} onClick={()=>setDialog('stop')} className={moment===7?'px-3.5 py-2 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-red-700 transition-colors disabled:opacity-50':secondary}>Dừng kế hoạch</button>}
-        {hasUnknown && destination && <a href={destination} target="_blank" rel="noopener noreferrer" className="px-3.5 py-2 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] inline-flex items-center gap-1.5 transition-colors">Kiểm tra trên {service}<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></a>}
-        {busy && <p role="status" className="text-xs text-[#6B7280]">Đang gửi yêu cầu và tải lại trạng thái…</p>}
+        {actions.includes('stop') && <button id="btn-recovery-stop" type="button" disabled={busy} onClick={()=>setDialog('stop')} className={moment===7?'px-3.5 py-2 text-xs sm:text-sm font-medium text-[#51463E] hover:text-red-700 transition-colors disabled:opacity-50':secondary}>Dừng kế hoạch</button>}
+        {hasUnknown && destination && <a href={destination} target="_blank" rel="noopener noreferrer" className="px-3.5 py-2 text-xs sm:text-sm font-medium text-[#51463E] hover:text-[#1a0e08] inline-flex items-center gap-1.5 transition-colors">Kiểm tra trên {service}<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></a>}
+        {busy && <p role="status" className="text-xs text-[#6A5F56]">Đang gửi yêu cầu và tải lại trạng thái…</p>}
       </div>
     </div>
-    {dialog==='stop' && createPortal(<CockpitDialog title="Dừng kế hoạch?" returnFocusId="btn-recovery-stop" onClose={()=>{if(!busy)setDialog(null);}}><div className="p-5 v3-space-y-4"><p className="text-sm text-[#4B5563] leading-relaxed">Không thể chạy tiếp sau khi dừng. Các kết quả đã có và bằng chứng chưa rõ kết quả được giữ nguyên.</p><div className="flex flex-wrap justify-end gap-2.5"><button type="button" disabled={busy} className={secondary} onClick={()=>setDialog(null)}>Tiếp tục xem</button><button type="button" disabled={busy} className={primary} onClick={()=>{setDialog(null);controls?.onStop();}}>Dừng hẳn quy trình</button></div></div></CockpitDialog>,document.body)}
+    {dialog==='stop' && createPortal(<CockpitDialog title="Dừng kế hoạch?" returnFocusId="btn-recovery-stop" onClose={()=>{if(!busy)setDialog(null);}}><div className="p-5 v3-space-y-4"><p className="text-sm text-[#51463E] leading-relaxed">Không thể chạy tiếp sau khi dừng. Các kết quả đã có và bằng chứng chưa rõ kết quả được giữ nguyên.</p><div className="flex flex-wrap justify-end gap-2.5"><button type="button" disabled={busy} className={secondary} onClick={()=>setDialog(null)}>Tiếp tục xem</button><button type="button" disabled={busy} className={primary} onClick={()=>{setDialog(null);controls?.onStop();}}>Dừng hẳn quy trình</button></div></div></CockpitDialog>,document.body)}
     {dialog==='edit' && paused && createPortal(<RecoveryEditor tool={paused.tool} stepArgs={snapshot && planStep ? savedArguments(planStep.args,snapshot) as Record<string,unknown> : planStep?.args} busy={busy} onClose={()=>setDialog(null)} onSubmit={(args,prompt)=>{setDialog(null);controls?.onEdit(paused.id,args,prompt);}}/>,document.body)}
   </section>;
 }

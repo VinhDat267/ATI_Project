@@ -1,10 +1,10 @@
 /* <style> của users.html, giữ nguyên thứ tự (biến --font-* đổi thành --page-font-*). */
     :root {
-      --bg: #F8F8F6;
+      --bg: #F8F4EE;
       --surface: #FFFFFF;
-      --fg: #111827;
-      --muted: #6B7280;
-      --border: #E7E7E2;
+      --fg: #1a0e08;
+      --muted: #6A5F56;
+      --border: #E8E0D6;
       --accent: #FF5701;
       --success: #16A34A;
       --warn: #D97706;
@@ -15,8 +15,8 @@
     }
 
     body {
-      background-color: #F8F8F6;
-      color: #111827;
+      background-color: #F8F4EE;
+      color: #1a0e08;
       font-family: 'Be Vietnam Pro', sans-serif;
       -webkit-font-smoothing: antialiased;
     }

@@ -137,7 +137,7 @@ export function SheetsDeliveryRecoveryControl({
   return (
     <div
       data-testid="sheets-delivery-recovery-panel"
-      className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-[#111827] v3-space-y-3"
+      className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-[#1a0e08] v3-space-y-3"
     >
       <p className="text-amber-950 font-medium">
         Trạng thái gửi báo cáo chưa xác định. Hệ thống đã khóa tự động thử lại để tránh gửi trùng báo cáo tới kênh đích.
@@ -152,7 +152,7 @@ export function SheetsDeliveryRecoveryControl({
         >
           Xác nhận đã nhận báo cáo
         </button>
-        <p className="text-[#4B5563]">Xác nhận báo cáo đã tới kênh đích (không gửi lại).</p>
+        <p className="text-[#51463E]">Xác nhận báo cáo đã tới kênh đích (không gửi lại).</p>
       </div>
       <div className="pt-2 border-t border-amber-200/80 v3-space-y-2">
         {isRetryUnavailable && (
@@ -170,7 +170,7 @@ export function SheetsDeliveryRecoveryControl({
                   : 'Lịch đang tạm dừng hoặc đã hủy. Vui lòng tiếp tục (Chạy tiếp) hoặc cấp quyền lại lịch trước khi tạo lượt gửi bù mới để lượt chạy bù không bị hủy.'}
           </p>
         )}
-        <label className="flex items-start gap-2 cursor-pointer text-[#111827]">
+        <label className="flex items-start gap-2 cursor-pointer text-[#1a0e08]">
           <input
             type="checkbox"
             data-testid="checkbox-confirm-duplicate-risk"
@@ -193,7 +193,7 @@ export function SheetsDeliveryRecoveryControl({
           >
             Tạo lượt gửi bù mới
           </button>
-          <p className="text-[#4B5563]">Tạo một lượt chạy mới độc lập để gửi bù báo cáo.</p>
+          <p className="text-[#51463E]">Tạo một lượt chạy mới độc lập để gửi bù báo cáo.</p>
         </div>
       </div>
       {resolveError && (
@@ -282,5 +282,5 @@ export function ScheduleRunRecovery({ message, navigate }: { message: ChatMessag
           run.error.includes('SHEETS_APPEND_UNKNOWN_OUTCOME'))
       )
   );
-  return <div className="mb-5 v3-space-y-2">{run && ['digest_sent', 'needs_attention'].includes(run.state) && <p role="status" className="text-sm font-medium text-[#111827]">{runLabel(run)}</p>}{run && <SheetsDeliveryRecoveryControl run={run} scheduleStatus={scheduleStatus} onResolved={res => { resolvedRunRef.current = res.run; setRun(res.run); setScheduleStatus(res.schedule.status); schedulesChanged(); }} />}{canReplan && run && <><p className="text-sm text-[#6B7280]">{runLabel(run)}</p><button type="button" className={primaryScheduleButton} disabled={busy} onClick={() => void replan()}>Lập lại kế hoạch</button></>}{error && <p role="alert" className="text-sm text-red-700">{error}</p>}</div>;
+  return <div className="mb-5 v3-space-y-2">{run && ['digest_sent', 'needs_attention'].includes(run.state) && <p role="status" className="text-sm font-medium text-[#1a0e08]">{runLabel(run)}</p>}{run && <SheetsDeliveryRecoveryControl run={run} scheduleStatus={scheduleStatus} onResolved={res => { resolvedRunRef.current = res.run; setRun(res.run); setScheduleStatus(res.schedule.status); schedulesChanged(); }} />}{canReplan && run && <><p className="text-sm text-[#6A5F56]">{runLabel(run)}</p><button type="button" className={primaryScheduleButton} disabled={busy} onClick={() => void replan()}>Lập lại kế hoạch</button></>}{error && <p role="alert" className="text-sm text-red-700">{error}</p>}</div>;
 }

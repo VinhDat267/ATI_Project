@@ -12,14 +12,14 @@ export function ChatComposer({variant,draft,planning,input,onDraft,onSend,onKeyD
  useLayoutEffect(()=>{const field=input.current;if(field){field.style.height='auto';field.style.height=`${Math.min(field.scrollHeight || 28,144)}px`;}},[draft,input,variant]);
  const submit=(event:FormEvent)=>{event.preventDefault();onSend(draft);};
  // ResponsesPage footer, retaining the app's multiline textarea and shared draft.
- if(variant==='response') return <footer ref={footer} id="global-bottom-bar" className="fixed bottom-0 left-0 right-0 z-30 bg-[#F8F8F6]/95 dark:bg-[#0E1528]/95 backdrop-blur-md border-t border-[#E5E5E0] dark:border-[#1F2A44] shadow-[0_-8px_24px_-12px_rgba(15,23,42,0.12)] px-4 py-3">
+ if(variant==='response') return <footer ref={footer} id="global-bottom-bar" className="fixed bottom-0 left-0 right-0 z-30 bg-[#F8F4EE]/95 dark:bg-[#131010]/95 backdrop-blur-md border-t border-[#E6DED3] dark:border-[#2A231E] shadow-[0_-8px_24px_-12px_rgba(15,23,42,0.12)] px-4 py-3">
    <div className="max-w-3xl mx-auto">
      <form id="chat-input-form" aria-label="Nhập yêu cầu" aria-busy={planning} onSubmit={submit} className="relative flex items-center gap-2">
        <label htmlFor="chat-prompt-input" className="sr-only">Nhắn cho Planora</label>
-       <textarea ref={input} rows={1} id="chat-prompt-input" value={draft} onChange={event=>onDraft(event.target.value)} onKeyDown={onKeyDown} aria-label="Mô tả công việc bạn muốn thực hiện" placeholder="Nhắn cho Planora…" autoComplete="off" className="w-full bg-white border border-[#E5E5E0] rounded-xl px-4 py-3 pr-24 text-xs sm:text-sm text-[#111827] placeholder-[#6B7280] shadow-2xs !outline-none focus-visible:!outline-none focus:border-[#111827] transition-all resize-none" />
+       <textarea ref={input} rows={1} id="chat-prompt-input" value={draft} onChange={event=>onDraft(event.target.value)} onKeyDown={onKeyDown} aria-label="Mô tả công việc bạn muốn thực hiện" placeholder="Nhắn cho Planora…" autoComplete="off" className="w-full bg-white border border-[#E6DED3] rounded-xl px-4 py-3 pr-24 text-xs sm:text-sm text-[#1a0e08] placeholder-[#6A5F56] shadow-2xs !outline-none focus-visible:!outline-none focus:border-[#1a0e08] transition-all resize-none" />
        <button type="submit" id="btn-submit-chat" aria-label="Gửi tin nhắn" disabled={!draft.trim() || planning} className="absolute right-2 px-3.5 py-1.5 bg-[#FF5701] hover:bg-[#E04D00] text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors flex items-center gap-1.5"><span>Gửi</span><svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg></button>
      </form>
-     <p className="text-[11px] text-[#6B7280] text-center mt-1.5">Planora chỉ đọc và ghi ở những nơi bạn cho phép. Chưa duyệt thì chưa làm. · <a href="/privacy" className="text-[#B43E00] hover:underline font-medium">Chính sách an toàn &amp; Dữ liệu</a></p>
+     <p className="text-[11px] text-[#6A5F56] text-center mt-1.5">Planora chỉ đọc và ghi ở những nơi bạn cho phép. Chưa duyệt thì chưa làm. · <a href="/privacy" className="text-[#B43E00] hover:underline font-medium">Chính sách an toàn &amp; Dữ liệu</a></p>
    </div>
  </footer>;
  if(variant==='inline') return (<form aria-label="Nhập yêu cầu" onSubmit={submit} id="moment-4-inline-chat" className={`mb-3 p-2 bg-white rounded-xl border border-brand-border shadow-soft-card flex items-center gap-2 transition-all`}>
@@ -40,10 +40,10 @@ export function ChatComposer({variant,draft,planning,input,onDraft,onSend,onKeyD
                 {' '}
               </button>
             </form>);
- if(variant==='drawer') return (<div className="p-4 border-t border-brand-border bg-[#F8F8F6]">
+ if(variant==='drawer') return (<div className="p-4 border-t border-brand-border bg-[#F8F4EE]">
           <form aria-label="Nhập yêu cầu" onSubmit={submit} className="flex items-center gap-2">
-            <textarea ref={input} rows={1} value={draft} onChange={event=>onDraft(event.target.value)} aria-label="Mô tả công việc bạn muốn thực hiện" id="drawer-chat-input" className="flex-1 px-3 py-2 bg-white rounded-xl border border-[#E5E5E0] text-xs sm:text-sm !outline-none focus-visible:!outline-none focus:border-[#111827]" placeholder="Nhắn tiếp trong phiên này…" onKeyDown={onKeyDown} />
-            <button type="submit" disabled={!draft.trim() || planning} className="p-2 bg-[#C84300] text-white rounded-xl hover:bg-[#A83800] disabled:bg-neutral-200 dark:disabled:bg-[#1E293B] disabled:text-neutral-500 dark:disabled:text-[#64748B] transition-colors" aria-label="Gửi tin nhắn">
+            <textarea ref={input} rows={1} value={draft} onChange={event=>onDraft(event.target.value)} aria-label="Mô tả công việc bạn muốn thực hiện" id="drawer-chat-input" className="flex-1 px-3 py-2 bg-white rounded-xl border border-[#E6DED3] text-xs sm:text-sm !outline-none focus-visible:!outline-none focus:border-[#1a0e08]" placeholder="Nhắn tiếp trong phiên này…" onKeyDown={onKeyDown} />
+            <button type="submit" disabled={!draft.trim() || planning} className="p-2 bg-[#C84300] text-white rounded-xl hover:bg-[#A83800] disabled:bg-neutral-200 dark:disabled:bg-[#27211C] disabled:text-neutral-500 dark:disabled:text-[#887D73] transition-colors" aria-label="Gửi tin nhắn">
               {' '}
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -52,9 +52,9 @@ export function ChatComposer({variant,draft,planning,input,onDraft,onSend,onKeyD
             </button>
           </form>
         </div>);
- return (<footer ref={footer} id="global-bottom-bar" className={`fixed bottom-0 left-0 right-0 z-20 bg-[#F8F8F6]/95 dark:bg-[#0E1528]/95 backdrop-blur-md border-t border-[#E5E5E0] dark:border-[#1F2A44] shadow-[0_-8px_24px_-12px_rgba(15,23,42,0.12)] py-3 px-4 sm:px-6`}>
+ return (<footer ref={footer} id="global-bottom-bar" className={`fixed bottom-0 left-0 right-0 z-20 bg-[#F8F4EE]/95 dark:bg-[#131010]/95 backdrop-blur-md border-t border-[#E6DED3] dark:border-[#2A231E] shadow-[0_-8px_24px_-12px_rgba(15,23,42,0.12)] py-3 px-4 sm:px-6`}>
         <div className={`${planning ? 'max-w-2xl' : 'max-w-3xl'} mx-auto`}>
-          <form aria-label="Nhập yêu cầu" aria-busy={planning} onSubmit={submit} className="bg-white rounded-xl border border-[#E2E2DC] shadow-2xs px-3 py-2 flex items-center gap-2.5 focus-within:border-[#B8B8B0] transition-colors">
+          <form aria-label="Nhập yêu cầu" aria-busy={planning} onSubmit={submit} className="bg-white rounded-xl border border-[#E3DACE] shadow-2xs px-3 py-2 flex items-center gap-2.5 focus-within:border-[#B8B8B0] transition-colors">
             <label htmlFor="bottom-chat-input" className="sr-only">
               Nhắn thêm với tôi
             </label>
@@ -66,7 +66,7 @@ export function ChatComposer({variant,draft,planning,input,onDraft,onSend,onKeyD
               value={draft}
               onChange={event=>onDraft(event.target.value)}
               aria-label="Mô tả công việc bạn muốn thực hiện"
-              className="flex-1 text-sm text-[#111827] placeholder-[#6B7280] bg-transparent border-0 focus:ring-0 !outline-none focus-visible:!outline-none px-1.5 py-1 resize-none"
+              className="flex-1 text-sm text-[#1a0e08] placeholder-[#6A5F56] bg-transparent border-0 focus:ring-0 !outline-none focus-visible:!outline-none px-1.5 py-1 resize-none"
               placeholder={
                 planning
                   ? 'Gõ sẵn ý muốn bổ sung (sẽ gửi được ngay khi kế hoạch hiện ra)…'
@@ -79,9 +79,9 @@ export function ChatComposer({variant,draft,planning,input,onDraft,onSend,onKeyD
               disabled={!draft.trim() || planning}
               className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors flex-shrink-0 flex items-center gap-1.5 !opacity-100 ${
                 planning
-                  ? 'bg-[#F4F4F1] dark:bg-[#1E293B] text-[#4B5563] dark:text-[#94A3B8] border border-[#E5E5E0] dark:border-[#334155] cursor-not-allowed'
+                  ? 'bg-[#F4F4F1] dark:bg-[#27211C] text-[#51463E] dark:text-[#A39A90] border border-[#E6DED3] dark:border-[#3d342d] cursor-not-allowed'
                   : !draft.trim()
-                  ? 'bg-[#F4F4F1] dark:bg-[#1E293B] text-[#4B5563] dark:text-[#94A3B8] border border-[#EAEAE4] dark:border-[#334155] cursor-not-allowed'
+                  ? 'bg-[#F4F4F1] dark:bg-[#27211C] text-[#51463E] dark:text-[#A39A90] border border-[#EAEAE4] dark:border-[#3d342d] cursor-not-allowed'
                   : 'bg-[#C84300] hover:bg-[#A83800] text-white shadow-2xs cursor-pointer'
               }`}
               aria-label="Gửi tin nhắn"

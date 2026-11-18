@@ -1,11 +1,11 @@
 /* <style> của responses.html, giữ nguyên thứ tự. */
     :root {
-      --bg: #F8F8F6;
+      --bg: #F8F4EE;
       --surface: #FFFFFF;
-      --fg: #111827;
-      --border: #E7E7E2;
+      --fg: #1a0e08;
+      --border: #E8E0D6;
       --accent: #FF5701;
-      --muted: #6B7280;
+      --muted: #6A5F56;
     }
     body {
       background-color: var(--bg);

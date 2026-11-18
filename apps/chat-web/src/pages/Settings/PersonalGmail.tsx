@@ -66,12 +66,12 @@ export function PersonalGmail({ service, refresh, selected, standalone = true }:
       <div className="v3-space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="font-sans font-semibold text-base text-[#111827] dark:text-white flex items-center gap-2.5">
+            <h3 className="font-sans font-semibold text-base text-[#1a0e08] dark:text-white flex items-center gap-2.5">
               <ServiceLogo service="gmail" className="w-5 h-5" />
               <span>Gmail</span>
             </h3>
             {service.email && (
-              <p className="text-xs font-medium text-[#4B5563] dark:text-[#9CA3AF] break-words mt-0.5 pl-7">{service.email}</p>
+              <p className="text-xs font-medium text-[#51463E] dark:text-[#9CA3AF] break-words mt-0.5 pl-7">{service.email}</p>
             )}
           </div>
           <span className={connectionBadgeClass(badgeTone)}>
@@ -79,7 +79,7 @@ export function PersonalGmail({ service, refresh, selected, standalone = true }:
             <span>{status === 'connected' ? 'Đã kết nối' : status === 'reconnect_required' ? 'Cần kết nối lại' : 'Chưa kết nối'}</span>
           </span>
         </div>
-        <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] leading-relaxed">Chỉ bạn dùng được hộp thư này. Planora được đọc, soạn, gửi, gắn nhãn và chuyển thư vào thùng rác; không xoá vĩnh viễn.</p>
+        <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF] leading-relaxed">Chỉ bạn dùng được hộp thư này. Planora được đọc, soạn, gửi, gắn nhãn và chuyển thư vào thùng rác; không xoá vĩnh viễn.</p>
         <div data-testid="gmail-capabilities" className="flex flex-wrap gap-1.5">
           {GMAIL_CAPABILITIES.map(cap => (
             <span key={cap} className={CAPABILITY_PILL_CLASS}>
@@ -88,18 +88,18 @@ export function PersonalGmail({ service, refresh, selected, standalone = true }:
           ))}
         </div>
         {status === 'connected' && service.email && (
-          <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#F8F8F6] dark:bg-[#0E1528] border border-[#E7E7E2] dark:border-[#293653]">
-            <span className="text-xs font-medium text-[#4B5563] dark:text-[#9CA3AF]">Hộp thư được dùng:</span>
+          <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#F8F4EE] dark:bg-[#131010] border border-[#E8E0D6] dark:border-[#3a312a]">
+            <span className="text-xs font-medium text-[#51463E] dark:text-[#9CA3AF]">Hộp thư được dùng:</span>
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/60">
               <span>{service.email}</span>
             </span>
           </div>
         )}
-        {status === 'reconnect_required' && <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Quyền có thể đã bị thu hồi hoặc hết hạn sau 7 ngày ở chế độ thử nghiệm của Google. Hãy kết nối lại.</p>}
+        {status === 'reconnect_required' && <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">Quyền có thể đã bị thu hồi hoặc hết hạn sau 7 ngày ở chế độ thử nghiệm của Google. Hãy kết nối lại.</p>}
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#293653]">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#3a312a]">
         <button id="gmail-action" type="button" className={status === 'connected' ? `${DANGER_GHOST_BTN} ml-auto` : button} disabled={busy} onClick={() => status === 'connected' ? setConfirm(true) : void act(false)}>{status === 'connected' ? 'Ngắt kết nối' : status === 'reconnect_required' ? 'Kết nối lại' : 'Kết nối Gmail'}</button>
-        {busy && <p role="status" className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">{status === 'connected' ? 'Đang ngắt kết nối…' : 'Đang chuyển hướng tới Google…'}</p>}
+        {busy && <p role="status" className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">{status === 'connected' ? 'Đang ngắt kết nối…' : 'Đang chuyển hướng tới Google…'}</p>}
         {error && <p role="alert" className="text-xs text-[#DC2626] w-full">{error}</p>}
       </div>
     </div>
@@ -107,7 +107,7 @@ export function PersonalGmail({ service, refresh, selected, standalone = true }:
   return <>
     {standalone ? (
       <section aria-labelledby="heading-personal-services" className="mb-8">
-        <h2 id="heading-personal-services" className="text-xs font-bold uppercase tracking-wider text-[#6B7280] mb-3.5">Của riêng bạn</h2>
+        <h2 id="heading-personal-services" className="text-xs font-bold uppercase tracking-wider text-[#6A5F56] mb-3.5">Của riêng bạn</h2>
         {rowContent}
       </section>
     ) : rowContent}

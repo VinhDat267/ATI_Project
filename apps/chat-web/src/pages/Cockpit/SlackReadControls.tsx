@@ -104,7 +104,7 @@ export function SlackReadControls({
       className={
         compact && !active
           ? 'inline-flex items-center'
-          : 'mb-4 rounded-2xl border border-[#E5E5E0] bg-white p-4 text-sm shadow-2xs'
+          : 'mb-4 rounded-2xl border border-[#E6DED3] bg-white p-4 text-sm shadow-2xs'
       }
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -115,16 +115,16 @@ export function SlackReadControls({
           onClick={() => onChange(active ? null : '')}
           className={
             compact && !active
-              ? 'rounded-lg border border-[#E5E5E0] bg-[#F8F8F6] hover:bg-[#EFEFE9] px-2.5 py-1 text-xs font-semibold text-[#111827] transition-colors'
+              ? 'rounded-lg border border-[#E6DED3] bg-[#F8F4EE] hover:bg-[#EFEFE9] px-2.5 py-1 text-xs font-semibold text-[#1a0e08] transition-colors'
               : active
-                ? 'rounded-xl border border-[#111827] bg-[#111827] px-3 py-1.5 text-xs font-semibold text-white transition-colors'
-                : 'rounded-xl border border-[#E5E5E0] bg-white hover:bg-[#F8F8F6] px-3 py-1.5 text-xs font-semibold text-[#111827] transition-colors'
+                ? 'rounded-xl border border-[#1a0e08] bg-[#1a0e08] px-3 py-1.5 text-xs font-semibold text-white transition-colors'
+                : 'rounded-xl border border-[#E6DED3] bg-white hover:bg-[#F8F4EE] px-3 py-1.5 text-xs font-semibold text-[#1a0e08] transition-colors'
           }
         >
           {purpose === 'write' ? 'Gửi tin Slack' : 'Tra cứu Slack của bạn'}
         </button>
         {!hideInboxLink && (
-          <a href="/inbox" className="text-xs font-medium underline underline-offset-2 text-[#4B5563] hover:text-[#111827]">
+          <a href="/inbox" className="text-xs font-medium underline underline-offset-2 text-[#51463E] hover:text-[#1a0e08]">
             Mở hộp thư đề xuất Slack
           </a>
         )}

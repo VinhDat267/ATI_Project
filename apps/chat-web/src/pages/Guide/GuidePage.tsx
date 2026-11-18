@@ -17,10 +17,10 @@ import { CAPABILITIES_DATA as BASE_CAPABILITIES, GITHUB_OAUTH_PROMPTS, MYCALENDA
 const SERVICE_GUIDES = BASE_GUIDES, SAMPLE_PROMPTS = BASE_PROMPTS, CAPABILITIES_DATA = BASE_CAPABILITIES;
 type MainTab = 'keys' | 'prompts' | 'capabilities';
 type Toast = { id: number; message: string; fading: boolean };
-const TAB_ON = 'main-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all inline-flex items-center gap-2 bg-[#111827] text-white shadow-2xs';
-const TAB_OFF = 'main-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all inline-flex items-center gap-2 bg-[#F8F8F6] text-[#4B5563] hover:bg-neutral-200/70 border border-[#E5E5E0]';
-const CAT_ON = 'cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#111827] text-white';
-const CAT_OFF = 'cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-[#F8F8F6] text-[#4B5563] hover:bg-neutral-200/70 border border-[#E5E5E0]';
+const TAB_ON = 'main-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all inline-flex items-center gap-2 bg-[#1a0e08] text-white shadow-2xs';
+const TAB_OFF = 'main-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all inline-flex items-center gap-2 bg-[#F8F4EE] text-[#51463E] hover:bg-neutral-200/70 border border-[#E6DED3]';
+const CAT_ON = 'cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#1a0e08] text-white';
+const CAT_OFF = 'cat-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-[#F8F4EE] text-[#51463E] hover:bg-neutral-200/70 border border-[#E6DED3]';
 
 type Navigate = (path: string) => void;
 function appLink(navigate: Navigate, path: string) {
@@ -46,17 +46,17 @@ function initialService() {
 function ServiceGuideDetail({ serviceId, navigate, guides = SERVICE_GUIDES }: { serviceId: string; navigate: Navigate; guides?: typeof SERVICE_GUIDES }) {
   const s = guides[serviceId];
   return <>
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#E7E7E2]">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#E8E0D6]">
       <div className="flex items-center gap-3.5">
-        <div className="w-12 h-12 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] flex items-center justify-center p-2.5 shadow-sm">
+        <div className="w-12 h-12 rounded-xl bg-[#F8F4EE] border border-[#E8E0D6] flex items-center justify-center p-2.5 shadow-sm">
           {SERVICE_SVGS[serviceId] || <ServiceLogo service={serviceId} className="w-5 h-5" />}
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="font-sans text-xl sm:text-2xl font-semibold text-[#111827]">{s.name}</h3>
+            <h3 className="font-sans text-xl sm:text-2xl font-semibold text-[#1a0e08]">{s.name}</h3>
             <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">{s.category}</span>
           </div>
-          <p className="text-xs sm:text-sm text-[#4B5563] mt-0.5">{s.summary}</p>
+          <p className="text-xs sm:text-sm text-[#51463E] mt-0.5">{s.summary}</p>
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -66,22 +66,22 @@ function ServiceGuideDetail({ serviceId, navigate, guides = SERVICE_GUIDES }: { 
       </div>
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
-        <div className="text-xs text-[#6B7280] font-medium">Phương thức kết nối:</div>
-        <div className="font-semibold text-xs text-[#111827] mt-1 flex flex-wrap gap-1">
+      <div className="p-3.5 rounded-xl bg-[#F8F4EE] border border-[#E8E0D6]">
+        <div className="text-xs text-[#6A5F56] font-medium">Phương thức kết nối:</div>
+        <div className="font-semibold text-xs text-[#1a0e08] mt-1 flex flex-wrap gap-1">
           {['gmail', 'mysheets'].includes(s.id) && <span>Google OAuth · không nhập khoá</span>}
-          {s.keys.map(k => <span key={k} className="bg-white px-2 py-0.5 rounded border border-[#E7E7E2] text-neutral-800">{k}</span>)}
+          {s.keys.map(k => <span key={k} className="bg-white px-2 py-0.5 rounded border border-[#E8E0D6] text-neutral-800">{k}</span>)}
         </div>
       </div>
-      <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
-        <div className="text-xs text-[#6B7280] font-medium">Nơi Planora được phép dùng:</div>
-        <div className="font-semibold text-xs text-[#111827] mt-1 flex items-center gap-1">
-          <span className="bg-white px-2 py-0.5 rounded border border-[#E7E7E2] text-neutral-800">{s.scopeLabel}</span>
-          <span className="text-xs text-[#6B7280] font-normal truncate">{`(${s.sampleScope})`}</span>
+      <div className="p-3.5 rounded-xl bg-[#F8F4EE] border border-[#E8E0D6]">
+        <div className="text-xs text-[#6A5F56] font-medium">Nơi Planora được phép dùng:</div>
+        <div className="font-semibold text-xs text-[#1a0e08] mt-1 flex items-center gap-1">
+          <span className="bg-white px-2 py-0.5 rounded border border-[#E8E0D6] text-neutral-800">{s.scopeLabel}</span>
+          <span className="text-xs text-[#6A5F56] font-normal truncate">{`(${s.sampleScope})`}</span>
         </div>
       </div>
-      <div className="p-3.5 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2]">
-        <div className="text-xs text-[#6B7280] font-medium">Thời gian hoàn thành:</div>
+      <div className="p-3.5 rounded-xl bg-[#F8F4EE] border border-[#E8E0D6]">
+        <div className="text-xs text-[#6A5F56] font-medium">Thời gian hoàn thành:</div>
         <div className="font-semibold text-xs text-emerald-700 mt-1 flex items-center gap-1">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           <span>{s.timeEstimate}</span>
@@ -95,26 +95,26 @@ function ServiceGuideDetail({ serviceId, navigate, guides = SERVICE_GUIDES }: { 
       </div>
     </div>
     <div className="v3-space-y-4 pt-2">
-      <h4 className="text-sm font-bold text-[#111827]">
+      <h4 className="text-sm font-bold text-[#1a0e08]">
         Các bước kết nối &amp; chọn phạm vi dữ liệu:
       </h4>
       <div className="v3-space-y-3">
         {s.steps.map(st => (
-          <div key={st.num} className="p-4 rounded-xl border border-[#E7E7E2] bg-white hover:border-neutral-300 transition-colors flex items-start gap-3.5">
-            <div className="w-7 h-7 rounded-full bg-[#111827] text-white flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">
+          <div key={st.num} className="p-4 rounded-xl border border-[#E8E0D6] bg-white hover:border-neutral-300 transition-colors flex items-start gap-3.5">
+            <div className="w-7 h-7 rounded-full bg-[#1a0e08] text-white flex items-center justify-center font-bold text-xs flex-shrink-0 mt-0.5">
               {st.num}
             </div>
             <div className="v3-space-y-1.5 flex-1 min-w-0">
-              <div className="font-bold text-sm text-[#111827]">{st.title}</div>
+              <div className="font-bold text-sm text-[#1a0e08]">{st.title}</div>
               {/* desc có thẻ <a>/<code> viết sẵn trong dữ liệu, chèn như innerHTML của bản mẫu. */}
-              <div className="text-xs sm:text-sm text-[#4B5563] leading-relaxed" dangerouslySetInnerHTML={{ __html: st.desc }} />
+              <div className="text-xs sm:text-sm text-[#51463E] leading-relaxed" dangerouslySetInnerHTML={{ __html: st.desc }} />
               {st.tags ? (
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {st.tags.map(t => <span key={t} className="px-2 py-0.5 rounded bg-neutral-100 text-neutral-700 font-mono text-[11px] border border-neutral-200">{t}</span>)}
                 </div>
               ) : ''}
               {st.urlSample ? (
-                <div className="p-2 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] text-xs font-mono text-[#111827] select-all break-all">
+                <div className="p-2 rounded-lg bg-[#F8F4EE] border border-[#E8E0D6] text-xs font-mono text-[#1a0e08] select-all break-all">
                   {st.urlSample}
                 </div>
               ) : ''}
@@ -147,7 +147,7 @@ function PromptCard({ p, copied, onCopy, navigate }: { p: typeof SAMPLE_PROMPTS[
     }
     navigate('/');
   };
-  return <div className="bg-white rounded-2xl border border-[#E5E5E0] p-5 shadow-2xs hover:border-[#B8B8B0] transition-all flex flex-col justify-between v3-space-y-4">
+  return <div className="bg-white rounded-2xl border border-[#E6DED3] p-5 shadow-2xs hover:border-[#B8B8B0] transition-all flex flex-col justify-between v3-space-y-4">
     <div className="v3-space-y-3">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-700 border border-neutral-200">
@@ -159,39 +159,39 @@ function PromptCard({ p, copied, onCopy, navigate }: { p: typeof SAMPLE_PROMPTS[
           </span>
         ) : ''}
       </div>
-      <h4 className="font-sans font-semibold text-sm sm:text-base text-[#111827] leading-snug">
+      <h4 className="font-sans font-semibold text-sm sm:text-base text-[#1a0e08] leading-snug">
         {` ${p.title} `}
       </h4>
       {p.services.length >= 2 && (
         <WorkflowFlowCanvas services={p.services} mode="preview" compact />
       )}
-      <div className="p-3 rounded-xl bg-[#F8F8F6] border border-[#E5E5E0] text-xs sm:text-sm font-medium text-[#111827] leading-relaxed relative group">
+      <div className="p-3 rounded-xl bg-[#F8F4EE] border border-[#E6DED3] text-xs sm:text-sm font-medium text-[#1a0e08] leading-relaxed relative group">
         {` "${p.prompt}" `}
       </div>
       <div className="v3-space-y-1.5 pt-1">
-        <div className="text-[11px] text-[#6B7280] font-medium">Công cụ tham gia:</div>
+        <div className="text-[11px] text-[#6A5F56] font-medium">Công cụ tham gia:</div>
         <div className="flex flex-wrap items-center gap-1.5">
           {p.services.map(sid => (
-            <span key={sid} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-[#E5E5E0] text-[11px] font-medium text-neutral-700">
+            <span key={sid} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-[#E6DED3] text-[11px] font-medium text-neutral-700">
               <span className="w-3.5 h-3.5 flex items-center justify-center">{SERVICE_SVGS[sid] || <ServiceLogo service={sid} className="w-5 h-5" />}</span>
               <span>{sid === 'gmail' ? 'Gmail' : sid === 'mysheets' ? 'Google Sheets' : SERVICE_GUIDES[sid]?.name || sid}</span>
             </span>
           ))}
         </div>
       </div>
-      <div className="v3-space-y-1 pt-1 border-t border-[#E5E5E0]">
-        <div className="text-xs text-[#6B7280] font-semibold">Planora sẽ làm lần lượt sau khi bạn duyệt:</div>
+      <div className="v3-space-y-1 pt-1 border-t border-[#E6DED3]">
+        <div className="text-xs text-[#6A5F56] font-semibold">Planora sẽ làm lần lượt sau khi bạn duyệt:</div>
         <ul className="text-xs text-neutral-600 v3-space-y-1 list-disc list-inside">
           {p.workflow.map(w => <li key={w} className="truncate">{w}</li>)}
         </ul>
       </div>
     </div>
-    <div className="pt-3 border-t border-[#E5E5E0] flex flex-wrap items-center justify-between gap-2">
+    <div className="pt-3 border-t border-[#E6DED3] flex flex-wrap items-center justify-between gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={handleTryPrompt} className="px-3.5 py-2 sm:py-1.5 rounded-lg bg-[#C84300] hover:bg-[#A83800] text-xs font-semibold text-white shadow-2xs transition-colors inline-flex items-center gap-1.5 min-h-[36px]">
           <span>Dùng thử mẫu lệnh này →</span>
         </button>
-        <button type="button" onClick={() => onCopy(p.id)} id={`copy-btn-${p.id}`} className="px-3 py-2 sm:py-1.5 rounded-lg bg-[#F8F8F6] hover:bg-neutral-200/80 text-xs font-semibold text-[#111827] border border-[#E5E5E0] transition-colors inline-flex items-center gap-1.5 min-h-[36px]">
+        <button type="button" onClick={() => onCopy(p.id)} id={`copy-btn-${p.id}`} className="px-3 py-2 sm:py-1.5 rounded-lg bg-[#F8F4EE] hover:bg-neutral-200/80 text-xs font-semibold text-[#1a0e08] border border-[#E6DED3] transition-colors inline-flex items-center gap-1.5 min-h-[36px]">
           {copied ? <>
             <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
             <span className="text-emerald-700">Đã sao chép!</span>
@@ -218,15 +218,15 @@ function PromptCard({ p, copied, onCopy, navigate }: { p: typeof SAMPLE_PROMPTS[
 
 // Phân khu 3: thẻ việc làm được / chưa làm được (renderCapabilitiesGrid).
 function CapabilityCard({ c, navigate }: { c: typeof CAPABILITIES_DATA[number]; navigate: Navigate }) {
-  return <div className="bg-white rounded-2xl border border-[#E7E7E2] p-6 shadow-sm v3-space-y-4">
-    <div className="flex items-center justify-between gap-3 pb-3 border-b border-[#E7E7E2]">
+  return <div className="bg-white rounded-2xl border border-[#E8E0D6] p-6 shadow-sm v3-space-y-4">
+    <div className="flex items-center justify-between gap-3 pb-3 border-b border-[#E8E0D6]">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] flex items-center justify-center p-1.5">
+        <div className="w-9 h-9 rounded-lg bg-[#F8F4EE] border border-[#E8E0D6] flex items-center justify-center p-1.5">
           {SERVICE_SVGS[c.id] || <ServiceLogo service={c.id} className="w-5 h-5" />}
         </div>
         <div>
-          <h4 className="font-bold text-base text-[#111827]">{c.name}</h4>
-          <div className="text-xs text-[#6B7280]">{c.role}</div>
+          <h4 className="font-bold text-base text-[#1a0e08]">{c.name}</h4>
+          <div className="text-xs text-[#6A5F56]">{c.role}</div>
         </div>
       </div>
       <a href={`/settings#${c.id}`} onClick={appLink(navigate, `/settings#${c.id}`)} className="text-xs text-[#B43E00] font-semibold hover:underline">
@@ -351,18 +351,18 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
     <>
       {/* FE-12: đã đăng nhập thì dùng thanh điều hướng chung; chưa đăng nhập giữ thanh của bản mẫu. */}
       {user ? <MainNav user={user} current="guide" pageName="Cẩm nang" navigate={navigate} onLogout={onLogout} /> : (
-        <header className="sticky top-0 z-30 w-full bg-[#F8F8F6] border-b border-[#E5E5E0] px-4 sm:px-6 py-3">
+        <header className="sticky top-0 z-30 w-full bg-[#F8F4EE] border-b border-[#E6DED3] px-4 sm:px-6 py-3">
           <div className="max-w-5xl mx-auto flex items-center justify-between gap-3">
             {/* Cụm Logo & Điều hướng */}
             <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
               <a href="/" onClick={appLink(navigate, '/')} className="flex items-center gap-2.5 group flex-shrink-0" title="Về không gian làm việc">
-                <PlanoraMark className="w-7 h-7 text-[#111827] dark:text-[#F1F5F9] flex-shrink-0 group-hover:scale-105 transition-transform" />
-                <span className="font-sans font-bold text-lg tracking-tight text-[#111827]">
+                <PlanoraMark className="w-7 h-7 text-[#1a0e08] dark:text-[#F3EEE8] flex-shrink-0 group-hover:scale-105 transition-transform" />
+                <span className="font-sans font-bold text-lg tracking-tight text-[#1a0e08]">
                   Planora
                 </span>
               </a>
-              <div className="h-4 w-px bg-[#E5E5E0] flex-shrink-0" />
-              <a href="/" onClick={appLink(navigate, '/')} className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Quay lại không gian làm việc">
+              <div className="h-4 w-px bg-[#E6DED3] flex-shrink-0" />
+              <a href="/" onClick={appLink(navigate, '/')} className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#51463E] hover:text-[#1a0e08] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Quay lại không gian làm việc">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
@@ -373,10 +373,10 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                   Quay lại
                 </span>
               </a>
-              <div className="hidden md:block h-4 w-px bg-[#E5E5E0] flex-shrink-0" />
+              <div className="hidden md:block h-4 w-px bg-[#E6DED3] flex-shrink-0" />
               {/* Liên kết chéo */}
-              <a href="/settings" onClick={appLink(navigate, '/settings')} className="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Kết nối dịch vụ">
-                <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <a href="/settings" onClick={appLink(navigate, '/settings')} className="hidden md:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#51463E] hover:text-[#1a0e08] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Kết nối dịch vụ">
+                <svg className="w-4 h-4 text-[#6A5F56]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                 </svg>
                 {' '}
@@ -384,8 +384,8 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                   Kết nối dịch vụ
                 </span>
               </a>
-              <a href="/history" onClick={appLink(navigate, '/history')} className="hidden lg:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Nhật ký điều phối">
-                <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <a href="/history" onClick={appLink(navigate, '/history')} className="hidden lg:inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#51463E] hover:text-[#1a0e08] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title="Mở trang Nhật ký điều phối">
+                <svg className="w-4 h-4 text-[#6A5F56]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 {' '}
@@ -397,7 +397,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
             {/* Cụm phải dùng trạng thái thật của app; bỏ menu kịch bản và vai trò giả của bản mẫu. */}
             <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
               <ThemeToggle />
-              <a href="/login" onClick={appLink(navigate, '/login')} className="px-3 py-1.5 min-h-[36px] rounded-xl bg-white hover:bg-neutral-50 text-[#111827] font-medium border border-[#E5E5E0] shadow-2xs transition-all inline-flex items-center">Đăng nhập</a>
+              <a href="/login" onClick={appLink(navigate, '/login')} className="px-3 py-1.5 min-h-[36px] rounded-xl bg-white hover:bg-neutral-50 text-[#1a0e08] font-medium border border-[#E6DED3] shadow-2xs transition-all inline-flex items-center">Đăng nhập</a>
             </div>
           </div>
         </header>
@@ -405,7 +405,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
       {/* ==================== MAIN CONTENT ==================== */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 v3-space-y-6">
         {/* HERO / TIÊU ĐỀ TRANG + OAUTH-FIRST PLAYBOOK SHOWCASE */}
-        <section className="bg-white rounded-2xl border border-[#E5E5E0] p-6 sm:p-7 shadow-2xs v3-space-y-5">
+        <section className="bg-white rounded-2xl border border-[#E6DED3] p-6 sm:p-7 shadow-2xs v3-space-y-5">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="v3-space-y-2 max-w-2xl">
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-[#FFF6EE] border border-[#F7D7BE] text-[#B43E00]">
@@ -417,10 +417,10 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                 </span>
               </div>
               {' '}
-              <h1 className="font-sans text-2xl sm:text-[28px] font-semibold text-[#111827] tracking-tight leading-tight">
+              <h1 className="font-sans text-2xl sm:text-[28px] font-semibold text-[#1a0e08] tracking-tight leading-tight">
                 Cẩm nang kết nối &amp; Mẫu câu lệnh Planora
               </h1>
-              <p className="text-sm text-[#4B5563] leading-relaxed">
+              <p className="text-sm text-[#51463E] leading-relaxed">
                 Dành cho quản lý dự án, vận hành và người dùng doanh nghiệp. Liên kết tài khoản nhanh chóng không cần cấu hình kỹ thuật, trực quan hoá luồng công việc đa dịch vụ và sử dụng ngay thư viện mẫu câu lệnh tiếng Việt hiệu quả cao.
               </p>
               <div className="flex flex-wrap items-center gap-2.5 pt-1">
@@ -428,26 +428,26 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                   <span>Mở Cài đặt dịch vụ</span>
                   <span>→</span>
                 </a>
-                <a href="/" onClick={appLink(navigate, '/')} className="px-4 py-2 rounded-xl bg-[#F8F8F6] hover:bg-neutral-200/70 text-[#111827] border border-[#E5E5E0] text-xs sm:text-sm font-semibold transition-all inline-flex items-center gap-1.5">
+                <a href="/" onClick={appLink(navigate, '/')} className="px-4 py-2 rounded-xl bg-[#F8F4EE] hover:bg-neutral-200/70 text-[#1a0e08] border border-[#E6DED3] text-xs sm:text-sm font-semibold transition-all inline-flex items-center gap-1.5">
                   <span>Quay lại trò chuyện</span>
                 </a>
               </div>
             </div>
             {/* Thẻ số liệu tóm tắt nhanh */}
             <div className="grid grid-cols-2 gap-2 sm:gap-3 flex-shrink-0">
-              <div className="bg-[#F8F8F6] border border-[#E5E5E0] rounded-xl p-3 sm:p-3.5 text-center">
+              <div className="bg-[#F8F4EE] border border-[#E6DED3] rounded-xl p-3 sm:p-3.5 text-center">
                 <div className="font-sans text-lg sm:text-2xl font-semibold tabular-nums text-[#B43E00]">
                   8/8
                 </div>
-                <div className="text-xs text-[#6B7280] font-medium mt-0.5 leading-tight">
+                <div className="text-xs text-[#6A5F56] font-medium mt-0.5 leading-tight">
                   Dịch vụ có hướng dẫn
                 </div>
               </div>
-              <div className="bg-[#F8F8F6] border border-[#E5E5E0] rounded-xl p-3 sm:p-3.5 text-center">
-                <div className="font-sans text-lg sm:text-2xl font-semibold tabular-nums text-[#111827]">
+              <div className="bg-[#F8F4EE] border border-[#E6DED3] rounded-xl p-3 sm:p-3.5 text-center">
+                <div className="font-sans text-lg sm:text-2xl font-semibold tabular-nums text-[#1a0e08]">
                   12+
                 </div>
-                <div className="text-xs text-[#6B7280] font-medium mt-0.5 leading-tight">
+                <div className="text-xs text-[#6A5F56] font-medium mt-0.5 leading-tight">
                   Mẫu câu lệnh sẵn
                 </div>
               </div>
@@ -455,13 +455,13 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
           </div>
 
           {/* Bắt đầu sử dụng Planora + Make.com Orbital Pipeline Showcase */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-[#F8F8F6] border border-[#E5E5E0] v3-space-y-4">
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#F8F4EE] border border-[#E6DED3] v3-space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h2 className="font-sans text-base sm:text-lg font-semibold text-[#111827]">
+                <h2 className="font-sans text-base sm:text-lg font-semibold text-[#1a0e08]">
                   Bắt đầu sử dụng Planora
                 </h2>
-                <p className="text-xs sm:text-sm text-[#4B5563]">
+                <p className="text-xs sm:text-sm text-[#51463E]">
                   Mọi yêu cầu phức tạp đều được Planora lập thành sơ đồ luồng công việc trực quan và chờ bạn duyệt trước khi thực hiện.
                 </p>
               </div>
@@ -473,13 +473,13 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
           </div>
 
           {/* Cài đặt dịch vụ 1-Click OAuth Showcase (thu gọn để nhường không gian cho 3 phân khu chính) */}
-          <div className="rounded-xl bg-[#F8F8F6] border border-[#E5E5E0] px-4 py-3 v3-space-y-2">
+          <div className="rounded-xl bg-[#F8F4EE] border border-[#E6DED3] px-4 py-3 v3-space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <h2 className="font-sans text-xs sm:text-sm font-semibold text-[#111827]">
+                <h2 className="font-sans text-xs sm:text-sm font-semibold text-[#1a0e08]">
                   Cài đặt dịch vụ
                 </h2>
-                <span className="text-xs text-[#6B7280] hidden sm:inline">
+                <span className="text-xs text-[#6A5F56] hidden sm:inline">
                   · Kết nối tài khoản trực tiếp tại trang Cài đặt, dưới đây là hướng dẫn sử dụng và mẫu câu lệnh.
                 </span>
               </div>
@@ -488,7 +488,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
               </a>
             </div>
             <details className="group">
-              <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs font-medium text-[#4B5563] hover:text-[#111827]">
+              <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs font-medium text-[#51463E] hover:text-[#1a0e08]">
                 <span>Xem tóm tắt nhanh 7 dịch vụ hỗ trợ liên kết trực tiếp</span>
                 <svg className="w-3.5 h-3.5 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
@@ -496,15 +496,15 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
               </summary>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-3">
                 {GUIDE_OAUTH_SHOWCASE_CARDS.map(card => (
-                  <div key={card.service} className="p-3.5 rounded-xl bg-white border border-[#E7E7E2] flex flex-col justify-between gap-2">
+                  <div key={card.service} className="p-3.5 rounded-xl bg-white border border-[#E8E0D6] flex flex-col justify-between gap-2">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-lg bg-[#F8F8F6] border border-[#E7E7E2] flex items-center justify-center"><ServiceLogo service={card.service} className={card.iconClassName} /></span>
-                        <span className="text-xs font-bold text-[#111827]">{card.title}</span>
+                        <span className="w-7 h-7 rounded-lg bg-[#F8F4EE] border border-[#E8E0D6] flex items-center justify-center"><ServiceLogo service={card.service} className={card.iconClassName} /></span>
+                        <span className="text-xs font-bold text-[#1a0e08]">{card.title}</span>
                       </div>
-                      <span className={card.badgeStyle === 'oauth' ? 'text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200' : 'text-xs font-semibold px-2 py-0.5 rounded-full bg-white text-[#4B5563] border border-[#E7E7E2]'}>{card.badge}</span>
+                      <span className={card.badgeStyle === 'oauth' ? 'text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200' : 'text-xs font-semibold px-2 py-0.5 rounded-full bg-white text-[#51463E] border border-[#E8E0D6]'}>{card.badge}</span>
                     </div>
-                    <p className="text-xs text-[#4B5563]">{card.description}</p>
+                    <p className="text-xs text-[#51463E]">{card.description}</p>
                   </div>
                 ))}
               </div>
@@ -512,7 +512,7 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
           </div>
 
           {/* 3 Tabs Điều hướng Phân khu chính */}
-          <div className="pt-4 border-t border-[#E7E7E2]">
+          <div className="pt-4 border-t border-[#E8E0D6]">
             <nav className="flex flex-wrap gap-2" aria-label="Các phân khu cẩm nang" role="tablist">
               <button type="button" role="tab" aria-controls="section-keys" onClick={() => actions.switchMainTab('keys')} id="tab-btn-keys" {...tabProps('keys')}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -546,35 +546,35 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
          ======================================================== */}
         <section id="section-keys" role="tabpanel" aria-labelledby="tab-btn-keys" className={`${tab === 'keys' ? '' : 'hidden '}v3-space-y-6`}>
           {/* Thanh chọn 8 dịch vụ */}
-          <div className="bg-white rounded-2xl border border-[#E7E7E2] p-4 shadow-sm">
-            <div className="text-xs font-semibold text-[#6B7280] mb-3 px-1">
+          <div className="bg-white rounded-2xl border border-[#E8E0D6] p-4 shadow-sm">
+            <div className="text-xs font-semibold text-[#6A5F56] mb-3 px-1">
               Chọn công cụ bạn muốn kết nối:
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2" id="service-pills-container">
               {Object.keys(SERVICE_GUIDES).map(id => {
                 const isSelected = id === serviceId;
                 return (
-                  <button key={id} type="button" onClick={() => actions.selectServiceGuide(id)} id={`service-pill-${id}`} className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all text-center group ${isSelected ? 'bg-white border-[#111827] ring-1 ring-[#111827]' : 'bg-[#F8F8F6] border-[#E5E5E0] hover:bg-white hover:border-neutral-300'}`}>
+                  <button key={id} type="button" onClick={() => actions.selectServiceGuide(id)} id={`service-pill-${id}`} className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all text-center group ${isSelected ? 'bg-white border-[#1a0e08] ring-1 ring-[#1a0e08]' : 'bg-[#F8F4EE] border-[#E6DED3] hover:bg-white hover:border-neutral-300'}`}>
                     <div className="w-8 h-8 flex items-center justify-center transition-transform group-hover:scale-105">
                       {SERVICE_SVGS[id] || <ServiceLogo service={id} className="w-5 h-5" />}
                     </div>
-                    <span className={`text-xs font-semibold mt-1.5 ${isSelected ? 'text-[#111827]' : 'text-[#374151]'}`}>{SERVICE_GUIDES[id].name}</span>
+                    <span className={`text-xs font-semibold mt-1.5 ${isSelected ? 'text-[#1a0e08]' : 'text-[#4a4038]'}`}>{SERVICE_GUIDES[id].name}</span>
                   </button>
                 );
               })}
             </div>
           </div>
           {/* Khung chi tiết hướng dẫn của dịch vụ được chọn */}
-          <div id="service-guide-detail" className="bg-white rounded-2xl border border-[#E5E5E0] p-6 sm:p-8 shadow-2xs v3-space-y-6">
+          <div id="service-guide-detail" className="bg-white rounded-2xl border border-[#E6DED3] p-6 sm:p-8 shadow-2xs v3-space-y-6">
             <ServiceGuideDetail serviceId={SERVICE_GUIDES[serviceId] ? serviceId : DEFAULT_SERVICE} guides={SERVICE_GUIDES} navigate={navigate} />
           </div>
           {/* Ngăn kéo nâng cao dành cho Quản trị viên Workspace */}
-          <details data-testid="workspace-admin-advanced-drawer" className="bg-white rounded-2xl border border-[#E5E5E0] p-5 sm:p-6 shadow-2xs">
-            <summary className="cursor-pointer font-semibold text-sm sm:text-base text-[#111827] flex items-center justify-between gap-2">
+          <details data-testid="workspace-admin-advanced-drawer" className="bg-white rounded-2xl border border-[#E6DED3] p-5 sm:p-6 shadow-2xs">
+            <summary className="cursor-pointer font-semibold text-sm sm:text-base text-[#1a0e08] flex items-center justify-between gap-2">
               <span>Dành cho Quản trị viên Workspace (Nâng cao)</span>
-              <span className="text-xs font-medium text-[#6B7280]">Quản lý quyền truy cập &amp; phạm vi dữ liệu nhóm</span>
+              <span className="text-xs font-medium text-[#6A5F56]">Quản lý quyền truy cập &amp; phạm vi dữ liệu nhóm</span>
             </summary>
-            <div className="mt-4 pt-4 border-t border-[#E5E5E0] text-xs sm:text-sm text-[#4B5563] v3-space-y-2 leading-relaxed">
+            <div className="mt-4 pt-4 border-t border-[#E6DED3] text-xs sm:text-sm text-[#51463E] v3-space-y-2 leading-relaxed">
               <p>
                 Tất cả các công cụ ({gmailEnabled ? 'Gmail, ' : ''}Google Calendar, Google Sheets, Trello, Slack, GitHub, Notion, Telegram, Atlassian Jira) đều hỗ trợ <strong>liên kết trực tiếp</strong> trong trang <a href="/settings" onClick={appLink(navigate, '/settings')} className="text-[#B43E00] font-semibold underline">Kết nối dịch vụ</a> mà người dùng không cần tự tạo hay dán khoá kỹ thuật thủ công.
               </p>
@@ -589,17 +589,17 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
          ======================================================== */}
         <section id="section-prompts" role="tabpanel" aria-labelledby="tab-btn-prompts" className={`${tab === 'prompts' ? '' : 'hidden '}v3-space-y-6`}>
           {/* Bộ lọc và tìm kiếm câu lệnh */}
-          <div className="bg-white rounded-2xl border border-[#E5E5E0] p-4 sm:p-5 shadow-2xs v3-space-y-4">
+          <div className="bg-white rounded-2xl border border-[#E6DED3] p-4 sm:p-5 shadow-2xs v3-space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               {/* Ô tìm kiếm */}
               <div className="relative flex-1">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#6B7280]">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#6A5F56]">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
                 {' '}
-                <input type="text" id="prompt-search-input" onInput={(event) => actions.filterPrompts(event.currentTarget.value)} placeholder="Tìm kiếm mẫu lệnh theo từ khoá (Trello, lỗi, sheets, slack, họp...)" className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-[#F8F8F6] border border-[#E5E5E0] rounded-xl placeholder-[#6B7280] !outline-none focus-visible:!outline-none focus:border-[#111827] focus:bg-white transition-all" />
+                <input type="text" id="prompt-search-input" onInput={(event) => actions.filterPrompts(event.currentTarget.value)} placeholder="Tìm kiếm mẫu lệnh theo từ khoá (Trello, lỗi, sheets, slack, họp...)" className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm bg-[#F8F4EE] border border-[#E6DED3] rounded-xl placeholder-[#6A5F56] !outline-none focus-visible:!outline-none focus:border-[#1a0e08] focus:bg-white transition-all" />
               </div>
               {/* Các nút lọc nhóm nghiệp vụ */}
               <div className="flex flex-wrap gap-1.5 sm:gap-2" id="prompt-category-filter">
@@ -623,29 +623,29 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
           {/* Danh sách thẻ câu lệnh mẫu */}
           <div id="prompts-grid" className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {prompts.length === 0 ? (
-              <div className="col-span-full p-8 text-center bg-white rounded-2xl border border-[#E7E7E2] text-sm text-[#6B7280]">
+              <div className="col-span-full p-8 text-center bg-white rounded-2xl border border-[#E8E0D6] text-sm text-[#6A5F56]">
                 {" Không tìm thấy mẫu câu lệnh phù hợp với từ khoá "}
-                <span className="font-bold text-[#111827]">{`"${search}"`}</span>
+                <span className="font-bold text-[#1a0e08]">{`"${search}"`}</span>
                 {'. Hãy thử tìm từ khoá khác như "Trello", "Slack", "lỗi", "báo cáo". '}
               </div>
             ) : prompts.map(p => <PromptCard key={p.id} p={p} copied={!!copied[p.id]} onCopy={actions.copyPromptText} navigate={navigate} />)}
           </div>
           {/* 4 Nguyên tắc vàng viết câu lệnh cho Planora */}
-          <div className="bg-white rounded-2xl border border-[#E5E5E0] p-6 shadow-2xs v3-space-y-3">
-            <div className="flex items-center gap-2 text-[#111827] font-semibold text-sm">
-              <svg className="w-5 h-5 text-[#4B5563]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-white rounded-2xl border border-[#E6DED3] p-6 shadow-2xs v3-space-y-3">
+            <div className="flex items-center gap-2 text-[#1a0e08] font-semibold text-sm">
+              <svg className="w-5 h-5 text-[#51463E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>
                 4 kinh nghiệm thực tế để câu lệnh tiếng Việt chạy chính xác nhất
               </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs text-[#111827]">
-              <div className="p-3 bg-[#F8F8F6] rounded-xl border border-[#E5E5E0] v3-space-y-1">
-                <div className="font-semibold text-[#111827]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs text-[#1a0e08]">
+              <div className="p-3 bg-[#F8F4EE] rounded-xl border border-[#E6DED3] v3-space-y-1">
+                <div className="font-semibold text-[#1a0e08]">
                   1. Dùng động từ hành động rõ
                 </div>
-                <p className="text-[#4B5563]">
+                <p className="text-[#51463E]">
                   {"Bắt đầu bằng: "}
                   <em>
                     "Tạo card..."
@@ -664,11 +664,11 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                   </em>
                 </p>
               </div>
-              <div className="p-3 bg-[#F8F8F6] rounded-xl border border-[#E5E5E0] v3-space-y-1">
-                <div className="font-semibold text-[#111827]">
+              <div className="p-3 bg-[#F8F4EE] rounded-xl border border-[#E6DED3] v3-space-y-1">
+                <div className="font-semibold text-[#1a0e08]">
                   2. Nêu rõ tên nơi cần làm
                 </div>
-                <p className="text-[#4B5563]">
+                <p className="text-[#51463E]">
                   {"Chỉ rõ: "}
                   <em>
                     bảng To Do
@@ -688,11 +688,11 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                   {" để Planora tìm đúng chỗ."}
                 </p>
               </div>
-              <div className="p-3 bg-[#F8F8F6] rounded-xl border border-[#E5E5E0] v3-space-y-1">
-                <div className="font-semibold text-[#111827]">
+              <div className="p-3 bg-[#F8F4EE] rounded-xl border border-[#E6DED3] v3-space-y-1">
+                <div className="font-semibold text-[#1a0e08]">
                   3. Ghép nhiều việc trong 1 câu
                 </div>
-                <p className="text-[#4B5563]">
+                <p className="text-[#51463E]">
                   {"Dùng từ nối: "}
                   <em>
                     "đồng thời"
@@ -708,11 +708,11 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
                   {" để Planora tự động móc nối các liên kết."}
                 </p>
               </div>
-              <div className="p-3 bg-[#F8F8F6] rounded-xl border border-[#E5E5E0] v3-space-y-1">
-                <div className="font-semibold text-[#111827]">
+              <div className="p-3 bg-[#F8F4EE] rounded-xl border border-[#E6DED3] v3-space-y-1">
+                <div className="font-semibold text-[#1a0e08]">
                   4. Luôn an tâm khi bấm duyệt
                 </div>
-                <p className="text-[#4B5563]">
+                <p className="text-[#51463E]">
                   Planora luôn cho bạn xem trước nguyên văn nội dung sẽ gửi đi. Không có gì bị ghi khi bạn chưa bấm Duyệt.
                 </p>
               </div>
@@ -724,20 +724,20 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
          ======================================================== */}
         <section id="section-capabilities" role="tabpanel" aria-labelledby="tab-btn-capabilities" className={`${tab === 'capabilities' ? '' : 'hidden '}v3-space-y-6`}>
           {/* Giới thiệu nguyên tắc an toàn */}
-          <div className="bg-white rounded-2xl border border-[#E5E5E0] p-5 shadow-2xs flex items-start sm:items-center justify-between gap-4">
+          <div className="bg-white rounded-2xl border border-[#E6DED3] p-5 shadow-2xs flex items-start sm:items-center justify-between gap-4">
             <div className="v3-space-y-1">
-              <h2 className="font-sans text-base sm:text-lg font-semibold text-[#111827]">
+              <h2 className="font-sans text-base sm:text-lg font-semibold text-[#1a0e08]">
                 Bảng minh bạch năng lực của Planora theo từng công cụ
               </h2>
-              <p className="text-xs sm:text-sm text-[#4B5563]">
+              <p className="text-xs sm:text-sm text-[#51463E]">
                 {"Planora tuân thủ nguyên tắc kiểm soát: "}
-                <span className="font-medium text-[#111827]">
+                <span className="font-medium text-[#1a0e08]">
                   không bao giờ tự ý xoá vĩnh viễn dữ liệu cũ
                 </span>
                 {" và chỉ hoạt động trong đúng phạm vi bảng, kênh, kho mã được quản trị viên cấp phép."}
               </p>
             </div>
-            <a href="/settings" onClick={appLink(navigate, '/settings')} className="flex-shrink-0 px-3.5 py-2 rounded-xl bg-[#F8F8F6] border border-[#E5E5E0] text-xs font-semibold text-[#111827] hover:border-[#111827] transition-colors inline-flex items-center gap-1.5">
+            <a href="/settings" onClick={appLink(navigate, '/settings')} className="flex-shrink-0 px-3.5 py-2 rounded-xl bg-[#F8F4EE] border border-[#E6DED3] text-xs font-semibold text-[#1a0e08] hover:border-[#1a0e08] transition-colors inline-flex items-center gap-1.5">
               <span>
                 Xem nơi được phép
               </span>
@@ -755,17 +755,17 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
       {/* ==================== TOAST NOTIFICATION CONTAINER ==================== */}
       <div id="toast-container" className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none" aria-live="polite">
         {toasts.map(toast => (
-          <div key={toast.id} className="pointer-events-auto bg-[#111827] text-white text-xs px-4 py-3 rounded-xl shadow-lg border border-neutral-700 flex items-center gap-2 max-w-sm transition-all v3-transform duration-200" style={toast.fading ? { opacity: '0' } : undefined}>
+          <div key={toast.id} className="pointer-events-auto bg-[#1a0e08] text-white text-xs px-4 py-3 rounded-xl shadow-lg border border-neutral-700 flex items-center gap-2 max-w-sm transition-all v3-transform duration-200" style={toast.fading ? { opacity: '0' } : undefined}>
             <svg className="w-4 h-4 text-[#FF9457] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             <span className="flex-1">{toast.message}</span>
           </div>
         ))}
       </div>
       {/* ==================== FOOTER ==================== */}
-      <footer className="mt-auto border-t border-[#E5E5E0] bg-[#F8F8F6] py-6 px-4 sm:px-6">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6B7280]">
+      <footer className="mt-auto border-t border-[#E6DED3] bg-[#F8F4EE] py-6 px-4 sm:px-6">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6A5F56]">
           <div className="flex items-center gap-2">
-            <span className="font-sans font-semibold text-[#111827]">
+            <span className="font-sans font-semibold text-[#1a0e08]">
               Planora
             </span>
             <span>
@@ -773,13 +773,13 @@ export function GuidePage({ navigate, user = null, onLogout = () => navigate('/'
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <a href="/" onClick={appLink(navigate, '/')} className="hover:text-[#111827] transition-colors">
+            <a href="/" onClick={appLink(navigate, '/')} className="hover:text-[#1a0e08] transition-colors">
               Không gian làm việc
             </a>
-            <a href="/settings" onClick={appLink(navigate, '/settings')} className="hover:text-[#111827] transition-colors">
+            <a href="/settings" onClick={appLink(navigate, '/settings')} className="hover:text-[#1a0e08] transition-colors">
               Kết nối dịch vụ
             </a>
-            <a href="/history" onClick={appLink(navigate, '/history')} className="hover:text-[#111827] transition-colors">
+            <a href="/history" onClick={appLink(navigate, '/history')} className="hover:text-[#1a0e08] transition-colors">
               Nhật ký điều phối
             </a>
             <a href="/privacy" onClick={appLink(navigate, '/privacy')} className="text-[#B43E00] hover:underline font-medium transition-colors">

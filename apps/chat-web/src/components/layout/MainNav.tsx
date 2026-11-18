@@ -1,9 +1,11 @@
-// FE-12: thanh điều hướng chung của mọi trang sau khi đăng nhập (nhóm trưởng chốt 19/10/2026,
-// đặc tả giao diện mục 1.1 điểm 10). Không có trong bản mẫu; class màu lấy từ header của bản React
-// để prototype/theme.css lo chế độ tối như ở các trang khác.
-// Tab hiện từ 900 px: ở 768–899 px, cockpit của admin không đủ chỗ đặt 5 tab ở giữa thanh
-// (review #162, nhóm trưởng chốt 20/10/2026).
-import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
+// FE-12: khung điều hướng chung của mọi trang sau khi đăng nhập.
+// Redesign 11/2026 (phong cách "framed sheet"): thanh bên trái và thanh trên cùng một nền ấm (hình chữ L),
+// nội dung nằm trên tờ giấy. Từ 1024 px thanh bên luôn hiện; hẹp hơn thì thanh bên thành tấm menu toàn màn hình
+// mở bằng nút menu trên thanh trên, nên điện thoại vẫn tới được mọi trang mà không phải vào menu avatar.
+// Mỗi đích chỉ còn một lối vào: Hộp thư đề xuất nằm trong danh sách, không còn chip "Sự kiện" riêng.
+// Giao diện của khung nằm ở src/styles/app-shell.css; MainNav gắn data-app-shell lên <html> khi có mặt.
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { BookOpen, History, Inbox, Menu, MessagesSquare, Plug, Users, X } from 'lucide-react';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import { PlanoraMark } from '../PlanoraMark';
 import type { User } from '../../types';
@@ -20,18 +22,17 @@ export const NAV_ITEMS = [
   { to: '/settings', label: 'Kết nối dịch vụ', end: false },
   { to: '/guide', label: 'Cẩm nang', end: false },
 ] as const;
-const TABS: { id: NavTab; path: string; name: string; short: string; adminOnly?: boolean }[] = [
-  { id: 'workspace', path: '/', name: 'Không gian làm việc', short: 'Làm việc' },
-  { id: 'history', path: '/history', name: 'Nhật ký', short: 'Nhật ký' },
-  { id: 'settings', path: '/settings', name: 'Kết nối dịch vụ', short: 'Kết nối' },
-  { id: 'guide', path: '/guide', name: 'Cẩm nang', short: 'Cẩm nang' },
-  { id: 'users', path: '/admin/users', name: 'Người dùng', short: 'Người dùng', adminOnly: true },
+type Tab = { id: NavTab; path: string; name: string; icon: typeof History; group: 'work' | 'more'; adminOnly?: boolean };
+const TABS: Tab[] = [
+  { id: 'workspace', path: '/', name: 'Không gian làm việc', icon: MessagesSquare, group: 'work' },
+  { id: 'history', path: '/history', name: 'Nhật ký', icon: History, group: 'work' },
+  { id: 'inbox', path: '/inbox', name: 'Hộp thư đề xuất', icon: Inbox, group: 'work' },
+  { id: 'settings', path: '/settings', name: 'Kết nối dịch vụ', icon: Plug, group: 'work' },
+  { id: 'guide', path: '/guide', name: 'Cẩm nang', icon: BookOpen, group: 'more' },
+  { id: 'users', path: '/admin/users', name: 'Người dùng', icon: Users, group: 'more', adminOnly: true },
 ];
-const TAB = 'inline-flex items-center h-9 px-2 border-b-2 text-sm whitespace-nowrap transition-colors';
-const TAB_ON = `${TAB} border-[#FF5701] font-semibold text-[#111827]`;
-const TAB_OFF = `${TAB} border-transparent font-medium text-[#4B5563] hover:text-[#111827]`;
-const AVATAR = 'w-8 h-8 rounded-full bg-[#FF5701] text-white text-xs font-bold flex items-center justify-center shadow-sm flex-shrink-0 hover:opacity-90';
-const MENU_ITEM = 'w-full flex text-left items-center gap-2.5 px-4 py-2 text-xs text-[#111827] dark:text-[#F1F5F9] hover:bg-neutral-100 dark:hover:bg-[#1F2A44] hover:text-[#B43E00] dark:hover:text-[#FB923C] focus:bg-neutral-100 dark:focus:bg-[#1F2A44] focus:text-[#B43E00] dark:focus:text-[#FB923C] focus:outline-none transition-colors';
+const AVATAR = 'w-8 h-8 rounded-full bg-[#1A0E08] dark:bg-[#F3EEE8] text-white dark:text-[#1A0E08] text-xs font-semibold flex items-center justify-center flex-shrink-0 hover:opacity-90';
+const MENU_ITEM = 'w-full flex text-left items-center gap-2.5 px-4 py-2 text-sm text-[#1a0e08] dark:text-[#F3EEE8] hover:bg-[#F3EEE7] dark:hover:bg-[#2A231E] focus:bg-[#F3EEE7] dark:focus:bg-[#2A231E] focus:outline-none transition-colors';
 
 export interface MainNavProps {
   user: User | null;
@@ -39,96 +40,149 @@ export interface MainNavProps {
   navigate: (path: string) => void;
   onLogout: () => void;
   onOpenSettings?: () => void;
-  /** Tên trang hiện cạnh logo khi màn hẹp hơn 900 px (lúc đó không có tab). */
+  /** Tên trang hiện trên thanh trên khi màn hẹp hơn 1024 px (lúc đó thanh bên đã gập). */
   pageName?: string;
   /** Nút riêng của trang, đặt trước nút sáng/tối (cockpit: Lịch sử, Xem hội thoại). */
   actions?: ReactNode;
-  /** Số đề xuất cần xử lý trong Hộp thư đề xuất (hiển thị badge nhanh trên thanh điều hướng). */
+  /** Số đề xuất cần xử lý trong Hộp thư đề xuất. */
   inboxBadgeCount?: number;
-  /** Phần nằm ngay dưới thanh, trong cùng header dính (cockpit: dải Chế độ thử nghiệm). */
+  /** Phần nằm ngay dưới thanh trên, trong cùng header dính (cockpit: dải Chế độ thử nghiệm). */
   children?: ReactNode;
 }
+
+const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pageName, actions, inboxBadgeCount, children }: MainNavProps) {
   const pendingCount = useSchedulePendingCount(user);
   const [activeWorkspace, setActiveWorkspace] = useState(getActiveWorkspaceSummary());
+  const [menuOpen, setMenuOpen] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
   useEffect(() => subscribeWorkspace(() => setActiveWorkspace(getActiveWorkspaceSummary())), []);
+  // Bật lớp giao diện của khung app (app-shell.css) khi khung đang hiện, trả lại khi rời trang.
+  useLayoutEffect(() => {
+    const html = document.documentElement;
+    html.dataset.appShell = '';
+    return () => { delete html.dataset.appShell; };
+  }, []);
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = (event: MediaQueryListEvent) => { if (event.matches) setMenuOpen(false); };
+    mq.addEventListener?.('change', onChange);
+    return () => mq.removeEventListener?.('change', onChange);
+  }, []);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeBtnRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (document.querySelector('[data-testid="create-org-modal-backdrop"], [data-testid="join-org-modal-backdrop"]')) return;
+      if (event.key === 'Escape' && !event.defaultPrevented) {
+        event.preventDefault();
+        setMenuOpen(false);
+        menuBtnRef.current?.focus();
+        return;
+      }
+      if (event.key === 'Tab' && sidebarRef.current && (sidebarRef.current.contains(document.activeElement) || document.activeElement === menuBtnRef.current)) {
+        const items = [...sidebarRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(el => !el.closest('[hidden]'));
+        const first = items[0], last = items.at(-1);
+        if (!first) return;
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === menuBtnRef.current)) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === menuBtnRef.current)) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+
+  const closeMenu = () => {
+    setMenuOpen(false);
+    menuBtnRef.current?.focus();
+  };
 
   // Bấm kèm phím bổ trợ hoặc chuột giữa thì để trình duyệt mở tab mới như link thường.
   const follow = (path: string) => (event: MouseEvent<HTMLAnchorElement>) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
+    setMenuOpen(false);
     navigate(path);
   };
   const canManageUsers = (activeWorkspace.id !== 'personal' && activeWorkspace.role === 'admin') || (activeWorkspace.id === 'personal' && user?.role === 'admin');
   const usersPendingCount = activeWorkspace.id !== 'personal' && typeof activeWorkspace.pendingCount === 'number' ? activeWorkspace.pendingCount : 0;
+  const inboxCount = typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0 ? inboxBadgeCount : 0;
   const tabs = TABS.filter(tab => !tab.adminOnly || canManageUsers);
+  const countFor = (id: NavTab) => (id === 'history' ? pendingCount : id === 'users' ? usersPendingCount : id === 'inbox' ? inboxCount : 0);
+  const labelFor = (tab: Tab, count: number) => {
+    if (!count) return tab.name;
+    if (tab.id === 'history') return `Nhật ký, ${count} lượt chờ duyệt`;
+    if (tab.id === 'inbox') return `Hộp thư đề xuất, ${count} đề xuất cần xử lý`;
+    return `${tab.name}, ${count} chờ duyệt`;
+  };
+  const link = (tab: Tab) => {
+    const count = countFor(tab.id);
+    const Icon = tab.icon;
+    return (
+      <a
+        key={tab.id}
+        href={tab.path}
+        onClick={follow(tab.path)}
+        data-testid={tab.id === 'inbox' ? 'nav-events-inbox-link' : undefined}
+        aria-label={labelFor(tab, count)}
+        aria-current={current === tab.id ? 'page' : undefined}
+        className="ps-navlink"
+      >
+        <Icon aria-hidden="true" strokeWidth={1.75} />
+        <span className="truncate">{tab.name}</span>
+        {count > 0 && <span aria-hidden="true" className="ps-navcount" data-schedule-count={tab.id === 'history' ? '' : undefined} data-users-pending-count={tab.id === 'users' ? '' : undefined} data-inbox-badge-count={tab.id === 'inbox' ? '' : undefined}>{count}</span>}
+      </a>
+    );
+  };
+
   return (
-    <header className="sticky top-0 z-30 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2]">
-      <div data-main-nav className="max-w-7xl mx-auto grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-4 sm:px-6 py-2">
-        <div className="col-start-1 flex items-center gap-2 min-w-0 max-w-full justify-self-start">
-          <a href="/" onClick={follow('/')} aria-label="Planora · Về không gian làm việc" title="Về không gian làm việc" className="flex items-center gap-2 group flex-shrink-0">
-            <PlanoraMark className="w-7 h-7 text-[#111827] dark:text-[#F1F5F9] flex-shrink-0 group-hover:scale-105 transition-transform" />
-            <span className="font-display font-bold text-lg tracking-tight text-[#111827] hidden sm:inline">
-              Planora
-            </span>
+    <header className="ps-topbar sticky top-0 z-30 w-full" data-menu-open={menuOpen ? '' : undefined}>
+      <div ref={sidebarRef} id="app-sidebar" className="ps-sidebar" data-app-sidebar data-open={menuOpen ? '' : undefined}>
+        <div className="flex items-center justify-between gap-2 h-9 px-1.5">
+          <button ref={closeBtnRef} type="button" className="ps-iconbtn ps-sidebar-close order-2" aria-label="Đóng menu điều hướng" onClick={closeMenu}>
+            <X aria-hidden="true" size={18} />
+          </button>
+          <a href="/" onClick={follow('/')} aria-label="Planora · Về không gian làm việc" title="Về không gian làm việc" className="order-1 flex items-center gap-2 min-w-0">
+            <PlanoraMark className="w-6 h-6 text-[#1a0e08] dark:text-[#F3EEE8] flex-shrink-0" />
+            <span className="ps-brand">Planora</span>
           </a>
-          <div className="flex items-center min-w-0 shrink">
-            <WorkspaceSwitcher navigate={navigate} />
-          </div>
-          {pageName && <span data-nav-page-name className="min-[900px]:hidden text-sm font-medium text-[#4B5563] truncate">{pageName}</span>}
         </div>
-        <nav aria-label="Điều hướng chính" className="col-start-2 hidden min-[900px]:flex items-center gap-1 justify-self-center">
-          {tabs.map(tab => (
-            <a key={tab.id} href={tab.path} onClick={follow(tab.path)} aria-label={tab.id === 'history' && pendingCount > 0 ? `Nhật ký, ${pendingCount} lượt chờ duyệt` : tab.name} aria-current={current === tab.id ? 'page' : undefined} className={current === tab.id ? TAB_ON : TAB_OFF}>
-              <span className="xl:hidden">{tab.short}</span>
-              <span className="hidden xl:inline">{tab.name}</span>
-              {tab.id === 'history' && pendingCount > 0 && <span aria-hidden="true" data-schedule-count className="ml-1 rounded-full px-1.5 py-0.5 bg-[#FF5701] text-white text-xs font-bold">{pendingCount}</span>}
-              {tab.id === 'users' && usersPendingCount > 0 && <span aria-hidden="true" data-users-pending-count className="ml-1 rounded-full px-1.5 py-0.5 bg-[#FF5701] text-white text-xs font-bold">{usersPendingCount}</span>}
-            </a>
-          ))}
+        <div data-sidebar-workspace className="mt-3 mb-4">
+          <WorkspaceSwitcher navigate={navigate} variant="sidebar" />
+        </div>
+        <nav aria-label="Điều hướng chính" className="flex flex-col">
+          <div className="ps-navgroup flex flex-col gap-0.5">{tabs.filter(tab => tab.group === 'work').map(link)}</div>
+          <div className="ps-navgroup flex flex-col gap-0.5">{tabs.filter(tab => tab.group === 'more').map(link)}</div>
         </nav>
-        <div className="col-start-3 flex items-center gap-1.5 sm:gap-2 flex-shrink-0 justify-self-end">
-          <a
-            href="/inbox"
-            onClick={follow('/inbox')}
-            data-testid="nav-events-inbox-link"
-            aria-current={current === 'inbox' ? 'page' : undefined}
-            aria-label={
-              typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0
-                ? `Hộp thư đề xuất, ${inboxBadgeCount} đề xuất cần xử lý`
-                : 'Sự kiện & Đề xuất'
-            }
-            title="Mở Trung tâm Sự kiện & Đề xuất chờ duyệt"
-            className={
-              current === 'inbox' || (typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0)
-                ? 'inline-flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 rounded-xl bg-[#FF5701]/10 px-2.5 py-1.5 text-xs font-semibold text-[#FF5701] hover:bg-[#FF5701]/20 transition-colors border border-[#FF5701]/30'
-                : `${actions ? 'hidden xl:inline-flex' : 'inline-flex'} items-center gap-1.5 whitespace-nowrap flex-shrink-0 rounded-xl bg-white dark:bg-[#131B2F] px-2.5 py-1.5 text-xs font-medium text-[#4B5563] dark:text-[#CBD5E1] hover:text-[#111827] dark:hover:text-[#F1F5F9] hover:bg-neutral-100 dark:hover:bg-[#1F2A44] border border-[#E7E7E2] dark:border-[#293653] shadow-sm transition-colors`
-            }
-          >
-            <svg className="w-3.5 h-3.5 text-[#FF5701] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            <span className={actions ? 'hidden 2xl:inline' : 'hidden xl:inline 2xl:hidden'}>
-              {typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0 ? 'Hộp thư' : 'Sự kiện'}
-            </span>
-            {!actions && (
-              <span className="hidden 2xl:inline">
-                {typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0 ? 'Hộp thư đề xuất' : 'Sự kiện & Đề xuất'}
-              </span>
-            )}
-            {typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0 && (
-              <span data-inbox-badge-count className="rounded-full bg-[#FF5701] px-1.5 py-0.5 text-xs font-bold text-white">
-                {inboxBadgeCount}
-              </span>
-            )}
-          </a>
+      </div>
+      <div data-main-nav className="ps-topbar-row flex items-center gap-2 px-3 sm:px-5">
+        <button ref={menuBtnRef} type="button" className="ps-iconbtn ps-menu-btn -ml-1" aria-label="Mở menu điều hướng" aria-expanded={menuOpen} aria-controls="app-sidebar" onClick={() => setMenuOpen(true)}>
+          <Menu aria-hidden="true" size={20} />
+        </button>
+        <PlanoraMark className="ps-topbar-mark w-5 h-5 text-[#1a0e08] dark:text-[#F3EEE8] flex-shrink-0 lg:hidden" />
+        {pageName && <span data-nav-page-name className="ps-pagename truncate lg:hidden">{pageName}</span>}
+        <div className="ml-auto flex items-center gap-1 flex-shrink-0">
           {actions}
           <ThemeToggle />
-          <UserNavMenu user={user} pendingScheduleCount={pendingCount} variant="prototype" triggerClassName={AVATAR} menuItemClassName={MENU_ITEM} navigate={navigate} currentPath={current ? TABS.find(t => t.id === current)?.path ?? (current === 'inbox' ? '/inbox' : '/') : undefined} inboxBadgeCount={inboxBadgeCount} onOpenSettings={onOpenSettings ?? (() => navigate('/settings'))} onOpenAccount={() => navigate('/account')} onManageUsers={() => navigate('/admin/users')} onLogout={onLogout} />
+          <UserNavMenu user={user} pendingScheduleCount={pendingCount} variant="prototype" triggerClassName={AVATAR} menuItemClassName={MENU_ITEM} navigate={navigate} currentPath={current ? TABS.find(t => t.id === current)?.path : undefined} inboxBadgeCount={inboxBadgeCount} onOpenSettings={onOpenSettings ?? (() => navigate('/settings'))} onOpenAccount={() => navigate('/account')} onManageUsers={() => navigate('/admin/users')} onLogout={onLogout} />
         </div>
       </div>
       {children}
+      <div aria-hidden="true" className="ps-sheet-corner" />
     </header>
   );
 }

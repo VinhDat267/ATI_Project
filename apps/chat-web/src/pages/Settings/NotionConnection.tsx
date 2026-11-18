@@ -441,7 +441,7 @@ export function NotionConnection({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <h3 className="font-sans font-semibold text-base text-[#111827] dark:text-white flex items-center gap-3">
+            <h3 className="font-sans font-semibold text-base text-[#1a0e08] dark:text-white flex items-center gap-3">
               <ServiceLogo service="notion" className="w-6 h-6" />
               Notion
             </h3>
@@ -449,7 +449,7 @@ export function NotionConnection({
               {badge.text}
             </span>
           </div>
-          <p className="mt-2 text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+          <p className="mt-2 text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
             Liên kết tài khoản Notion để tra cứu dữ liệu, tạo hoặc cập nhật trang và tổng hợp báo cáo tự động trong đúng các bảng dữ liệu bạn cho phép.
           </p>
 
@@ -457,7 +457,7 @@ export function NotionConnection({
             <div className="mt-2.5 flex items-center gap-2">
               <label
                 htmlFor="notion-workspace-select"
-                className="text-xs font-medium text-[#374151] dark:text-[#D1D5DB]"
+                className="text-xs font-medium text-[#4a4038] dark:text-[#D1D5DB]"
               >
                 Workspace đang dùng:
               </label>
@@ -467,7 +467,7 @@ export function NotionConnection({
                 value={activeConnectionId ?? ''}
                 disabled={busy}
                 onChange={(e) => void handleSwitchWorkspace(e.target.value)}
-                className="rounded-lg border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#1F2937] px-2.5 py-1.5 text-xs text-[#111827] dark:text-white focus:border-[#FF5701] focus:outline-none"
+                className="rounded-lg border border-[#E8E0D6] dark:border-[#4a4038] bg-white dark:bg-[#2A2420] px-2.5 py-1.5 text-xs text-[#1a0e08] dark:text-white focus:border-[#FF5701] focus:outline-none"
               >
                 {connections.map((conn) => (
                   <option key={conn.id} value={conn.id}>
@@ -482,7 +482,7 @@ export function NotionConnection({
             <div className="mt-2 space-y-1.5">
               <div
                 data-testid="notion-connected-databases"
-                className="flex flex-wrap items-center gap-1.5 text-xs text-[#6B7280] dark:text-[#9CA3AF]"
+                className="flex flex-wrap items-center gap-1.5 text-xs text-[#6A5F56] dark:text-[#9CA3AF]"
               >
                 <span>Database được phép:</span>
                 {databases.map((d) =>
@@ -492,7 +492,7 @@ export function NotionConnection({
                       href={d.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-full border border-[#E7E7E2] dark:border-[#374151] bg-[#F8F8F6] dark:bg-[#1F2937] px-2.5 py-0.5 text-xs font-medium text-[#111827] dark:text-white hover:border-[#FF5701]"
+                      className="inline-flex items-center gap-1 rounded-full border border-[#E8E0D6] dark:border-[#4a4038] bg-[#F8F4EE] dark:bg-[#2A2420] px-2.5 py-0.5 text-xs font-medium text-[#1a0e08] dark:text-white hover:border-[#FF5701]"
                     >
                       <span>{d.title}</span>
                       <span aria-hidden="true" className="text-xs text-neutral-500">
@@ -502,7 +502,7 @@ export function NotionConnection({
                   ) : (
                     <span
                       key={d.id}
-                      className="inline-flex items-center gap-1 rounded-full border border-[#E7E7E2] dark:border-[#374151] bg-[#F8F8F6] dark:bg-[#1F2937] px-2.5 py-0.5 text-xs font-medium text-[#111827] dark:text-white"
+                      className="inline-flex items-center gap-1 rounded-full border border-[#E8E0D6] dark:border-[#4a4038] bg-[#F8F4EE] dark:bg-[#2A2420] px-2.5 py-0.5 text-xs font-medium text-[#1a0e08] dark:text-white"
                     >
                       {d.title}
                     </span>
@@ -618,15 +618,15 @@ export function NotionConnection({
         <div
           id="notion-scope"
           data-testid="notion-scope"
-          className="mt-4 rounded-xl border border-[#E7E7E2] dark:border-[#374151] bg-[#F8F8F6] dark:bg-[#1F2937]/50 p-4 space-y-3"
+          className="mt-4 rounded-xl border border-[#E8E0D6] dark:border-[#4a4038] bg-[#F8F4EE] dark:bg-[#2A2420]/50 p-4 space-y-3"
         >
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold text-[#111827] dark:text-white">
+            <p className="text-xs font-semibold text-[#1a0e08] dark:text-white">
               Chọn phạm vi Database Notion (1–10 database)
             </p>
             <span
               data-testid="notion-scope-counter"
-              className="rounded-md border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#111827] px-2 py-0.5 text-xs font-medium text-[#374151] dark:text-[#D1D5DB]"
+              className="rounded-md border border-[#E8E0D6] dark:border-[#4a4038] bg-white dark:bg-[#1a0e08] px-2 py-0.5 text-xs font-medium text-[#4a4038] dark:text-[#D1D5DB]"
             >
               Đã chọn {selectedDatabases.size}/10
             </span>
@@ -640,7 +640,7 @@ export function NotionConnection({
               onChange={(e) => setPasteInput(e.target.value)}
               placeholder="Dán link hoặc ID Database Notion (VD: https://notion.so/...)"
               aria-label="Dán link hoặc ID Database Notion"
-              className="flex-1 rounded-lg border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#111827] px-3 py-1.5 text-xs text-[#111827] dark:text-white placeholder:text-neutral-400 focus:border-[#FF5701] focus:outline-none"
+              className="flex-1 rounded-lg border border-[#E8E0D6] dark:border-[#4a4038] bg-white dark:bg-[#1a0e08] px-3 py-1.5 text-xs text-[#1a0e08] dark:text-white placeholder:text-neutral-400 focus:border-[#FF5701] focus:outline-none"
             />
             <button
               id="notion-add-db-btn"
@@ -664,7 +664,7 @@ export function NotionConnection({
                   onChange={(e) => setDbFilter(e.target.value)}
                   placeholder="Tìm nhanh database..."
                   aria-label="Tìm nhanh database"
-                  className="w-full rounded-lg border border-[#E7E7E2] dark:border-[#374151] bg-white dark:bg-[#111827] px-3 py-1.5 text-xs text-[#111827] dark:text-white placeholder:text-neutral-400 focus:border-[#FF5701] focus:outline-none"
+                  className="w-full rounded-lg border border-[#E8E0D6] dark:border-[#4a4038] bg-white dark:bg-[#1a0e08] px-3 py-1.5 text-xs text-[#1a0e08] dark:text-white placeholder:text-neutral-400 focus:border-[#FF5701] focus:outline-none"
                 />
               )}
 
@@ -673,7 +673,7 @@ export function NotionConnection({
                   Chưa tìm thấy database nào. Hãy chia sẻ database với kết nối trong Notion hoặc dán trực tiếp link/ID ở trên.
                 </p>
               ) : (
-                <div className="max-h-48 overflow-y-auto space-y-1.5 rounded-lg border border-[#E7E7E2] dark:border-[#293653] bg-white dark:bg-[#0E1528] p-2">
+                <div className="max-h-48 overflow-y-auto space-y-1.5 rounded-lg border border-[#E8E0D6] dark:border-[#3a312a] bg-white dark:bg-[#131010] p-2">
                   {visibleCandidates.map((db) => {
                     const checked = selectedDatabases.has(db.id);
                     const disableNew = !checked && selectedDatabases.size >= 10;
@@ -682,8 +682,8 @@ export function NotionConnection({
                         key={db.id}
                         className={`flex items-center justify-between gap-2 text-xs ${
                           disableNew
-                            ? 'text-neutral-400 dark:text-[#64748B] cursor-not-allowed'
-                            : 'text-[#111827] dark:text-[#E2E8F0] cursor-pointer'
+                            ? 'text-neutral-400 dark:text-[#887D73] cursor-not-allowed'
+                            : 'text-[#1a0e08] dark:text-[#EAE3DB] cursor-pointer'
                         }`}
                       >
                         <span className="flex items-center gap-2 min-w-0">

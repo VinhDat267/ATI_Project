@@ -8,11 +8,11 @@ import { operation, planStepDataFlows, serviceId, servicePalette, statusLabel, O
 import { RequestEcho } from './RequestEcho';
 
 const ITEM_DONE = 'p-3.5 bg-white rounded-lg border border-[#E5E5E3] flex items-center justify-between gap-3';
-const ITEM_RUNNING = 'p-3.5 bg-white rounded-lg border border-[#111827] flex items-center justify-between gap-3 opacity-100';
+const ITEM_RUNNING = 'p-3.5 bg-white rounded-lg border border-[#1a0e08] flex items-center justify-between gap-3 opacity-100';
 const ITEM_SKIPPED = 'p-3.5 bg-[#F8F8F7] rounded-lg border border-[#E5E5E3] flex items-center justify-between gap-3 opacity-80';
 const ITEM_PENDING = 'p-3.5 bg-[#F9F9F8] rounded-lg border border-[#ECECE9] flex items-center justify-between gap-3 opacity-80';
 const BADGE_DONE = 'text-[11px] bg-[#DCFAE5] text-[#04250E] px-2 py-0.5 rounded-[6px] font-medium';
-const BADGE_RUNNING = 'text-[11px] bg-[#1D1F20] text-white px-2 py-0.5 rounded-[6px] font-medium';
+const BADGE_RUNNING = 'text-[11px] bg-[#1A0E08] text-white px-2 py-0.5 rounded-[6px] font-medium';
 const BADGE_PENDING = 'text-[11px] text-[#5F6368] bg-[#F4F4F3] border border-[#E5E5E3] px-2 py-0.5 rounded-[6px] font-medium';
 
 export function ExecutionMoment({
@@ -51,21 +51,21 @@ export function ExecutionMoment({
         <div className="px-5 sm:px-6 pt-5 pb-4 border-b border-[#ECECE9]">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5 text-xs">
             <div className="flex flex-wrap items-center gap-2 text-[#5F6368] font-medium">
-              <span className="inline-flex items-center gap-1 text-[#4B5563]">
+              <span className="inline-flex items-center gap-1 text-[#51463E]">
                 <svg aria-hidden="true" className="w-3.5 h-3.5 text-[#047857]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
                 </svg>
                 <span>Đã duyệt</span>
               </span>
               <span aria-hidden="true" className="text-[#9CA3AF]">→</span>
-              <span className="inline-flex items-center gap-1.5 font-medium text-[#111827]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#1D1F20] animate-pulse" />
+              <span className="inline-flex items-center gap-1.5 font-medium text-[#1a0e08]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#1A0E08] animate-pulse" />
                 <span>Đang thực thi tự động</span>
               </span>
             </div>
             <div
               id="exec-progress-label"
-              className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#F4F4F3] text-[#111827] font-medium text-xs rounded-[6px] border border-[#E5E5E3] tabular-nums"
+              className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#F4F4F3] text-[#1a0e08] font-medium text-xs rounded-[6px] border border-[#E5E5E3] tabular-nums"
             >
               <span id="exec-step-counter">{`Việc ${current}/${steps.length}`}</span>
             </div>
@@ -88,7 +88,7 @@ export function ExecutionMoment({
           <div className="w-full bg-[#ECECE9] h-1 rounded-full overflow-hidden">
             <div
               id="exec-progress-bar"
-              className="bg-[#1D1F20] h-full transition-[width] duration-500 rounded-full"
+              className="bg-[#1A0E08] h-full transition-[width] duration-500 rounded-full"
               role="progressbar"
               aria-label="Tiến độ công việc"
               aria-valuemin={0}
@@ -136,14 +136,14 @@ export function ExecutionMoment({
                       id={`exec-icon-${index + 1}`}
                       className="w-8 h-8 rounded-md bg-[#F8F8F7] border border-[#E6E6E3] flex items-center justify-center flex-shrink-0"
                     >
-                      <ServiceLogo service={service} className={`w-4 h-4 ${palette.logo === 'text-white' ? 'text-[#111827]' : (palette.logo ?? '')}`} />
+                      <ServiceLogo service={service} className={`w-4 h-4 ${palette.logo === 'text-white' ? 'text-[#1a0e08]' : (palette.logo ?? '')}`} />
                     </div>
                     <div className="min-w-0">
                       <div
                         className={
                           step.status === 'pending' || step.status === 'skipped'
-                            ? 'text-sm font-medium text-[#4B5563] flex items-center gap-2 flex-wrap'
-                            : 'text-sm font-semibold text-[#111827] flex items-center gap-2 flex-wrap'
+                            ? 'text-sm font-medium text-[#51463E] flex items-center gap-2 flex-wrap'
+                            : 'text-sm font-semibold text-[#1a0e08] flex items-center gap-2 flex-wrap'
                         }
                       >
                         <span className="truncate">{step.description}</span>
@@ -163,9 +163,9 @@ export function ExecutionMoment({
                       <div
                         className={
                           step.status === 'running'
-                            ? 'text-xs text-[#111827] font-medium mt-0.5 truncate'
+                            ? 'text-xs text-[#1a0e08] font-medium mt-0.5 truncate'
                             : step.status === 'pending'
-                              ? 'text-xs text-[#6B7280] mt-0.5 truncate'
+                              ? 'text-xs text-[#6A5F56] mt-0.5 truncate'
                               : 'text-xs text-[#5F6368] font-normal mt-0.5 truncate'
                         }
                       >
@@ -188,9 +188,9 @@ export function ExecutionMoment({
                     id={`exec-time-${index + 1}`}
                     className={
                       step.status === 'running'
-                        ? 'text-xs font-medium text-[#111827] tabular-nums flex-shrink-0'
+                        ? 'text-xs font-medium text-[#1a0e08] tabular-nums flex-shrink-0'
                         : step.status === 'pending' || step.status === 'skipped'
-                          ? 'text-xs text-[#6B7280] tabular-nums flex-shrink-0'
+                          ? 'text-xs text-[#6A5F56] tabular-nums flex-shrink-0'
                           : 'text-xs text-[#5F6368] tabular-nums flex-shrink-0'
                     }
                   >

@@ -239,7 +239,7 @@ function GitHubWorkspaceConnection({
       className={`${CARD_CONTAINER_CLASS} focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none`}
     >
       <div className="flex items-center justify-between gap-3">
-        <h3 className="font-sans font-semibold text-base text-[#111827] dark:text-white flex items-center gap-3">
+        <h3 className="font-sans font-semibold text-base text-[#1a0e08] dark:text-white flex items-center gap-3">
           <ServiceLogo service="github" className="w-6 h-6" />
           GitHub
         </h3>
@@ -262,11 +262,11 @@ function GitHubWorkspaceConnection({
         )}
       </div>
 
-      <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+      <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
         Chỉ bạn dùng được tài khoản GitHub này để thao tác trên các repository đã được chọn.
       </p>
 
-      <div className="text-sm text-[#111827] dark:text-[#E2E8F0] break-words">
+      <div className="text-sm text-[#1a0e08] dark:text-[#EAE3DB] break-words">
         {status === 'connected' ? (
           <span>
             Đã kết nối {data?.login && <>· @{data.login}</>}
@@ -284,12 +284,12 @@ function GitHubWorkspaceConnection({
             Cần kết nối lại {data?.login && <>· @{data.login}</>}
           </span>
         ) : status === 'unconfigured' ? (
-          <span className="text-[#6B7280] dark:text-[#9CA3AF]">GitHub chưa được cấu hình trên máy chủ.</span>
+          <span className="text-[#6A5F56] dark:text-[#9CA3AF]">GitHub chưa được cấu hình trên máy chủ.</span>
         ) : null}
       </div>
 
       {status === 'needs_membership' && data?.repos && data.repos.length > 0 && (
-        <div className="v3-space-y-2 border-t border-[#F3F4F6] dark:border-[#293653] pt-3">
+        <div className="v3-space-y-2 border-t border-[#F3F4F6] dark:border-[#3a312a] pt-3">
           <p className="text-xs font-semibold text-[#DC2626] dark:text-red-300">
             Bạn cần được cấp quyền truy cập repository:
           </p>
@@ -297,9 +297,9 @@ function GitHubWorkspaceConnection({
             {data.repos.map((r) => (
               <div
                 key={r.fullName}
-                className="flex items-center justify-between p-2.5 bg-neutral-50 dark:bg-[#0E1528] rounded-lg text-xs"
+                className="flex items-center justify-between p-2.5 bg-neutral-50 dark:bg-[#131010] rounded-lg text-xs"
               >
-                <span className="font-medium text-[#111827] dark:text-[#F1F5F9]">{r.fullName}</span>
+                <span className="font-medium text-[#1a0e08] dark:text-[#F3EEE8]">{r.fullName}</span>
                 <span className="text-[#DC2626] dark:text-red-300 font-medium">
                   Bạn cần được cấp quyền truy cập repository
                 </span>
@@ -310,14 +310,14 @@ function GitHubWorkspaceConnection({
       )}
 
       {status === 'connected' && data?.repos && (
-        <div className="v3-space-y-2 border-t border-[#F3F4F6] dark:border-[#293653] pt-3">
+        <div className="v3-space-y-2 border-t border-[#F3F4F6] dark:border-[#3a312a] pt-3">
           <div className="v3-space-y-1.5">
             {data.repos.map((r) => (
               <div
                 key={r.fullName}
-                className="flex items-center justify-between p-2.5 bg-neutral-50 dark:bg-[#0E1528] rounded-lg text-xs"
+                className="flex items-center justify-between p-2.5 bg-neutral-50 dark:bg-[#131010] rounded-lg text-xs"
               >
-                <span className="font-medium text-[#111827] dark:text-[#F1F5F9]">{r.fullName}</span>
+                <span className="font-medium text-[#1a0e08] dark:text-[#F3EEE8]">{r.fullName}</span>
                 <span
                   className={
                     r.accessible
@@ -333,7 +333,7 @@ function GitHubWorkspaceConnection({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#293653]">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#3a312a]">
         {status === 'not_connected' || status === 'reconnect_required' || status === 'unconfigured' ? (
           <button
             id="github-connect"
@@ -384,20 +384,20 @@ function GitHubWorkspaceConnection({
         <div
           id="github-scope"
           data-testid="github-scope"
-          className="mt-4 p-4 border border-[#E7E7E2] dark:border-[#374151] rounded-xl bg-[#F8F8F6] dark:bg-[#1F2937]/50 v3-space-y-3"
+          className="mt-4 p-4 border border-[#E8E0D6] dark:border-[#4a4038] rounded-xl bg-[#F8F4EE] dark:bg-[#2A2420]/50 v3-space-y-3"
         >
-          <h4 className="text-xs font-semibold text-[#374151] dark:text-[#D1D5DB]">
+          <h4 className="text-xs font-semibold text-[#4a4038] dark:text-[#D1D5DB]">
             {isOrgWorkspace ? 'Chọn repository GitHub cho nhóm' : 'Chọn repository GitHub của bạn'}
           </h4>
 
           <div className="v3-space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <label className="text-xs font-semibold text-[#111827] dark:text-[#F1F5F9]">
+              <label className="text-xs font-semibold text-[#1a0e08] dark:text-[#F3EEE8]">
                 Các repository được phép dùng (tối đa 10 repository)
               </label>
               <span
                 data-testid="github-scope-counter"
-                className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white dark:bg-[#0E1528] border border-[#E7E7E2] dark:border-[#293653] text-[#4B5563] dark:text-[#CBD5E1]"
+                className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white dark:bg-[#131010] border border-[#E8E0D6] dark:border-[#3a312a] text-[#51463E] dark:text-[#D7CEC4]"
               >
                 Đã chọn {selectedRepos.length}/10
               </span>
@@ -409,7 +409,7 @@ function GitHubWorkspaceConnection({
                 onChange={(e) => setRepoFilter(e.target.value)}
                 placeholder="Tìm nhanh theo tên repository..."
                 aria-label="Tìm nhanh repository"
-                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-[#0E1528] border border-[#E7E7E2] dark:border-[#293653] rounded-lg text-[#111827] dark:text-[#F1F5F9] placeholder:text-[#9CA3AF] focus:ring-2 focus:ring-[#FF5701] focus:v3-outline-none"
+                className="w-full px-3 py-1.5 text-xs bg-white dark:bg-[#131010] border border-[#E8E0D6] dark:border-[#3a312a] rounded-lg text-[#1a0e08] dark:text-[#F3EEE8] placeholder:text-[#9CA3AF] focus:ring-2 focus:ring-[#FF5701] focus:v3-outline-none"
               />
             )}
             <div className="v3-space-y-1.5 max-h-48 overflow-y-auto">
@@ -426,8 +426,8 @@ function GitHubWorkspaceConnection({
                       key={r.fullName}
                       className={`flex items-center justify-between gap-2 p-2 rounded-lg text-xs ${
                         checked
-                          ? 'bg-[#F8F8F6] dark:bg-[#1E293B] border border-[#111827]/30 dark:border-[#FF5701]/60'
-                          : 'bg-white dark:bg-[#0E1528] border border-[#E7E7E2] dark:border-[#293653]'
+                          ? 'bg-[#F8F4EE] dark:bg-[#27211C] border border-[#1a0e08]/30 dark:border-[#FF5701]/60'
+                          : 'bg-white dark:bg-[#131010] border border-[#E8E0D6] dark:border-[#3a312a]'
                       }`}
                     >
                       <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
@@ -436,16 +436,16 @@ function GitHubWorkspaceConnection({
                           checked={checked}
                           disabled={disabled}
                           onChange={() => toggleRepo(r.fullName)}
-                          className="rounded text-[#111827] dark:text-[#FF5701] focus:ring-[#111827] dark:focus:ring-[#FF5701]"
+                          className="rounded text-[#1a0e08] dark:text-[#FF5701] focus:ring-[#1a0e08] dark:focus:ring-[#FF5701]"
                         />
-                        <span className="font-medium text-[#111827] dark:text-[#F1F5F9] truncate">{r.fullName}</span>
+                        <span className="font-medium text-[#1a0e08] dark:text-[#F3EEE8] truncate">{r.fullName}</span>
                       </label>
                       {typeof r.private === 'boolean' && (
                         <span
                           className={`text-xs font-semibold px-1.5 py-0.5 rounded border shrink-0 ${
                             r.private
                               ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
-                              : 'bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-[#1A2540] dark:text-[#CBD5E1] dark:border-[#293653]'
+                              : 'bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-[#221C18] dark:text-[#D7CEC4] dark:border-[#3a312a]'
                           }`}
                         >
                           {r.private ? 'Private' : 'Public'}
@@ -455,13 +455,13 @@ function GitHubWorkspaceConnection({
                   );
                 })}
               {!candidateRepos && !candidateError && (
-                <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Đang tải danh sách repository từ GitHub…</p>
+                <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">Đang tải danh sách repository từ GitHub…</p>
               )}
               {candidateError && (
                 <p role="alert" className="text-xs text-[#DC2626] dark:text-red-400">{candidateError}</p>
               )}
               {candidateRepos?.length === 0 && (
-                <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Không có repository nào trong tài khoản này.</p>
+                <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">Không có repository nào trong tài khoản này.</p>
               )}
             </div>
           </div>
@@ -490,7 +490,7 @@ function GitHubWorkspaceConnection({
       )}
 
       {busy && (
-        <p role="status" className="text-xs text-[#6B7280]">
+        <p role="status" className="text-xs text-[#6A5F56]">
           Đang xử lý…
         </p>
       )}

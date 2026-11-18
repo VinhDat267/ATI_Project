@@ -5,7 +5,7 @@ import { apiClient } from '../services/api-client';
 import { subscribeAuthTokens } from '../services/auth-storage';
 import { gmailSessionOwner, gmailCallbackError, gmailConnectionNotice, conversationReturnPath } from '../services/gmail-connection';
 import { usePrototypePage } from '../prototype/usePrototypePage';
-const meta = { id: 'gmail-callback', title: 'Kết nối Gmail — Planora', htmlClass: '', bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased', css: '' };
+const meta = { id: 'gmail-callback', title: 'Kết nối Gmail — Planora', htmlClass: '', bodyClass: 'min-h-screen bg-[#F8F4EE] text-[#1a0e08] antialiased', css: '' };
 
 export function GmailCallbackView({ navigate, input }: { navigate: (path: string, replace?: boolean) => void; input?: GoogleCallbackInput }) {
   usePrototypePage(meta);
@@ -44,8 +44,8 @@ export function GmailCallbackView({ navigate, input }: { navigate: (path: string
     }
     return () => { mounted = false; unsubscribe(); window.removeEventListener('storage', onStorage); };
   }, [navigate]);
-  return <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] v3-space-y-5">
-    <h1 className="font-sans text-2xl font-semibold tracking-tight text-[#111827] dark:text-white">Kết nối Gmail</h1>
+  return <main className="max-w-xl mx-auto px-4 py-16 text-[#1a0e08] v3-space-y-5">
+    <h1 className="font-sans text-2xl font-semibold tracking-tight text-[#1a0e08] dark:text-white">Kết nối Gmail</h1>
     {error ? <p role="alert">{error}</p> : <p role="status">Đang hoàn tất kết nối Gmail…</p>}
     <a href="/settings" onClick={event => { event.preventDefault(); navigate('/settings', true); }} className="text-[#FF5701] underline">Về Kết nối dịch vụ</a>
   </main>;

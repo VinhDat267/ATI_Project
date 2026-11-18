@@ -8,6 +8,9 @@ import {
   notionSessionOwner,
   redirectToNotion,
 } from '../services/notion-connection';
+import { usePrototypePage } from '../prototype/usePrototypePage';
+
+const meta = { id: 'notion-callback', title: 'Kết nối Notion — Planora', htmlClass: '', bodyClass: 'min-h-screen bg-[#F8F4EE] text-[#1a0e08] antialiased', css: '' };
 
 export function NotionCallbackView({
   input,
@@ -16,6 +19,7 @@ export function NotionCallbackView({
   input?: NotionCallbackInput;
   navigate: (path: string, replace?: boolean) => void;
 }) {
+  usePrototypePage(meta);
   const completion = useRef<ReturnType<typeof apiClient.completeNotionConnection> | null>(null);
   const [error, setError] = useState(() =>
     input?.error
@@ -75,19 +79,19 @@ export function NotionCallbackView({
   };
 
   return (
-    <main className="min-h-screen bg-white text-neutral-900 flex flex-col justify-between px-4 py-8">
-      <div className="mx-auto w-full max-w-sm flex items-center justify-between text-xs text-neutral-500">
-        <span className="font-semibold text-neutral-900">AI Workflow Platform</span>
+    <main className="min-h-screen bg-[#F8F4EE] text-[#1a0e08] flex flex-col justify-between px-4 py-8">
+      <div className="mx-auto w-full max-w-sm flex items-center justify-between text-xs text-[#6A5F56]">
+        <span className="font-semibold text-[#1a0e08]">AI Workflow Platform</span>
         <button
           type="button"
           onClick={() => navReplace('/settings#notion')}
-          className="hover:text-neutral-900"
+          className="hover:text-[#1a0e08]"
         >
           Cài đặt dịch vụ
         </button>
       </div>
       <section className="mx-auto w-full max-w-sm my-auto py-8 space-y-4">
-        <h1 className="text-xl font-semibold tracking-tight text-neutral-900">
+        <h1 className="text-xl font-semibold tracking-tight text-[#1a0e08]">
           Kết nối Notion
         </h1>
         {error ? (
@@ -103,21 +107,21 @@ export function NotionCallbackView({
                 type="button"
                 disabled={retrying}
                 onClick={retry}
-                className="rounded bg-neutral-900 px-3 py-2 text-xs font-medium text-white hover:bg-neutral-800 disabled:opacity-50"
+                className="rounded bg-[#1a0e08] px-3 py-2 text-xs font-medium text-white hover:bg-[#2a2420] disabled:opacity-50"
               >
                 {retrying ? 'Đang mở Notion...' : 'Thử kết nối lại'}
               </button>
               <button
                 type="button"
                 onClick={() => navReplace('/settings#notion')}
-                className="rounded border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                className="rounded border border-[#E8E0D6] bg-white px-3 py-2 text-xs font-medium text-[#51463E] hover:bg-[#F3EEE7]"
               >
                 Về trang Dịch vụ
               </button>
             </div>
           </div>
         ) : (
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-[#6A5F56]">
             Đang hoàn tất kết nối tài khoản Notion của bạn...
           </p>
         )}

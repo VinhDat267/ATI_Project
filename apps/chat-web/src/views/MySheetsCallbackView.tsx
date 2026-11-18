@@ -18,7 +18,7 @@ const meta = {
   id: 'mysheets-callback',
   title: 'Chọn bảng tính Google Sheets — Planora',
   htmlClass: '',
-  bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased',
+  bodyClass: 'min-h-screen bg-[#F8F4EE] text-[#1a0e08] antialiased',
   css: '',
 };
 
@@ -281,13 +281,13 @@ export function MySheetsCallbackView({
   const hasValidReturn = Boolean(returnToRef.current);
 
   return (
-    <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] v3-space-y-6">
+    <main className="max-w-xl mx-auto px-4 py-16 text-[#1a0e08] v3-space-y-6">
       <div className="v3-space-y-2">
         <h1 className="font-sans text-2xl font-semibold tracking-tight">
           Chọn bảng tính cho Planora
         </h1>
         {email && (
-          <p className="text-sm text-[#4B5563]">
+          <p className="text-sm text-[#51463E]">
             Đã xác thực tài khoản <strong>{email}</strong>
           </p>
         )}
@@ -333,7 +333,7 @@ export function MySheetsCallbackView({
                 type="button"
                 disabled={openingPicker || saving || spreadsheets.length >= 10}
                 onClick={handleOpenPicker}
-                className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white text-[#111827] border border-[#E7E7E2] hover:bg-neutral-50 disabled:opacity-50 transition-colors shadow-sm inline-flex items-center gap-2"
+                className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white text-[#1a0e08] border border-[#E8E0D6] hover:bg-neutral-50 disabled:opacity-50 transition-colors shadow-sm inline-flex items-center gap-2"
               >
                 <svg className="w-4 h-4 text-[#188038]" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z" />
@@ -347,7 +347,7 @@ export function MySheetsCallbackView({
             </div>
 
             {email && (
-              <p className="text-xs text-[#6B7280]">
+              <p className="text-xs text-[#6A5F56]">
                 Trình duyệt cần đang đăng nhập đúng tài khoản <strong>{email}</strong>.
               </p>
             )}
@@ -360,13 +360,13 @@ export function MySheetsCallbackView({
                 value={urlInput}
                 disabled={saving || spreadsheets.length >= 10}
                 onChange={(e) => setUrlInput(e.target.value)}
-                className="flex-1 px-3 py-2 rounded-xl text-xs sm:text-sm bg-white border border-[#E7E7E2] text-[#111827] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#FF5701]"
+                className="flex-1 px-3 py-2 rounded-xl text-xs sm:text-sm bg-white border border-[#E8E0D6] text-[#1a0e08] placeholder:text-[#9CA3AF] focus:outline-none focus:ring-2 focus:ring-[#FF5701]"
               />
               <button
                 type="button"
                 disabled={!urlInput.trim() || saving || spreadsheets.length >= 10}
                 onClick={() => void handleAddFromUrl()}
-                className="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#111827] border border-[#E7E7E2] hover:bg-neutral-50 disabled:opacity-50 transition-colors"
+                className="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#1a0e08] border border-[#E8E0D6] hover:bg-neutral-50 disabled:opacity-50 transition-colors"
               >
                 Thêm từ liên kết
               </button>
@@ -379,17 +379,17 @@ export function MySheetsCallbackView({
               role="group"
               aria-label="Danh sách bảng tính đã chọn"
             >
-              <h2 className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider">
+              <h2 className="text-xs font-semibold text-[#6A5F56] uppercase tracking-wider">
                 Bảng tính đã chọn ({spreadsheets.length}/10):
               </h2>
               {spreadsheets.map((sheet) => (
                 <div
                   key={sheet.id}
-                  className="flex items-center justify-between p-3.5 sm:p-4 bg-white border border-[#E7E7E2] rounded-xl shadow-sm gap-3"
+                  className="flex items-center justify-between p-3.5 sm:p-4 bg-white border border-[#E8E0D6] rounded-xl shadow-sm gap-3"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-sm text-[#111827] break-words">
+                      <span className="font-semibold text-sm text-[#1a0e08] break-words">
                         {sheet.title}
                       </span>
                       <a
@@ -407,11 +407,11 @@ export function MySheetsCallbackView({
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-[#6B7280] font-mono mt-0.5 break-all">
+                    <p className="text-xs text-[#6A5F56] font-mono mt-0.5 break-all">
                       {sheet.id}
                     </p>
                     {sheet.sheets && sheet.sheets.length > 0 && (
-                      <p className="text-xs text-[#4B5563] mt-1">
+                      <p className="text-xs text-[#51463E] mt-1">
                         Tabs: {sheet.sheets.join(', ')}
                       </p>
                     )}
@@ -429,7 +429,7 @@ export function MySheetsCallbackView({
                 </div>
               ))}
               {spreadsheets.length === 1 && (
-                <p className="text-xs text-[#6B7280] pt-1">
+                <p className="text-xs text-[#6A5F56] pt-1">
                   Cần giữ lại ít nhất 1 bảng tính. Để huỷ toàn bộ quyền truy cập, hãy{' '}
                   <a
                     href="/settings#mysheets"
@@ -475,7 +475,7 @@ export function MySheetsCallbackView({
               type="button"
               disabled={saving}
               onClick={handleLater}
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#4B5563] border border-[#E7E7E2] hover:bg-neutral-50 transition-colors"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#51463E] border border-[#E8E0D6] hover:bg-neutral-50 transition-colors"
             >
               Để sau (về trang Cài đặt)
             </button>

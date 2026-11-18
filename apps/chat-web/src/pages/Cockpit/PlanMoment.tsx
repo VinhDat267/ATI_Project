@@ -232,9 +232,9 @@ export function PlanMoment({
       data-moment="4"
       aria-labelledby="heading-moment-4"
     >
-      <div className="bg-white rounded-2xl border border-[#E5E5E0] shadow-2xs">
+      <div className="bg-white rounded-2xl border border-[#E6DED3] shadow-2xs">
         {/* Top Workflow Stepper Bar */}
-        <div className="px-4 sm:px-6 py-2.5 bg-[#F8F8F6] border-b border-[#EAEAE4] rounded-t-2xl flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
+        <div className="px-4 sm:px-6 py-2.5 bg-[#F8F4EE] border-b border-[#EAEAE4] rounded-t-2xl flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
           <div className="flex items-center gap-2 text-xs">
             <span className="hidden sm:inline-flex items-center gap-1 text-emerald-700 font-medium">
               <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -254,19 +254,19 @@ export function PlanMoment({
             <span className="text-[#9CA3AF] hidden md:inline" aria-hidden="true">
               →
             </span>
-            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-white border border-[#DEDED8] text-[11px] sm:text-xs font-semibold text-[#111827] shadow-2xs whitespace-nowrap">
+            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-white border border-[#DEDED8] text-[11px] sm:text-xs font-semibold text-[#1a0e08] shadow-2xs whitespace-nowrap">
               <span className="w-2 h-2 rounded-full bg-[#FF5701]" aria-hidden="true" />
               <span>3. Xem trước & duyệt kế hoạch</span>
             </span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white border border-[#E5E5E0] text-[#4B5563] font-medium">
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white border border-[#E6DED3] text-[#51463E] font-medium">
               <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
               <span>Chưa thực thi</span>
             </span>
-            <span className="text-[#6B7280] font-medium hidden sm:inline">Bước 3 / 3</span>
+            <span className="text-[#6A5F56] font-medium hidden sm:inline">Bước 3 / 3</span>
           </div>
         </div>
 
@@ -276,14 +276,14 @@ export function PlanMoment({
           <div>
             <h1
               id="heading-moment-4"
-              className="text-xl sm:text-2xl font-semibold text-[#111827] tracking-tight leading-snug"
+              className="text-xl sm:text-2xl font-semibold text-[#1a0e08] tracking-tight leading-snug"
               tabIndex={-1}
             >
               {plan.steps.length === 1
                 ? 'Tôi sẽ làm 1 việc'
                 : `Tôi sẽ làm ${plan.steps.length} việc, theo thứ tự`}
             </h1>
-            <p className="text-sm text-[#4B5563] mt-1 leading-relaxed">
+            <p className="text-sm text-[#51463E] mt-1 leading-relaxed">
               {slackRead
                 ? 'Xem workspace và phạm vi tra cứu trước khi duyệt.'
                 : plan.steps.length === 1
@@ -297,10 +297,10 @@ export function PlanMoment({
               {accountChips.map((chip) => (
                 <div
                   key={chip.key}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F8F8F6] border border-[#E5E5E0] max-w-full"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F8F4EE] border border-[#E6DED3] max-w-full"
                 >
                   <ServiceLogo service={chip.service} className="w-3.5 h-3.5 flex-shrink-0" />
-                  <p className="text-xs font-medium text-[#374151] [overflow-wrap:anywhere]">{chip.text}</p>
+                  <p className="text-xs font-medium text-[#4a4038] [overflow-wrap:anywhere]">{chip.text}</p>
                 </div>
               ))}
             </div>
@@ -372,13 +372,13 @@ export function PlanMoment({
                   className={`plan-card-stagger-${Math.min(index + 1, 4)} bg-white rounded-xl border ${
                     isHighlighted
                       ? 'border-brand-primary ring-2 ring-brand-primary/20'
-                      : 'border-[#E5E5E0] hover:border-[#D4D4CE]'
+                      : 'border-[#E6DED3] hover:border-[#D4D4CE]'
                   } p-4 transition-all`}
                   data-od-id={`plan-item-${index + 1}`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                      <div className="w-9 h-9 rounded-xl bg-[#F8F8F6] border border-[#E5E5E0] text-[#111827] flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#F8F4EE] border border-[#E6DED3] text-[#1a0e08] flex items-center justify-center flex-shrink-0 mt-0.5">
                         <ServiceLogo service={service} className="w-4 h-4" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -386,10 +386,10 @@ export function PlanMoment({
                           <span className={`text-xs font-semibold px-2 py-0.5 ${palette.badge} rounded-md`}>
                             {serviceName(service, services)}
                           </span>
-                          <span className="text-xs font-medium px-2 py-0.5 bg-[#F4F4F1] text-[#374151] rounded-md">
+                          <span className="text-xs font-medium px-2 py-0.5 bg-[#F4F4F1] text-[#4a4038] rounded-md">
                             {operation(step.tool).action}
                           </span>
-                          <span className="text-xs text-[#6B7280] font-medium">Việc {index + 1}</span>
+                          <span className="text-xs text-[#6A5F56] font-medium">Việc {index + 1}</span>
                           {incomingFlows.map((edge) => (
                             <span
                               key={`${edge.fromStepId}-${edge.field}`}
@@ -400,12 +400,12 @@ export function PlanMoment({
                             </span>
                           ))}
                         </div>
-                        <h2 className="text-[15px] sm:text-base font-semibold text-[#111827] mt-1.5 leading-snug">
+                        <h2 className="text-[15px] sm:text-base font-semibold text-[#1a0e08] mt-1.5 leading-snug">
                           {step.tool === 'mysheets.read_range'
                             ? `Đọc từ bảng tính của bạn: ${plan.resourceLabels?.[String(step.args.spreadsheetId)] ?? step.description}`
                             : step.description}
                         </h2>
-                        <p className="text-xs text-[#6B7280] mt-1 break-words [overflow-wrap:anywhere]">
+                        <p className="text-xs text-[#6A5F56] mt-1 break-words [overflow-wrap:anywhere]">
                           Đích đến: {destination(step, plan.resourceLabels)}
                         </p>
                         {service === 'myjira' &&
@@ -424,7 +424,7 @@ export function PlanMoment({
                                   siteStep.projectId)
                                 : undefined);
                             return (
-                              <p className="text-xs text-[#6B7280] mt-1 break-words">
+                              <p className="text-xs text-[#6A5F56] mt-1 break-words">
                                 Site đích: {siteLabel}
                                 {projectLabel ? ` · Dự án: ${projectLabel}` : ''}
                               </p>
@@ -434,12 +434,12 @@ export function PlanMoment({
                         {previewRows.length > 0 && (
                           <dl
                             data-testid="step-inline-payload"
-                            className="mt-3 px-3.5 py-2.5 rounded-xl bg-[#F8F8F6] border border-[#EAEAE4] v3-space-y-1.5 text-xs"
+                            className="mt-3 px-3.5 py-2.5 rounded-xl bg-[#F8F4EE] border border-[#EAEAE4] v3-space-y-1.5 text-xs"
                           >
                             {previewRows.map((row) => (
                               <div key={row.label} className="grid grid-cols-1 sm:grid-cols-[84px_1fr] gap-0.5 sm:gap-2">
-                                <dt className="font-medium text-[#6B7280]">{row.label}</dt>
-                                <dd className="text-[#111827] font-medium line-clamp-2 whitespace-pre-wrap break-words">
+                                <dt className="font-medium text-[#6A5F56]">{row.label}</dt>
+                                <dd className="text-[#1a0e08] font-medium line-clamp-2 whitespace-pre-wrap break-words">
                                   {row.value}
                                 </dd>
                               </div>
@@ -448,8 +448,8 @@ export function PlanMoment({
                         )}
 
                         {step.tool === 'myslack.chat_postMessage' && (
-                          <div className="mt-3 px-3.5 py-2.5 rounded-xl bg-[#F8F8F6] border border-[#EAEAE4] whitespace-pre-wrap break-words text-xs sm:text-sm text-[#111827]">
-                            <span className="font-semibold text-[#6B7280] block text-xs mb-0.5">Nội dung gửi:</span>
+                          <div className="mt-3 px-3.5 py-2.5 rounded-xl bg-[#F8F4EE] border border-[#EAEAE4] whitespace-pre-wrap break-words text-xs sm:text-sm text-[#1a0e08]">
+                            <span className="font-semibold text-[#6A5F56] block text-xs mb-0.5">Nội dung gửi:</span>
                             <p>{String(step.args.text)}</p>
                           </div>
                         )}
@@ -855,10 +855,10 @@ export function PlanMoment({
                       id={`preview-${step.id}`}
                       type="button"
                       onClick={() => onPreview(step)}
-                      className="flex-shrink-0 px-3 py-1.5 bg-white hover:bg-[#F8F8F6] border border-[#DEDED8] text-[#111827] text-xs font-medium rounded-lg shadow-2xs transition-colors inline-flex items-center gap-1.5"
+                      className="flex-shrink-0 px-3 py-1.5 bg-white hover:bg-[#F8F4EE] border border-[#DEDED8] text-[#1a0e08] text-xs font-medium rounded-lg shadow-2xs transition-colors inline-flex items-center gap-1.5"
                       aria-label="Xem trước"
                     >
-                      <svg className="w-3.5 h-3.5 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3.5 h-3.5 text-[#6A5F56]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         <path
                           strokeLinecap="round"
@@ -943,7 +943,7 @@ export function PlanMoment({
           )}
 
           {/* Safety & Expiry Notice (in normal document flow so sticky bar stays slim) */}
-          <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-[#F8F8F6] border border-[#EAEAE4]">
+          <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-[#F8F4EE] border border-[#EAEAE4]">
             {isSafeTone ? (
               <svg
                 aria-hidden="true"
@@ -975,8 +975,8 @@ export function PlanMoment({
                 />
               </svg>
             )}
-            <div className="text-xs leading-relaxed text-[#4B5563]">
-              <span className="font-semibold text-[#111827]">{safetyTitle}</span>{' '}
+            <div className="text-xs leading-relaxed text-[#51463E]">
+              <span className="font-semibold text-[#1a0e08]">{safetyTitle}</span>{' '}
               <span>Kế hoạch giữ hiệu lực trong 30 phút — bạn có thể sửa qua chat hoặc bấm duyệt để chạy ngay.</span>
             </div>
           </div>
@@ -985,7 +985,7 @@ export function PlanMoment({
         {/* Slim Opaque Sticky Approval Footer */}
         <div
           id="moment-4-sticky-bar"
-          className="sticky bottom-0 z-30 px-5 sm:px-6 py-3.5 bg-[#F8F8F6] border-t border-[#EAEAE4] rounded-b-2xl"
+          className="sticky bottom-0 z-30 px-5 sm:px-6 py-3.5 bg-[#F8F4EE] border-t border-[#EAEAE4] rounded-b-2xl"
         >
           {inlineComposer}
 
@@ -1008,9 +1008,9 @@ export function PlanMoment({
                 id="btn-edit-plan"
                 type="button"
                 onClick={() => onEdit()}
-                className="px-3.5 py-2.5 bg-white hover:bg-neutral-50 border border-[#DEDED8] text-[#111827] text-xs sm:text-sm font-medium rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1.5 flex-shrink-0"
+                className="px-3.5 py-2.5 bg-white hover:bg-neutral-50 border border-[#DEDED8] text-[#1a0e08] text-xs sm:text-sm font-medium rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1.5 flex-shrink-0"
               >
-                <svg className="w-4 h-4 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-[#6A5F56]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -1023,7 +1023,7 @@ export function PlanMoment({
               <button
                 type="button"
                 onClick={onCancel}
-                className="px-3 py-2.5 text-xs sm:text-sm font-medium text-[#6B7280] hover:text-[#DC2626] hover:bg-red-50/60 rounded-xl transition-colors flex-shrink-0"
+                className="px-3 py-2.5 text-xs sm:text-sm font-medium text-[#6A5F56] hover:text-[#DC2626] hover:bg-red-50/60 rounded-xl transition-colors flex-shrink-0"
               >
                 Hủy
               </button>
@@ -1033,7 +1033,7 @@ export function PlanMoment({
                 type="button"
                 onClick={() => setTechOpen(!techOpen)}
                 aria-controls="tech-details-panel"
-                className="text-xs text-[#6B7280] hover:text-[#111827] font-mono inline-flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg hover:bg-white/80 transition-colors"
+                className="text-xs text-[#6A5F56] hover:text-[#1a0e08] font-mono inline-flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg hover:bg-white/80 transition-colors"
                 aria-expanded={techOpen ? 'true' : 'false'}
                 id="btn-tech-toggle"
               >

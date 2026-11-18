@@ -15,7 +15,7 @@ const meta = {
   id: 'mycalendar-callback',
   title: 'Chọn lịch Google Calendar — Planora',
   htmlClass: '',
-  bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased',
+  bodyClass: 'min-h-screen bg-[#F8F4EE] text-[#1a0e08] antialiased',
   css: '',
 };
 
@@ -204,13 +204,13 @@ export function MyCalendarCallbackView({
   const hasValidReturn = Boolean(returnToRef.current);
 
   return (
-    <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] v3-space-y-6">
+    <main className="max-w-xl mx-auto px-4 py-16 text-[#1a0e08] v3-space-y-6">
       <div className="v3-space-y-2">
         <h1 className="font-sans text-2xl font-semibold tracking-tight">
           Chọn lịch Google Calendar cho phép Planora sử dụng
         </h1>
         {email && (
-          <p className="text-sm text-[#4B5563]">
+          <p className="text-sm text-[#51463E]">
             Đã xác thực tài khoản <strong>{email}</strong>
           </p>
         )}
@@ -251,7 +251,7 @@ export function MyCalendarCallbackView({
                   className={`flex items-start justify-between p-3.5 sm:p-4 bg-white border rounded-xl transition-all cursor-pointer shadow-sm gap-3 ${
                     isChecked
                       ? 'border-[#FF5701] ring-1 ring-[#FF5701]'
-                      : 'border-[#E7E7E2] hover:border-neutral-300'
+                      : 'border-[#E8E0D6] hover:border-neutral-300'
                   }`}
                 >
                   <div className="flex items-start gap-3 min-w-0">
@@ -259,12 +259,12 @@ export function MyCalendarCallbackView({
                       type="checkbox"
                       checked={isChecked}
                       onChange={() => toggleCalendar(cal.id)}
-                      className="w-4 h-4 mt-0.5 text-[#FF5701] rounded border-[#E7E7E2] focus:ring-[#FF5701]"
+                      className="w-4 h-4 mt-0.5 text-[#FF5701] rounded border-[#E8E0D6] focus:ring-[#FF5701]"
                       aria-label={cal.summary}
                     />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold text-sm text-[#111827] break-words">
+                        <span className="font-semibold text-sm text-[#1a0e08] break-words">
                           {cal.summary}
                         </span>
                         {cal.primary && (
@@ -277,7 +277,7 @@ export function MyCalendarCallbackView({
                         </span>
                       </div>
                       {cal.id !== cal.summary && (
-                        <p className="text-xs text-[#6B7280] font-mono mt-0.5 break-all">
+                        <p className="text-xs text-[#6A5F56] font-mono mt-0.5 break-all">
                           {cal.id}
                         </p>
                       )}
@@ -328,7 +328,7 @@ export function MyCalendarCallbackView({
               type="button"
               disabled={saving}
               onClick={handleLater}
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#4B5563] border border-[#E7E7E2] hover:bg-neutral-50 transition-colors"
+              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#51463E] border border-[#E8E0D6] hover:bg-neutral-50 transition-colors"
             >
               Để sau (về trang Cài đặt)
             </button>

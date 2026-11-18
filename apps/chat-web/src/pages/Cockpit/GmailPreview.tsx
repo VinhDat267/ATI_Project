@@ -19,7 +19,7 @@ function argumentValue(key: string, value: unknown, labels?: Record<string, stri
         : null;
   if (!missing) return formatArgValue(value).text;
   const items = Array.isArray(value) ? value : [value];
-  return <div className="flex flex-wrap gap-1.5 mt-1 min-w-0">{items.map((item, index) => <div key={index} className="px-2.5 py-1 rounded-lg bg-white border border-[#E7E7E2] text-[#111827] font-medium max-w-full min-w-0 break-words [overflow-wrap:anywhere]">{typeof item === 'string'
+  return <div className="flex flex-wrap gap-1.5 mt-1 min-w-0">{items.map((item, index) => <div key={index} className="px-2.5 py-1 rounded-lg bg-white border border-[#E8E0D6] text-[#1a0e08] font-medium max-w-full min-w-0 break-words [overflow-wrap:anywhere]">{typeof item === 'string'
     ? labels?.[item] ?? `${item} · chưa có ${missing} trong dữ liệu`
     : formatArgValue(item).text}</div>)}</div>;
 }
@@ -28,8 +28,8 @@ function Arguments({ step, labels, except = [] }: { step: PlanStep; labels?: Rec
   return <dl className="v3-space-y-3 min-w-0">{Object.entries(step.args).filter(([key]) => !except.includes(key)).map(([key, value]) => {
     const isFramedField = key === 'body' || key === 'note' || key === 'subject';
     return <div key={key} className="v3-space-y-1 min-w-0">
-      <dt className="font-semibold text-xs uppercase tracking-wider text-[#6B7280]">{fieldNames[key] ?? key}</dt>
-      <dd className={isFramedField ? 'whitespace-pre-wrap break-words [overflow-wrap:anywhere] min-w-0 p-3 rounded-lg bg-white border border-[#E7E7E2] text-[#111827]' : 'whitespace-pre-wrap break-words [overflow-wrap:anywhere] min-w-0'}>{argumentValue(key, value, labels)}</dd>
+      <dt className="font-semibold text-xs uppercase tracking-wider text-[#6A5F56]">{fieldNames[key] ?? key}</dt>
+      <dd className={isFramedField ? 'whitespace-pre-wrap break-words [overflow-wrap:anywhere] min-w-0 p-3 rounded-lg bg-white border border-[#E8E0D6] text-[#1a0e08]' : 'whitespace-pre-wrap break-words [overflow-wrap:anywhere] min-w-0'}>{argumentValue(key, value, labels)}</dd>
     </div>;
   })}</dl>;
 }
@@ -47,7 +47,7 @@ export function GmailPreview({ step, labels }: { step: PlanStep; labels?: Record
   const hasDraftRecipients =
     step.tool !== 'gmail.send_draft' ||
     Boolean(step.args.to || step.args.cc || step.args.bcc);
-  if (!isMail) return <div data-testid="gmail-preview-card" className="p-4 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-4 min-w-0">
+  if (!isMail) return <div data-testid="gmail-preview-card" className="p-4 rounded-xl bg-[#F8F4EE] border border-[#E8E0D6] text-xs sm:text-sm v3-space-y-4 min-w-0">
     {step.tool === 'gmail.trash_thread' && <p className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">Luồng thư này sẽ được chuyển vào Thùng rác của Gmail.</p>}
     <Arguments step={step} labels={labels} />
   </div>;
@@ -56,7 +56,7 @@ export function GmailPreview({ step, labels }: { step: PlanStep; labels?: Record
   const recipients = ['to', 'cc', 'bcc'].filter(group => step.tool !== 'gmail.update_draft' || Object.hasOwn(step.args, group)).map(group => {
     const value = step.args[group];
     const list = Array.isArray(value) ? value : value == null ? [] : [value];
-    return <div key={group} className="v3-space-y-1 min-w-0"><dt className="font-semibold text-xs uppercase tracking-wider text-[#6B7280]">{group === 'to' ? 'Tới' : group === 'cc' ? 'Cc' : 'Bcc'}</dt><dd className="flex flex-wrap gap-1.5 min-w-0">{list.length ? list.map((email, index) => {
+    return <div key={group} className="v3-space-y-1 min-w-0"><dt className="font-semibold text-xs uppercase tracking-wider text-[#6A5F56]">{group === 'to' ? 'Tới' : group === 'cc' ? 'Cc' : 'Bcc'}</dt><dd className="flex flex-wrap gap-1.5 min-w-0">{list.length ? list.map((email, index) => {
       const label = typeof email === 'string' ? labels?.[`recipient:${email.trim().toLowerCase()}`] : undefined;
       if (label?.startsWith('thread:')) fromThread = true;
       const badgeClass = label === 'user'
@@ -64,11 +64,11 @@ export function GmailPreview({ step, labels }: { step: PlanStep; labels?: Record
         : label?.startsWith('service:')
           ? 'px-1.5 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-800 border border-blue-200'
           : 'px-1.5 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-900 border border-amber-200';
-      return <div key={index} className="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-[#E7E7E2] max-w-full min-w-0 break-words [overflow-wrap:anywhere]"><span className="font-medium text-[#111827] [overflow-wrap:anywhere]">{formatArgValue(email).text}</span>{' · '}<span className={`${badgeClass} [overflow-wrap:anywhere]`}>{label === 'user' ? 'bạn đã gõ' : label?.startsWith('thread:') ? `lấy từ luồng thư '${label.slice(7)}'` : label?.startsWith('service:') ? `lấy từ ${label.slice(8)}` : 'chưa có nhãn nguồn; hãy kiểm lại'}</span></div>;
+      return <div key={index} className="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-[#E8E0D6] max-w-full min-w-0 break-words [overflow-wrap:anywhere]"><span className="font-medium text-[#1a0e08] [overflow-wrap:anywhere]">{formatArgValue(email).text}</span>{' · '}<span className={`${badgeClass} [overflow-wrap:anywhere]`}>{label === 'user' ? 'bạn đã gõ' : label?.startsWith('thread:') ? `lấy từ luồng thư '${label.slice(7)}'` : label?.startsWith('service:') ? `lấy từ ${label.slice(8)}` : 'chưa có nhãn nguồn; hãy kiểm lại'}</span></div>;
     }) : <span className="text-brand-muted">{step.tool === 'gmail.update_draft' ? 'Xóa người nhận trong nhóm này' : 'Không có'}</span>}</dd></div>;
   });
-  return <div data-testid="gmail-preview-card" className="p-4 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] text-xs sm:text-sm v3-space-y-4 min-w-0">
-    <p data-testid="gmail-delivery-mode" className="text-xs text-[#4B5563] font-medium break-words">
+  return <div data-testid="gmail-preview-card" className="p-4 rounded-xl bg-[#F8F4EE] border border-[#E8E0D6] text-xs sm:text-sm v3-space-y-4 min-w-0">
+    <p data-testid="gmail-delivery-mode" className="text-xs text-[#51463E] font-medium break-words">
       {step.tool === 'gmail.create_draft'
         ? 'Chế độ thực thi: Chỉ tạo thư nháp trong Gmail; chưa gửi thư tới người nhận.'
         : step.tool === 'gmail.update_draft'
@@ -79,7 +79,7 @@ export function GmailPreview({ step, labels }: { step: PlanStep; labels?: Record
     </p>
     {hasDraftRecipients && recipients.length > 0 && <dl className="v3-space-y-3 min-w-0">{recipients}</dl>}
     {step.tool === 'gmail.send_draft' && !hasDraftRecipients && (
-      <p data-testid="gmail-draft-send-recipient-note" className="p-2.5 rounded-lg bg-white border border-[#E7E7E2] text-xs text-[#4B5563] leading-relaxed">
+      <p data-testid="gmail-draft-send-recipient-note" className="p-2.5 rounded-lg bg-white border border-[#E8E0D6] text-xs text-[#51463E] leading-relaxed">
         Người nhận thực tế sẽ lấy theo tiêu đề To/Cc/Bcc đã lưu trong thư nháp và được kiểm tra lại trước khi gửi.
       </p>
     )}
@@ -87,9 +87,9 @@ export function GmailPreview({ step, labels }: { step: PlanStep; labels?: Record
     {step.tool === 'gmail.forward' && (step.args.includeAttachments === true
       ? <p data-testid="gmail-forward-attachment-included" className="p-3 rounded-xl border border-blue-200 bg-blue-50 text-blue-900 font-medium">Chuyển tiếp kèm tệp đính kèm gốc từ thư (tối đa 10 MB tổng dung lượng đính kèm).</p>
       : <p data-testid="gmail-forward-attachment-warning" className="p-3 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 font-medium">Chỉ chuyển tiếp văn bản; tệp đính kèm gốc không được gửi.</p>)}
-    {(step.tool === 'gmail.reply' || (step.tool === 'gmail.forward' && !source)) && <p data-testid="gmail-source-drift-notice" className="p-2.5 rounded-lg bg-white border border-[#E7E7E2] text-xs text-[#4B5563] leading-relaxed">Khi thực thi, hệ thống đối chiếu tin nhắn đã gửi mới nhất trong luồng thư trên Gmail (nội dung gốc trong luồng không cố định theo bản xem trước nếu luồng có thư mới trước lúc chạy).</p>}
-    {step.tool === 'gmail.create_draft' && hasThreadId && <p data-testid="gmail-source-drift-notice" className="p-2.5 rounded-lg bg-white border border-[#E7E7E2] text-xs text-[#4B5563] leading-relaxed">Thư nháp trả lời trong luồng dùng tin nhắn đã gửi mới nhất khi thực thi (không cố định nội dung luồng tại thời điểm xem trước) và giữ tiêu đề Re: của luồng; máy chủ từ chối tiêu đề tùy chỉnh không khớp — hãy tạo thư nháp độc lập mới nếu muốn đổi tiêu đề.</p>}
-    {source && <div data-testid="gmail-approved-source" className="p-3 rounded-lg bg-white border border-[#E7E7E2] v3-space-y-2 break-words [overflow-wrap:anywhere]">
+    {(step.tool === 'gmail.reply' || (step.tool === 'gmail.forward' && !source)) && <p data-testid="gmail-source-drift-notice" className="p-2.5 rounded-lg bg-white border border-[#E8E0D6] text-xs text-[#51463E] leading-relaxed">Khi thực thi, hệ thống đối chiếu tin nhắn đã gửi mới nhất trong luồng thư trên Gmail (nội dung gốc trong luồng không cố định theo bản xem trước nếu luồng có thư mới trước lúc chạy).</p>}
+    {step.tool === 'gmail.create_draft' && hasThreadId && <p data-testid="gmail-source-drift-notice" className="p-2.5 rounded-lg bg-white border border-[#E8E0D6] text-xs text-[#51463E] leading-relaxed">Thư nháp trả lời trong luồng dùng tin nhắn đã gửi mới nhất khi thực thi (không cố định nội dung luồng tại thời điểm xem trước) và giữ tiêu đề Re: của luồng; máy chủ từ chối tiêu đề tùy chỉnh không khớp — hãy tạo thư nháp độc lập mới nếu muốn đổi tiêu đề.</p>}
+    {source && <div data-testid="gmail-approved-source" className="p-3 rounded-lg bg-white border border-[#E8E0D6] v3-space-y-2 break-words [overflow-wrap:anywhere]">
       <p className="font-semibold">{step.tool === 'gmail.forward' ? 'Thư nguồn' : 'Thư nháp hiện tại'} · {source.subject || '(Không có tiêu đề)'}</p>
       {source.body && <p className="whitespace-pre-wrap">{source.body}</p>}
       {source.bodyTruncated && <p className="text-brand-muted">Bản xem trước chỉ hiển thị phần đầu nội dung thư.</p>}

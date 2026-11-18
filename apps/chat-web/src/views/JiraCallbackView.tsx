@@ -74,14 +74,14 @@ export function JiraCallbackView({
   }, [navigate]);
 
   return (
-    <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] dark:text-white">
-      <h1 className="font-sans text-2xl font-semibold tracking-tight text-[#111827] dark:text-white mb-4">Kết nối Jira</h1>
+    <main className="max-w-xl mx-auto px-4 py-16 text-[#1a0e08] dark:text-white">
+      <h1 className="font-sans text-2xl font-semibold tracking-tight text-[#1a0e08] dark:text-white mb-4">Kết nối Jira</h1>
       {error ? (
         <div role="alert" className="p-4 mb-4 rounded-xl bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-900 text-sm">
           {error}
         </div>
       ) : (
-        <p role="status" className="text-sm text-[#4B5563] dark:text-[#9CA3AF] mb-4">
+        <p role="status" className="text-sm text-[#51463E] dark:text-[#9CA3AF] mb-4">
           Đang hoàn tất kết nối Jira…
         </p>
       )}

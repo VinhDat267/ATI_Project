@@ -5,9 +5,11 @@ import pg from 'pg';
 import {fixtureConversation,fixtureMessage,certifyFixturePlan} from './persisted-artifacts.fixture.js';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
 
+// Redesign 11/2026: thanh bên trái; Hộp thư đề xuất nằm trong danh sách.
 const TABS = [
   ['Không gian làm việc', /\/$/],
   ['Nhật ký', /\/history$/],
+  ['Hộp thư đề xuất', /\/inbox$/],
   ['Kết nối dịch vụ', /\/settings$/],
   ['Cẩm nang', /\/guide$/],
   ['Người dùng', /\/admin\/users$/],
@@ -15,6 +17,7 @@ const TABS = [
 const PAGES = [
   { path: '/', current: 'Không gian làm việc' },
   { path: '/history', current: 'Nhật ký' },
+  { path: '/inbox', current: 'Hộp thư đề xuất' },
   { path: '/settings', current: 'Kết nối dịch vụ' },
   { path: '/account', current: null },
   { path: '/admin/users', current: 'Người dùng' },
@@ -60,17 +63,21 @@ async function seedPlanWithManyMessages(db: pg.Pool, userId: string, request: st
   return id as string;
 }
 type Box = { left: number; right: number; top: number; bottom: number };
-async function barLayout(page: Page) {
-  return page.locator('[data-main-nav]').evaluate(bar => {
+async function shellLayout(page: Page) {
+  return page.evaluate(() => {
     const box = (element: Element | null): Box | null => {
       if (!element || !(element as HTMLElement).getClientRects().length) return null;
       const r = element.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
     };
-    const [left, nav, right] = [bar.children[0], bar.querySelector('nav'), bar.children[bar.children.length - 1]];
-    return { bar: box(bar)!, left: box(left), nav: box(nav), right: box(right), scroll: document.documentElement.scrollWidth, viewport: window.innerWidth };
+    const bar = document.querySelector('[data-main-nav]')!;
+    return {
+      bar: box(bar)!, right: box(bar.lastElementChild), sidebar: box(document.getElementById('app-sidebar')),
+      main: box(document.querySelector('main')),
+      menuButton: box(bar.querySelector('button[aria-controls="app-sidebar"]')),
+      scroll: document.documentElement.scrollWidth, viewport: window.innerWidth,
+    };
   });
 }
-const apart = (a: Box, b: Box) => a.right <= b.left || b.right <= a.left;
 
 for (const theme of ['light', 'dark'] as const) {
   test(`FE-12: the user menu keeps logout reachable on a short landscape viewport (${theme})`, async ({ page }) => {
@@ -98,6 +105,8 @@ for (const theme of ['light', 'dark'] as const) {
     await admin(page);
     await page.goto('/guide');
     await setTheme(page, theme);
+    // Redesign 11/2026: dưới 1024 px bộ chọn không gian nằm trong tấm menu điều hướng.
+    await page.getByRole('button', { name: 'Mở menu điều hướng' }).click();
     await page.getByRole('button', { name: /^Không gian làm việc:/ }).click();
     const menu = page.getByRole('menu', { name: 'Danh sách không gian làm việc', exact: true });
     await expect(menu).toBeVisible();
@@ -127,7 +136,7 @@ test('FE-12: an admin reaches every tab from every page and the current tab is m
   }
 });
 
-test('FE-12: the bar fits without overlap, centres its tabs and never scrolls sideways, light and dark', async ({ page }, info) => {
+test('FE-12: the shell keeps a fixed sidebar from 1024 px, folds it into a menu sheet below, and never scrolls sideways, light and dark', async ({ page }, info) => {
   test.setTimeout(480_000);
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
   const hashes: string[] = [];
@@ -136,8 +145,7 @@ test('FE-12: the bar fits without overlap, centres its tabs and never scrolls si
     const request = `FE12 tạo issue GitHub rồi báo Slack #ati-test ${randomUUID().slice(0, 8)}`;
     const conversation = await seedPlanWithManyMessages(db, user.id, request);
     const pages = [{ path: `/c/${conversation}`, scope: 'cockpit-plan' }, ...PAGES.filter(entry => entry.path !== '/').map(entry => ({ path: entry.path, scope: entry.path.slice(1).replace('/', '-') }))];
-    // Tabs start at 900 px. Review #162 measured them 51 px off centre at 768 px when they started there.
-    for (const width of [1440, 1280, 1024, 900, 899, 768, 375]) {
+    for (const width of [1440, 1280, 1024, 1023, 768, 375]) {
       await page.setViewportSize({ width, height: 900 });
       for (const theme of ['light', 'dark'] as const) {
         for (const entry of pages) {
@@ -149,19 +157,31 @@ test('FE-12: the bar fits without overlap, centres its tabs and never scrolls si
             await expect(page.locator('[data-request-echo]')).toContainText(request);
           }
           const label = `${entry.path} ${width} ${theme}`;
-          const layout = await barLayout(page);
+          const layout = await shellLayout(page);
           expect(layout.scroll, `${label}: no sideways scroll`).toBeLessThanOrEqual(layout.viewport);
           expect(layout.bar.right - layout.right!.right, `${label}: avatar cluster sits at the right edge`).toBeLessThanOrEqual(24);
           expect(layout.right!.bottom - layout.right!.top, `${label}: right cluster stays on one line`).toBeLessThanOrEqual(40);
-          if (width >= 900) {
-            expect(layout.nav, `${label}: tabs visible`).not.toBeNull();
-            expect(apart(layout.left!, layout.nav!), `${label}: logo and tabs do not overlap`).toBe(true);
-            expect(apart(layout.nav!, layout.right!), `${label}: tabs and right cluster do not overlap`).toBe(true);
-            const centre = (box: Box) => (box.left + box.right) / 2;
-            expect(Math.abs(centre(layout.nav!) - centre(layout.bar)), `${label}: tabs centred`).toBeLessThanOrEqual(2);
+          if (width >= 1024) {
+            expect(layout.sidebar, `${label}: sidebar visible`).not.toBeNull();
+            expect(layout.sidebar!.left, `${label}: sidebar on the left edge`).toBe(0);
+            expect(layout.sidebar!.right, `${label}: sidebar 240 px`).toBe(240);
+            expect(layout.bar.left, `${label}: top bar starts after the sidebar`).toBeGreaterThanOrEqual(240);
+            if (layout.main) expect(layout.main.left, `${label}: content starts after the sidebar`).toBeGreaterThanOrEqual(240);
+            expect(layout.menuButton, `${label}: no menu button beside a visible sidebar`).toBeNull();
           } else {
-            expect(layout.nav, `${label}: tabs hidden on phones`).toBeNull();
+            expect(layout.sidebar, `${label}: sidebar folded`).toBeNull();
+            expect(layout.menuButton, `${label}: menu button shown`).not.toBeNull();
             if (entry.scope !== 'cockpit-plan') await expect(page.locator('[data-nav-page-name]')).toBeVisible();
+            if (entry.scope === 'cockpit-plan' && width === 375 && theme === 'light') {
+              await expect(page.locator('#moment-4-sticky-bar')).toBeVisible();
+              await page.getByRole('button', { name: 'Mở menu điều hướng' }).click();
+              await expect(page.locator('#app-sidebar')).toHaveAttribute('data-open', '');
+              const coversBottom = await page.evaluate(() => Boolean(document.elementFromPoint(180, window.innerHeight - 20)?.closest('#app-sidebar')));
+              expect(coversBottom, `${label}: mobile menu sheet sits above #moment-4-sticky-bar`).toBe(true);
+              await page.keyboard.press('Escape');
+              await expect(page.locator('#app-sidebar')).not.toHaveAttribute('data-open', '');
+              await expect(page.getByRole('button', { name: 'Mở menu điều hướng' })).toBeFocused();
+            }
           }
           const name = `FE12-${entry.scope}-${width}-${theme}.png`;
           const path = info.outputPath(name);
@@ -248,7 +268,7 @@ test('FE-12: a long request without spaces wraps in every cockpit moment and nev
   } finally { await db.end(); }
 });
 
-test('FE-12: a member gets four tabs on desktop and reaches every page from the avatar menu on a phone', async ({ page }) => {
+test('FE-12: a member gets five links on desktop and reaches every page from the menu sheet on a phone', async ({ page }) => {
   test.setTimeout(120_000);
   const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
   const email = `fe12-member-${randomUUID()}@example.test`;
@@ -258,17 +278,26 @@ test('FE-12: a member gets four tabs on desktop and reaches every page from the 
     await session(page, email, memberPassword);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/history');
-    await expect(mainNav(page).getByRole('link')).toHaveCount(4);
+    await expect(mainNav(page).getByRole('link')).toHaveCount(5);
     await expect(mainNav(page).getByRole('link', { name: 'Người dùng' })).toHaveCount(0);
     await page.setViewportSize({ width: 375, height: 812 });
-    for (const [item, url] of [['Kết nối dịch vụ', /\/settings$/], ['Cẩm nang', /\/guide$/], ['Tài khoản', /\/account$/], ['Chính sách an toàn', /\/privacy$/], ['Nhật ký điều phối', /\/history$/]] as const) {
+    const menuButton = page.getByRole('button', { name: 'Mở menu điều hướng' });
+    for (const [item, url] of [['Kết nối dịch vụ', /\/settings$/], ['Cẩm nang', /\/guide$/], ['Hộp thư đề xuất', /\/inbox$/], ['Nhật ký', /\/history$/]] as const) {
       await expect(mainNav(page)).toBeHidden();
-      await page.getByRole('button', { name: /Menu người dùng/ }).click();
-      await page.getByRole('menuitem', { name: item, exact: true }).click();
+      await menuButton.click();
+      await expect(mainNav(page)).toBeVisible();
+      await mainNav(page).getByRole('link', { name: item, exact: true }).click();
       await expect(page, `menu → ${item}`).toHaveURL(url);
     }
+    for (const [item, url] of [['Tài khoản', /\/account$/], ['Chính sách an toàn', /\/privacy$/]] as const) {
+      await page.getByRole('button', { name: /Menu người dùng/ }).click();
+      await page.getByRole('menuitem', { name: item, exact: true }).click();
+      await expect(page, `avatar menu → ${item}`).toHaveURL(url);
+    }
+    await menuButton.click();
     await page.getByRole('banner').getByRole('link', { name: /Về không gian làm việc/ }).click();
     await expect(page).toHaveURL(/\/$/);
+    await expect(mainNav(page)).toBeHidden();
   } finally {
     if (id) await db.query('DELETE FROM users WHERE id=$1', [id]);
     await db.end();

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..700&family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap');
 /* FE-04b: Tailwind không gói vào cascade layer, cùng thứ tự với bản React của bản mẫu
    (docs/design/prototypes/react/src/styles/tailwind.css). theme.css và CSS riêng của trang bản mẫu được chèn trước
    stylesheet này (usePrototypePage), nên thua utility khi cùng độ ưu tiên, như Tailwind v3 CDN của bản mẫu.
@@ -11,22 +11,24 @@
 @import "./prototype/styles/v3-base.css";
 @import "tailwindcss/utilities.css";
 @import "./prototype/styles/v3-theme-targets.css";
+/* Khung app sau đăng nhập: bảng màu ấm, một bộ chữ, thanh bên (redesign 11/2026). */
+@import "./styles/app-shell.css";
 /* Gradient và màu divide của bản mẫu đi theo cách v3 (v3-theme-targets.css); v4 không sinh các class này, để không khai
    @property kiểu <color> làm hỏng ghi đè chế độ tối của theme.css. Màn chưa chuyển không dùng utility gradient. */
-@source not inline("bg-gradient-to-t bg-gradient-to-r bg-gradient-to-br from-[#F8F8F6] from-amber-50/80 from-white via-[#F8F8F6]/95 via-white to-amber-50/40 to-transparent divide-neutral-200 divide-[#E7E7E2]");
+@source not inline("bg-gradient-to-t bg-gradient-to-r bg-gradient-to-br from-[#F8F4EE] from-amber-50/80 from-white via-[#F8F4EE]/95 via-white to-amber-50/40 to-transparent divide-neutral-200 divide-[#E8E0D6]");
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   color-scheme: light;
-  scrollbar-color: #CBD5E1 transparent;
-  --bg-page: #F6F6F1;
+  scrollbar-color: #D7CEC4 transparent;
+  --bg-page: #F8F4EE;
   --surface: #FFFFFF;
-  --surface-inset: #F6F6F1;
+  --surface-inset: #F8F4EE;
   --surface-raised: #F3F4F6;
-  --text: #111827;
-  --text-secondary: #4B5563;
-  --text-muted: #626B79;
-  --border: #E7E7E2;
+  --text: #1a0e08;
+  --text-secondary: #51463E;
+  --text-muted: #665B52;
+  --border: #E8E0D6;
   --border-strong: #D1D5DB;
   --primary: #FF5701;
   --planora-mark-dot: #E04800;
@@ -67,16 +69,16 @@
 :root[data-proto-page] #root { display: contents; }
 html.dark {
   color-scheme: dark;
-  scrollbar-color: #334155 transparent;
-  --bg-page: #0B1020;
-  --surface: #131B2F;
-  --surface-inset: #0E1528;
-  --surface-raised: #1A2338;
-  --text: #F1F5F9;
-  --text-secondary: #B4BFCD;
-  --text-muted: #A1AEC0;
-  --border: rgba(148,163,184,.18);
-  --border-strong: rgba(148,163,184,.32);
+  scrollbar-color: #3d342d transparent;
+  --bg-page: #0E0B09;
+  --surface: #1A1613;
+  --surface-inset: #131010;
+  --surface-raised: #211B17;
+  --text: #F3EEE8;
+  --text-secondary: #C4BAAF;
+  --text-muted: #AFA59A;
+  --border: rgba(200,186,170,.18);
+  --border-strong: rgba(200,186,170,.32);
   --primary: #FF5701;
   --planora-mark-dot: #FF5701;
   --primary-tint: #33231F;
@@ -171,28 +173,29 @@ html.dark svg[fill="#0052cc"], html.dark svg[fill="#0052CC"] { fill: #60A5FA; }
 /* Light-mode WCAG AA contrast fix for small text/link labels (keep solid CTA buttons untouched). */
 :root:not(.dark) .text-\[\#16A34A\]:not(.text-white) { color: #15803D; }
 :root:not(.dark) :is(.text-\[\#FF5701\], .text-brand-primary):not(.text-white) { color: #B43E00; }
-:root:not(.dark) :is(.text-\[\#6B7280\], .text-neutral-500, .text-neutral-600, .text-\[\#737373\]):not(.text-white) { color: #4B5563; }
+:root:not(.dark) :is(.text-\[\#6A5F56\], .text-neutral-500, .text-neutral-600, .text-\[\#737373\]):not(.text-white) { color: #51463E; }
 :root:not(.dark) .text-\[\#9CA3AF\]:not([aria-hidden="true"]) { color: #52525B; }
 :root:not(.dark) :is(.text-red-600, .text-\[\#DC2626\], .text-brand-danger):not(.text-white) { color: #B91C1C; }
 
-/* Unified Slate-Navy dark surfaces, crisp borders, and WCAG AA text contrast across all routes (/inbox included). */
-html.dark :is(.bg-\[\#F8F8F6\], .bg-\[\#FAF9F7\], .bg-\[\#FAFAF8\], .bg-\[\#F8F8F6\]\/95):not([class*="dark:bg-"]) { background-color: #0E1528 !important; }
-html.dark :is(.bg-white, .bg-\[\#FFFFFF\], .bg-\[\#FAFAFA\]):not([class*="dark:bg-"]) { background-color: #131B2F !important; }
-html.dark :is(.bg-\[\#F9F9F8\], .bg-\[\#F8F8F7\], .bg-\[\#F4F4F3\], .bg-\[\#F3F2EE\], .bg-\[\#F3F4F6\], .bg-\[\#F5F5F4\], .bg-\[\#F7F7F5\], .bg-neutral-50):not([class*="dark:bg-"]) { background-color: #172036 !important; }
-html.dark :is(.bg-\[\#F4F4F1\], .bg-\[\#F1F1EF\], .bg-\[\#F3F3F1\], .bg-\[\#F5F5F5\], .bg-\[\#ECECE9\], .bg-neutral-100):not([class*="dark:bg-"]) { background-color: #1E293B !important; }
+/* Unified warm dark surfaces, crisp borders, and WCAG AA text contrast across all routes (/inbox included). */
+html.dark :is(.bg-\[\#F8F4EE\], .bg-\[\#FAF9F7\], .bg-\[\#FAFAF8\], .bg-\[\#F8F4EE\]\/95):not([class*="dark:bg-"]) { background-color: #131010 !important; }
+html.dark :is(.bg-white, .bg-\[\#FFFFFF\], .bg-\[\#FAFAFA\]):not([class*="dark:bg-"]) { background-color: #1A1613 !important; }
+html.dark :is(.bg-\[\#F9F9F8\], .bg-\[\#F8F8F7\], .bg-\[\#F4F4F3\], .bg-\[\#F3F2EE\], .bg-\[\#F3F4F6\], .bg-\[\#F5F5F4\], .bg-\[\#F7F7F5\], .bg-neutral-50):not([class*="dark:bg-"]) { background-color: #1f1a16 !important; }
+html.dark :is(.bg-\[\#F4F4F1\], .bg-\[\#F1F1EF\], .bg-\[\#F3F3F1\], .bg-\[\#F5F5F5\], .bg-\[\#ECECE9\], .bg-neutral-100):not([class*="dark:bg-"]) { background-color: #27211C !important; }
 html.dark :is(.bg-\[\#FFF6EE\], .bg-\[\#FFF3ED\], .bg-\[\#FFF7ED\], .bg-\[\#FEF8EC\]):not([class*="dark:bg-"]) { background-color: rgba(255, 87, 1, 0.14) !important; }
 html.dark .bg-\[\#DCFAE5\]:not([class*="dark:bg-"]) { background-color: rgba(16, 185, 129, 0.16) !important; }
-html.dark .bg-\[\#1D1F20\]:not([class*="dark:bg-"]) { background-color: #24324D !important; }
-html.dark :is(.hover\:bg-\[\#F3F3F1\]:hover, .hover\:bg-\[\#F5F5F4\]:hover, .hover\:bg-neutral-50:hover, .hover\:bg-neutral-100:hover):not([class*="dark:hover:bg-"]) { background-color: #1F2A44 !important; }
+html.dark :is(.bg-\[\#1A0E08\], .bg-\[\#1a0e08\], .bg-\[\#E6DED3\]):not([class*="dark:bg-"]) { background-color: #312923 !important; }
+html.dark :is(.hover\:bg-\[\#F3F3F1\]:hover, .hover\:bg-\[\#F5F5F4\]:hover, .hover\:bg-neutral-50:hover, .hover\:bg-neutral-100:hover):not([class*="dark:hover:bg-"]) { background-color: #2A231E !important; }
 
-html.dark :is(.border-\[\#E5E5E0\], .border-\[\#E5E5E3\], .border-\[\#ECECE9\], .border-\[\#E7E7E2\], .border-\[\#E6E6E3\], .border-\[\#DFDFDC\], .border-\[\#E2E2DC\], .border-\[\#F3F4F6\]):not([class*="dark:border-"]) { border-color: rgba(148, 163, 184, 0.2) !important; }
-html.dark :is(.border-\[\#D1D5DB\], .border-\[\#D4D4CE\]):not([class*="dark:border-"]) { border-color: rgba(148, 163, 184, 0.32) !important; }
+html.dark :is(.border-\[\#1A0E08\], .border-\[\#1a0e08\]):not([class*="dark:border-"]) { border-color: #D7CEC4 !important; }
+html.dark :is(.border-\[\#E6DED3\], .border-\[\#E5E5E3\], .border-\[\#ECECE9\], .border-\[\#E8E0D6\], .border-\[\#E6E6E3\], .border-\[\#DFDFDC\], .border-\[\#E3DACE\], .border-\[\#F3F4F6\]):not([class*="dark:border-"]) { border-color: rgba(200, 186, 170, 0.2) !important; }
+html.dark :is(.border-\[\#D1D5DB\], .border-\[\#D4D4CE\]):not([class*="dark:border-"]) { border-color: rgba(200, 186, 170, 0.32) !important; }
 html.dark .border-\[\#F7D7BE\]:not([class*="dark:border-"]) { border-color: rgba(255, 87, 1, 0.35) !important; }
 
-html.dark :is(.text-\[\#111827\], .text-\[\#111111\], .text-\[\#1D1F20\], .text-\[\#1F2937\]):not([class*="dark:text-"]) { color: #F1F5F9 !important; }
-html.dark .text-\[\#374151\]:not([class*="dark:text-"]) { color: #E2E8F0 !important; }
-html.dark :is(.text-\[\#4B5563\], .text-\[\#5F6368\]):not([class*="dark:text-"]) { color: #CBD5E1 !important; }
-html.dark :is(.text-\[\#6B7280\], .text-brand-muted):not([class*="dark:text-"]) { color: #A1AEC0 !important; }
+html.dark :is(.text-\[\#1a0e08\], .text-\[\#111111\], .text-\[\#1A0E08\], .text-\[\#2A2420\]):not([class*="dark:text-"]) { color: #F3EEE8 !important; }
+html.dark .text-\[\#4a4038\]:not([class*="dark:text-"]) { color: #EAE3DB !important; }
+html.dark :is(.text-\[\#51463E\], .text-\[\#5F6368\]):not([class*="dark:text-"]) { color: #D7CEC4 !important; }
+html.dark :is(.text-\[\#6A5F56\], .text-brand-muted):not([class*="dark:text-"]) { color: #AFA59A !important; }
 html.dark :is(.text-\[\#FF5701\], .text-brand-primary):not(.text-white):not([class*="dark:text-"]) { color: #FF8547 !important; }
 html.dark :is(.text-danger-text, .text-brand-danger, .text-\[\#DC2626\]):not([class*="dark:text-"]) { color: #FCA5A5 !important; }
 html.dark .text-\[\#B43E00\]:not([class*="dark:text-"]) { color: #FB923C !important; }

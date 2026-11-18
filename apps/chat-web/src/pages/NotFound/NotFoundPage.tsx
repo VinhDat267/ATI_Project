@@ -20,7 +20,7 @@ export const meta: PageMeta = {
   id: '404',
   title: '404 — Không tìm thấy trang · Planora',
   htmlClass: '',
-  bodyClass: 'min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]',
+  bodyClass: 'min-h-screen flex flex-col bg-[#F8F4EE] text-[#1a0e08]',
   css,
 };
 
@@ -42,18 +42,18 @@ export function NotFoundPage({ signedIn, navigate }: { signedIn: boolean; naviga
   return (
     <>
       {/* 1. Thanh điều hướng chuẩn cockpit */}
-      <header className="sticky top-0 z-40 w-full bg-[#F8F8F6]/90 backdrop-blur-md border-b border-[#E7E7E2] px-4 sm:px-6 py-3">
+      <header className="sticky top-0 z-40 w-full bg-[#F8F4EE]/90 backdrop-blur-md border-b border-[#E8E0D6] px-4 sm:px-6 py-3">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
           {/* Cụm Logo & Quay lại */}
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <a href="/" onClick={go('/')} className="flex items-center gap-2.5 group flex-shrink-0" title={home.logo}>
-              <PlanoraMark className="w-7 h-7 text-[#111827] dark:text-[#F1F5F9] flex-shrink-0 group-hover:scale-105 transition-transform" />
-              <span className="font-display font-bold text-lg tracking-tight text-[#111827]">
+              <PlanoraMark className="w-7 h-7 text-[#1a0e08] dark:text-[#F3EEE8] flex-shrink-0 group-hover:scale-105 transition-transform" />
+              <span className="font-display font-bold text-lg tracking-tight text-[#1a0e08]">
                 Planora
               </span>
             </a>
-            <div className="h-4 w-px bg-[#E7E7E2] flex-shrink-0" />
-            <a href="/" onClick={go('/')} className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#4B5563] hover:text-[#111827] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title={home.title}>
+            <div className="h-4 w-px bg-[#E8E0D6] flex-shrink-0" />
+            <a href="/" onClick={go('/')} className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-[#51463E] hover:text-[#1a0e08] transition-colors py-1 px-2 rounded-lg hover:bg-black/5" title={home.title}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
@@ -68,7 +68,7 @@ export function NotFoundPage({ signedIn, navigate }: { signedIn: boolean; naviga
           {/* Trạng thái trang */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <ThemeToggle />
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-neutral-200/70 dark:bg-[#19233B] text-[#4B5563] dark:text-[#CBD5E1]">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-neutral-200/70 dark:bg-[#211B17] text-[#51463E] dark:text-[#D7CEC4]">
               Không tìm thấy (404)
             </span>
           </div>
@@ -84,7 +84,7 @@ export function NotFoundPage({ signedIn, navigate }: { signedIn: boolean; naviga
               404
             </span>
             <div className="absolute inset-0 flex items-center justify-center">
-              <h1 className="font-display font-bold text-2xl sm:text-3xl text-[#111827] px-4 py-1 bg-[#F8F8F6]/80 backdrop-blur-sm rounded-lg">
+              <h1 className="font-display font-bold text-2xl sm:text-3xl text-[#1a0e08] px-4 py-1 bg-[#F8F4EE]/80 backdrop-blur-sm rounded-lg">
                 Không tìm thấy trang
               </h1>
             </div>
@@ -93,7 +93,7 @@ export function NotFoundPage({ signedIn, navigate }: { signedIn: boolean; naviga
           {' '}
           {/* Hiển thị đường dẫn không tồn tại */}
           {' '}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-200/60 border border-[#E7E7E2] text-xs font-mono text-[#4B5563] max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-200/60 border border-[#E8E0D6] text-xs font-mono text-[#51463E] max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
             <span className="text-neutral-500 font-sans">
               Đường dẫn:
             </span>
@@ -102,7 +102,7 @@ export function NotFoundPage({ signedIn, navigate }: { signedIn: boolean; naviga
             </span>
           </div>
           {' '}
-          <p className="text-sm text-[#4B5563] leading-relaxed">
+          <p className="text-sm text-[#51463E] leading-relaxed">
             Đường dẫn bạn vừa truy cập không tồn tại trên hệ thống Planora, đã được đổi tên hoặc chuyển sang vị trí khác. Lỗi điều hướng này không thay đổi dữ liệu công việc của bạn.
           </p>
           {/* Hành động điều hướng chính */}
@@ -115,20 +115,20 @@ export function NotFoundPage({ signedIn, navigate }: { signedIn: boolean; naviga
                 {home.main}
               </span>
             </a>
-            <button type="button" onClick={() => actions.historyBackFallback()} className="px-4 py-2.5 min-h-[44px] rounded-xl bg-white hover:bg-neutral-50 text-[#4B5563] hover:text-[#111827] text-xs font-medium border border-[#E7E7E2] transition-colors inline-flex items-center justify-center">
+            <button type="button" onClick={() => actions.historyBackFallback()} className="px-4 py-2.5 min-h-[44px] rounded-xl bg-white hover:bg-neutral-50 text-[#51463E] hover:text-[#1a0e08] text-xs font-medium border border-[#E8E0D6] transition-colors inline-flex items-center justify-center">
               ← Quay lại trang trước
             </button>
           </div>
         </section>
       </main>
       {/* 4. Chân trang đơn giản */}
-      <footer className="mt-auto border-t border-[#E7E7E2] py-4 px-4 text-center text-xs text-[#6B7280]">
+      <footer className="mt-auto border-t border-[#E8E0D6] py-4 px-4 text-center text-xs text-[#6A5F56]">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>
             Planora · 2026 — Hệ thống điều phối tác vụ an toàn &amp; minh bạch
           </span>
           <div className="flex items-center gap-3">
-            <a href="/" onClick={go('/')} className="hover:text-[#111827] transition-colors">
+            <a href="/" onClick={go('/')} className="hover:text-[#1a0e08] transition-colors">
               {home.footer}
             </a>
             <span>
