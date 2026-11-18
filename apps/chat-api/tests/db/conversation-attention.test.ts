@@ -25,7 +25,7 @@ describe('ConversationRepo.listAttention and GET /api/conversations/attention', 
        VALUES ($1, $2::jsonb, $3, $4, $5, now() + make_interval(mins => $6), now() - make_interval(secs => $7)) RETURNING id`,
       [convId, JSON.stringify(json), JSON.stringify(json), randomUUID(), status, options.expiresInMinutes ?? 30, options.createdSecondsAgo ?? 0]
     );
-    return rows[0].id;
+    return rows[0]!.id;
   }
   async function workspace(createdBy: string, members: string[]) {
     const id = randomUUID();
@@ -76,7 +76,7 @@ describe('ConversationRepo.listAttention and GET /api/conversations/attention', 
     expect(result.needsAttention.map(row => [row.conversationId, row.status])).toEqual([
       [partial, 'partial'], [reconcile, 'reconciliation_required'], [unknown, 'unknown'],
     ]);
-    expect(result.needsAttention[0].planId).toBe(partialPlan);
+    expect(result.needsAttention[0]?.planId).toBe(partialPlan);
   });
 
   it('never shows another user, and keeps personal and organization workspaces apart', async () => {
