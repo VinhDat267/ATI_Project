@@ -195,4 +195,63 @@ describe('GitHubTokenManager cross-process locking & resilience (Task 5)', () =>
     // 3. Subsequent retry succeeds cleanly
     await expect(provider.getAccessToken()).resolves.toBe('ghu_recovered');
   });
+
+  it('runs a forced refresh instead of returning an in-flight non-forced DB token result when forceRefresh=true arrives concurrently', async () => {
+    const refresh = vi.fn().mockResolvedValue({
+      accessToken: 'ghu_forced_fresh',
+      refreshToken: 'ghr_forced_fresh',
+      expiresInSeconds: 3600,
+    });
+    const markReconnectRequired = vi.fn().mockResolvedValue(true);
+    const rotatePersonalSecret = vi.fn().mockResolvedValue('rotated');
+
+    let signalFirstLockEntered!: () => void;
+    const firstLockEntered = new Promise<void>((resolve) => {
+      signalFirstLockEntered = resolve;
+    });
+    let releaseFirstLock!: () => void;
+    const holdFirstLock = new Promise<void>((resolve) => {
+      releaseFirstLock = resolve;
+    });
+
+    const now = 1_000_000;
+    let lockCall = 0;
+    const withPersonalSecretLock = vi.fn().mockImplementation(async (_opts, fn) => {
+      lockCall += 1;
+      if (lockCall === 1) {
+        signalFirstLockEntered();
+        await holdFirstLock;
+      }
+      return fn({
+        read: async () => ({
+          status: 'active',
+          accessToken: 'ghu_stale_but_unexpired_in_db',
+          accessTokenExpiresAt: now + 3_600_000,
+          refreshToken: 'ghr_valid',
+        }),
+        rotate: async () => 'rotated' as const,
+        markReconnectRequired: async () => true,
+      });
+    });
+
+    const manager = new GitHubTokenManager({
+      client: { refresh },
+      credentials: { rotatePersonalSecret, markReconnectRequired, withPersonalSecretLock },
+      clock: () => now,
+    });
+
+    const provider = manager.forConnection('u-force', 'cred-force', { refreshToken: 'ghr_valid' });
+
+    const nonForcedPromise = provider.getAccessToken();
+    await firstLockEntered;
+
+    const forcedPromise = provider.getAccessToken({ forceRefresh: true });
+    releaseFirstLock();
+
+    const [nonForcedToken, forcedToken] = await Promise.all([nonForcedPromise, forcedPromise]);
+    expect(nonForcedToken).toBe('ghu_stale_but_unexpired_in_db');
+    expect(forcedToken).toBe('ghu_forced_fresh');
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).toHaveBeenCalledWith('ghr_valid', expect.any(AbortSignal));
+  });
 });

@@ -7,7 +7,7 @@ import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import type { GoogleAuthRepo } from '../../db/repositories/google-auth-repo.js';
 import type { SessionRepo } from '../../db/repositories/session-repo.js';
 import type { TelegramTeamChatItem, TelegramTeamRepo } from '../../db/repositories/telegram-team-repo.js';
-import type { WorkspaceRepo } from '../../db/repositories/workspace-repo.js';
+import { WorkspaceRepo } from '../../db/repositories/workspace-repo.js';
 import { createWorkspaceContextMiddleware } from '../../middleware/workspace-context.js';
 import { TelegramBotClient, TelegramBotError } from '../../services/telegram/bot-client.js';
 
@@ -41,9 +41,23 @@ export interface TelegramConnectionsOptions {
 }
 
 function telegramScopeId(req: Request): string {
-  return req.workspace?.mode === 'organization' && req.workspace.workspaceId
-    ? req.workspace.workspaceId
-    : 'default';
+  if (req.workspace?.mode === 'personal' && (req as any).user?.id) {
+    return `personal:${(req as any).user.id}`;
+  }
+  if (req.workspace?.mode === 'organization' && req.workspace.workspaceId) {
+    return req.workspace.workspaceId;
+  }
+  return 'default';
+}
+
+function canUpdateTeamScope(req: Request, adminUserIds?: string[]): boolean {
+  if (req.workspace?.mode === 'personal') {
+    return Boolean((req as any).user?.id);
+  }
+  if (req.workspace?.mode === 'organization') {
+    return req.workspace.role === 'admin';
+  }
+  return isAdmin((req as any).user, adminUserIds);
 }
 
 export function isTelegramConnectAvailable(
@@ -86,6 +100,11 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
   const timeoutMs = options.telegramTimeoutMs ?? 10_000;
   const botClient = options.botClient ?? (options.bot ? new TelegramBotClient(options.bot, options.fetchFn) : undefined);
   const auth = createAuthMiddleware(options.jwtSecret, { sessionRepo: options.sessionRepo, clock });
+  const pool =
+    (options.teamRepo as any)?.pool ??
+    (options.credentialRepo as any)?.pool ??
+    (options.sessionRepo as any)?.pool;
+  const workspaceRepo = options.workspaceRepo ?? (pool ? new WorkspaceRepo(pool) : undefined);
 
   router.use((_req, res, next) => {
     const json = res.json.bind(res);
@@ -99,9 +118,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
   });
 
   router.use(auth);
-  if (options.workspaceRepo) {
-    router.use(createWorkspaceContextMiddleware(options.workspaceRepo));
-  }
+  router.use(createWorkspaceContextMiddleware(workspaceRepo));
   router.use((req, res, next) => {
     if (!isTelegramConnectAvailable(options)) {
       if (req.method === 'GET' && (req.path === '/' || req.path === '')) {
@@ -406,7 +423,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
     }
 
     const selectedChats = eligibleChats.slice(0, 10);
-    if (isAdmin(user, options.adminUserIds) && options.teamRepo) {
+    if (canUpdateTeamScope(req, options.adminUserIds) && options.teamRepo) {
       const groupChats = selectedChats.filter((c) => c.type !== 'private').slice(0, 10);
       if (groupChats.length > 0) {
         await options.teamRepo.replace({ scopeId: telegramScopeId(req), chosenBy: user.id, chats: groupChats }).catch(() => {});
@@ -608,7 +625,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
       candidateMap.set(id, chatItem);
     }
 
-    if (isAdmin(user, options.adminUserIds) && options.teamRepo) {
+    if (canUpdateTeamScope(req, options.adminUserIds) && options.teamRepo) {
       const groupChats = chosenChats.filter((c) => c.type !== 'private').slice(0, 10);
       if (groupChats.length > 0) {
         await options.teamRepo.replace({ scopeId: telegramScopeId(req), chosenBy: user.id, chats: groupChats });

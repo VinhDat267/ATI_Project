@@ -80,10 +80,26 @@ export function hasDeferredCalendarRecap(steps: readonly PlanStep[]): boolean {
   });
 }
 
+function sameConstValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((item, idx) => sameConstValue(item, b[idx]));
+  }
+  if (isObject(a) && isObject(b)) {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    return keysA.length === keysB.length && keysA.every((k) => k in b && sameConstValue(a[k], b[k]));
+  }
+  return false;
+}
+
 export function validateSchemaValue(value: unknown, schema: Record<string, any>, path: string): string | null {
   if (schema['x-recipient']) {
     if (!Array.isArray(value) || value.some(address => !normalizedRecipient(address))) return `${path} must contain literal bare email addresses; references and templates are forbidden`;
     if (value.length < (schema.minItems ?? 0) || value.length > (schema.maxItems ?? 20)) return `${path} recipient count is out of range`;
+  }
+  if ('const' in schema && !sameConstValue(value, schema.const)) {
+    return `${path} must equal ${JSON.stringify(schema.const)}`;
   }
   const allowedTypes = Array.isArray(schema.type) ? schema.type : schema.type ? [schema.type] : [];
   if (isObject(value) && ('$ref' in value || '$template' in value)) {
@@ -117,7 +133,15 @@ export function validateSchemaValue(value: unknown, schema: Record<string, any>,
     return branchErrors.length === 1 ? branchErrors[0]! : `${path} must match type ${allowedTypes.join(' | ')}`;
   }
 
-  if (schema.type === 'object') {
+  const isObjectSchema =
+    schema.type === 'object' ||
+    (!schema.type &&
+      (Array.isArray(schema.required) ||
+        isObject(schema.properties) ||
+        Array.isArray(schema.anyOf) ||
+        schema.additionalProperties !== undefined));
+
+  if (isObjectSchema) {
     if (!isObject(value)) return `${path} must be an object`;
     const properties = schema.properties || {};
     for (const required of schema.required || []) {
@@ -172,6 +196,9 @@ export function validateSchemaValue(value: unknown, schema: Record<string, any>,
   if (typeof value === 'number') {
     if (schema.minimum !== undefined && value < schema.minimum) return `${path} is below minimum`;
     if (schema.maximum !== undefined && value > schema.maximum) return `${path} is above maximum`;
+  }
+  if (isObject(schema.not) && validateSchemaValue(value, schema.not, path) === null) {
+    return `${path} violates forbidden schema combination`;
   }
   return null;
 }

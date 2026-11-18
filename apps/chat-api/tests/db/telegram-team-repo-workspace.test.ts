@@ -144,4 +144,118 @@ describe('Per-workspace TelegramTeamRepo & routes scope isolation (Task 6)', () 
     expect((await teamRepo.get(wsB.id))?.chats.map((c) => c.chatId)).toEqual(['-100702']);
     expect(await teamRepo.get('default')).toBeNull();
   });
+
+  it('authorizes org teamRepo updates by workspace role, scopes personal mode to personal:<userId>, and derives workspaceRepo from pool', async () => {
+    const orgCreator = await db.person('Org Creator');
+    const orgAdminGlobalMember = await db.person('Org Admin Global Member');
+    const globalAdminOrgMember = await db.person('Global Admin Org Member');
+    const outsider = await db.person('Outsider');
+
+    const org = await workspaceRepo.create(orgCreator.id, 'Org Auth Test');
+    await db.pool.query(
+      `INSERT INTO workspace_members (workspace_id, user_id, role, status)
+       VALUES ($1, $2, 'admin', 'active'), ($1, $3, 'member', 'active')`,
+      [org.id, orgAdminGlobalMember.id, globalAdminOrgMember.id],
+    );
+
+    const orgAdminToken = `Bearer ${generateAccessToken({ ...orgAdminGlobalMember, role: 'member' }, JWT_SECRET, orgAdminGlobalMember.sid).accessToken}`;
+    const globalAdminToken = `Bearer ${generateAccessToken({ ...globalAdminOrgMember, role: 'admin' }, JWT_SECRET, globalAdminOrgMember.sid).accessToken}`;
+    const outsiderToken = `Bearer ${generateAccessToken({ ...outsider, role: 'member' }, JWT_SECRET, outsider.sid).accessToken}`;
+
+    for (const [person, tgId, chatId] of [
+      [orgAdminGlobalMember, '6001', '-100801'],
+      [globalAdminOrgMember, '6002', '-100802'],
+      [outsider, '6003', '-100803'],
+    ] as const) {
+      await credRepo.saveCredentials(
+        'telegram',
+        encryptCredentials(
+          {
+            telegramUserId: tgId,
+            username: `u_${tgId}`,
+            displayName: person.name,
+            selectedChats: [{ chatId: tgId, title: 'Private', type: 'private' }],
+            knownChats: [
+              { chatId: tgId, title: 'Private', type: 'private' },
+              { chatId, title: `Group ${tgId}`, type: 'supergroup' },
+            ],
+          },
+          ENC_KEY,
+        ),
+        person.id,
+      );
+    }
+
+    const botClient = {
+      botUsername: 'test_bot',
+      callbackUrl: (s: string) => `http://127.0.0.1/cb?state=${s}`,
+      deepLinkUrl: (s: string) => `https://t.me/test_bot?start=${s}`,
+      groupDeepLinkUrl: (s: string) => `https://t.me/test_bot?startgroup=${s}`,
+      discoverGroups: vi.fn(async () => [
+        { chatId: '-100801', title: 'Group 6001', type: 'supergroup' as const },
+        { chatId: '-100802', title: 'Group 6002', type: 'supergroup' as const },
+        { chatId: '-100803', title: 'Group 6003', type: 'supergroup' as const },
+      ]),
+      getChatMember: vi.fn(async () => true),
+      getChat: vi.fn(async (id: string) => ({ chatId: id, title: id, type: 'supergroup' as const })),
+    } as any;
+
+    // Omit workspaceRepo intentionally to verify telegramRoutes derives WorkspaceRepo from pool
+    const appWithoutExplicitWorkspaceRepo = createApp({
+      jwtSecret: JWT_SECRET,
+      encryptionKey: ENC_KEY,
+      userRepo: db.users,
+      credentialRepo: credRepo,
+      telegramTeamRepo: teamRepo,
+      serviceAdminUserIds: [globalAdminOrgMember.id],
+      telegram: {
+        bot: {
+          botToken: '123456789:synthetic_token_abcdef',
+          botUsername: 'test_bot',
+          callbackUrl: 'http://127.0.0.1/connections/telegram/callback',
+          apiBaseUrl: 'https://api.telegram.org',
+          deepLinkBaseUrl: 'https://t.me',
+        },
+        botClient,
+        teamRepo,
+      },
+    });
+
+    // 1. Org admin (even with global role='member') CAN set org teamRepo
+    const orgAdminPut = await request(appWithoutExplicitWorkspaceRepo)
+      .put('/api/connections/telegram/scope')
+      .set('Authorization', orgAdminToken)
+      .set('x-workspace-id', org.id)
+      .send({ chatIds: ['-100801'] });
+    expect(orgAdminPut.status).toBe(200);
+    expect((await teamRepo.get(org.id))?.chats.map((c) => c.chatId)).toEqual(['-100801']);
+
+    // 2. Global admin who is only an org 'member' CANNOT overwrite org teamRepo
+    const globalAdminPutOrg = await request(appWithoutExplicitWorkspaceRepo)
+      .put('/api/connections/telegram/scope')
+      .set('Authorization', globalAdminToken)
+      .set('x-workspace-id', org.id)
+      .send({ chatIds: ['-100802'] });
+    expect(globalAdminPutOrg.status).toBe(200);
+    expect((await teamRepo.get(org.id))?.chats.map((c) => c.chatId)).toEqual(['-100801']);
+
+    // 3. Personal mode saves into personal:<userId>, never polluting 'default' (even for global admin)
+    const personalPut = await request(appWithoutExplicitWorkspaceRepo)
+      .put('/api/connections/telegram/scope')
+      .set('Authorization', globalAdminToken)
+      .set('x-workspace-id', 'personal')
+      .send({ chatIds: ['-100802'] });
+    expect(personalPut.status).toBe(200);
+    expect((await teamRepo.get(`personal:${globalAdminOrgMember.id}`))?.chats.map((c) => c.chatId)).toEqual(['-100802']);
+    expect(await teamRepo.get('default')).toBeNull();
+
+    // 4. Non-member sending x-workspace-id=<orgUuid> must receive 403 WORKSPACE_ACCESS_DENIED even without explicit workspaceRepo
+    const outsiderRes = await request(appWithoutExplicitWorkspaceRepo)
+      .put('/api/connections/telegram/scope')
+      .set('Authorization', outsiderToken)
+      .set('x-workspace-id', org.id)
+      .send({ chatIds: ['-100803'] });
+    expect(outsiderRes.status).toBe(403);
+    expect(outsiderRes.body.error).toBe('WORKSPACE_ACCESS_DENIED');
+  });
 });

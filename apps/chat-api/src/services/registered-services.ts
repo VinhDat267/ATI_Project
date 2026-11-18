@@ -445,9 +445,11 @@ export async function getToolCatalogFor(
           myjira?.status === 'connected' ||
           myjira?.connectionState === 'connected' ||
           myjira?.connected === true;
+        const sites = myjira?.sites;
+        const projects = myjira?.projects;
         const hasSitesOrProjects =
-          (Array.isArray(myjira.sites) && myjira.sites.length > 0) ||
-          (Array.isArray(myjira.projects) && myjira.projects.length > 0);
+          (Array.isArray(sites) && sites.length > 0) ||
+          (Array.isArray(projects) && projects.length > 0);
         if (isConnected && hasSitesOrProjects) {
           catalog = [...catalog, ...MYJIRA_TOOLS];
         }

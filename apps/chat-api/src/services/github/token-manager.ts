@@ -51,7 +51,7 @@ function isNonExpiringGitHubToken(token?: string): boolean {
 
 export class GitHubTokenManager {
   private cache = new Map<string, Cached>();
-  private inflight = new Map<string, Promise<Cached>>();
+  private inflight = new Map<string, { promise: Promise<Cached>; forced: boolean }>();
   private generation = new Map<string, number>();
   private refreshTokens = new Map<string, string>();
   private revokedConnections = new Set<string>();
@@ -156,17 +156,32 @@ export class GitHubTokenManager {
       return cached.accessToken;
     }
 
-    let shared = this.inflight.get(key);
-    if (!shared) {
-      shared = this.refresh(userId, credentialId, key, Boolean(options.forceRefresh));
-      this.inflight.set(key, shared);
+    let existing = this.inflight.get(key);
+    while (existing && options.forceRefresh && !existing.forced) {
+      try {
+        await this.wait(existing.promise, options.signal);
+      } catch (err) {
+        if (options.signal?.aborted) throw err;
+        // Re-check connection state below after non-forced attempt settles.
+      }
+      if (this.revokedConnections.has(key)) {
+        throw this.failure('AUTH_ERROR', 400);
+      }
+      existing = this.inflight.get(key);
+    }
+    if (!existing) {
+      const forced = Boolean(options.forceRefresh);
+      const promise = this.refresh(userId, credentialId, key, forced);
+      const entry = { promise, forced };
+      this.inflight.set(key, entry);
       const settle = () => {
-        if (this.inflight.get(key) === shared) this.inflight.delete(key);
+        if (this.inflight.get(key) === entry) this.inflight.delete(key);
       };
-      shared.then(settle, settle);
+      promise.then(settle, settle);
+      existing = entry;
     }
 
-    return (await this.wait(shared, options.signal)).accessToken;
+    return (await this.wait(existing.promise, options.signal)).accessToken;
   }
 
   private async refresh(
