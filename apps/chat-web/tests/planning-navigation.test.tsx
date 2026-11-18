@@ -55,7 +55,9 @@ afterEach(async () => {
 });
 async function select(id: 'c1' | 'c2') {
   await openHistory();
-  fireEvent.click(await screen.findByRole('button', { name: id === 'c1' ? 'Conversation one' : 'Conversation two' }));
+  // Redesign 11/2026: trang chủ cũng liệt kê hội thoại gần đây; chọn trong ngăn kéo lịch sử.
+  const drawer = await screen.findByRole('dialog', { name: 'Lịch sử yêu cầu' });
+  fireEvent.click(await within(drawer).findByRole('button', { name: id === 'c1' ? 'Conversation one' : 'Conversation two' }));
   await transcriptText(`Saved ${id}`);
   await waitFor(() => expect(streams.has(id)).toBe(true));
 }
@@ -190,7 +192,7 @@ it('clears every conversation planning record when the authenticated session is 
   expect(useChatStore.getState().planningByConversation).toEqual({});
   expect(useChatStore.getState().conversationId).toBeNull();
 });
-async function historyReady() { await openHistory(); await screen.findByRole('button', { name: 'Conversation one' }); closeCockpitDialog(); }
+async function historyReady() { await openHistory(); await within(await screen.findByRole('dialog', { name: 'Lịch sử yêu cầu' })).findByRole('button', { name: 'Conversation one' }); closeCockpitDialog(); }
 const newConversationButton = () => { closeCockpitDialog(); fireEvent.click(screen.getByRole('button', {name:'Mở danh sách hội thoại'})); return screen.getByRole('button', { name: /Cuộc hội thoại mới/ }); };
 it('restores the previous conversation when New fails without replacing its planning record', async () => {
   render(<App />); await transcriptText('Saved c1');

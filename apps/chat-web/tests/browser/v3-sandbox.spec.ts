@@ -46,7 +46,8 @@ test('real browser and PostgreSQL: login, chat, approval and execution recovery 
     const listed = await page.request.get('/api/conversations', { headers: { Authorization: `Bearer ${access}` } });
     expect((await listed.json()).conversations[0].id).toBe(convId);
     await page.getByRole('button', { name: 'Mở danh sách hội thoại' }).click();
-    await page.getByRole('button', { name: new RegExp(`^${title}`) }).click();
+    // Redesign 11/2026: trang chủ cũng liệt kê hội thoại; chọn trong ngăn kéo lịch sử.
+    await page.getByRole('dialog', { name: 'Lịch sử yêu cầu' }).getByRole('button', { name: new RegExp(`^${title}`) }).click();
     const notice = page.getByRole('region', { name: /Hệ thống vừa khởi động lại|Chưa rõ kết quả/ });
     await expect(notice).toBeVisible();
     await notice.getByText('Chi tiết để đối chiếu').click();
@@ -109,7 +110,8 @@ test('real browser and PostgreSQL: login, chat, approval and execution Continue 
     page.on('request', req => { if (req.method() === 'POST' && req.url().includes('/api/executions/')) writes.push(new URL(req.url()).pathname); });
     await page.reload();
     await page.getByRole('button', { name: 'Mở danh sách hội thoại' }).click();
-    await page.getByRole('button', { name: new RegExp(`^${title}`) }).click();
+    // Redesign 11/2026: trang chủ cũng liệt kê hội thoại; chọn trong ngăn kéo lịch sử.
+    await page.getByRole('dialog', { name: 'Lịch sử yêu cầu' }).getByRole('button', { name: new RegExp(`^${title}`) }).click();
     const notice = page.getByRole('region', { name: /Hệ thống vừa khởi động lại|Chưa rõ kết quả/ });
     await expect(notice.getByText(/chưa từng được gửi/)).toBeVisible();
     await expect(notice.getByRole('button', { name: /Skip/ })).toHaveCount(0);

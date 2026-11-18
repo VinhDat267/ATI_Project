@@ -237,6 +237,29 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
     }
   });
 
+  // Việc đang chờ người dùng trong không gian hiện tại (trang chủ). Chỉ đọc; đặt trước '/:id'.
+  router.get('/attention', async (req: Request, res: Response): Promise<void> => {
+    try {
+      const userId = (req as any).user?.id;
+      if (!userId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      const { limit } = req.query;
+      if (limit !== undefined && (typeof limit !== 'string' || !/^\d{1,2}$/.test(limit))) {
+        res.status(400).json({ error: 'Tham số không hợp lệ.' });
+        return;
+      }
+      const scope: ConversationScope = {
+        workspaceMode: req.workspace?.mode,
+        workspaceId: req.workspace?.workspaceId,
+      };
+      res.status(200).json(await convRepo.listAttention(userId, scope, limit === undefined ? undefined : Number(limit)));
+    } catch {
+      res.status(500).json({ error: 'Không tải được việc đang chờ.' });
+    }
+  });
+
   // GET /api/conversations/:id/plans/active
   router.get('/:id/plans/active', async (req: Request, res: Response): Promise<void> => {
     try {

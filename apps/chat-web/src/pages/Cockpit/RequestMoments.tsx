@@ -36,6 +36,8 @@ interface Props {
   feedback?: ReactNode;
   /** PBI-03: thẻ hội thoại đã lưu; khi có, tiêu đề mời tiếp tục thay vì bắt đầu mới. */
   resume?: ReactNode;
+  /** Redesign 11/2026: việc đang chờ bạn và hội thoại gần đây, ngay dưới ô lệnh. */
+  queue?: ReactNode;
   onDraft: (value: string) => void;
   onSend: (value: string, workflowContext?: SendWorkflowContext) => void;
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -163,6 +165,7 @@ export function RequestMoment({
   inputHidden,
   feedback,
   resume,
+  queue,
   onDraft,
   onSend,
   onKeyDown,
@@ -821,6 +824,8 @@ export function RequestMoment({
         </div>
       )}
 
+      {queue}
+
       {/* Quick Single-Tool Starter Pills directly below Composer */}
       {services.some((service) => service.configured) ? (
         <div className="v3-space-y-2">
@@ -893,9 +898,13 @@ export function RequestMoment({
         const visibleCoreJobs = CORE_JOBS.filter(
           (job) => services.some((service) => service.id === 'gmail') || !job.requiredServices.includes('gmail'),
         );
-        const visibleMultiPlaybooks = multiServicePlaybooks.filter(
+        const filteredMultiPlaybooks = multiServicePlaybooks.filter(
           (pb) => services.some((s) => s.id === 'gmail') || !pb.services.includes('gmail'),
         );
+        // Redesign 11/2026: mẫu đã đủ dịch vụ lên trước, mẫu còn thiếu xuống sau; giữ thứ tự gốc trong mỗi nhóm.
+        const readyFirst = <T,>(items: T[], ready: (item: T) => boolean) => [...items.filter(ready), ...items.filter((item) => !ready(item))];
+        const sortedCoreJobs = readyFirst(visibleCoreJobs, (job) => evaluateJobReadiness(job.requiredServices, services, job.scopeOptionalServices).isReady);
+        const visibleMultiPlaybooks = readyFirst(filteredMultiPlaybooks, (pb) => evaluateJobReadiness(pb.services, services).isReady);
         return (
       <div className="v3-space-y-4 pt-1">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-2.5 border-b border-[#E8E0D6]">
@@ -1053,7 +1062,7 @@ export function RequestMoment({
         >
           <div className="sr-only">{visibleCoreJobs.length} Quy trình trọng tâm sẵn dùng</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 items-stretch">
-            {visibleCoreJobs.map((job) => {
+            {sortedCoreJobs.map((job) => {
               const readiness = evaluateJobReadiness(job.requiredServices, services, job.scopeOptionalServices);
               return (
                 <div
