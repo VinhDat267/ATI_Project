@@ -646,7 +646,7 @@ function ReceiptCard({
                     href={directUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`text-xs font-semibold ${palette.name} hover:underline inline-flex items-center gap-1`}
+                    className="text-xs font-semibold text-[#1A0E08] dark:text-[#F3EEE8] underline underline-offset-2 decoration-[#D9D0C4] hover:decoration-current inline-flex items-center gap-1"
                   >
                     <span>{operation(step.tool).link}</span>
                     <svg
@@ -816,8 +816,7 @@ export function ReceiptMoment({
   servicesError?: string | null;
 }) {
   const [selectedService, setSelectedService] = useState<string | null>(null);
-  const rows: ExecutionStepInfo[][] = [];
-  for (let index = 0; index < steps.length; index += 2) rows.push(steps.slice(index, index + 2));
+  // Redesign 11/2026: một bước một hàng, đúng thứ tự kế hoạch đã duyệt (trước đây ghép cặp hai cột, cao lệch nhau).
   const ids = new Set(steps.map((step) => step.id));
   const refs = receiptReferences(planSteps).filter((edge) => ids.has(edge.from) && ids.has(edge.to));
   const cardProps = {
@@ -987,14 +986,13 @@ export function ReceiptMoment({
           )}
 
           <div id="receipt-chain" className="flex flex-col gap-2.5 sm:gap-4">
-            {rows.map((row, rowIndex) => {
-              const horizontal =
-                row.length === 2 ? refs.filter((edge) => edge.from === row[0].id && edge.to === row[1].id) : [];
-              const incoming = refs.filter(
-                (edge) => row.some((step) => step.id === edge.to) && !horizontal.includes(edge)
-              );
+            {steps.map((step, index) => {
+              // Dữ liệu từ bước liền trước hiện ngay trong thẻ; từ bước xa hơn thì hiện giữa hai hàng.
+              const previous = index > 0 ? steps[index - 1] : undefined;
+              const inline = previous ? refs.filter((edge) => edge.from === previous.id && edge.to === step.id) : [];
+              const incoming = refs.filter((edge) => edge.to === step.id && !inline.includes(edge));
               return (
-                <Fragment key={row[0].id}>
+                <Fragment key={step.id}>
                   {incoming.map((edge) => (
                     <ReceiptBetweenRows
                       key={`${edge.from}-${edge.to}-${edge.field}`}
@@ -1005,35 +1003,23 @@ export function ReceiptMoment({
                       field={friendlyFieldLabel(edge.field)}
                     />
                   ))}
-                  <div
-                    className={`grid grid-cols-1 ${
-                      row.length > 1 ? 'md:grid-cols-2' : ''
-                    } items-start gap-4`}
-                  >
+                  <div className="grid grid-cols-1 items-start gap-4">
                     <ReceiptCard
-                      step={row[0]}
-                      index={rowIndex * 2}
-                      highlighted={selectedService === serviceId(row[0].tool)}
+                      step={step}
+                      index={index}
+                      highlighted={selectedService === serviceId(step.tool)}
+                      horizontalConnector={
+                        previous && inline.length > 0
+                          ? {
+                              from: previous.id,
+                              to: step.id,
+                              sourceIndex: index,
+                              label: inline.map((edge) => friendlyFieldLabel(edge.field)).join(' + '),
+                            }
+                          : undefined
+                      }
                       {...cardProps}
                     />
-                    {row[1] && (
-                      <ReceiptCard
-                        step={row[1]}
-                        index={rowIndex * 2 + 1}
-                        highlighted={selectedService === serviceId(row[1].tool)}
-                        horizontalConnector={
-                          horizontal.length > 0
-                            ? {
-                                from: row[0].id,
-                                to: row[1].id,
-                                sourceIndex: rowIndex * 2 + 1,
-                                label: horizontal.map((edge) => friendlyFieldLabel(edge.field)).join(' + '),
-                              }
-                            : undefined
-                        }
-                        {...cardProps}
-                      />
-                    )}
                   </div>
                 </Fragment>
               );

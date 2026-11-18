@@ -223,6 +223,13 @@ export function PlanMoment({
           : 'Hãy kiểm tra chế độ máy chủ trước khi duyệt các thao tác ghi.';
 
   const isSafeTone = runtimeMode === 'sandbox' || slackRead || (runtimeMode === 'live' && isReadOnlyPlan && !slackPost);
+  // Cổng duyệt: tóm tắt điều sắp xảy ra ngay cạnh nút duyệt, sau khi người dùng đã đọc hết các bước.
+  const writeCount = plan.steps.filter((step) => toolDefinition(step.tool)?.sideEffect !== 'read').length;
+  const gateSummary = [
+    writeCount > 0 ? `${writeCount} thao tác ghi` : 'Chỉ đọc',
+    `${uniqueServicesCount} công cụ`,
+    'hết hạn sau 30 phút',
+  ].join(' · ');
 
   return (
     <section
@@ -232,47 +239,16 @@ export function PlanMoment({
       data-moment="4"
       aria-labelledby="heading-moment-4"
     >
-      <div className="bg-white rounded-2xl border border-[#E6DED3] shadow-2xs">
-        {/* Top Workflow Stepper Bar */}
-        <div className="px-4 sm:px-6 py-2.5 bg-[#F8F4EE] border-b border-[#EAEAE4] rounded-t-2xl flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="hidden sm:inline-flex items-center gap-1 text-emerald-700 font-medium">
-              <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-              </svg>
-              <span>1. Phân tích</span>
-            </span>
-            <span className="text-[#9CA3AF] hidden sm:inline" aria-hidden="true">
-              →
-            </span>
-            <span className="hidden md:inline-flex items-center gap-1 text-emerald-700 font-medium">
-              <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-              </svg>
-              <span>2. Chuẩn bị</span>
-            </span>
-            <span className="text-[#9CA3AF] hidden md:inline" aria-hidden="true">
-              →
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-white border border-[#DEDED8] text-[11px] sm:text-xs font-semibold text-[#1a0e08] shadow-2xs whitespace-nowrap">
-              <span className="w-2 h-2 rounded-full bg-[#FF5701]" aria-hidden="true" />
-              <span>3. Xem trước & duyệt kế hoạch</span>
+      <div className="bg-white rounded-2xl border border-[#E6DED3]">
+        {/* Redesign 11/2026: một dòng trạng thái thay cho thanh 1-2-3; kế hoạch chưa chạy cho tới khi qua Cổng duyệt. */}
+        <div className="px-5 sm:px-6 pt-5 pb-4 border-b border-[#F1EBE3] v3-space-y-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <RequestEcho request={request} />
+            <span data-plan-status className="inline-flex flex-shrink-0 items-center gap-1.5 text-xs font-medium text-[#51463E]">
+              <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-[#FF5701]" />
+              Chưa thực thi
             </span>
           </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white border border-[#E6DED3] text-[#51463E] font-medium">
-              <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-              <span>Chưa thực thi</span>
-            </span>
-            <span className="text-[#6A5F56] font-medium hidden sm:inline">Bước 3 / 3</span>
-          </div>
-        </div>
-
-        {/* Plan Header & Connected Account Attribution */}
-        <div className="px-5 sm:px-6 pt-5 pb-4 border-b border-[#F1F1EC] v3-space-y-2.5">
-          <RequestEcho request={request} />
           <div>
             <h1
               id="heading-moment-4"
@@ -376,9 +352,9 @@ export function PlanMoment({
                   } p-4 transition-all`}
                   data-od-id={`plan-item-${index + 1}`}
                 >
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                     <div className="flex items-start gap-3.5 min-w-0 flex-1">
-                      <div className="w-9 h-9 rounded-xl bg-[#F8F4EE] border border-[#E6DED3] text-[#1a0e08] flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <div className="hidden sm:flex w-9 h-9 rounded-xl bg-[#F8F4EE] border border-[#E6DED3] text-[#1a0e08] items-center justify-center flex-shrink-0 mt-0.5">
                         <ServiceLogo service={service} className="w-4 h-4" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -855,7 +831,7 @@ export function PlanMoment({
                       id={`preview-${step.id}`}
                       type="button"
                       onClick={() => onPreview(step)}
-                      className="flex-shrink-0 px-3 py-1.5 bg-white hover:bg-[#F8F4EE] border border-[#DEDED8] text-[#1a0e08] text-xs font-medium rounded-lg shadow-2xs transition-colors inline-flex items-center gap-1.5"
+                      className="self-start flex-shrink-0 px-3 py-1.5 bg-white hover:bg-[#F8F4EE] border border-[#DEDED8] text-[#1a0e08] text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5"
                       aria-label="Xem trước"
                     >
                       <svg className="w-3.5 h-3.5 text-[#6A5F56]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -942,8 +918,17 @@ export function PlanMoment({
             </div>
           )}
 
-          {/* Safety & Expiry Notice (in normal document flow so sticky bar stays slim) */}
-          <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-[#F8F4EE] border border-[#EAEAE4]">
+        </div>
+
+        {/* Cổng duyệt (redesign 11/2026): đứng sau bước cuối, không dính đáy, nên nút duyệt chỉ tới sau khi đã đọc kế hoạch.
+            Giữ id moment-4-sticky-bar cho ô sửa qua chat và các test đang trỏ tới. */}
+        <div id="moment-4-sticky-bar" data-approval-gate className="px-5 sm:px-6 pt-4 pb-5 bg-[#F8F4EE] rounded-b-2xl">
+          <div aria-hidden="true" className="h-0.5 -mx-5 sm:-mx-6 mb-4 bg-[#1A0E08] dark:bg-[#F3EEE8]" />
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="text-base font-semibold text-[#1a0e08]">Cổng duyệt</h2>
+            <p data-gate-summary className="text-sm font-medium text-[#51463E] tabular-nums">{gateSummary}</p>
+          </div>
+          <div className="mt-2 flex items-start gap-2">
             {isSafeTone ? (
               <svg
                 aria-hidden="true"
@@ -975,21 +960,15 @@ export function PlanMoment({
                 />
               </svg>
             )}
-            <div className="text-xs leading-relaxed text-[#51463E]">
-              <span className="font-semibold text-[#1a0e08]">{safetyTitle}</span>{' '}
+            <p className="text-sm leading-relaxed text-[#51463E]">
+              <span className="font-medium text-[#1a0e08]">{safetyTitle}</span>{' '}
               <span>Kế hoạch giữ hiệu lực trong 30 phút — bạn có thể sửa qua chat hoặc bấm duyệt để chạy ngay.</span>
-            </div>
+            </p>
           </div>
-        </div>
 
-        {/* Slim Opaque Sticky Approval Footer */}
-        <div
-          id="moment-4-sticky-bar"
-          className="sticky bottom-0 z-30 px-5 sm:px-6 py-3.5 bg-[#F8F4EE] border-t border-[#EAEAE4] rounded-b-2xl"
-        >
-          {inlineComposer}
+          {inlineComposer && <div className="mt-4">{inlineComposer}</div>}
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap w-full sm:w-auto">
               <button
                 id="btn-approve-plan"
