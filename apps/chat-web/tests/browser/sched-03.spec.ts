@@ -200,7 +200,8 @@ test('SCHED-03 off: no schedule requests or schedule section on Tự động and
   try {
     const calls: string[] = []; page.on('request', request => { if (/\/api\/(schedules|schedule-runs)/.test(request.url())) calls.push(request.url()); });
     await login(page, db); await expect(page.locator('[data-schedule-count]')).toHaveCount(0);
-    await page.goto('/history'); await expect(page.getByRole('heading', { name: /Nhật ký điều phối &/ })).toBeVisible();
+    // Redesign 11/2026 bước 6c: tiêu đề /history rút thành "Nhật ký".
+    await page.goto('/history'); await expect(page.getByRole('heading', { name: 'Nhật ký', level: 1, exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Lịch chạy', exact: true })).toHaveCount(0);
     await page.goto('/inbox'); await expect(page.getByRole('heading', { name: 'Tự động', level: 1 })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Lịch chạy', exact: true })).toHaveCount(0); await page.evaluate(() => window.dispatchEvent(new Event('focus')));

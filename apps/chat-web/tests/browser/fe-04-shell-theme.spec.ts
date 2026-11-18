@@ -33,7 +33,8 @@ test('FE-04: shell menu, protected routes, cross-tab theme and mobile sandbox wa
   await avatar.click(); await page.getByRole('menuitem', { name: 'Kết nối dịch vụ' }).click();
   await expect(page).toHaveURL(/\/settings$/); await expect(page.getByRole('heading', { name: 'Kết nối dịch vụ', level: 1 })).toBeVisible();
   await page.getByRole('link', { name: 'Nhật ký', exact: true }).click();
-  await expect(page).toHaveURL(/\/history$/); await expect(page.getByRole('heading', { name: 'Nhật ký điều phối & Lịch sử yêu cầu', level: 1, exact: true })).toBeVisible();
+  // Redesign 11/2026 bước 6c: tiêu đề /history rút thành danh từ ngắn "Nhật ký".
+  await expect(page).toHaveURL(/\/history$/); await expect(page.getByRole('heading', { name: 'Nhật ký', level: 1, exact: true })).toBeVisible();
   const other = await context.newPage(); await other.goto('/guide');
   await page.getByRole('button', { name: 'Chuyển sang giao diện Tối' }).click();
   await expect(other.locator('html')).toHaveClass(/dark/);

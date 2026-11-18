@@ -19,10 +19,8 @@ const meta = {
   css: '',
 };
 
-const primaryBtn =
-  'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] disabled:opacity-50 transition-colors shadow-sm';
-const secondaryBtn =
-  'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#1a0e08] border border-[#E8E0D6] hover:bg-neutral-50 disabled:opacity-50 transition-colors';
+const primaryBtn = 'ps-btn';
+const secondaryBtn = 'ps-btn-quiet';
 
 export function TelegramCallbackView({
   navigate,

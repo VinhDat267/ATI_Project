@@ -195,7 +195,7 @@ export function FakeSheetsPicker({
             type="button"
             onClick={onCancel}
             disabled={granting}
-            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#51463E] border border-[#E8E0D6] hover:bg-neutral-50 transition-colors disabled:opacity-50"
+            className="ps-btn-quiet"
           >
             Huỷ
           </button>
@@ -203,7 +203,7 @@ export function FakeSheetsPicker({
             type="button"
             onClick={handleSubmit}
             disabled={selectedIds.length === 0 || granting || loading}
-            className="px-5 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] disabled:opacity-50 transition-colors shadow-sm"
+            className="ps-btn"
           >
             {granting ? 'Đang cấp quyền…' : `Chọn ${selectedIds.length > 0 ? `(${selectedIds.length})` : ''}`}
           </button>

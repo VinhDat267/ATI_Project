@@ -6,10 +6,8 @@ import { conversationPath } from '../../routes';
 import { slackSessionOwner } from '../../services/slack-connection';
 import { friendlyFieldLabel, operation, serviceId, serviceName } from '../../pages/Cockpit/presentation';
 
-const buttonClass =
-  'rounded-lg border border-[#D1D5DB] dark:border-[#3a312a] bg-white dark:bg-[#221C18] px-3 py-1.5 text-xs font-medium text-[#1a0e08] dark:text-[#F3EEE8] hover:bg-neutral-50 dark:hover:bg-[#312923] transition-colors disabled:opacity-50';
-const primaryClass =
-  'rounded-lg bg-[#C84300] hover:bg-[#A83800] px-3 py-1.5 text-xs font-semibold text-white transition-colors disabled:opacity-50';
+const buttonClass = 'ps-btn-quiet';
+const primaryClass = 'ps-btn';
 const inputClass =
   'w-full rounded-lg border border-[#D1D5DB] dark:border-[#3a312a] bg-white dark:bg-[#131010] px-2.5 py-1.5 text-xs text-[#1a0e08] dark:text-[#F3EEE8] !outline-none focus-visible:!outline-none focus:border-[#1a0e08]';
 

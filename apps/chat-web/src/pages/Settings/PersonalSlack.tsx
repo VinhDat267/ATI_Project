@@ -178,7 +178,7 @@ export function PersonalSlack({ standalone = true }: { standalone?: boolean } = 
           <button
             type="button"
             onClick={() => void loadConnections()}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] transition-colors"
+            className="ps-btn-quiet"
           >
             Thử lại
           </button>
@@ -241,7 +241,7 @@ export function PersonalSlack({ standalone = true }: { standalone?: boolean } = 
                     disabled={!!busy}
                     aria-label={`Kết nối lại ${row.workspaceName}`}
                     onClick={() => void reconnect(row)}
-                    className="px-3 py-1 rounded-lg text-xs font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] transition-colors disabled:opacity-50"
+                    className="ps-btn"
                   >
                     Kết nối lại
                   </button>

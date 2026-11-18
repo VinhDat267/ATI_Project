@@ -468,7 +468,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                 <div id="save-validation-error" role="alert" className={`${saveError.visible ? '' : 'hidden '}text-xs text-[#DC2626] font-medium`}>
                   {saveError.text}
                 </div>
-                <button type="button" id="btn-save-service-changes" disabled={isMemberDrawer || !!busy[drawer.service.id]} onClick={() => void actions.saveServiceChanges()} className={`w-full py-2.5 px-4 text-xs sm:text-sm font-semibold text-white bg-[#FF5701] hover:bg-[#e04d01] rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2${isMemberDrawer ? ' opacity-50 cursor-not-allowed' : ''}`}>
+                <button type="button" id="btn-save-service-changes" disabled={isMemberDrawer || !!busy[drawer.service.id]} onClick={() => void actions.saveServiceChanges()} className="ps-btn w-full">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                   </svg>

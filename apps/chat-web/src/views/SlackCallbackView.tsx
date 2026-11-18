@@ -133,7 +133,7 @@ export function SlackCallbackView({
       <button
         type="button"
         onClick={() => navigate('/settings#myslack', true)}
-        className="bg-[#FF5701] text-white px-5 py-3 rounded-xl font-medium hover:bg-[#E04C00] transition-colors"
+        className="ps-btn"
       >
         Về Kết nối dịch vụ
       </button>

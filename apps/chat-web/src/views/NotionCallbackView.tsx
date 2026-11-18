@@ -107,14 +107,14 @@ export function NotionCallbackView({
                 type="button"
                 disabled={retrying}
                 onClick={retry}
-                className="rounded bg-[#1a0e08] px-3 py-2 text-xs font-medium text-white hover:bg-[#2a2420] disabled:opacity-50"
+                className="ps-btn"
               >
                 {retrying ? 'Đang mở Notion...' : 'Thử kết nối lại'}
               </button>
               <button
                 type="button"
                 onClick={() => navReplace('/settings#notion')}
-                className="rounded border border-[#E8E0D6] bg-white px-3 py-2 text-xs font-medium text-[#51463E] hover:bg-[#F3EEE7]"
+                className="ps-btn-quiet"
               >
                 Về trang Dịch vụ
               </button>
