@@ -12,6 +12,7 @@ import type { JiraConnectionLookupResult } from './jira-digest-candidate.js';
 import type { MyCalendarDigestConnection } from './mycalendar-digest-source.js';
 import type { MySheetsDigestConnection } from './mysheets-digest-source.js';
 import { validateTelegramDigestGmailConfig } from './gmail-digest-binding.js';
+import { extractSlackDigestChannelHint } from './slack-digest-channel.js';
 import {
   buildMultiDigestSources,
   canonicalizeDigestValue,
@@ -143,10 +144,7 @@ export async function evaluateSlackDigestCandidate(
   }
 
   // Resolve target Slack channel from explicit request, existing digest, or single allowed channel
-  const hashMatch =
-    requestText.match(/#([a-z0-9._-]+)/i) ??
-    requestText.match(/(?:kênh|channel|slack)\s+#?([a-z0-9._-]+)/i);
-  const rawChannelHint = hashMatch?.[1]?.trim() ?? '';
+  const rawChannelHint = extractSlackDigestChannelHint(requestText);
   const channelHint =
     rawChannelHint && !['slack', 'nay', 'này', 'moi', 'mới', 'do', 'đó'].includes(foldVietnamese(rawChannelHint))
       ? rawChannelHint

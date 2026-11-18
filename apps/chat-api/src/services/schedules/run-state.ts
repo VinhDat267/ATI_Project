@@ -18,6 +18,7 @@ import { GITHUB_DELIVERY_UNKNOWN } from './github-digest-runner.js';
 import type { JiraDigestConfig } from './jira-digest-candidate.js';
 import { isValidJiraDigestConfig, JIRA_READ_UNAVAILABLE_PREFIX, MYJIRA_DELIVERY_UNKNOWN } from './jira-digest-runner.js';
 import { NOTION_DELIVERY_UNKNOWN } from './notion-digest-runner.js';
+import { TELEGRAM_DELIVERY_UNKNOWN } from './telegram-digest-runner.js';
 import { TRELLO_READ_UNAVAILABLE_PREFIX } from './trello-digest-runner.js';
 
 /** A schedule_runs row joined with the latest plan of its conversation (see RUN_SELECT). */
@@ -163,6 +164,19 @@ export function matchesDispatchedDigestConfig(run: RunRow, schedule: DeliverySch
     (run.dispatched_config_hash == null || run.dispatched_config_hash === schedule.digest_config_hash);
 }
 
+export function hasUnknownTelegramDispatch(run: RunRow): boolean {
+  const config = run.dispatched_config;
+  // Keep the snapshot identity aligned with startup reconciliation.
+  return Boolean(
+    run.status === 'needs_attention' && run.delivery_started_at != null && run.delivery_resolution == null &&
+    run.dispatched_config_hash && config && typeof config === 'object' &&
+    'credentialId' in config && typeof config.credentialId === 'string' &&
+    'telegramUserId' in config && typeof config.telegramUserId === 'string' &&
+    'chatId' in config && typeof config.chatId === 'string' &&
+    'sources' in config && Array.isArray(config.sources),
+  );
+}
+
 export function getJiraDeliveryUnknown(run: RunRow): { config: JiraDigestConfig | null } | null {
   if (
     run.status !== 'needs_attention' ||
@@ -204,8 +218,10 @@ export function isNotionDeliveryUnknown(run: RunRow, schedule?: DeliverySchedule
 export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): ScheduleRunView {
   const jiraUnknown = getJiraDeliveryUnknown(row);
   const slackUnknown = getSlackDeliveryUnknown(row);
+  const telegramUnknown = hasUnknownTelegramDispatch(row);
   let error = jiraUnknown ? MYJIRA_DELIVERY_UNKNOWN
     : slackUnknown && !row.error?.startsWith(SLACK_DELIVERY_UNKNOWN_PREFIX) ? SLACK_DIGEST_DELIVERY_UNKNOWN
+    : telegramUnknown ? TELEGRAM_DELIVERY_UNKNOWN
     : isNotionDeliveryUnknown(row, schedule) ? NOTION_DELIVERY_UNKNOWN : row.error;
   if (row.status === 'digest_failed' && error?.startsWith(TRELLO_READ_UNAVAILABLE_PREFIX)) {
     error = error.slice(TRELLO_READ_UNAVAILABLE_PREFIX.length);
@@ -226,7 +242,8 @@ export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): Sc
     deliveryResolvedAt: row.delivery_resolved_at ? iso(row.delivery_resolved_at) : null,
     deliveryFollowupRunId: row.delivery_followup_run_id ?? null,
   };
-  const unknownKind = slackUnknown ? 'slack_digest' : calendarOrGithubDeliveryUnknownKind(row, schedule);
+  const unknownKind = slackUnknown ? 'slack_digest'
+    : telegramUnknown ? 'telegram_digest' : calendarOrGithubDeliveryUnknownKind(row, schedule);
   if (schedule && jiraUnknown) {
     view.canRetryDelivery = schedule.kind === 'myjira_digest' && schedule.status === 'active' &&
       matchesDispatchedDigestConfig(row, schedule);

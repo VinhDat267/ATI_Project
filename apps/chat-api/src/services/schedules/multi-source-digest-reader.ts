@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { detectCalendarConflicts, GMAIL_DIGEST_READ_TOOL, quoteSheetTitle, StepError } from '@wap/tool-adapters';
+import { detectCalendarConflicts, GMAIL_DIGEST_READ_TOOL, StepError } from '@wap/tool-adapters';
 import type {
   GmailDigestBinding,
   NotionDigestSourceBinding,
@@ -14,7 +14,7 @@ import { createMyCalendarConnectionLookup, createMySheetsConnectionLookup, type 
 import { matchesMyCalendarDigestBinding, MYCALENDAR_DIGEST_REAPPROVAL, readMyCalendarDigestBinding } from './mycalendar-digest-source.js';
 import {
   matchesMySheetsDigestBinding,
-  MYSHEETS_DIGEST_DEFAULT_RANGE,
+  mySheetsDigestScanRange,
   MYSHEETS_DIGEST_REAPPROVAL,
   MYSHEETS_DIGEST_ROW_LIMIT,
   readMySheetsDigestBinding,
@@ -495,9 +495,7 @@ export async function executeMultiDigestReadSources(input: {
         const targetSheets = mysheets.binding.spreadsheetIds;
         const { sheetName, ...approvedArgs } = source.args ?? {};
         const explicitRange = typeof approvedArgs.range === 'string' ? approvedArgs.range : undefined;
-        const scanRange = explicitRange ?? (typeof sheetName === 'string'
-          ? `${quoteSheetTitle(sheetName)}!${MYSHEETS_DIGEST_DEFAULT_RANGE}`
-          : MYSHEETS_DIGEST_DEFAULT_RANGE);
+        const scanRange = mySheetsDigestScanRange({ ...approvedArgs, sheetName });
         const startingRow = /(?:^|!)[A-Z]{1,3}(\d+)(?::|$)/i.exec(scanRange)?.[1];
         let anyTruncated = mysheets.binding.truncated;
         const perSheet: Array<Record<string, unknown>> = [];

@@ -4,6 +4,7 @@ import type { ScheduleResponse, SlackDigestConfig, TelegramDigestConfig } from '
 import { ConversationRepo } from '../../../src/db/repositories/conversation-repo.js';
 import { CredentialRepo } from '../../../src/db/repositories/credential-repo.js';
 import { MessageRepo } from '../../../src/db/repositories/message-repo.js';
+import { ChatService } from '../../../src/services/chat-service.js';
 import { assertDigestScheduleLiveScopeAndAuth } from '../../../src/services/schedules/digest-scope-guard.js';
 import {
   buildMultiDigestSources,
@@ -301,8 +302,66 @@ describe('MySheets multi-source schedule approval & guard on PostgreSQL', () => 
         ...(schedule ? { scheduleId: schedule.id, baseVersion: schedule.version } : {}),
       });
     const createMessage = await saveProposal(proposal, createCandidate);
-    return { owner, creds, schedules, proposal, services, createCandidate, createMessage, changeScope, replaceSheets, approve, evaluate, saveProposal };
+    return { owner, conv, conversations, messages, creds, schedules, proposal, services, createCandidate, createMessage, changeScope, replaceSheets, approve, evaluate, saveProposal };
   }
+
+  it.each(['slack', 'telegram'] as const)('verifies an explicit MySheets range with Google before offering %s auto-send', async (destination) => {
+    const f = await fixture(destination);
+    const spreadsheetId = 'fixture_spreadsheet_01';
+    await f.replaceSheets(connection.email, [spreadsheetId]);
+    const checkedRanges: string[] = [];
+    const adapter = createPersonalSheetsAdapter({
+      userId: f.owner.id,
+      tokens: { getAccessToken: async () => 'fixture' },
+      allowedScope: { spreadsheets: [spreadsheetId] },
+      rateLimiter: new GlobalRateLimiter({ maxRequests: 100, windowMs: 60_000 }),
+      fetchFn: async (url) => {
+        const pathname = decodeURIComponent(new URL(String(url)).pathname);
+        expect(pathname).toContain(`/${spreadsheetId}/values/`);
+        const range = pathname.split('/values/')[1]!;
+        checkedRanges.push(range);
+        return range.startsWith('Sheet1!')
+          ? Response.json({ error: { status: 'INVALID_ARGUMENT' } }, { status: 400 })
+          : Response.json({ range, values: [['fixture']] });
+      },
+    });
+    const telegram = await f.creds.getPersonalCredentials('telegram', f.owner.id);
+    const candidates: Array<{ canAutoDigest: boolean; disabledReason?: string }> = [];
+    let tab = 'Sheet1';
+    const chat = new ChatService({
+      convRepo: f.conversations,
+      msgRepo: f.messages,
+      schedules: { repo: f.schedules.repo, pool: db.pool, credentialRepo: f.creds, encryptionKey: key, timeZone, now: () => now },
+      eventEmitter: { emit: (event, value) => {
+        if (event === 'schedule_proposal') candidates.push(value.metadata.digestCandidate);
+      } },
+      getAdapter: async (service, context) => {
+        if (service === 'slack') return { execute: async () => [{ id: 'C_WORK', name: 'work' }] };
+        expect(context.connections.mysheets.allowedSpreadsheets).toEqual([spreadsheetId]);
+        expect(context.phase).toBe('execution');
+        return adapter;
+      },
+      ...(telegram ? { telegramConnection: async () => ({
+        status: 'connected' as const,
+        selectedChats: [{ chatId: '777', title: 'Me', type: 'private' as const }],
+        connection: { credentialId: telegram.id, telegramUserId: '777', username: 'fixture', chatIds: ['777'] },
+      }) } : {}),
+      planner: {
+        routeSchedule: async () => ({ services: f.services, unavailable: [] }),
+        processMessage: async () => ({
+          ...f.proposal,
+          request: `Gửi bản tin từ bảng tính Sheet 1 (tab "${tab}") vùng A1:B5 và Trello lên ${destination === 'slack' ? '#work' : 'Telegram'}`,
+        }),
+      } as any,
+    });
+    await chat.handleUserMessage({ conversationId: f.conv.id, userId: f.owner.id, content: 'Tạo lịch bản tin' });
+    await expect.poll(() => candidates[0]).toMatchObject({ canAutoDigest: false, disabledReason: expect.stringContaining('Google Sheets không đọc được vùng') });
+    tab = 'Trang tính1';
+    const next = await f.conversations.createConversation(f.owner.id, 'Corrected tab', { workspaceMode: 'personal' });
+    await chat.handleUserMessage({ conversationId: next.id, userId: f.owner.id, content: 'Tạo lịch bản tin' });
+    await expect.poll(() => candidates[1] && [candidates[1].canAutoDigest, candidates[1].disabledReason]).toEqual([true, undefined]);
+    expect(checkedRanges).toEqual(['Sheet1!A1:B5', "'Trang tính1'!A1:B5"]);
+  });
 
   it.each(['slack', 'telegram'] as const)('keeps exact approved spreadsheets on %s edits, executes bound read_range in phase=execution, and blocks revoked/unpinned scope', async (destination) => {
     const f = await fixture(destination);

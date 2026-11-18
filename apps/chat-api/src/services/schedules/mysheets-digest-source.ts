@@ -1,7 +1,8 @@
 import type pg from 'pg';
-import { quoteSheetTitle } from '@wap/tool-adapters';
+import { quoteSheetTitle, StepError } from '@wap/tool-adapters';
 import type { MySheetsDigestSourceBinding, TelegramDigestSource } from '@wap/tool-schemas';
 import { isUuid } from '../../db/repositories/uuid.js';
+import type { AdapterContext } from '../adapter-factory.js';
 import {
   createMySheetsConnectionLookup,
   type MySheetsConnectionReference,
@@ -30,6 +31,47 @@ const TAB_KEYWORD_RE = /(?:^|[^\p{L}\p{N}_])(?:tab|sheet|worksheet|trang\s+tính
 const CHOOSE_TAB = 'Hãy chỉ định một tab duy nhất cho vùng ô của bản tin Google Sheets.';
 
 export type MySheetsDigestConfig = { sources?: TelegramDigestSource[] };
+
+export function mySheetsDigestScanRange(args: TelegramDigestSource['args']): string {
+  if (typeof args?.range === 'string') return args.range;
+  if (typeof args?.sheetName === 'string') return `${quoteSheetTitle(args.sheetName)}!${MYSHEETS_DIGEST_DEFAULT_RANGE}`;
+  return MYSHEETS_DIGEST_DEFAULT_RANGE;
+}
+
+/** Selected tab names can be stale. Check the exact requested range before offering auto-send. */
+export async function verifyMySheetsDigestPreview(
+  config: MySheetsDigestConfig,
+  scope: Pick<AdapterContext, 'userId' | 'workspaceMode' | 'workspaceId'>,
+  getAdapter?: (service: string, context: AdapterContext) => Promise<any> | any,
+): Promise<string | undefined> {
+  const source = config.sources?.find(isMySheetsDigestSource);
+  if (!getAdapter || !source || !(source.args?.range || source.args?.sheetName)) return;
+  const binding = approvedMySheetsDigestBinding(source);
+  if (!binding || binding.spreadsheetIds.length !== 1) return MYSHEETS_DIGEST_REAPPROVAL;
+
+  const range = mySheetsDigestScanRange(source.args);
+  const signal = AbortSignal.timeout(8_000);
+  try {
+    const adapter = await getAdapter('mysheets', {
+      ...scope,
+      phase: 'execution',
+      signal,
+      connections: {
+        mysheets: {
+          credentialId: binding.credentialId,
+          email: binding.email,
+          allowedSpreadsheets: binding.spreadsheetIds,
+        },
+      },
+    });
+    await adapter.execute('mysheets.read_range', { spreadsheetId: binding.spreadsheetIds[0], range, limit: 1 }, { signal });
+  } catch (error) {
+    if (error instanceof StepError && (error.statusCode === 400 || error.statusCode === 404)) {
+      return 'Google Sheets không đọc được vùng đã yêu cầu. Hãy kiểm tra tên tab và vùng ô, rồi tạo bản xem trước mới.';
+    }
+    return 'Chưa xác minh được vùng ô trên Google Sheets. Hãy kiểm tra kết nối rồi thử lại.';
+  }
+}
 
 function isSpreadsheetId(id: unknown): id is string {
   return typeof id === 'string' && id.length > 0 && id === id.trim();
@@ -195,9 +237,7 @@ export function bindMySheetsDigestSource(
     ...(requestedTab ? { sheetName: requestedTab } : {}),
   };
   const title = live.selectedSpreadsheets?.find((item) => item.id === spreadsheetId)?.title.trim();
-  const scannedRange = args.range ?? (args.sheetName
-    ? `${quoteSheetTitle(args.sheetName)}!${MYSHEETS_DIGEST_DEFAULT_RANGE}`
-    : MYSHEETS_DIGEST_DEFAULT_RANGE);
+  const scannedRange = mySheetsDigestScanRange(args);
   return {
     ...source,
     ...(spreadsheetId ? { tool: 'mysheets.read_range', label: `${title || spreadsheetId} · ${scannedRange}` } : {}),

@@ -4,6 +4,7 @@ import {
   canonicalNotionDigestBinding, isNotionDigestSourceBinding, NOTION_DIGEST_REAPPROVAL, type NotionDigestSourceAuthority,
 } from '../notion/digest-source-authority.js';
 import { canonicalizeRecurrence } from './github-digest-candidate.js';
+import { extractSlackDigestChannelHint } from './slack-digest-channel.js';
 
 export function canonicalizeNotionDigestConfig(config: NotionDigestConfig): NotionDigestConfig {
   return {
@@ -90,9 +91,7 @@ export async function evaluateNotionDigestCandidate(
   if (!binding) return { canAutoDigest: false, disabledReason: NOTION_DIGEST_REAPPROVAL };
 
   // Slack destination
-  const hashMatch =
-    request.match(/#([a-z0-9._-]+)/i) ?? request.match(/(?:kênh|slack)\s+#?([a-z0-9._-]+)/i);
-  const channelQuery = hashMatch?.[1]?.trim() ?? '';
+  const channelQuery = extractSlackDigestChannelHint(request);
 
   let matchedChannel: { id: string; name: string } | null = null;
   try {

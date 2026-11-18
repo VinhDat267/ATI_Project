@@ -36,7 +36,7 @@ import { MessageRepo } from '../../db/repositories/message-repo.js';
 import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
 import { calendarDigestCandidateMatches, computeCalendarDigestHash, evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js';
-import { calendarOrGithubDeliveryUnknownKind, getJiraDeliveryUnknown, getSlackDeliveryUnknown, isNotionDeliveryUnknown, matchesDispatchedDigestConfig, runState, runView } from './run-state.js';
+import { calendarOrGithubDeliveryUnknownKind, getJiraDeliveryUnknown, getSlackDeliveryUnknown, hasUnknownTelegramDispatch, isNotionDeliveryUnknown, matchesDispatchedDigestConfig, runState, runView } from './run-state.js';
 import { nextOccurrence, nextRuns } from './next-occurrence.js';
 import { captureScheduleArtifact, guardScheduleArtifact, prelockScheduleArtifacts, registerScheduleFields, scheduleRegistry, scheduleSourceContext, tagScheduleContext } from '../slack/slack-schedule-lineage.js';
 import { messageOutputSelectors } from '../slack/slack-message-selectors.js';
@@ -75,6 +75,7 @@ import {
   matchesMySheetsDigestBinding,
   MYSHEETS_DIGEST_REAPPROVAL,
   readMySheetsDigestBinding,
+  verifyMySheetsDigestPreview,
 } from './mysheets-digest-source.js';
 import { canonicalNotionDigestBinding, lockApprovedNotionSource, NOTION_DIGEST_REAPPROVAL, type NotionDigestSourceAuthority } from '../notion/digest-source-authority.js';
 import {
@@ -1848,6 +1849,8 @@ export class ScheduleService {
           slackCandidate.disabledReason ?? SCHEDULE_CONFLICTS.REAUTHORIZATION_NOT_READY,
         );
       }
+      const sheetsError = await verifyMySheetsDigestPreview(slackCandidate.config, { userId, ...trustedScope }, this.options.getAdapter);
+      if (sheetsError) throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', sheetsError);
       if (prevSlackConfig?.channelId && slackCandidate.config.channelId !== prevSlackConfig.channelId) {
         throw new ScheduleConflict(
           'REAUTHORIZATION_NOT_READY',
@@ -1923,6 +1926,8 @@ export class ScheduleService {
           tgCandidate.disabledReason ?? SCHEDULE_CONFLICTS.REAUTHORIZATION_NOT_READY,
         );
       }
+      const sheetsError = await verifyMySheetsDigestPreview(tgCandidate.config, { userId, ...trustedScope }, this.options.getAdapter);
+      if (sheetsError) throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', sheetsError);
       if (prevTgConfig?.chatId && tgCandidate.config.chatId !== prevTgConfig.chatId) {
         throw new ScheduleConflict(
           'REAUTHORIZATION_NOT_READY',
@@ -3029,6 +3034,7 @@ export class ScheduleService {
       const slackUnknown = getSlackDeliveryUnknown(run);
       const unknownDigestKind = jiraUnknown ? 'myjira_digest'
         : slackUnknown ? 'slack_digest'
+        : hasUnknownTelegramDispatch(run) ? 'telegram_digest'
         : calendarOrGithubDeliveryUnknownKind(run, schedule);
       if (!isSheetsUnknown && !isTrelloOrTelegramUnknown && !isNotionUnknown && !unknownDigestKind) {
         throw new ScheduleConflict(
@@ -3435,6 +3441,9 @@ export class ScheduleService {
             }
           }
         } else if (schedule.kind === 'telegram_digest') {
+          if (!matchesDispatchedDigestConfig(run, schedule)) {
+            throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
+          }
           const cfg = schedule.digest_config as TelegramDigestConfig;
           await this.assertNotionSourceInTx(client, schedule);
           const expectedHash = computeTelegramDigestConfigHash(cfg);
