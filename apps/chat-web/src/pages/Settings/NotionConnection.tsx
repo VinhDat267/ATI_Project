@@ -436,9 +436,9 @@ export function NotionConnection({
   const content = (
     <div
       id="service-row-notion"
-      className={`${CARD_CONTAINER_CLASS} ${selected ? 'border-[#FF5701] ring-2 ring-[#FF5701]/20' : ''}`}
+      className={`${CARD_CONTAINER_CLASS} ps-connection-card ${selected ? 'border-[#FF5701] ring-2 ring-[#FF5701]/20' : ''}`}
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="ps-connection-header gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
             <h3 className="font-sans font-semibold text-base text-[#1a0e08] dark:text-white flex items-center gap-3">
@@ -467,7 +467,7 @@ export function NotionConnection({
                 value={activeConnectionId ?? ''}
                 disabled={busy}
                 onChange={(e) => void handleSwitchWorkspace(e.target.value)}
-                className="rounded-lg border border-[#E8E0D6] dark:border-[#4a4038] bg-white dark:bg-[#2A2420] px-2.5 py-1.5 text-xs text-[#1a0e08] dark:text-white focus:border-[#FF5701] focus:outline-none"
+                className="min-w-0 rounded-lg border border-[#E8E0D6] dark:border-[#4a4038] bg-white dark:bg-[#2A2420] px-2.5 py-1.5 text-xs text-[#1a0e08] dark:text-white focus:border-[#FF5701] focus:outline-none"
               >
                 {connections.map((conn) => (
                   <option key={conn.id} value={conn.id}>

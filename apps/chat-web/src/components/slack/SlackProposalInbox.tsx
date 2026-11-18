@@ -45,7 +45,7 @@ const digestStatusLabels: Record<string, string> = {
 
 export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalInboxProps) {
   usePrototypePage(inboxMeta);
-  const [connections, setConnections] = useState<SlackConnectionPublicInfo[]>([]);
+  const [connections, setConnections] = useState<SlackConnectionPublicInfo[] | null>(null);
   const [selectedConnectionId, setSelectedConnectionId] = useState('');
   const [proposals, setProposals] = useState<SlackProposalViewDto[]>([]);
   const [digests, setDigests] = useState<SlackDigestViewDto[]>([]);
@@ -62,7 +62,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
     return authStorage.subscribeAuthTokens(() => {
       if (!owns()) {
         generation.current++;
-        setConnections([]);
+        setConnections(null);
         setSelectedConnectionId('');
         setProposals([]);
         setDigests([]);
@@ -86,9 +86,10 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
         setSelectedConnectionId((prev) => (rows.some((r) => r.id === prev) ? prev : rows[0]?.id ?? ''));
         if (rows.length === 0) setLoading(false);
       })
-      .catch(() => {
+      .catch((reason) => {
         if (owns() && epoch === generation.current) {
-          setConnections([]);
+          setConnections(null);
+          if (reason?.status !== 404) setError('Không tải được kết nối Slack.');
           setLoading(false);
         }
       });
@@ -192,7 +193,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
         <section aria-labelledby="proposals-heading" className="v3-space-y-4">
           <div className="ps-sectionhead">
             <h2 id="proposals-heading">Hộp thư đề xuất</h2>
-            {connections.length > 0 && (
+            {connections && connections.length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
                 <select
                   aria-label="Chọn workspace"
@@ -225,7 +226,10 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
           )}
           {loading && <p role="status" className="ps-note">Đang tải hộp thư đề xuất…</p>}
 
-          {!loading && connections.length === 0 && (
+          {!loading && !error && connections === null && (
+            <p className="ps-note">Slack cá nhân chưa khả dụng trên máy chủ.</p>
+          )}
+          {!loading && connections?.length === 0 && (
             <div data-inbox-connect className="ps-panel p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <p className="ps-note">
                 Kết nối Slack cá nhân để Planora nhận ra việc được giao cho bạn trong tin nhắn và gửi đề xuất về đây.
@@ -243,7 +247,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
             </div>
           )}
 
-          {connections.length > 0 && (
+          {connections && connections.length > 0 && (
             <>
               <div role="group" aria-label="Thống kê đề xuất" className="ps-panel ps-stats">
                 {filters.map(([key, label, count]) => (
@@ -291,7 +295,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
           )}
         </section>
 
-        {connections.length > 0 && (
+        {connections && connections.length > 0 && (
           <section aria-labelledby="digests-heading" className="v3-space-y-4">
             <div className="ps-sectionhead">
               <h2 id="digests-heading">Bản tóm tắt hàng ngày</h2>

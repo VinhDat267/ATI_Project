@@ -178,7 +178,13 @@ html[data-app-shell] :is(.ps-btn, .ps-btn-quiet, .ps-stat):focus-visible { outli
 .ps-cardgrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: stretch; }
 @media (min-width: 1024px) {
   .ps-cardgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .ps-cardgrid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .ps-cardgrid > :last-child:nth-child(odd),
+  .ps-cardgrid > #jira:has(> details[open]) { grid-column: 1 / -1; }
+}
+.ps-connection-card { container: service-connection / inline-size; }
+.ps-connection-header { display: flex; flex-direction: column; }
+@container service-connection (min-width: 36rem) {
+  .ps-connection-header { flex-direction: row; align-items: flex-start; justify-content: space-between; }
 }
 .ps-grouptitle { display: flex; align-items: center; gap: 8px; font-family: var(--ps-font-sans); font-size: 14px; font-weight: 600; letter-spacing: 0; color: var(--ps-ink); }
 .ps-groupcount { font-weight: 500; color: var(--ps-faint); font-variant-numeric: tabular-nums; }

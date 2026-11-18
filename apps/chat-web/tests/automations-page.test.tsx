@@ -40,6 +40,18 @@ it('puts Lịch chạy first, then Hộp thư đề xuất, and asks to connect 
   expect(screen.getByRole('link', { name: 'Tự động' })).toHaveAttribute('aria-current', 'page');
 });
 
+it.each([
+  [404, 'Slack cá nhân chưa khả dụng trên máy chủ.'],
+  [503, 'Không tải được kết nối Slack.'],
+])('keeps schedules available without a Slack connect prompt when the connection list returns %i', async (status, message) => {
+  vi.mocked(slackConnectionApi.list).mockRejectedValue(Object.assign(new Error('Slack unavailable'), { status }));
+  render(withSchedules(<SlackProposalInbox user={user} navigate={vi.fn()} onLogout={vi.fn()} />));
+  const inbox = screen.getByRole('region', { name: 'Hộp thư đề xuất' });
+  expect(await within(inbox).findByText(message)).toBeVisible();
+  expect(within(inbox).queryByRole('link', { name: 'Mở Kết nối dịch vụ' })).toBeNull();
+  expect(screen.getByRole('region', { name: 'Lịch chạy' })).toBeVisible();
+});
+
 it('offers each template as a row whose button names the template', async () => {
   render(withSchedules(<SlackProposalInbox user={user} navigate={vi.fn()} onLogout={vi.fn()} />));
   const templates = await screen.findByTestId('schedule-event-templates');
