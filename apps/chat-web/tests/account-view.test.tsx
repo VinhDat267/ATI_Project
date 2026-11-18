@@ -119,7 +119,8 @@ it('hides the Google section when Google sign-in is not configured', async () =>
   serve(profile());
   render(<App />);
   await screen.findByText('Chrome trên Windows');
-  expect(screen.queryByRole('heading', { name: '4. Liên kết tài khoản Google' })).toBeNull();
+  // Redesign 11/2026 bước 6a: bỏ đánh số đề mục, tiêu đề khối là "Google".
+  expect(screen.queryByRole('heading', { name: 'Google' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'Liên kết Google' })).toBeNull();
 });
 

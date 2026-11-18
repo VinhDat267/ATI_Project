@@ -62,7 +62,8 @@ async function openAccount() {
   render(<AccountView user={member} navigate={() => {}} onLogout={() => {}} />);
   await screen.findByDisplayValue('Member');
   // The sign-in methods section depends on a separate config request; wait for it too.
-  await screen.findByRole('heading', { name: '4. Liên kết tài khoản Google' });
+  // Redesign 11/2026 bước 6a: bỏ đánh số đề mục, tiêu đề khối là "Google".
+  await screen.findByRole('heading', { name: 'Google' });
 }
 async function saveName(value: string) {
   fireEvent.change(screen.getByLabelText(/Họ và tên/), { target: { value } });

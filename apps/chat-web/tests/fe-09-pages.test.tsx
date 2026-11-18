@@ -19,7 +19,8 @@ it('ports the Account page without the shell or demo controls and requires curre
   window.history.replaceState({}, '', '/account');
   const unlink = vi.spyOn(apiClient, 'unlinkGoogle').mockResolvedValue({ success: true });
   render(<App />);
-  expect(await screen.findByRole('heading', { name: 'Cài đặt tài khoản' })).toBeInTheDocument();
+  // Redesign 11/2026 bước 6a: tiêu đề trang Tài khoản dùng danh từ ngắn theo .ps-pagehead.
+  expect(await screen.findByRole('heading', { name: 'Tài khoản' })).toBeInTheDocument();
   expect(document.documentElement.dataset.protoPage).toBe('account');
   expect(screen.queryByText(/Kịch bản demo/)).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: 'Gỡ liên kết Google' }));
