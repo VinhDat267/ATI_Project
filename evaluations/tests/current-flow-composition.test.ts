@@ -284,7 +284,9 @@ describe('FLOW-05: Six Core Workflow Compositions & 36 Audit Regression Suite', 
       });
 
       expect(rendered.itemCount).toBe(3);
-      expect(rendered.text).toContain('Duyệt từng lượt trước khi gửi - Manual Approval Required');
+      // Approval happens in the app preview; the delivered message must not carry internal approval wording.
+      expect(rendered.text).not.toContain('Manual Approval Required');
+      expect(rendered.text).toContain('Tổng số 3 ticket.');
 
       const artifact = artifactStore.createArtifact({
         kind: 'jira_progress',

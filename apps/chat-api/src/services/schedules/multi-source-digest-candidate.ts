@@ -373,6 +373,21 @@ export function validateMultiDigestSourcePreconditions(input: {
   return { ok: true };
 }
 
+/** Filters of `myjira.search_issues` the request asks for; without them the digest lists every issue. */
+export function resolveJiraDigestFilters(
+  requestText: string,
+): { overdueOnly?: true; unassignedOnly?: true; dueWithinDays?: number } {
+  const text = foldVietnamese(requestText);
+  const filters: { overdueOnly?: true; unassignedOnly?: true; dueWithinDays?: number } = {};
+  if (/\b(?:qua|tre|tru?ot) han\b|\boverdue\b|\bpast due\b/.test(text)) filters.overdueOnly = true;
+  if (/\bchua (?:co nguoi (?:phu trach|nhan|xu ly)|duoc (?:giao|gan|phan cong)|gan|giao|phan cong)\b|\bunassigned\b/.test(text)) {
+    filters.unassignedOnly = true;
+  }
+  const dueSoon = /\b(?:sap (?:den|het|toi) han|due soon|due within)\b(?:[^0-9]{0,12}(\d{1,3})\s*(?:ngay|days?)\b)?/.exec(text);
+  if (dueSoon) filters.dueWithinDays = Math.min(30, dueSoon[1] ? Number(dueSoon[1]) : 3);
+  return filters;
+}
+
 export function buildMultiDigestSources(
   input: BuildMultiDigestSourcesInput,
 ): { ok: true; sources: TelegramDigestSource[] } | { ok: false; disabledReason: string } {
@@ -451,10 +466,11 @@ export function buildMultiDigestSources(
             requestText,
           ) || (p.projectName && lowerReq.includes(p.projectName.toLowerCase())),
       );
+      const filters = resolveJiraDigestFilters(requestText);
       for (const proj of (matched.length > 0 ? matched : projects).slice(0, 5)) {
         sources.push({
           ...source,
-          args: { siteId: proj.siteId, projectKey: proj.projectKey, query: '' },
+          args: { siteId: proj.siteId, projectKey: proj.projectKey, query: '', ...filters },
           label: `${source.label} (${proj.projectKey})`,
           jiraBinding: { grantId, atlassianAccountId },
         });

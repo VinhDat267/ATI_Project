@@ -126,7 +126,7 @@ describe('Deterministic Report Renderers (FLOW-05)', () => {
   });
 
   describe('renderJiraProgressReport', () => {
-    it('summarizes Jira sprint issues grouped by status and notes manual per-turn approval', () => {
+    it('summarizes Jira sprint issues grouped by status without internal approval wording', () => {
       const issues = [
         { key: 'FE-1', title: 'Login with Google OAuth', status: 'Done', url: 'https://jira.acme.com/browse/FE-1' },
         { key: 'FE-2', title: 'Session expiration dialog', status: 'Done', url: 'https://jira.acme.com/browse/FE-2' },
@@ -141,7 +141,7 @@ describe('Deterministic Report Renderers (FLOW-05)', () => {
 
       expect(report.itemCount).toBe(4);
       expect(report.text).toContain('Báo cáo tiến độ Jira Sprint (Sprint 24 - FE)');
-      expect(report.text).toContain('Duyệt từng lượt trước khi gửi');
+      expect(report.text).not.toContain('Duyệt từng lượt trước khi gửi');
       expect(report.text).toContain('Done: 2');
       expect(report.text).toContain('In Progress: 1');
       expect(report.text).toContain('To Do: 1');
