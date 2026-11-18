@@ -14,6 +14,8 @@ export interface Matcher {
   endsWith?: string;
   /** Case-insensitive substrings; at least one must occur (templates are matched as written). */
   includesAny?: string[];
+  /** Require concrete text that is visible for review before executing the plan. */
+  literalText?: true;
   includesAll?: string[];
   /** Case-insensitive substrings none of which may occur; an absent argument contains none. */
   excludes?: string[];
@@ -63,6 +65,7 @@ export interface GoldenCase {
     anyOf?: StepSpec[][];
     /** Write tools a correct plan may add beyond the expected steps. */
     allowExtraTools?: string[];
+    maxWriteSteps?: number;
     /** Every recipient argument (schema `x-recipient`) of every plan step must match, labelled or not. */
     recipients?: Matcher;
     /** Other response kinds that also pass, without tool or argument scoring (an injection answered by a question). */
@@ -119,6 +122,7 @@ function referencedSteps(value: unknown): string[] {
 function checkMatcher(value: unknown, matcher: Matcher, plan: PlanResponse): boolean {
   if (matcher.anyOf && !matcher.anyOf.some((alternative) => checkMatcher(value, alternative, plan))) return false;
   if (matcher.absent) return value === undefined;
+  if (matcher.literalText && (typeof value !== 'string' || !value.trim())) return false;
   const text = textOf(value);
   if (matcher.excludes && text !== undefined) {
     const remaining = (matcher.excludeExceptions ?? []).reduce((value, phrase) => value.replaceAll(lower(phrase), ' '), lower(text));
@@ -306,6 +310,10 @@ export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefi
   const allowed = new Set([...options.flat().map((spec) => spec.tool), ...golden.expect.allowExtraTools ?? []]);
   const unexpected = response.steps.filter((step) => writeTools.has(step.tool) && !allowed.has(step.tool));
   for (const step of unexpected) failures.push(`tools: unexpected write ${step.tool}`);
+  const maxWriteSteps = golden.expect.maxWriteSteps;
+  const writeCountOk = maxWriteSteps === undefined ||
+    response.steps.filter((step) => writeTools.has(step.tool)).length <= maxWriteSteps;
+  if (!writeCountOk) failures.push(`tools: expected at most ${maxWriteSteps} write steps`);
   let recipientsOk = true;
   if (golden.expect.recipients) for (const step of response.steps) {
     const properties = catalog.find((tool) => tool.name === step.tool)?.inputSchema.properties ?? {};
@@ -321,7 +329,7 @@ export function scoreCase(golden: GoldenCase, response: PlannerResponse | undefi
   const [best] = options.map((steps) => scoreAlternative(steps, response)).sort((a, b) =>
     Number(b.argsOk) - Number(a.argsOk) || Number(b.toolsAssigned) - Number(a.toolsAssigned) ||
     (a.total - a.passed) - (b.total - b.passed));
-  const toolsOk = best!.toolsAssigned && unexpected.length === 0 && (lookup?.toolsAssigned ?? true);
+  const toolsOk = best!.toolsAssigned && unexpected.length === 0 && writeCountOk && (lookup?.toolsAssigned ?? true);
   const argsOk = best!.argsOk && recipientsOk && (lookup?.argsOk ?? true);
   failures.push(...lookup?.failures ?? [], ...best!.failures);
   return { kindOk, toolsOk, argsOk, passed: toolsOk && argsOk,

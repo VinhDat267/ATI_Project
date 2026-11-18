@@ -46,7 +46,7 @@ export function parseEvalOptions(env: NodeJS.ProcessEnv) {
   if (!Object.hasOwn(EVAL_FILES, set)) throw new Error('EVAL_SET must be core, freeform, services, independent, gmail, answers, multiturn, mycalendar, myjira, schedule');
   if (env.EVAL_SEARCH_MODE && env.PLANNER_SEARCH_MODE && env.EVAL_SEARCH_MODE !== env.PLANNER_SEARCH_MODE)
     throw new Error('EVAL_SEARCH_MODE and PLANNER_SEARCH_MODE disagree');
-  const searchMode = env.EVAL_SEARCH_MODE ?? env.PLANNER_SEARCH_MODE ?? 'regex';
+  const searchMode = env.EVAL_SEARCH_MODE ?? env.PLANNER_SEARCH_MODE ?? (set === 'mycalendar' ? 'llm' : 'regex');
   if (searchMode !== 'regex' && searchMode !== 'llm') throw new Error('Search mode must be regex or llm');
   if (env.EVAL_READ_ANSWERS && env.PLANNER_READ_ANSWERS && env.EVAL_READ_ANSWERS !== env.PLANNER_READ_ANSWERS)
     throw new Error('EVAL_READ_ANSWERS and PLANNER_READ_ANSWERS disagree');

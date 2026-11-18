@@ -15,7 +15,7 @@ import { readableRecoveryPlan, recoveryConflict, restoredProgress, validateRecov
 import { AdapterFactory, type AdapterContext } from './adapter-factory.js';
 import { validateJiraApprovalBinding } from './jira/jira-approval-guard.js';
 import { validateReportEvidenceBinding } from './report-evidence-guard.js';
-import { relevantGroundingUserTexts, type ReportArtifactStore, type ChatMessage } from '@wap/planner';
+import { DEFERRED_CALENDAR_RECAP_ERROR, hasDeferredCalendarRecap, relevantGroundingUserTexts, type ReportArtifactStore, type ChatMessage } from '@wap/planner';
 import type { PlanJiraGuard } from '../db/repositories/plan-repo.js';
 import { JiraStreamBuffer, JiraStreamBufferRevokedError } from '../sse/jira-stream-guard.js';
 import type { JiraLeaseManager } from './jira/jira-lease-manager.js';
@@ -224,6 +224,10 @@ export class ExecutionService {
       }
     } catch {
       return { success: false, status: 409, error: 'Plan integrity check failed' };
+    }
+
+    if (Array.isArray(planJson?.steps) && hasDeferredCalendarRecap(planJson.steps)) {
+      return { success: false, status: 409, error: DEFERRED_CALENDAR_RECAP_ERROR };
     }
 
     const jiraG2ACheck = this.checkJiraG2APlanContainment(planJson);
@@ -498,6 +502,9 @@ export class ExecutionService {
       throw recoveryConflict('Reconciliation required: execution controller is unavailable');
     }
     const { steps, connections } = verifiedRecoveryPlan(plan);
+    if (hasDeferredCalendarRecap(steps)) {
+      throw recoveryConflict(DEFERRED_CALENDAR_RECAP_ERROR);
+    }
     const rawPlanJson = typeof plan.plan_json === 'string' ? JSON.parse(plan.plan_json) : plan.plan_json;
     const jiraG2ACheck = this.checkJiraG2APlanContainment({ ...rawPlanJson, steps, connections });
     if (!jiraG2ACheck.ok) {

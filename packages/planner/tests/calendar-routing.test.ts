@@ -101,6 +101,35 @@ it('includes Personal Google Calendar (mycalendar) Rules in buildSystemPrompt wh
   expect(withSchedules).toContain('mycalendar.create_event');
 });
 
+it.each([
+  ['slack.send_message', { channel: 'C123' }, { $template: 'Tóm tắt: ${read.output.title}' }],
+  ['telegram.send_message', { chatId: '-12345' }, { $ref: 'read.output.title' }],
+] as const)('requires a concrete personal Calendar recap before approving %s', (tool, destination, rawText) => {
+  const catalog = [...ALL_TOOLS, ...MYCALENDAR_TOOLS];
+  const read = {
+    id: 'read', tool: 'mycalendar.get_event', description: 'Đọc sự kiện', dependsOn: [],
+    args: { calendarId: 'owner@example.test', eventId: 'event_123' },
+  };
+  const send = {
+    id: 'send', tool, description: 'Gửi tóm tắt', dependsOn: ['read'],
+    args: { ...destination, text: rawText },
+  };
+  const plan = { kind: 'plan', thinking: 'Đọc và gửi tóm tắt', summary: 'Tóm tắt lịch', warnings: [] };
+  expect(validatePlan(JSON.stringify({ ...plan, steps: [read, send] }), catalog)).toMatchObject({
+    valid: false, layer: 'semantic', error: expect.stringContaining('Calendar recap'),
+  });
+  expect(validatePlan(JSON.stringify({
+    ...plan, steps: [{ ...send, dependsOn: [], args: { ...destination, text: 'Họp nhóm lúc 09:00.' } }],
+  }), catalog).valid).toBe(true);
+  const create = {
+    ...read, tool: 'mycalendar.create_event',
+    args: { calendarId: 'owner@example.test', summary: 'Họp nhóm', start: '2026-11-19T09:00:00+07:00', end: '2026-11-19T10:00:00+07:00' },
+  };
+  expect(validatePlan(JSON.stringify({
+    ...plan, steps: [create, { ...send, args: { ...destination, text: { $template: 'Sự kiện mới: ${read.output.url}' } } }],
+  }), catalog).valid).toBe(true);
+});
+
 it('grounds post-meeting follow-up email recipients from observed mycalendar.get_event attendees and blocks ungrounded addresses', () => {
   const eventDetail = {
     id: 'evt_design_review',

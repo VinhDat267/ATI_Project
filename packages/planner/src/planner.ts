@@ -187,6 +187,14 @@ function readOnlyQuestion(): PlannerResponse {
     context: 'Kế hoạch cần ít nhất một hành động ghi. Hãy chọn hành động trên dịch vụ đã kết nối.', reason: 'read_only' };
 }
 
+function calendarRecapQuestion(): PlannerResponse {
+  return {
+    kind: 'clarification',
+    question: 'Bạn muốn gửi nội dung tóm tắt nào?',
+    context: 'Cần có nội dung tin nhắn cụ thể để hiển thị trong bản xem trước.',
+  };
+}
+
 function isClarificationAssistantMessage(content: unknown): boolean {
   if (!content) return false;
   if (typeof content === 'object') {
@@ -897,6 +905,7 @@ export class AIPlanner {
         // A turn let through without tools for its schedule ends as it would have without one.
         if (activeTools.length === 0) return unroutable(route.unavailable);
         if (answerOutput) return readOnlyQuestion();
+        if (validation.code === 'DEFERRED_CALENDAR_RECAP') return calendarRecapQuestion();
         if (validation.layer === 'grounding' && validation.ungrounded) {
           const resources = [...new Set(validation.ungrounded.map((u) => u.resource))];
           return {
@@ -974,6 +983,7 @@ export class AIPlanner {
       return firstValidation.parsed;
     }
     if (firstValidation.code === 'READ_ONLY_PLAN') return readOnlyQuestion();
+    if (firstValidation.code === 'DEFERRED_CALENDAR_RECAP') return calendarRecapQuestion();
 
     // 4. Attempt 2: Retry exactly 1x with feedback
     const feedbackTurn: ChatMessage[] = [
@@ -999,6 +1009,7 @@ export class AIPlanner {
       return retryValidation.parsed;
     }
     if (retryValidation.code === 'READ_ONLY_PLAN') return readOnlyQuestion();
+    if (retryValidation.code === 'DEFERRED_CALENDAR_RECAP') return calendarRecapQuestion();
     // A turn let through without tools for its schedule ends as it would have without one.
     if (activeTools.length === 0) return unroutable(route.unavailable);
 

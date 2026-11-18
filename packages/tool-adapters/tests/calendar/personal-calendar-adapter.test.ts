@@ -842,12 +842,9 @@ describe('PersonalCalendarAdapter', () => {
     expect(detail.selfResponseStatus).toBe('needsAction');
   });
 
-  it('supports mycalendar.list_event_instances for master series and resolves occurrence eventId back to recurringEventId', async () => {
+  it('uses the master ID even when Google accepts an occurrence ID at the instances endpoint', async () => {
     const { adapter, calls } = setup({
       handler: (url) => {
-        if (url.pathname.endsWith('/events/occ_1/instances')) {
-          return json({ error: { message: 'Not Found' } }, 404);
-        }
         if (url.pathname.endsWith('/events/occ_1')) {
           return json({
             id: 'occ_1',
@@ -858,7 +855,8 @@ describe('PersonalCalendarAdapter', () => {
             end: { dateTime: '2026-11-03T09:30:00+07:00' },
           });
         }
-        if (url.pathname.endsWith('/events/series_master_1/instances')) {
+        if (url.pathname.endsWith('/events/series_master_1/instances') ||
+            url.pathname.endsWith('/events/occ_1/instances')) {
           return json({
             timeZone: 'Asia/Ho_Chi_Minh',
             items: [
@@ -901,6 +899,28 @@ describe('PersonalCalendarAdapter', () => {
     });
     expect(result.coverage).toEqual({ complete: true, returned: 1, totalAvailable: 1 });
     expect(calls.some((c) => c.url.pathname.endsWith('/events/series_master_1/instances'))).toBe(true);
+    expect(calls.some((c) => c.url.pathname.endsWith('/events/occ_1/instances'))).toBe(false);
+  });
+
+  it('returns the master ID for an occurrence even when the requested window is empty', async () => {
+    const { adapter } = setup({
+      handler: (url) => url.pathname.endsWith('/events/occ_1')
+        ? json({ id: 'occ_1', recurringEventId: 'series_master_1' })
+        : json({ items: [] }),
+    });
+
+    const result = await adapter.execute('mycalendar.list_event_instances', {
+      calendarId,
+      eventId: 'occ_1',
+      timeMin: '2026-11-01T00:00:00+07:00',
+      timeMax: '2026-11-02T00:00:00+07:00',
+    });
+
+    expect(result).toMatchObject({
+      masterEventId: 'series_master_1',
+      events: [],
+      coverage: { complete: true, returned: 0, totalAvailable: 0 },
+    });
   });
 
   it('updates only the calendar participant and preserves attendee changes made after the RSVP lookup', async () => {
