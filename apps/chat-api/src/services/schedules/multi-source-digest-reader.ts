@@ -19,6 +19,7 @@ import {
   MYSHEETS_DIGEST_ROW_LIMIT,
   readMySheetsDigestBinding,
 } from './mysheets-digest-source.js';
+import { approvedOrgSheetsDigestRead, ORG_SHEETS_DIGEST_REAPPROVAL } from './org-sheets-digest-source.js';
 import { analyzeSheetKpiMetrics } from './sheets-digest-runner.js';
 import { buildTelegramDigestSourceArgs } from './multi-source-digest-candidate.js';
 import { assertGmailDigestBinding, isValidGmailDigestQuery } from './gmail-digest-binding.js';
@@ -449,17 +450,36 @@ export async function executeMultiDigestReadSources(input: {
         sourceAdapterContext.jiraDigestBinding = source.jiraBinding;
         sourceAdapterContext.signal = signal;
       }
+      if (source.service === 'sheets') sourceAdapterContext.phase = 'execution';
       const adapter =
         source.service === 'notion'
           ? null
           : await input.adapterFactory.getAdapterForService(source.service, sourceAdapterContext);
-      const { callArgs, repoSearchTool, sheetListTool, sheetReadTool } = buildTelegramDigestSourceArgs(source, {
+      const { callArgs, repoSearchTool, sheetReadTool } = buildTelegramDigestSourceArgs(source, {
         sinceIso,
         untilIso,
       });
 
       let rawResult: unknown;
-      if (source.service === 'notion') {
+      if (source.service === 'sheets') {
+        const read = approvedOrgSheetsDigestRead(source);
+        if (!read) return { kind: 'blocked', error: ORG_SHEETS_DIGEST_REAPPROVAL, pauseSchedule: true };
+        const result = await adapter.execute('sheets.read_range', read, { signal });
+        const coordinates = read.range.slice(read.range.lastIndexOf('!') + 1);
+        const [firstRow, lastRow] = coordinates.match(/\d+/g) ?? [];
+        const withoutHeader = firstRow !== '1' || firstRow === lastRow;
+        // A range starting below row 1 contains data. Do not read outside it for column names.
+        const records = withoutHeader && Array.isArray(result.values)
+          ? (result.values as string[][])
+            .filter((row) => row.some((cell) => cell.trim() !== ''))
+            .map((row) => Object.fromEntries(row.map((cell, index) => ['Cột ' + (index + 1), cell])))
+          : undefined;
+        rawResult = {
+          ...result,
+          ...(records ? { headers: [], records, values: [] } : {}),
+          scannedRange: result.range ?? read.range,
+        };
+      } else if (source.service === 'notion') {
         if (!notionBinding || !input.notionSources) return { kind: 'notion_blocked' };
         rawResult = await input.notionSources.read(userId, notionBinding, signal);
       } else if (source.service === 'gmail') {
@@ -594,25 +614,6 @@ export async function executeMultiDigestReadSources(input: {
               if (Array.isArray(issues)) mergedIssues.push(...issues);
             }
             rawResult = mergedIssues;
-          } else if (sheetListTool && !callArgs.spreadsheetId) {
-            const sheetsRes = await adapter.execute(sheetListTool, { query: '' }, { signal });
-            const sheets = Array.isArray(sheetsRes) ? sheetsRes : [];
-            if (sheets.length > 0 && sheets[0]?.id) {
-              const readRes = await adapter.execute(
-                source.tool,
-                { ...callArgs, spreadsheetId: String(sheets[0].id) },
-                { signal },
-              );
-              rawResult =
-                readRes && typeof readRes === 'object' && !Array.isArray(readRes)
-                  ? {
-                      ...(readRes as Record<string, unknown>),
-                      spreadsheetTitle: String(sheets[0].name ?? sheets[0].title ?? sheets[0].id),
-                    }
-                  : readRes;
-            } else {
-              throw innerErr;
-            }
           } else if (
             source.service === 'calendar' &&
             source.tool === 'calendar.list_events' &&
@@ -673,6 +674,10 @@ export async function executeMultiDigestReadSources(input: {
       }
       if (source.service === 'notion' && isNotionSourceDenied(err)) {
         return { kind: 'notion_blocked' };
+      }
+      if (source.service === 'sheets' &&
+        ['AUTH_ERROR', 'PERMISSION_DENIED', 'NOT_FOUND', 'VALIDATION'].includes(err?.category)) {
+        return { kind: 'blocked', error: ORG_SHEETS_DIGEST_REAPPROVAL, pauseSchedule: true };
       }
       if (source.service === 'mycalendar' && isGmailAuthOrBindingFailure(err)) {
         return {

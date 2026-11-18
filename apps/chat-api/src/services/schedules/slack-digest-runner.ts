@@ -42,6 +42,8 @@ function isDefiniteSlackRejection(error: unknown): boolean {
   return false;
 }
 
+import { ORG_SHEETS_DIGEST_REAPPROVAL, readOrgSheetsDigestScope } from './org-sheets-digest-source.js';
+
 export interface SlackDigestRunInput {
   runId: string;
   scheduleId: string;
@@ -238,6 +240,7 @@ export class SlackDigestRunner {
         lockTelegramJiraAuthority: hasJira,
         lockMyCalendarAuthority: 'nowait',
         lockMySheetsAuthority: 'nowait',
+        lockOrgSheetsAuthority: 'nowait',
       });
       if (!guard.allowed) {
         await client.query('COMMIT');
@@ -328,6 +331,10 @@ export class SlackDigestRunner {
         error: 'Cấu hình bản tin Slack tự động không hợp lệ.',
         pauseSchedule: true,
       };
+    }
+
+    if (readOrgSheetsDigestScope(digestConfig, run.services).kind === 'invalid') {
+      return { status: 'blocked', error: ORG_SHEETS_DIGEST_REAPPROVAL, pauseSchedule: true };
     }
 
     const mycalendar = readMyCalendarDigestBinding(digestConfig, run.services ?? null);

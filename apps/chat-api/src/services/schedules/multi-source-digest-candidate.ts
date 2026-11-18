@@ -162,7 +162,6 @@ export function buildTelegramDigestSourceArgs(
 ): {
   callArgs: Record<string, any>;
   repoSearchTool?: string;
-  sheetListTool?: string;
   sheetReadTool?: string;
 } {
   const base = { ...(source.args ?? {}) };
@@ -174,12 +173,6 @@ export function buildTelegramDigestSourceArgs(
   if (source.tool === 'mycalendar.list_events') {
     return {
       callArgs: { timeMin: window.sinceIso, timeMax: window.untilIso, ...base },
-    };
-  }
-  if (source.tool === 'sheets.read_range') {
-    return {
-      callArgs: { range: 'A1:Z20', ...base },
-      sheetListTool: 'sheets.list_spreadsheets',
     };
   }
   if (source.tool === 'mysheets.list_spreadsheets') {

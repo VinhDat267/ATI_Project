@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import type { AdapterContext } from '../adapter-factory.js';
 import { decryptCredentials } from '@wap/tool-adapters';
 import {
   isSheetsDigestConfigV2,
@@ -77,6 +78,7 @@ import {
   readMySheetsDigestBinding,
   verifyMySheetsDigestPreview,
 } from './mysheets-digest-source.js';
+import { allowsOrgSheetsDigestRead, ORG_SHEETS_DIGEST_REAPPROVAL, readOrgSheetsDigestScope } from './org-sheets-digest-source.js';
 import { canonicalNotionDigestBinding, lockApprovedNotionSource, NOTION_DIGEST_REAPPROVAL, type NotionDigestSourceAuthority } from '../notion/digest-source-authority.js';
 import {
   buildConfirmedTrelloDigestDelivery,
@@ -784,6 +786,7 @@ export class ScheduleService {
             wsMode,
             wsId,
             config: effectiveConfig,
+            services: metadata.services,
             conflictCode: 'DIGEST_PREVIEW_CHANGED',
           });
           let computedHash: string;
@@ -1248,6 +1251,7 @@ export class ScheduleService {
               wsMode,
               wsId,
               config: updatedConfig,
+              services: fields.services,
               conflictCode: 'DIGEST_PREVIEW_CHANGED',
             });
             if (involvesGmail) {
@@ -1800,17 +1804,9 @@ export class ScheduleService {
             label: prevGmailSource.label.replace(/\s*\([^()]+\)\s*$/, '').trim() || 'Email chưa đọc',
           }
         : undefined;
-      const fallbackAdapter = async (serviceName: string) => {
-        if (serviceName !== 'slack') return null;
-        if (this.options.getAdapter) {
-          return this.options.getAdapter(serviceName, {
-            userId,
-            phase: 'planning',
-            workspaceMode: trustedScope.workspaceMode,
-            workspaceId: trustedScope.workspaceId,
-          });
-        }
-        return prevSlackConfig
+      const fallbackAdapter = async (serviceName: string, context?: AdapterContext) => {
+        if (this.options.getAdapter) return this.options.getAdapter(serviceName, context);
+        return serviceName === 'slack' && prevSlackConfig
           ? {
               execute: async () => [{ id: prevSlackConfig.channelId, name: prevSlackConfig.channelName }],
             }
@@ -1830,6 +1826,7 @@ export class ScheduleService {
         userId,
         pool: this.options.pool,
         getAdapter: fallbackAdapter,
+        reauthorizeOrgSheets: true,
         mycalendarLookup,
         reauthorizeMyCalendar: true,
         mysheetsLookup,
@@ -2192,6 +2189,7 @@ export class ScheduleService {
           wsMode: wsCheckMode,
           wsId: wsCheckId,
           config: slackCandidate.config,
+          services: reauthServices,
           conflictCode: 'REAUTHORIZATION_NOT_READY',
           conflictMessage: 'Kết nối Slack nhận bản tin không còn hợp lệ.',
         });
@@ -2682,6 +2680,7 @@ export class ScheduleService {
       wsMode: string;
       wsId: string | null;
       config: SlackDigestConfig;
+      services: readonly string[];
       conflictCode: 'DIGEST_PREVIEW_CHANGED' | 'REAUTHORIZATION_NOT_READY';
       conflictMessage?: string;
     },
@@ -2695,6 +2694,11 @@ export class ScheduleService {
         input.conflictCode,
         input.conflictMessage ?? 'Không gian làm việc hoặc kết nối Slack không khớp với bản xem trước.',
       );
+    }
+    const sheets = readOrgSheetsDigestScope(input.config, input.services);
+    if (sheets.kind === 'invalid' || (sheets.kind === 'bound' &&
+      !(await allowsOrgSheetsDigestRead(client, input.wsId, this.options.encryptionKey, sheets.read, 'share')))) {
+      throw new ScheduleConflict(input.conflictCode, ORG_SHEETS_DIGEST_REAPPROVAL);
     }
     const slackCredRes = await client.query<{
       id: string;

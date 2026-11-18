@@ -120,7 +120,9 @@ export class SheetsAdapter extends BaseAdapter {
     beforeDispatch?: () => Promise<void>
   ): Promise<any> {
     if (signal?.aborted) throw new StepError({ message: 'Sheets request cancelled before dispatch', category: 'NETWORK' });
-    const writing = body !== undefined;
+    const hasBody = body !== undefined;
+    // Google uses POST for the read-only DataFilter endpoint.
+    const writing = hasBody && !path.endsWith('/values:batchGetByDataFilter');
     const token = await this.auth.getAccessToken(SHEETS_SCOPE, signal);
     let response: Response;
     let rateRetries = 0; let networkRetries = 0; let serverRetries = 0;
@@ -138,9 +140,9 @@ export class SheetsAdapter extends BaseAdapter {
       try {
         if (writing) onDispatch?.(true);
         response = await this.fetchFn(apiBase + path, {
-          method: writing ? 'POST' : 'GET', signal, redirect: 'error',
-          headers: { Authorization: 'Bearer ' + token, ...(writing ? { 'Content-Type': 'application/json' } : {}) },
-          ...(writing ? { body: JSON.stringify(body) } : {}),
+          method: hasBody ? 'POST' : 'GET', signal, redirect: 'error',
+          headers: { Authorization: 'Bearer ' + token, ...(hasBody ? { 'Content-Type': 'application/json' } : {}) },
+          ...(hasBody ? { body: JSON.stringify(body) } : {}),
         });
       } catch {
         if (!writing && !signal?.aborted && networkRetries < 2) { networkRetries++; continue; }
@@ -175,26 +177,37 @@ export class SheetsAdapter extends BaseAdapter {
     const signal = context?.signal;
     if (toolName === 'sheets.list_spreadsheets') {
       const query = queryText(args.query); const limit = bounded(args.limit, 10);
+      const ids = this.allowedSpreadsheets();
+      const requestedId = args.spreadsheetId ?? (args.exactMatch === true ? ids.find((id) => id === args.query.trim()) : undefined);
       const matches = [];
-      for (const id of this.allowedSpreadsheets()) {
+      for (const id of requestedId === undefined ? ids : [this.checkedId(requestedId)]) {
         this.assertAllowedScope('spreadsheets', id);
         const value = await this.request(id + '?fields=properties.title', signal);
         if (typeof value?.properties?.title !== 'string') badResponse();
-        if (value.properties.title.toLowerCase().includes(query)) matches.push({ id, title: value.properties.title, url: this.url(id) });
+        const title: string = value.properties.title;
+        const normalizedTitle = title.trim().toLowerCase();
+        if (requestedId !== undefined || (args.exactMatch === true ? normalizedTitle === query : title.toLowerCase().includes(query))) {
+          matches.push({ id, title, url: this.url(id) });
+        }
         if (matches.length >= limit) break;
       }
       return matches;
     }
     if (toolName === 'sheets.list_sheets') {
       const id = this.checkedId(args.spreadsheetId); const query = queryText(args.query); const limit = bounded(args.limit, 10);
-      return (await this.tabs(id, signal)).filter(tab => tab.title.toLowerCase().includes(query)).slice(0, limit);
+      return (await this.tabs(id, signal)).filter((tab) => args.exactMatch === true
+        ? tab.title.trim().toLowerCase() === query : tab.title.toLowerCase().includes(query)).slice(0, limit);
     }
     if (toolName === 'sheets.read_range') {
       const id = this.checkedId(args.spreadsheetId);
       const limit = bounded(args.limit, 50);
-      const resolved = resolveReadRange(args.range, { limit, tail: args.tail, headerAware: args.headerAware });
+      const range = args.sheetId !== undefined && typeof args.range === 'string'
+        ? args.range.slice(args.range.lastIndexOf('!') + 1) : args.range;
+      const resolved = resolveReadRange(range, { limit, tail: args.tail, headerAware: args.headerAware });
       const fetchLimit = resolved.isTail ? 500 : limit;
-      const value = await this.request(id + '/values/' + encodeURIComponent(resolved.apiRange), signal);
+      const value = args.sheetId === undefined
+        ? await this.request(id + '/values/' + encodeURIComponent(resolved.apiRange), signal)
+        : await this.readPinnedGrid(id, args.sheetId, resolved.apiRange, signal);
       if (typeof value?.range !== 'string' || (value.values !== undefined && (!Array.isArray(value.values) || value.values.some((row: unknown) => !Array.isArray(row))))) badResponse();
       let truncated = false;
       const values = (value.values ?? []).slice(0, fetchLimit).map((row: unknown[]) => {
@@ -690,6 +703,41 @@ export class SheetsAdapter extends BaseAdapter {
     });
   }
   private url(id: string): string { return 'https://docs.google.com/spreadsheets/d/' + id + '/edit'; }
+  private async readPinnedGrid(
+    spreadsheetId: string,
+    sheetId: unknown,
+    a1Range: string,
+    signal?: AbortSignal,
+  ): Promise<any> {
+    const cells = /^([A-Z])([1-9]\d*):([A-Z])([1-9]\d*)$/i.exec(a1Range);
+    if (typeof sheetId !== 'number' || !Number.isInteger(sheetId) || sheetId < 0 || sheetId > 2147483647 || !cells) {
+      invalid('A pinned read needs a numeric sheetId and a bounded A1 cell range');
+    }
+    const startRowIndex = Number(cells[2]) - 1;
+    const endRowIndex = Number(cells[4]);
+    const startColumnIndex = cells[1]!.toUpperCase().charCodeAt(0) - 65;
+    const endColumnIndex = cells[3]!.toUpperCase().charCodeAt(0) - 64;
+    if (!Number.isInteger(endRowIndex) || endRowIndex > 2147483647 ||
+      endRowIndex <= startRowIndex || endColumnIndex <= startColumnIndex || endRowIndex - startRowIndex > 50) {
+      invalid('The pinned A1 range exceeds the supported bounds');
+    }
+    const gridRange = { sheetId, startRowIndex, endRowIndex, startColumnIndex, endColumnIndex };
+    const response = await this.request(spreadsheetId + '/values:batchGetByDataFilter', signal, {
+      dataFilters: [{ gridRange }],
+    });
+    if (response?.spreadsheetId !== spreadsheetId ||
+      (response.valueRanges !== undefined && !Array.isArray(response.valueRanges))) badResponse();
+    const matches = response.valueRanges ?? [];
+    if (matches.length === 0) {
+      throw new StepError({ message: 'Approved Sheets tab or range is no longer available', category: 'NOT_FOUND' });
+    }
+    const match = matches[0];
+    const echoedGrid = match?.dataFilters?.[0]?.gridRange;
+    if (matches.length !== 1 || !echoedGrid ||
+      !Object.entries(gridRange).every(([key, value]) => (echoedGrid[key] ?? 0) === value)) badResponse();
+    return match.valueRange;
+  }
+
   private async tabs(id: string, signal?: AbortSignal, includeLocale = false): Promise<Array<{ id: number; title: string; spreadsheetId: string; headers?: string[] }>> {
     const fields = includeLocale
       ? 'properties.locale,sheets.properties(sheetId,title)'

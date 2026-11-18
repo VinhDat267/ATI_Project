@@ -671,3 +671,40 @@ it('handles pure-update upsert in sheets.append_rows when 0 new rows remain (row
   expect(res.skippedDuplicates).toBe(0);
   expect(apiCalls.some((c) => c.url.pathname.includes(':append'))).toBe(false);
 });
+
+it('discovers an exact workbook beyond the normal page by ID or title and returns duplicate titles for ambiguity checks', async () => {
+  const preceding = Array.from({ length: 11 }, (_, i) => 'preceding_fixture_spreadsheet_' + i);
+  const { adapter, apiCalls } = setup((url) => {
+    const requestedId = url.pathname.split('/').at(-1);
+    const title = requestedId === id || requestedId === other ? 'Sprint' : 'Sprint archive';
+    return json({ properties: { title } });
+  }, { spreadsheets: [...preceding, id, other] });
+  await expect(adapter.execute('sheets.list_spreadsheets', { query: '', spreadsheetId: id, exactMatch: true, limit: 2 }))
+    .resolves.toMatchObject([{ id, title: 'Sprint' }]);
+  expect(apiCalls).toHaveLength(1);
+  await expect(adapter.execute('sheets.list_spreadsheets', { query: 'Sprint', exactMatch: true, limit: 2 }))
+    .resolves.toMatchObject([{ id }, { id: other }]);
+});
+
+it('reads an exact grid by pinned sheet ID without resolving or reading its A1 tab title', async () => {
+  const gridRange = { sheetId: 2, startRowIndex: 2, endRowIndex: 5, startColumnIndex: 1, endColumnIndex: 4 };
+  const { adapter, apiCalls } = setup(() => json({
+    spreadsheetId: id,
+    valueRanges: [{ dataFilters: [{ gridRange }], valueRange: { range: 'Renamed!B3:D5', values: [['A', 2]] } }],
+  }));
+  const args = { spreadsheetId: id, sheetId: 2, range: "'Team''s Tasks'!B3:D5" };
+  await expect(adapter.execute('sheets.read_range', args)).resolves.toMatchObject({
+    range: 'Renamed!B3:D5', values: [['A', '2']],
+  });
+  expect(apiCalls).toHaveLength(1);
+  expect(apiCalls[0]!.url.pathname).toBe('/v4/spreadsheets/' + id + '/values:batchGetByDataFilter');
+  expect(apiCalls[0]!.init.method).toBe('POST');
+  expect(JSON.parse(String(apiCalls[0]!.init.body))).toEqual({ dataFilters: [{ gridRange }] });
+});
+
+it('rejects a pinned read when Sheets cannot return the approved grid', async () => {
+  const { adapter, apiCalls } = setup(() => json({ spreadsheetId: id, valueRanges: [] }));
+  await expect(adapter.execute('sheets.read_range', { spreadsheetId: id, sheetId: 0, range: 'Tasks!A1:B2' }))
+    .rejects.toMatchObject({ category: 'NOT_FOUND' });
+  expect(apiCalls).toHaveLength(1);
+});
