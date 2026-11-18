@@ -75,6 +75,22 @@ export function sanitizeReportString(input: unknown): string {
     .slice(0, 300);
 }
 
+const PREFIX_REQUEST =
+  /(?:mở đầu|bắt đầu|đầu tin|tiền tố|prefix|start(?:ing)? with|begin(?:ning)? with)\s*(?:bằng|là|với|by)?\s*[:：]?\s*(?:"([^"\n]{1,200})"|“([^”\n]{1,200})”|'([^'\n]{1,200})'|(\[[^\]\n]{1,198}\]))/iu;
+
+/**
+ * The opening text the user asked the message to start with ("mở đầu bằng [X]"), taken verbatim
+ * from the user's own words so it can be prepended to a grounded report without model-written content.
+ */
+export function requestedReportPrefix(userTexts: readonly string[]): string | undefined {
+  for (const text of [...userTexts].reverse()) {
+    const match = PREFIX_REQUEST.exec(text);
+    const value = (match?.[1] ?? match?.[2] ?? match?.[3] ?? match?.[4])?.replace(/\s+/g, ' ').trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
 /**
  * Robust number parsing supporting:
  * - US format: "1,234.56", "$1,234.50", "1234.5"
@@ -267,7 +283,40 @@ export function renderGithubIssueAgingReport(
 }
 
 /**
- * Deterministically renders a Jira Sprint progress report (PM-03).
+ * Deterministically renders open GitHub issues when the user asked for a list, not an aging report.
+ */
+export function renderGithubIssueListReport(
+  issues: GitHubIssueItem[],
+  options?: { repo?: string; clock?: string | Date; limit?: number }
+): RenderedReport {
+  if (!Array.isArray(issues)) {
+    throw new Error('Invalid Issues read outcome: expected an array of GitHub issue items');
+  }
+  const repoLabel = options?.repo ? ` (${options.repo})` : '';
+  const referenceTime = options?.clock
+    ? typeof options.clock === 'string' ? Date.parse(options.clock) : options.clock.getTime()
+    : Date.now();
+  const count = issues.length;
+  if (count === 0) {
+    return { text: `Báo cáo GitHub Issue đang mở${repoLabel}: Hiện không có issue nào đang mở.`, itemCount: 0, coverage: 'complete' };
+  }
+  const limit = options?.limit ?? count;
+  const itemsToRender = issues.slice(0, limit);
+  const isPartial = count > itemsToRender.length;
+  const lines = [
+    `Báo cáo GitHub Issue đang mở${repoLabel}: Hiện có ${count} issue${isPartial ? ` (hiển thị ${itemsToRender.length} mục đầu tiên)` : ''}:`,
+    ...itemsToRender.map((iss) => {
+      const rawTime = iss.createdAt || iss.updatedAt;
+      const timeMs = rawTime ? Date.parse(rawTime) : Number.NaN;
+      const age = Number.isNaN(timeMs) ? '' : ` (tuổi: ${Math.max(0, Math.floor((referenceTime - timeMs) / 86400000))} ngày)`;
+      return `- #${iss.number}: ${sanitizeReportString(iss.title)}${age} (${iss.url})`;
+    }),
+  ];
+  return { text: lines.join('\n'), itemCount: count, coverage: isPartial ? 'partial' : 'complete' };
+}
+
+/**
+ * Deterministically renders a Jira issue report (PM-03); "Sprint" only when a sprint is named.
  */
 export function renderJiraProgressReport(
   issues: JiraIssueItem[],
@@ -275,6 +324,8 @@ export function renderJiraProgressReport(
     projectKey?: string;
     sprintName?: string;
     limit?: number;
+    /** Filters the read actually applied; the title names them instead of assuming a sprint. */
+    filters?: { overdueOnly?: boolean; unassignedOnly?: boolean; dueWithinDays?: number };
   }
 ): RenderedReport {
   if (!Array.isArray(issues)) {
@@ -287,11 +338,22 @@ export function renderJiraProgressReport(
     : options?.projectKey
     ? ` (${options.projectKey})`
     : '';
+  const filters = options?.filters;
+  const filterLabel = [
+    filters?.overdueOnly ? 'quá hạn' : '',
+    filters?.unassignedOnly ? 'chưa có người phụ trách' : '',
+    Number.isInteger(filters?.dueWithinDays) ? `sắp đến hạn trong ${filters!.dueWithinDays} ngày` : '',
+  ].filter(Boolean).join(', ');
+  const title = options?.sprintName
+    ? `Báo cáo tiến độ Jira Sprint${sprintLabel}`
+    : `Báo cáo issue Jira${filterLabel ? ` ${filterLabel}` : ''}${sprintLabel}`;
 
   const count = issues.length;
   if (count === 0) {
     return {
-      text: `Báo cáo tiến độ Jira Sprint${sprintLabel}: Hiện không có ticket nào trong Sprint.`,
+      text: options?.sprintName
+        ? `${title}: Hiện không có ticket nào trong Sprint.`
+        : `${title}: Hiện không có ticket nào.`,
       itemCount: 0,
       coverage: 'complete',
     };
@@ -313,7 +375,7 @@ export function renderJiraProgressReport(
   const isPartial = count > itemsToRender.length;
 
   const lines = [
-    `Báo cáo tiến độ Jira Sprint${sprintLabel}: Tổng số ${count} ticket.`,
+    `${title}: Tổng số ${count} ticket.`,
     `Trạng thái: ${statusSummary}`,
     ...itemsToRender.map((iss) => {
       const key = sanitizeReportString(iss.key);

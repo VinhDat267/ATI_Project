@@ -35,8 +35,10 @@ import { ReportArtifactStore } from './reports/artifacts.js';
 import {
   renderGithubPrsReport,
   renderGithubIssueAgingReport,
+  renderGithubIssueListReport,
   renderJiraProgressReport,
   renderSheetSummaryReport,
+  requestedReportPrefix,
   type SheetSummaryData,
   type RenderedReport,
 } from './reports/renderers.js';
@@ -483,7 +485,14 @@ export class AIPlanner {
       if (!Array.isArray(items)) return rawOutput;
       kind = 'jira_progress';
       const projectKey = typeof readArgs.projectKey === 'string' ? readArgs.projectKey : undefined;
-      rendered = renderJiraProgressReport(items as any, { projectKey });
+      rendered = renderJiraProgressReport(items as any, {
+        projectKey,
+        filters: {
+          overdueOnly: readArgs.overdueOnly === true,
+          unassignedOnly: readArgs.unassignedOnly === true,
+          ...(Number.isInteger(readArgs.dueWithinDays) ? { dueWithinDays: readArgs.dueWithinDays as number } : {}),
+        },
+      });
       sourceLabel = projectKey ? `Jira ${projectKey}` : 'Jira Sprint';
       artifactItems = items;
     } else if (readTool === 'github.list_issues' || readTool.endsWith('.search_issues')) {
@@ -498,9 +507,17 @@ export class AIPlanner {
       kind = 'github_issues';
       const repo = typeof readArgs.repo === 'string' ? readArgs.repo : undefined;
       const ageMatch = combinedText.match(/(?:quá|trên|hơn)\s*(\d+)\s*ngày/i);
-      const agingDays = ageMatch?.[1] ? Number.parseInt(ageMatch[1], 10) : 7;
-      rendered = renderGithubIssueAgingReport(items as any, { repo, agingDays, clock: this.now() });
-      sourceLabel = repo ? `${repo} (>${agingDays}d)` : 'GitHub Issues';
+      const folded = combinedText.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toLowerCase();
+      // Only an aging question filters by age; "liệt kê issue đang mở" lists every open issue.
+      const agingIntent = Boolean(ageMatch) || /\b(?:ton dong|qua lau|lau ngay|lau roi|aging|stale|overdue)\b/.test(folded);
+      if (agingIntent) {
+        const agingDays = ageMatch?.[1] ? Number.parseInt(ageMatch[1], 10) : 7;
+        rendered = renderGithubIssueAgingReport(items as any, { repo, agingDays, clock: this.now() });
+        sourceLabel = repo ? `${repo} (>${agingDays}d)` : 'GitHub Issues';
+      } else {
+        rendered = renderGithubIssueListReport(items as any, { repo, clock: this.now() });
+        sourceLabel = repo || 'GitHub Issues';
+      }
       artifactItems = items;
     } else {
       let sheetData: SheetSummaryData | null = null;
@@ -521,6 +538,10 @@ export class AIPlanner {
       sourceLabel = `${typeof readArgs.spreadsheetId === 'string' ? readArgs.spreadsheetId : 'Spreadsheet'} (${sheetTitle})`;
       artifactItems = Array.isArray(rawResult) ? rawResult : [rawResult];
     }
+
+    // The user's own opening words stay in front of the grounded report and inside its content hash.
+    const prefix = requestedReportPrefix(groundingUserTexts.length ? groundingUserTexts : [input.userMessage]);
+    if (prefix && !rendered.text.startsWith(prefix)) rendered = { ...rendered, text: `${prefix}\n${rendered.text}` };
 
     const artifact = this.reportEvidenceStore.createArtifact({
       kind,
