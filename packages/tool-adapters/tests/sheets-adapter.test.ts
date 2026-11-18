@@ -593,3 +593,81 @@ it('GAS-10: shared SheetsAdapter (sheets.append_rows) fails closed on delayed co
   });
   expect((await leaseStore.getLeaseState?.(scopeKey))?.status).toBe('unknown_outcome');
 });
+
+it('requests properties.locale in search_rows and aggregate_rows while preserving list_sheets fields', async () => {
+  const { adapter, apiCalls } = setup((url) => {
+    if (url.pathname.includes('/values/')) {
+      return json({
+        range: 'Tasks!A1:B3',
+        values: [
+          ['Mục', 'Giá trị'],
+          ['A', '1.234,5'],
+          ['B', '2.000'],
+        ],
+      });
+    }
+    return json({
+      spreadsheetId: id,
+      properties: { title: 'ATI Test Tracker', locale: 'vi_VN' },
+      sheets: [{ properties: { sheetId: 0, title: 'Tasks' } }],
+    });
+  });
+
+  await adapter.execute('sheets.list_sheets', { spreadsheetId: id, query: '', limit: 10 });
+  expect(apiCalls[0]!.url.searchParams.get('fields')).toBe('sheets.properties(sheetId,title)');
+
+  const searched = await adapter.execute('sheets.search_rows', {
+    spreadsheetId: id,
+    sheet: 'Tasks',
+    filters: [{ column: 'Giá trị', operator: 'gt', value: '1234' }],
+  });
+  expect(searched.totalMatched).toBe(2);
+  expect(apiCalls[1]!.url.searchParams.get('fields')).toBe('properties.locale,sheets.properties(sheetId,title)');
+
+  const agg = await adapter.execute('sheets.aggregate_rows', {
+    spreadsheetId: id,
+    sheet: 'Tasks',
+    metrics: [{ column: 'Giá trị', fn: 'sum' }],
+  });
+  expect(agg.totals['Giá trị_sum']).toBe(3234.5);
+  expect(apiCalls[3]!.url.searchParams.get('fields')).toBe('properties.locale,sheets.properties(sheetId,title)');
+});
+
+it('handles pure-update upsert in sheets.append_rows when 0 new rows remain (rowsToWrite empty)', async () => {
+  const { adapter, apiCalls } = setup((url, init) => {
+    if (init.method === 'GET' && url.pathname.includes('/values/')) {
+      return json({
+        range: 'Tasks!A1:B3',
+        values: [
+          ['Mã', 'Ngân sách'],
+          ['AT-01', '1000'],
+          ['AT-02', '2000'],
+        ],
+      });
+    }
+    if (init.method === 'POST' && url.pathname.endsWith('/values:batchUpdate')) {
+      return json({
+        totalUpdatedRows: 1,
+        responses: [{ updatedRange: 'Tasks!A3:B3', updatedRows: 1 }],
+      });
+    }
+    return json({
+      spreadsheetId: id,
+      properties: { title: 'ATI Test Tracker' },
+      sheets: [{ properties: { sheetId: 0, title: 'Tasks' } }],
+    });
+  });
+
+  const res = await adapter.execute('sheets.append_rows', {
+    spreadsheetId: id,
+    sheet: 'Tasks',
+    deduplicate: true,
+    keyColumn: 'Mã',
+    onDuplicate: 'update',
+    records: [{ 'Mã': 'AT-02', 'Ngân sách': '3500' }],
+  });
+
+  expect(res.updatedRows).toBe(1);
+  expect(res.skippedDuplicates).toBe(0);
+  expect(apiCalls.some((c) => c.url.pathname.includes(':append'))).toBe(false);
+});

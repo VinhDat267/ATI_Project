@@ -81,6 +81,7 @@ export interface AdapterFactoryOptions {
     appendLeaseStore?: SheetsAppendLeaseStore;
   }) => AdapterExecutor;
   mysheetsTokens?: GmailTokenManager;
+  mysheetsOAuthClientId?: string;
   sheetsAppendLeaseStore?: SheetsAppendLeaseStore;
   createTrelloAdapter?: (input: { userId: string; accessToken: string; allowedBoardIds: string[] }) => AdapterExecutor;
   trelloTokens?: any;
@@ -427,6 +428,12 @@ export class AdapterFactory {
     if (!userId) throw mysheetsError('AUTH_ERROR', 'Google Sheets cá nhân chỉ dùng được với kết nối của chính người dùng.');
     const record = await this.credentialRepo.getPersonalCredentials('mysheets', userId);
     if (!record || record.status !== 'active') throw mysheetsError('AUTH_ERROR', 'Google Sheets chưa được kết nối hoặc cần kết nối lại.');
+    if (
+      this.options.mysheetsOAuthClientId &&
+      !hasGoogleCredentialOrigin(record.config, this.encryptionKey, this.options.mysheetsOAuthClientId)
+    ) {
+      throw mysheetsError('AUTH_ERROR', 'Google Sheets cần được kết nối lại.');
+    }
 
     let config: any;
     try {
@@ -443,7 +450,12 @@ export class AdapterFactory {
 
     if (context?.phase === 'execution') {
       const previewed = context.connections?.mysheets;
-      if (!previewed || !previewed.credentialId || record.id !== previewed.credentialId) {
+      if (
+        !previewed ||
+        !previewed.credentialId ||
+        record.id !== previewed.credentialId ||
+        (previewed.email && config.email !== previewed.email)
+      ) {
         throw mysheetsError('AUTH_ERROR', 'Kết nối hoặc danh sách bảng tính đã đổi, hãy lập lại kế hoạch.');
       }
       const currentSet = new Set(allowedSpreadsheets);

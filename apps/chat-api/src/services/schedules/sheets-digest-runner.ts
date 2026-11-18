@@ -47,6 +47,7 @@ export interface SheetsDigestRunnerOptions {
   messageRepo?: MessageRepo;
   encryptionKey: string;
   gmailOAuthClientId?: string;
+  mysheetsOAuthClientId?: string;
   mysheetsEnabled?: boolean;
   v2Mode?: SheetsDigestV2Mode;
   v1CompatPolicy?: SheetsDigestV1CompatPolicy;
@@ -124,6 +125,10 @@ export function analyzeSheetKpiMetrics(
   doneCount: number;
   inProgressCount: number;
   overdueOrPendingCount: number;
+  overdueCount: number;
+  dueSoonCount: number;
+  blockedCount: number;
+  unassignedCount: number;
   highlights: string[];
   numericTotals: Array<{ column: string; sum: number; formattedSum: string }>;
 } {
@@ -139,7 +144,10 @@ export function analyzeSheetKpiMetrics(
     /^(?:status|trạng\s*thái|tiến\s*độ|done|state)$/iu.test(h.trim())
   );
   const deadlineKey = headers.find((h) =>
-    /^(?:deadline|due\s*date|due|hạn\s*chót|hạn\s*thanh\s*toán|ngày\s*đến\s*hạn|ngày\s*giao)$/iu.test(h.trim())
+    /^(?:deadline|due\s*date|due|hạn\s*chót|hạn\s*thanh\s*toán|ngày\s*đến\s*hạn|ngày\s*giao|hạn)$/iu.test(h.trim())
+  );
+  const assigneeKey = headers.find((h) =>
+    /^(?:assignee|owner|pic|người\s*phụ\s*trách|phụ\s*trách|người\s*thực\s*hiện|nhân\s*viên)$/iu.test(h.trim())
   );
   const titleKey =
     headers.find((h) =>
@@ -156,30 +164,59 @@ export function analyzeSheetKpiMetrics(
   let doneCount = 0;
   let inProgressCount = 0;
   let overdueOrPendingCount = 0;
+  let overdueCount = 0;
+  let dueSoonCount = 0;
+  let blockedCount = 0;
+  let unassignedCount = 0;
   const candidateHighlights: Array<{ text: string; priority: number; index: number }> = [];
   const nowMs = now.getTime();
+  const soonWindowMs = nowMs + 48 * 3600_000;
 
   dataRows.forEach((row, index) => {
     const rawStatus = statusKey ? (row[statusKey] ?? '').trim().toLowerCase() : '';
     const isDone = /^(?:done|completed|hoàn\s*thành|xong|true|100%)$/iu.test(rawStatus);
+    const isBlockedStatus =
+      !isDone && /\b(?:blocked|bị\s*chặn|tắc\s*nghẽn|chờ\s*bên\s*thứ\s*ba)\b/iu.test(rawStatus);
     const isInProgressStatus = /^(?:in\s*progress|đang\s*làm|doing|active|review)$/iu.test(rawStatus);
+    const isExplicitOverdueStatus = !isDone && /\b(?:quá\s*hạn|trễ\s*hạn|overdue|late)\b/iu.test(rawStatus);
     const rawDeadline = deadlineKey ? (row[deadlineKey] ?? '').trim() : '';
     const deadlineMs = rawDeadline ? parseSheetDeadlineCell(rawDeadline) : null;
     const isOverdueByDate = !isDone && deadlineMs !== null && deadlineMs < nowMs;
+    const isDueSoon = !isDone && deadlineMs !== null && deadlineMs >= nowMs && deadlineMs <= soonWindowMs;
+    const isUnassignedOpen = !isDone && Boolean(assigneeKey) && !(row[assigneeKey!] ?? '').trim();
+
+    if (isBlockedStatus) blockedCount++;
+    if (isOverdueByDate || isExplicitOverdueStatus) overdueCount++;
+    if (isDueSoon) dueSoonCount++;
+    if (isUnassignedOpen) unassignedCount++;
 
     let priority = 2;
     if (isDone) {
       doneCount++;
       priority = 3;
+    } else if (isBlockedStatus) {
+      overdueOrPendingCount++;
+      priority = 0;
     } else if (isOverdueByDate) {
       overdueOrPendingCount++;
       priority = 0;
+    } else if (isDueSoon) {
+      if (isInProgressStatus) {
+        inProgressCount++;
+      } else {
+        overdueOrPendingCount++;
+      }
+      priority = 0.5;
     } else if (isInProgressStatus) {
       inProgressCount++;
       priority = 1;
     } else if (rawStatus) {
       overdueOrPendingCount++;
       priority = 0;
+    }
+
+    if (isUnassignedOpen) {
+      priority = Math.min(priority, 1);
     }
 
     for (const col of numericColumns) {
@@ -202,11 +239,16 @@ export function analyzeSheetKpiMetrics(
     const label = titleKey ? (row[titleKey] ?? '').trim() : Object.values(row).filter(Boolean).join(' · ');
     if (label) {
       let statusBadge = statusKey && row[statusKey] ? ` [${row[statusKey]}]` : '';
-      if (isOverdueByDate) {
+      if (isBlockedStatus) {
+        statusBadge = ` ⛔ [Bị chặn${rawDeadline ? ` · Hạn ${rawDeadline}` : ''}${statusKey && row[statusKey] ? ` · ${row[statusKey]}` : ''}]`;
+      } else if (isOverdueByDate) {
         statusBadge = ` 🚨 [Quá hạn${rawDeadline ? `: ${rawDeadline}` : ''}${statusKey && row[statusKey] ? ` · ${row[statusKey]}` : ''}]`;
+      } else if (isDueSoon) {
+        statusBadge = ` ⏰ [Sắp đến hạn${rawDeadline ? `: ${rawDeadline}` : ''}${statusKey && row[statusKey] ? ` · ${row[statusKey]}` : ''}]`;
       }
+      const unassignedBadge = isUnassignedOpen ? ' 👤 (chưa gán)' : '';
       candidateHighlights.push({
-        text: `• ${label}${statusBadge}`,
+        text: `• ${label}${statusBadge}${unassignedBadge}`,
         priority,
         index,
       });
@@ -234,6 +276,10 @@ export function analyzeSheetKpiMetrics(
     doneCount,
     inProgressCount,
     overdueOrPendingCount,
+    overdueCount,
+    dueSoonCount,
+    blockedCount,
+    unassignedCount,
     highlights,
     numericTotals,
   };
@@ -439,6 +485,15 @@ export class SheetsDigestRunner {
         );
         if (!record || record.status !== 'active') {
           return { ok: false, reason: 'Kết nối Google Sheets cá nhân không còn hoạt động. Hãy kết nối lại.' };
+        }
+        if (
+          this.options.mysheetsOAuthClientId &&
+          !hasGoogleCredentialOrigin(record.config, this.options.encryptionKey, this.options.mysheetsOAuthClientId)
+        ) {
+          return {
+            ok: false,
+            reason: 'Kết nối Google Sheets cá nhân không khớp cấu hình OAuth hiện tại. Hãy kết nối lại.',
+          };
         }
         try {
           const dec = decryptCredentials(record.config, this.options.encryptionKey);
@@ -1120,6 +1175,11 @@ export class SheetsDigestRunner {
       (metrics.doneCount > 0 || metrics.inProgressCount > 0 || metrics.overdueOrPendingCount > 0
         ? `Tổng số dòng: ${metrics.totalRows} · Hoàn thành: ${metrics.doneCount} · Đang làm: ${metrics.inProgressCount} · Cần chú ý/Chờ xử lý: ${metrics.overdueOrPendingCount}`
         : `Tổng số dòng dữ liệu: ${metrics.totalRows}`) + numericSuffix;
+    const actionSignals: string[] = [];
+    if (metrics.overdueCount > 0) actionSignals.push(`Quá hạn: ${metrics.overdueCount}`);
+    if (metrics.dueSoonCount > 0) actionSignals.push(`Sắp đến hạn (48h): ${metrics.dueSoonCount}`);
+    if (metrics.blockedCount > 0) actionSignals.push(`Bị chặn: ${metrics.blockedCount}`);
+    if (metrics.unassignedCount > 0) actionSignals.push(`Chưa gán PIC: ${metrics.unassignedCount}`);
 
     const bodySection = aiSummaryText
       ? aiSummaryText
@@ -1132,6 +1192,7 @@ export class SheetsDigestRunner {
       sheetLine,
       ...(scopeLine ? [scopeLine] : []),
       statsLine,
+      ...(actionSignals.length > 0 ? [`Cần xử lý thêm: ${actionSignals.join(' · ')}`] : []),
       '',
       bodySection,
     ].join('\n');

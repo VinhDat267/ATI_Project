@@ -69,6 +69,13 @@ import {
   MYCALENDAR_DIGEST_REAPPROVAL,
   readMyCalendarDigestBinding,
 } from './mycalendar-digest-source.js';
+import {
+  isMySheetsDigestSource,
+  loadLiveMySheetsDigestConnection,
+  matchesMySheetsDigestBinding,
+  MYSHEETS_DIGEST_REAPPROVAL,
+  readMySheetsDigestBinding,
+} from './mysheets-digest-source.js';
 import { canonicalNotionDigestBinding, lockApprovedNotionSource, NOTION_DIGEST_REAPPROVAL, type NotionDigestSourceAuthority } from '../notion/digest-source-authority.js';
 import {
   buildConfirmedTrelloDigestDelivery,
@@ -184,6 +191,7 @@ export interface ScheduleServiceOptions {
   encryptionKey?: string;
   gmailOAuthClientId?: string;
   mycalendarOAuthClientId?: string;
+  mysheetsOAuthClientId?: string;
   mysheetsEnabled?: boolean;
   emitV2?: boolean;
   fetchOrgSheetsMetadata?: FetchOrgSheetsMetadataFn;
@@ -720,6 +728,7 @@ export class ScheduleService {
             confirmedAiSetting === undefined ? candidate.config : { ...candidate.config, includeAiSummary: confirmedAiSetting };
           await this.verifyTelegramDigestGmailConfigInTx(client, userId, effectiveConfig, metadata.services);
           await this.verifyMyCalendarDigestConfigInTx(client, userId, effectiveConfig, metadata.services);
+          await this.verifyMySheetsDigestConfigInTx(client, userId, effectiveConfig, metadata.services);
           let computedHash: string;
           try {
             computedHash = computeTelegramDigestConfigHash(effectiveConfig);
@@ -768,6 +777,7 @@ export class ScheduleService {
             confirmedAiSetting === undefined ? candidate.config : { ...candidate.config, includeAiSummary: confirmedAiSetting };
           await this.verifyTelegramDigestGmailConfigInTx(client, userId, effectiveConfig as unknown as TelegramDigestConfig, metadata.services);
           await this.verifyMyCalendarDigestConfigInTx(client, userId, effectiveConfig, metadata.services);
+          await this.verifyMySheetsDigestConfigInTx(client, userId, effectiveConfig, metadata.services);
           await this.verifySlackDigestConfigInTx(client, {
             userId,
             wsMode,
@@ -855,6 +865,7 @@ export class ScheduleService {
             trustedScope,
             encryptionKey: this.options.encryptionKey,
             gmailOAuthClientId: this.options.gmailOAuthClientId,
+            mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
             mysheetsEnabled: this.options.mysheetsEnabled,
           });
           if (!verified.ok) {
@@ -1129,6 +1140,9 @@ export class ScheduleService {
           if (fields.services.includes('mycalendar') && tgCandidate?.canAutoDigest === false) {
             await this.verifyMyCalendarDigestConfigInTx(client, userId, existing.digest_config as TelegramDigestConfig, fields.services, 'REAUTHORIZATION_REQUIRED');
           }
+          if (fields.services.includes('mysheets') && tgCandidate?.canAutoDigest === false) {
+            await this.verifyMySheetsDigestConfigInTx(client, userId, existing.digest_config as TelegramDigestConfig, fields.services, 'REAUTHORIZATION_REQUIRED');
+          }
           const existingGmailValidation = validateTelegramDigestGmailConfig(existing.digest_config);
           const involvesGmail =
             fields.services.includes('gmail') || existingGmailValidation.kind !== 'non_gmail';
@@ -1154,6 +1168,8 @@ export class ScheduleService {
                 : { ...proposedConfig, includeAiSummary: previousConfig.includeAiSummary };
             this.assertUnchangedMyCalendarDigestAuthority(previousConfig, updatedConfig);
             await this.verifyMyCalendarDigestConfigInTx(client, userId, updatedConfig, fields.services, 'REAUTHORIZATION_REQUIRED');
+            this.assertUnchangedMySheetsDigestAuthority(previousConfig, updatedConfig);
+            await this.verifyMySheetsDigestConfigInTx(client, userId, updatedConfig, fields.services, 'REAUTHORIZATION_REQUIRED');
             if (previouslyNotion) {
               const binding = approvedTelegramNotionBinding(updatedConfig);
               if (!binding || wsMode === 'organization' || !(await lockApprovedNotionSource(client, userId, binding))) {
@@ -1186,6 +1202,9 @@ export class ScheduleService {
           const slackCandidate = metadata.digestCandidate as SlackDigestCandidate | undefined;
           if (fields.services.includes('mycalendar') && slackCandidate?.canAutoDigest === false) {
             await this.verifyMyCalendarDigestConfigInTx(client, userId, existing.digest_config as SlackDigestConfig, fields.services, 'REAUTHORIZATION_REQUIRED');
+          }
+          if (fields.services.includes('mysheets') && slackCandidate?.canAutoDigest === false) {
+            await this.verifyMySheetsDigestConfigInTx(client, userId, existing.digest_config as SlackDigestConfig, fields.services, 'REAUTHORIZATION_REQUIRED');
           }
           const existingGmailValidation = validateTelegramDigestGmailConfig(existing.digest_config);
           const involvesGmail =
@@ -1221,6 +1240,8 @@ export class ScheduleService {
                 : { ...proposedConfig, includeAiSummary: previousConfig.includeAiSummary };
             this.assertUnchangedMyCalendarDigestAuthority(previousConfig, updatedConfig);
             await this.verifyMyCalendarDigestConfigInTx(client, userId, updatedConfig, fields.services, 'REAUTHORIZATION_REQUIRED');
+            this.assertUnchangedMySheetsDigestAuthority(previousConfig, updatedConfig);
+            await this.verifyMySheetsDigestConfigInTx(client, userId, updatedConfig, fields.services, 'REAUTHORIZATION_REQUIRED');
             await this.verifySlackDigestConfigInTx(client, {
               userId,
               wsMode,
@@ -1621,6 +1642,7 @@ export class ScheduleService {
       trustedScope,
       encryptionKey: this.options.encryptionKey,
       gmailOAuthClientId: this.options.gmailOAuthClientId,
+      mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
       mysheetsEnabled: this.options.mysheetsEnabled,
     });
     if (!verified.ok) {
@@ -1721,13 +1743,24 @@ export class ScheduleService {
         : null;
     const previousSources = prevTgConfig?.sources ?? prevSlackConfig?.sources;
     const previousHasCalendar = Array.isArray(previousSources) && previousSources.some(isMyCalendarDigestSource);
-    const reauthServices = previousHasCalendar && !snap.services.includes('mycalendar')
-      ? [...snap.services, 'mycalendar'] : snap.services;
-    const mycalendarLookup = reauthServices.includes('mycalendar')
-      ? await loadLiveMyCalendarDigestConnection(this.options.pool, userId, this.options.encryptionKey, {
-          oauthClientId: this.options.mycalendarOAuthClientId,
-        })
-      : undefined;
+    const previousHasSheets = Array.isArray(previousSources) && previousSources.some(isMySheetsDigestSource);
+    const reauthServices = [
+      ...snap.services,
+      ...(previousHasCalendar && !snap.services.includes('mycalendar') ? ['mycalendar'] : []),
+      ...(previousHasSheets && !snap.services.includes('mysheets') ? ['mysheets'] : []),
+    ];
+    const [mycalendarLookup, mysheetsLookup] = await Promise.all([
+      reauthServices.includes('mycalendar')
+        ? loadLiveMyCalendarDigestConnection(this.options.pool, userId, this.options.encryptionKey, {
+            oauthClientId: this.options.mycalendarOAuthClientId,
+          })
+        : Promise.resolve(undefined),
+      reauthServices.includes('mysheets')
+        ? loadLiveMySheetsDigestConnection(this.options.pool, userId, this.options.encryptionKey, {
+            oauthClientId: this.options.mysheetsOAuthClientId,
+          })
+        : Promise.resolve(undefined),
+    ]);
     let tgCandidate: TelegramDigestCandidate | null = null;
     let slackCandidate: SlackDigestCandidate | null = null;
     let sheetsCandidate: SheetsDigestCandidate | null = null;
@@ -1798,6 +1831,8 @@ export class ScheduleService {
         getAdapter: fallbackAdapter,
         mycalendarLookup,
         reauthorizeMyCalendar: true,
+        mysheetsLookup,
+        reauthorizeMySheets: true,
         githubLookup,
         jiraLookup,
         workspaceMode: trustedScope.workspaceMode,
@@ -1871,6 +1906,8 @@ export class ScheduleService {
         telegramLookup,
         mycalendarLookup,
         reauthorizeMyCalendar: true,
+        mysheetsLookup,
+        reauthorizeMySheets: true,
         githubLookup,
         jiraLookup,
         workspaceMode: trustedScope.workspaceMode,
@@ -1963,6 +2000,7 @@ export class ScheduleService {
         credentialRepo: this.options.credentialRepo,
         encryptionKey: this.options.encryptionKey,
         gmailOAuthClientId: this.options.gmailOAuthClientId,
+        mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
         mysheetsEnabled: this.options.mysheetsEnabled,
         fetchOrgSheetsMetadata: this.options.fetchOrgSheetsMetadata,
         emitV2: true,
@@ -2132,6 +2170,7 @@ export class ScheduleService {
         try {
           await this.verifyTelegramDigestGmailConfigInTx(client, userId, slackCandidate.config as unknown as TelegramDigestConfig, current.services);
           await this.verifyMyCalendarDigestConfigInTx(client, userId, slackCandidate.config, reauthServices, 'REAUTHORIZATION_NOT_READY');
+          await this.verifyMySheetsDigestConfigInTx(client, userId, slackCandidate.config, reauthServices, 'REAUTHORIZATION_NOT_READY');
         } catch (err) {
           if (err instanceof ScheduleConflict) {
             throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', err.message);
@@ -2164,6 +2203,7 @@ export class ScheduleService {
         try {
           await this.verifyTelegramDigestGmailConfigInTx(client, userId, tgCandidate.config, current.services);
           await this.verifyMyCalendarDigestConfigInTx(client, userId, tgCandidate.config, reauthServices, 'REAUTHORIZATION_NOT_READY');
+          await this.verifyMySheetsDigestConfigInTx(client, userId, tgCandidate.config, reauthServices, 'REAUTHORIZATION_NOT_READY');
         } catch (err) {
           if (err instanceof ScheduleConflict) {
             throw new ScheduleConflict('REAUTHORIZATION_NOT_READY', err.message);
@@ -2195,6 +2235,7 @@ export class ScheduleService {
           trustedScope: txTrustedScope,
           encryptionKey: this.options.encryptionKey,
           gmailOAuthClientId: this.options.gmailOAuthClientId,
+          mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
           mysheetsEnabled: this.options.mysheetsEnabled,
         });
         if (!verified.ok) {
@@ -2333,6 +2374,42 @@ export class ScheduleService {
     throw new ScheduleConflict(conflictCode, MYCALENDAR_DIGEST_REAPPROVAL);
   }
 
+  private assertUnchangedMySheetsDigestAuthority(
+    previous: SlackDigestConfig | TelegramDigestConfig,
+    current: SlackDigestConfig | TelegramDigestConfig,
+  ): void {
+    const currentSource = Array.isArray(current.sources) && current.sources.find(isMySheetsDigestSource);
+    if (!currentSource) return;
+    const previousSource = Array.isArray(previous.sources) && previous.sources.find(isMySheetsDigestSource);
+    const destination = (config: SlackDigestConfig | TelegramDigestConfig) => 'channelId' in config
+      ? [config.slackCredentialId, config.channelId] : [config.credentialId, config.chatId];
+    if (
+      JSON.stringify(canonicalizeDigestValue(previousSource)) !== JSON.stringify(canonicalizeDigestValue(currentSource)) ||
+      JSON.stringify(destination(previous)) !== JSON.stringify(destination(current))
+    ) {
+      throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', MYSHEETS_DIGEST_REAPPROVAL);
+    }
+  }
+
+  private async verifyMySheetsDigestConfigInTx(
+    client: pg.PoolClient,
+    userId: string,
+    config: SlackDigestConfig | TelegramDigestConfig,
+    services: string[],
+    conflictCode: 'DIGEST_PREVIEW_CHANGED' | 'REAUTHORIZATION_REQUIRED' | 'REAUTHORIZATION_NOT_READY' = 'DIGEST_PREVIEW_CHANGED',
+  ): Promise<void> {
+    const check = readMySheetsDigestBinding(config, services);
+    if (check.kind === 'none') return;
+    if (check.kind === 'bound') {
+      const live = await loadLiveMySheetsDigestConnection(client, userId, this.options.encryptionKey, {
+        oauthClientId: this.options.mysheetsOAuthClientId,
+        lock: 'share',
+      });
+      if (matchesMySheetsDigestBinding(live, check.binding)) return;
+    }
+    throw new ScheduleConflict(conflictCode, MYSHEETS_DIGEST_REAPPROVAL);
+  }
+
   private async verifyTelegramDigestGmailConfigInTx(
     client: pg.PoolClient,
     userId: string,
@@ -2373,6 +2450,7 @@ export class ScheduleService {
     row: ScheduleRow,
   ): Promise<void> {
     const mycalendar = readMyCalendarDigestBinding(row.digest_config as TelegramDigestConfig | null, row.services);
+    const mysheets = readMySheetsDigestBinding(row.digest_config as TelegramDigestConfig | null, row.services);
     const gmailCheck = validateTelegramDigestGmailConfig(row.digest_config);
     if (
       gmailCheck.kind === 'invalid' ||
@@ -2400,7 +2478,9 @@ export class ScheduleService {
         encryptionKey: this.options.encryptionKey,
         gmailOAuthClientId: this.options.gmailOAuthClientId,
         mycalendarOAuthClientId: this.options.mycalendarOAuthClientId,
+        mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
         lockMyCalendarAuthority: 'share',
+        lockMySheetsAuthority: 'share',
       });
       if (!guard.allowed) {
         throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', guard.pauseReason);
@@ -2412,12 +2492,13 @@ export class ScheduleService {
           encryptionKey: this.options.encryptionKey,
           gmailOAuthClientId: this.options.gmailOAuthClientId,
           mycalendarOAuthClientId: this.options.mycalendarOAuthClientId,
+          mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
         });
         if (!tgCtx.allowed) {
           throw new ScheduleConflict('REAUTHORIZATION_REQUIRED');
         }
       }
-    } else if (mycalendar.kind !== 'none' || row.services?.includes('myjira')) {
+    } else if (mycalendar.kind !== 'none' || mysheets.kind !== 'none' || row.services?.includes('myjira')) {
       let expectedHash: string | null = null;
       try {
         expectedHash = computeTelegramDigestConfigHash(row.digest_config as TelegramDigestConfig);
@@ -2432,7 +2513,9 @@ export class ScheduleService {
         scheduleId: row.id,
         encryptionKey: this.options.encryptionKey,
         mycalendarOAuthClientId: this.options.mycalendarOAuthClientId,
+        mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
         lockMyCalendarAuthority: 'share',
+        lockMySheetsAuthority: 'share',
       });
       if (!guard.allowed) {
         throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', guard.pauseReason);
@@ -2474,7 +2557,9 @@ export class ScheduleService {
       encryptionKey: this.options.encryptionKey,
       gmailOAuthClientId: this.options.gmailOAuthClientId,
       mycalendarOAuthClientId: this.options.mycalendarOAuthClientId,
+      mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
       lockMyCalendarAuthority: 'share',
+      lockMySheetsAuthority: 'share',
     });
     if (!guard.allowed) {
       throw new ScheduleConflict('REAUTHORIZATION_REQUIRED', guard.pauseReason);

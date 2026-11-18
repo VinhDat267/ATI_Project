@@ -99,6 +99,7 @@ export interface MySheetsAppOptions {
   fakePickerBaseUrl?: string;
   driveApiBaseUrl?: string;
   pickerLimiter?: GlobalRateLimiter;
+  enableDriveWriteTools?: boolean;
 }
 
 /** Trello as each member's own OAuth connection and team workspace boards. */
@@ -472,6 +473,7 @@ export function createApp(options: AppOptions): Express {
       gmailAvailable: Boolean(gmailRoutes && isGmailAvailable(gmailRoutes)),
       mycalendarAvailable: Boolean(mycalendarRoutes && isMyCalendarAvailable(mycalendarRoutes)),
       mysheetsAvailable: Boolean(mysheetsRoutes && isMySheetsAvailable(mysheetsRoutes)),
+      enableMySheetsDriveWriteTools: options.mysheets?.enableDriveWriteTools,
       googleClientIds: options.runtimeMode === 'live' ? {
         gmail: options.gmail?.oauth?.clientId, mycalendar: options.mycalendar?.oauth?.clientId, mysheets: options.mysheets?.oauth?.clientId,
       } : undefined,

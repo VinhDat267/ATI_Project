@@ -31,6 +31,7 @@ export interface ScheduleRuntimeOptions {
   encryptionKey?: string;
   gmailOAuthClientId?: string;
   mycalendarOAuthClientId?: string;
+  mysheetsOAuthClientId?: string;
   /** Plans one run. Until SCHED-02 connects the planner, every run fails without calling a model. */
   planRun?: PlanRun;
   runDigest?: RunCalendarDigest | RunGithubDigest;
@@ -74,6 +75,7 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
     encryptionKey: options.encryptionKey,
     gmailOAuthClientId: options.gmailOAuthClientId,
     mycalendarOAuthClientId: options.mycalendarOAuthClientId,
+    mysheetsOAuthClientId: options.mysheetsOAuthClientId,
     mysheetsEnabled: options.mysheetsEnabled,
     emitV2: options.emitV2,
     fetchOrgSheetsMetadata: options.fetchOrgSheetsMetadata,
@@ -88,6 +90,7 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
           credentialRepo: options.credentialRepo,
           encryptionKey: options.encryptionKey,
           gmailOAuthClientId: options.gmailOAuthClientId,
+          mysheetsOAuthClientId: options.mysheetsOAuthClientId,
           mysheetsEnabled: options.mysheetsEnabled,
           v2Mode: options.sheetsDigestV2Mode,
           v1CompatPolicy: options.sheetsDigestV1CompatPolicy,
@@ -101,6 +104,7 @@ export function createScheduleRuntime(options: ScheduleRuntimeOptions) {
     encryptionKey: options.encryptionKey,
     gmailOAuthClientId: options.gmailOAuthClientId,
     mycalendarOAuthClientId: options.mycalendarOAuthClientId,
+    mysheetsOAuthClientId: options.mysheetsOAuthClientId,
     planRun: options.planRun ?? notConnected,
     runDigest: options.runDigest,
     runGithubDigest: options.runGithubDigest,

@@ -9,8 +9,9 @@ import {
 } from './gmail-digest-binding.js';
 import { computeTelegramDigestConfigHash, isJiraDigestSourceBinding } from './telegram-digest-candidate.js';
 import { computeSlackDigestConfigHash } from './slack-digest-candidate.js';
-import { matchesSlackDigestCredentialOwner } from './multi-source-digest-candidate.js';
+import { getDigestSourceDisabledReason, matchesSlackDigestCredentialOwner } from './multi-source-digest-candidate.js';
 import { loadLiveMyCalendarDigestConnection, matchesMyCalendarDigestBinding, MYCALENDAR_DIGEST_REAPPROVAL, readMyCalendarDigestBinding } from './mycalendar-digest-source.js';
+import { loadLiveMySheetsDigestConnection, matchesMySheetsDigestBinding, MYSHEETS_DIGEST_REAPPROVAL, readMySheetsDigestBinding } from './mysheets-digest-source.js';
 
 type Queryable = pg.Pool | Pick<pg.Pool, 'query'>;
 
@@ -27,6 +28,7 @@ export type DigestScopeGuardCode =
   | 'DIGEST_GMAIL_LEGACY_UNBOUND'
   | 'DIGEST_JIRA_BINDING_INVALID'
   | 'DIGEST_MYCALENDAR_BINDING_INVALID'
+  | 'DIGEST_MYSHEETS_BINDING_INVALID'
   | GmailBindingGuardCode;
 
 export interface DigestScopeGuardInput {
@@ -36,9 +38,11 @@ export interface DigestScopeGuardInput {
   encryptionKey?: string;
   gmailOAuthClientId?: string;
   mycalendarOAuthClientId?: string;
+  mysheetsOAuthClientId?: string;
   expectedTelegramDigestConfigHash?: string;
   lockTelegramJiraAuthority?: boolean;
   lockMyCalendarAuthority?: 'share' | 'nowait';
+  lockMySheetsAuthority?: 'share' | 'nowait';
 }
 
 export interface DigestScopeGuardResult {
@@ -445,6 +449,25 @@ export async function assertDigestScheduleLiveScopeAndAuth(
       if (!matchesMyCalendarDigestBinding(live, mycalendar.binding)) return blocked();
     }
 
+    const mysheets = readMySheetsDigestBinding(cfg, row.services);
+    if (mysheets.kind !== 'none') {
+      const blocked = () => deny(
+        'DIGEST_MYSHEETS_BINDING_INVALID', MYSHEETS_DIGEST_REAPPROVAL,
+        trustedWorkspaceId, trustedWorkspaceMode,
+      );
+      if (mysheets.kind !== 'bound') return blocked();
+      try {
+        if (computeMultiHash() !== row.digest_config_hash) return blocked();
+      } catch {
+        return blocked();
+      }
+      const live = await loadLiveMySheetsDigestConnection(pool, row.user_id, input.encryptionKey, {
+        oauthClientId: input.mysheetsOAuthClientId,
+        lock: input.lockMySheetsAuthority ?? input.lockMyCalendarAuthority,
+      });
+      if (!matchesMySheetsDigestBinding(live, mysheets.binding)) return blocked();
+    }
+
     const gmailCheck = validateTelegramDigestGmailConfig(cfg);
     if (gmailCheck.kind === 'gmail_legacy') {
       return deny('DIGEST_GMAIL_LEGACY_UNBOUND', gmailCheck.reason, trustedWorkspaceId, trustedWorkspaceMode);
@@ -606,6 +629,22 @@ export async function assertDigestScheduleLiveScopeAndAuth(
         }
       }
     }
+
+    for (const src of cfgSources) {
+      const disabledReason = getDigestSourceDisabledReason(src as any, {
+        workspaceMode: trustedWorkspaceMode,
+        workspaceId: trustedWorkspaceId,
+        destination: isSlackMulti ? 'slack' : 'telegram',
+      });
+      if (disabledReason) {
+        return deny(
+          'DIGEST_CROSS_TENANT_SCOPE_MISMATCH',
+          disabledReason,
+          trustedWorkspaceId,
+          trustedWorkspaceMode,
+        );
+      }
+    }
   }
 
   return { allowed: true, trustedWorkspaceId, trustedWorkspaceMode };
@@ -623,8 +662,10 @@ export async function buildPinnedTelegramAdapterContext(input: {
   encryptionKey: string;
   gmailOAuthClientId?: string;
   mycalendarOAuthClientId?: string;
+  mysheetsOAuthClientId?: string;
   lockTelegramJiraAuthority?: boolean;
   lockMyCalendarAuthority?: 'share' | 'nowait';
+  lockMySheetsAuthority?: 'share' | 'nowait';
 }): Promise<PinnedTelegramAdapterContextResult> {
   const guard = await assertDigestScheduleLiveScopeAndAuth({
     pool: input.pool,
@@ -632,8 +673,10 @@ export async function buildPinnedTelegramAdapterContext(input: {
     encryptionKey: input.encryptionKey,
     gmailOAuthClientId: input.gmailOAuthClientId,
     mycalendarOAuthClientId: input.mycalendarOAuthClientId,
+    mysheetsOAuthClientId: input.mysheetsOAuthClientId,
     lockTelegramJiraAuthority: input.lockTelegramJiraAuthority,
     lockMyCalendarAuthority: input.lockMyCalendarAuthority,
+    lockMySheetsAuthority: input.lockMySheetsAuthority,
   });
   const base = { trustedWorkspaceId: guard.trustedWorkspaceId, trustedWorkspaceMode: guard.trustedWorkspaceMode };
   if (!guard.allowed) return { allowed: false, code: guard.code, pauseReason: guard.pauseReason, ...base };

@@ -37,7 +37,7 @@ import { evaluateGithubDigestCandidate } from './schedules/github-digest-candida
 import { evaluateTelegramDigestCandidate } from './schedules/telegram-digest-candidate.js';
 import { evaluateSlackDigestCandidate } from './schedules/slack-digest-candidate.js';
 import { loadGmailDigestBinding } from './schedules/gmail-digest-binding.js';
-import { createMyCalendarConnectionLookup } from './gmail/connection-reference.js';
+import { createMyCalendarConnectionLookup, createMySheetsConnectionLookup } from './gmail/connection-reference.js';
 import { evaluateTrelloDigestCandidate } from './schedules/trello-digest-candidate.js';
 import type { NotionDigestSourceAuthority } from './notion/digest-source-authority.js';
 import { evaluateNotionDigestCandidate } from './schedules/notion-digest-candidate.js';
@@ -237,6 +237,7 @@ export interface ChatServiceOptions {
     credentialRepo?: any;
     encryptionKey?: string;
     gmailOAuthClientId?: string;
+    mysheetsOAuthClientId?: string;
     mysheetsEnabled?: boolean;
     emitV2?: boolean;
     fetchOrgSheetsMetadata?: FetchOrgSheetsMetadataFn;
@@ -1809,6 +1810,7 @@ export class ChatService {
         credentialRepo: this.schedules.credentialRepo,
         encryptionKey: this.schedules.encryptionKey,
         gmailOAuthClientId: this.schedules.gmailOAuthClientId,
+        mysheetsOAuthClientId: this.schedules.mysheetsOAuthClientId,
         mysheetsEnabled: this.schedules.mysheetsEnabled,
         fetchOrgSheetsMetadata: this.schedules.fetchOrgSheetsMetadata,
         emitV2: isSheetsDigestEmitV2Enabled(this.schedules),
@@ -1859,6 +1861,18 @@ export class ChatService {
               )(actor.userId).catch(() => null)
             : undefined
         : undefined;
+      const mysheetsLookup = services.includes('mysheets')
+        ? this.mysheetsConnection
+          ? await this.mysheetsConnection(actor.userId).catch(() => null)
+          : this.schedules.credentialRepo && this.schedules.encryptionKey
+            ? await createMySheetsConnectionLookup(
+                this.schedules.credentialRepo,
+                this.schedules.encryptionKey,
+                undefined,
+                this.schedules.mysheetsOAuthClientId,
+              )(actor.userId).catch(() => null)
+            : undefined
+        : undefined;
       digestCandidate = evaluateTelegramDigestCandidate({
         proposal,
         services,
@@ -1868,6 +1882,7 @@ export class ChatService {
         githubLookup: ghLookup,
         jiraLookup: myjiraLookup,
         ...(mycalLookup !== undefined ? { mycalendarLookup: mycalLookup } : {}),
+        ...(mysheetsLookup !== undefined ? { mysheetsLookup } : {}),
         workspaceMode: trustedScope.workspaceMode,
         workspaceId: trustedScope.workspaceId,
         gmailBinding,
@@ -1918,6 +1933,18 @@ export class ChatService {
               )(actor.userId).catch(() => null)
             : undefined
         : undefined;
+      const mysheetsLookup = services.includes('mysheets')
+        ? this.mysheetsConnection
+          ? await this.mysheetsConnection(actor.userId).catch(() => null)
+          : this.schedules.credentialRepo && this.schedules.encryptionKey
+            ? await createMySheetsConnectionLookup(
+                this.schedules.credentialRepo,
+                this.schedules.encryptionKey,
+                undefined,
+                this.schedules.mysheetsOAuthClientId,
+              )(actor.userId).catch(() => null)
+            : undefined
+        : undefined;
       const slackCandidate = await evaluateSlackDigestCandidate({
         proposal,
         services,
@@ -1928,6 +1955,7 @@ export class ChatService {
         githubLookup: ghLookup,
         jiraLookup: myjiraLookup,
         ...(mycalLookup !== undefined ? { mycalendarLookup: mycalLookup } : {}),
+        ...(mysheetsLookup !== undefined ? { mysheetsLookup } : {}),
         workspaceMode: trustedScope.workspaceMode,
         workspaceId: trustedScope.workspaceId,
         gmailBinding,
@@ -1940,6 +1968,7 @@ export class ChatService {
         services.includes('github') &&
         Boolean(this.githubConnection) &&
         !services.includes('mycalendar') &&
+        !services.includes('mysheets') &&
         !services.includes('gmail') &&
         !services.includes('myjira') &&
         Boolean(slackCandidate.disabledReason?.includes('thao tác ghi'))

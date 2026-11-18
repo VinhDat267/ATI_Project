@@ -123,7 +123,7 @@ describe('PersonalSheetsAdapter', () => {
     ]);
   });
 
-  it('mysheets.list_sheets returns tab metadata for allowed spreadsheet', async () => {
+  it('mysheets.list_sheets returns tab metadata for allowed spreadsheet without dropping tabs 2..N', async () => {
     const { adapter, calls } = setup();
     const tabs = await adapter.execute('mysheets.list_sheets', {
       spreadsheetId,
@@ -133,7 +133,9 @@ describe('PersonalSheetsAdapter', () => {
     expect(tabs).toEqual([
       { id: 1, title: 'Archive', spreadsheetId },
     ]);
-    expect(calls).toHaveLength(1);
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.url.searchParams.has('ranges')).toBe(false);
+    expect(calls[1]!.url.searchParams.getAll('ranges')).toEqual(['Archive!1:1']);
   });
 
   it('mysheets.read_range returns bounded values and checks truncation', async () => {
@@ -522,13 +524,26 @@ describe('PersonalSheetsAdapter', () => {
     ]);
   });
 
-  it('mysheets.list_sheets extracts row 1 headers when returned by Google Sheets metadata', async () => {
+  it('mysheets.list_sheets extracts row 1 headers for all tabs (including tabs 2..N) using per-tab ranges', async () => {
     const { adapter, calls } = setup({
-      handler: () =>
-        json({
+      handler: (url) => {
+        if (!url.searchParams.has('ranges')) {
+          return json({
+            properties: { locale: 'vi_VN' },
+            sheets: [
+              { properties: { sheetId: 0, title: 'Trang tính1' } },
+              { properties: { sheetId: 99, title: 'KPI Tháng 11' } },
+            ],
+          });
+        }
+        return json({
           sheets: [
             {
-              properties: { sheetId: 0, title: 'KPI Tháng 11' },
+              properties: { sheetId: 0, title: 'Trang tính1' },
+              data: [{ rowData: [{ values: [{ formattedValue: 'Cột A' }] }] }],
+            },
+            {
+              properties: { sheetId: 99, title: 'KPI Tháng 11' },
               data: [
                 {
                   rowData: [
@@ -545,7 +560,8 @@ describe('PersonalSheetsAdapter', () => {
               ],
             },
           ],
-        }),
+        });
+      },
     });
 
     const tabs = await adapter.execute('mysheets.list_sheets', {
@@ -557,13 +573,24 @@ describe('PersonalSheetsAdapter', () => {
     expect(tabs).toEqual([
       {
         id: 0,
+        title: 'Trang tính1',
+        spreadsheetId,
+        headers: ['Cột A'],
+      },
+      {
+        id: 99,
         title: 'KPI Tháng 11',
         spreadsheetId,
         headers: ['Mã việc', 'Tiêu đề', 'Người phụ trách', 'Trạng thái'],
       },
     ]);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]!.url.searchParams.get('fields')).toContain('sheets.data.rowData.values.formattedValue');
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.url.searchParams.has('ranges')).toBe(false);
+    expect(calls[1]!.url.searchParams.getAll('ranges')).toEqual([
+      "'Trang tính1'!1:1",
+      "'KPI Tháng 11'!1:1",
+    ]);
+    expect(calls[1]!.url.searchParams.get('fields')).toContain('sheets.data.rowData.values.formattedValue');
   });
 
   it('supports upsert via onDuplicate="update" in mysheets.append_rows, updating matched key rows with formula protection and appending new rows', async () => {
@@ -1945,5 +1972,233 @@ describe('PersonalSheetsAdapter', () => {
     expect(queries[1]).toContain("mimeType = 'application/vnd.google-apps.spreadsheet'");
     expect(queries[2]).toContain("mimeType = 'application/vnd.google-apps.document'");
     expect(queries[3]).toContain("mimeType = 'application/vnd.google-apps.spreadsheet'");
+  });
+
+  it('wraps step-2 failure as UNKNOWN with partialWrite:true & requestSent:true when mysheets.create_sheet already created the tab', async () => {
+    const { adapter } = setup({
+      handler: (url, init) => {
+        if (init.method === 'GET' && url.searchParams.get('fields')?.includes('sheets.properties')) {
+          return json({
+            properties: { locale: 'vi_VN' },
+            sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }],
+          });
+        }
+        if (init.method === 'POST' && url.pathname.endsWith('/values:batchUpdate')) {
+          return json({ error: { message: 'Token expired after addSheet' } }, 401);
+        }
+        if (init.method === 'POST' && url.pathname.endsWith(':batchUpdate')) {
+          return json({ replies: [{ addSheet: { properties: { sheetId: 99, title: 'Sprint 16' } } }] });
+        }
+        return json({});
+      },
+    });
+
+    await expect(
+      adapter.execute('mysheets.create_sheet', {
+        spreadsheetId,
+        title: 'Sprint 16',
+        headers: ['Mã việc', 'Tiêu đề', 'Trạng thái'],
+      })
+    ).rejects.toMatchObject({
+      category: 'UNKNOWN',
+      statusCode: 401,
+      retryable: false,
+      details: {
+        partialWrite: true,
+        requestSent: true,
+      },
+    });
+  });
+
+  it('wraps step-2 append failure as UNKNOWN with partialWrite:true & requestSent:true when mysheets.append_rows upsert batchUpdate already committed', async () => {
+    const { adapter } = setup({
+      handler: (url, init) => {
+        if (init.method === 'GET' && url.searchParams.get('fields')?.includes('sheets.properties')) {
+          return json({ sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }] });
+        }
+        if (init.method === 'GET' && url.pathname.includes('/values/')) {
+          return json({
+            range: 'Sheet1!A1:B2',
+            values: [
+              ['Mã', 'Trạng thái'],
+              ['K-1', 'Mới'],
+            ],
+          });
+        }
+        if (init.method === 'POST' && url.pathname.endsWith('/values:batchUpdate')) {
+          return json({ totalUpdatedRows: 1, responses: [{ updatedRange: 'Sheet1!A2:B2' }] });
+        }
+        if (init.method === 'POST' && url.pathname.includes(':append')) {
+          return json({ error: { message: 'Invalid append payload after batchUpdate' } }, 400);
+        }
+        return json({});
+      },
+    });
+
+    await expect(
+      adapter.execute('mysheets.append_rows', {
+        spreadsheetId,
+        sheet: 'Sheet1',
+        keyColumn: 'Mã',
+        deduplicate: true,
+        onDuplicate: 'update',
+        records: [
+          { Mã: 'K-1', 'Trạng thái': 'Đang làm' },
+          { Mã: 'K-2', 'Trạng thái': 'Mới' },
+        ],
+      })
+    ).rejects.toMatchObject({
+      category: 'UNKNOWN',
+      statusCode: 400,
+      retryable: false,
+      details: {
+        partialWrite: true,
+        requestSent: true,
+      },
+    });
+  });
+
+  it('requests properties.locale in tabs() fields mask for mysheets.search_rows and parses vi_VN formatted decimals accurately', async () => {
+    const { adapter, calls } = setup({
+      handler: (url) => {
+        if (url.searchParams.get('fields')?.includes('sheets.properties')) {
+          return json({
+            properties: { locale: 'vi_VN' },
+            sheets: [{ properties: { sheetId: 0, title: 'Doanh thu' } }],
+          });
+        }
+        if (url.pathname.includes('/values/')) {
+          return json({
+            range: "'Doanh thu'!A1:B4",
+            values: [
+              ['Mục', 'Giá trị'],
+              ['Gói A', '1.234,5'],
+              ['Gói B', '900'],
+              ['Gói C', '2.500,5'],
+            ],
+          });
+        }
+        return json({});
+      },
+    });
+
+    const searched = await adapter.execute('mysheets.search_rows', {
+      spreadsheetId,
+      sheet: 'Doanh thu',
+      filters: [{ column: 'Giá trị', operator: 'gt', value: '1200' }],
+    });
+
+    expect(searched.totalMatched).toBe(2);
+    expect(searched.matches.map((m: any) => m.record['Mục'])).toEqual(['Gói A', 'Gói C']);
+    const metaFields = calls[0]!.url.searchParams.get('fields') ?? '';
+    expect(metaFields).toContain('properties.locale');
+    expect(metaFields).toContain('sheets.properties(sheetId,title)');
+  });
+
+  it('handles pure-update upsert in mysheets.append_rows when 0 new rows remain (rowsToWrite empty)', async () => {
+    const { adapter, calls } = setup({
+      handler: (url, init) => {
+        if (init.method === 'GET' && url.searchParams.get('fields')?.includes('sheets.properties')) {
+          return json({
+            properties: { locale: 'en_US' },
+            sheets: [{ properties: { sheetId: 0, title: 'Tasks' } }],
+          });
+        }
+        if (init.method === 'GET' && url.pathname.includes('/values/')) {
+          return json({
+            range: 'Tasks!A1:B2',
+            values: [
+              ['Mã', 'Ngân sách'],
+              ['AT-01', '1000'],
+            ],
+          });
+        }
+        if (init.method === 'POST' && url.pathname.endsWith('/values:batchUpdate')) {
+          return json({
+            totalUpdatedRows: 1,
+            responses: [{ updatedRange: 'Tasks!A2:B2', updatedRows: 1 }],
+          });
+        }
+        return json({});
+      },
+    });
+
+    const res = await adapter.execute('mysheets.append_rows', {
+      spreadsheetId,
+      sheet: 'Tasks',
+      deduplicate: true,
+      keyColumn: 'Mã',
+      onDuplicate: 'update',
+      records: [{ 'Mã': 'AT-01', 'Ngân sách': '2500' }],
+    });
+
+    expect(res.updatedRows).toBe(1);
+    expect(res.skippedDuplicates).toBe(0);
+    expect(calls.some((c) => c.url.pathname.includes(':append'))).toBe(false);
+  });
+
+  it('marks a rejected header write on an existing blank tab as pre-dispatch when refresh fails', async () => {
+    const { adapter, calls } = setup({
+      onTokenCall(options) {
+        if (options?.forceRefresh) throw new StepError({
+          category: 'NETWORK', message: 'Refresh transport failed', retryable: false,
+        });
+      },
+      handler(url, init) {
+        if (init.method === 'POST') return json({}, 401);
+        if (url.searchParams.has('fields')) return json({ sheets: [{ properties: { sheetId: 0, title: sheet } }] });
+        return json({ range: 'Sheet1!A1:Z1' });
+      },
+    });
+
+    await expect(adapter.execute('mysheets.create_sheet', { spreadsheetId, title: sheet, headers: ['Task'] }))
+      .rejects.toMatchObject({ category: 'NETWORK', details: { requestSent: false } });
+    expect(calls.filter(({ init }) => init.method === 'POST')).toHaveLength(1);
+  });
+
+  it('preserves partialWrite: true (and never stamps requestSent: false) when mysheets.create_sheet step-2 headers hit 401 and token refresh fails', async () => {
+    const { adapter } = setup({
+      onTokenCall: (opts) => {
+        if (opts?.forceRefresh) {
+          throw new StepError({
+            category: 'AUTH_ERROR',
+            statusCode: 401,
+            retryable: false,
+            message: 'refresh failed',
+            details: { requestSent: false },
+          });
+        }
+      },
+      handler: (url, init) => {
+        if (init.method === 'GET' && url.searchParams.get('fields')?.includes('sheets.properties')) {
+          return json({ sheets: [{ properties: { sheetId: 0, title: 'Sheet1' } }] });
+        }
+        if (init.method === 'POST' && url.pathname.endsWith('/values:batchUpdate')) {
+          return json({ error: { message: 'token expired before step 2' } }, 401);
+        }
+        if (init.method === 'POST' && url.pathname.endsWith(':batchUpdate')) {
+          return json({
+            replies: [{ addSheet: { properties: { sheetId: 42, title: 'SprintNew' } } }],
+          });
+        }
+        return json({});
+      },
+    });
+
+    let caught: any;
+    try {
+      await adapter.execute('mysheets.create_sheet', {
+        spreadsheetId,
+        title: 'SprintNew',
+        headers: ['Mã', 'Công việc'],
+      });
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(StepError);
+    expect(caught.category).toBe('UNKNOWN');
+    expect(caught.details?.partialWrite).toBe(true);
+    expect(caught.details?.requestSent).not.toBe(false);
   });
 });

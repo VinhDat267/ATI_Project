@@ -15,6 +15,7 @@ import { ScheduleService, ScheduleConflict } from '../../../src/services/schedul
 import { ScheduleRunner, reconcileScheduleRuns } from '../../../src/services/schedules/schedule-runner.js';
 import { evaluateSlackDigestCandidate, computeSlackDigestConfigHash } from '../../../src/services/schedules/slack-digest-candidate.js';
 import { SlackDigestRunner, SLACK_DIGEST_DELIVERY_UNKNOWN } from '../../../src/services/schedules/slack-digest-runner.js';
+import { certifyScheduleFixture } from '../../../src/services/slack/slack-schedule-origin.js';
 import { createMigratedSchema } from '../../helpers/gmail-test-db.js';
 
 const KEY = '0123456789abcdef0123456789abcdef';
@@ -741,9 +742,16 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
         sources: [{ service: 'github', tool: 'github.search_issues', args: { repo: 'ati/core', query: 'open' }, label: 'GitHub' }],
       };
       await db.pool.query(
-        'UPDATE schedules SET digest_config = $2, digest_config_hash = $3, next_run_at = $4 WHERE id = $1',
-        [confirmed.schedule.id, JSON.stringify(renamedConfig), computeSlackDigestConfigHash(renamedConfig), new Date(NOW.getTime() - 60_000)],
+        'UPDATE schedules SET digest_config = $2, digest_config_hash = $3, next_run_at = $4, services = $5 WHERE id = $1',
+        [
+          confirmed.schedule.id,
+          JSON.stringify(renamedConfig),
+          computeSlackDigestConfigHash(renamedConfig),
+          new Date(NOW.getTime() - 60_000),
+          ['github', 'slack'],
+        ],
       );
+      await certifyScheduleFixture(db.pool, confirmed.schedule.id);
 
       // Update branch validates tampered hash
       const badMsg = await msgRepo.createMessage(conv.id, 'assistant', 'Update', {

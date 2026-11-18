@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { PlanResponse } from '@wap/tool-schemas';
+import { MYSHEETS_TOOLS, type PlanResponse } from '@wap/tool-schemas';
 import { executeApproved, planDigest, readLiveConfig, writeSteps } from './harness.js';
 
 const fullEnv = {
@@ -104,5 +104,37 @@ describe('executeApproved', () => {
     expect(calls.map((c) => c.tool)).toEqual(['github.create_issue', 'trello.create_card']);
     expect(result.steps.map((s) => s.status)).toEqual(['succeeded', 'failed', 'pending']);
     expect(result.steps[1]!.error?.message).toMatch(/invalid channel/);
+  });
+
+  it('validates opt-in personal tools when explicit toolCatalog is provided', async () => {
+    const mysheetsPlan: PlanResponse = {
+      kind: 'plan',
+      thinking: 'append row to personal sheet',
+      summary: 'Append row to personal sheet',
+      warnings: [],
+      steps: [
+        {
+          id: 'append',
+          tool: 'mysheets.append_rows',
+          description: 'Append row',
+          args: { spreadsheetId: 'ss-1', sheet: 'Trang tính1', rows: [['AT-1', 'Demo']] },
+          dependsOn: [],
+        },
+      ],
+    };
+    const { getAdapter, calls } = fakeAdapters();
+    await expect(
+      executeApproved({ plan: mysheetsPlan, approvedHash: planDigest(mysheetsPlan), services: ['mysheets'], getAdapter }),
+    ).rejects.toThrow(/not found in catalog/i);
+
+    const result = await executeApproved({
+      plan: mysheetsPlan,
+      approvedHash: planDigest(mysheetsPlan),
+      services: ['mysheets'],
+      toolCatalog: MYSHEETS_TOOLS,
+      getAdapter,
+    });
+    expect(result.status).toBe('completed');
+    expect(calls.map((c) => c.tool)).toEqual(['mysheets.append_rows']);
   });
 });

@@ -412,6 +412,7 @@ describe('Sheets Digest Candidate, Schedule Confirmation & SheetsDigestRunner', 
     expect(sentMessages[0]!.text).not.toContain('@channel');
     expect(sentMessages[0]!.text).not.toContain('@everyone');
     expect(sentMessages[0]!.text).toContain('Báo cáo KPI Q4');
+    expect(sentMessages[0]!.text).toContain('Cần xử lý thêm: Quá hạn:');
 
     const runs = await service.listRuns(alice.id, change.schedule.id, 10, new Date('2026-11-02T01:01:00Z'));
     expect(runs[0]?.state).toBe('digest_sent');

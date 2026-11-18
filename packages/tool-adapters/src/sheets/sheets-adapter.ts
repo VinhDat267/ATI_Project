@@ -211,7 +211,7 @@ export class SheetsAdapter extends BaseAdapter {
       const id = this.checkedId(args.spreadsheetId);
       const sheet = titleText(args.sheet);
       const limit = args.limit === undefined ? 20 : bounded(args.limit, 50);
-      const tabs = await this.tabs(id, signal);
+      const tabs = await this.tabs(id, signal, true);
       if (!tabs.some((tab) => tab.title === sheet)) {
         throw new StepError({
           message: 'Sheets tab not found in the allowed spreadsheet',
@@ -239,7 +239,7 @@ export class SheetsAdapter extends BaseAdapter {
     if (toolName === 'sheets.aggregate_rows') {
       const id = this.checkedId(args.spreadsheetId);
       const sheet = titleText(args.sheet);
-      const tabs = await this.tabs(id, signal);
+      const tabs = await this.tabs(id, signal, true);
       if (!tabs.some((tab) => tab.title === sheet)) {
         throw new StepError({
           message: 'Sheets tab not found in the allowed spreadsheet',
@@ -332,7 +332,7 @@ export class SheetsAdapter extends BaseAdapter {
             }));
             const allLogicalKeys = [
               ...filtered.updates.map((u) => buildRowDedupSignature(u.row, null)),
-              ...safeRows(rowsToWrite).map((r) => buildRowDedupSignature(r, null)),
+              ...(rowsToWrite.length > 0 ? safeRows(rowsToWrite) : []).map((r) => buildRowDedupSignature(r, null)),
             ];
             const batchDispatchMeta: SheetsAppendDispatchMetadata = {
               operation: 'upsert',
@@ -690,8 +690,11 @@ export class SheetsAdapter extends BaseAdapter {
     });
   }
   private url(id: string): string { return 'https://docs.google.com/spreadsheets/d/' + id + '/edit'; }
-  private async tabs(id: string, signal?: AbortSignal): Promise<Array<{ id: number; title: string; spreadsheetId: string; headers?: string[] }>> {
-    const value = await this.request(id + '?fields=' + encodeURIComponent('sheets.properties(sheetId,title)'), signal);
+  private async tabs(id: string, signal?: AbortSignal, includeLocale = false): Promise<Array<{ id: number; title: string; spreadsheetId: string; headers?: string[] }>> {
+    const fields = includeLocale
+      ? 'properties.locale,sheets.properties(sheetId,title)'
+      : 'sheets.properties(sheetId,title)';
+    const value = await this.request(id + '?fields=' + encodeURIComponent(fields), signal);
     if (typeof value?.properties?.locale === 'string' && value.properties.locale.trim()) {
       this.spreadsheetLocales.set(id, value.properties.locale.trim());
     }

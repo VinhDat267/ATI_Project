@@ -538,4 +538,64 @@ describe('Routes: /api/connections/mysheets', () => {
       expect(decryptCredentials(gmailStatus!.config, key).email).toBe('alice.gmail@example.test');
     });
   });
+
+  describe('POST /quick-create-spreadsheet', () => {
+    const validSpreadsheetId = '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms';
+
+    it('discovers localized default tab titles such as "Trang tính1" instead of hardcoding "Sheet1"', async () => {
+      const customFetch: typeof fetch = async (input, init) => {
+        const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        if (urlStr.startsWith('https://www.googleapis.com/drive/v3/about')) {
+          return new Response(
+            JSON.stringify({ user: { emailAddress: 'owner.vi@example.test' } }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        if (urlStr.startsWith('https://www.googleapis.com/drive/v3/files') && init?.method === 'POST') {
+          return new Response(
+            JSON.stringify({
+              id: validSpreadsheetId,
+              name: 'Bảng tính Planora Tự động hoá',
+              mimeType: 'application/vnd.google-apps.spreadsheet',
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        if (urlStr.startsWith(`https://sheets.googleapis.com/v4/spreadsheets/${validSpreadsheetId}`)) {
+          return new Response(
+            JSON.stringify({
+              sheets: [{ properties: { sheetId: 0, title: 'Trang tính1' } }],
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        return fetch(input, init);
+      };
+
+      const app = build({
+        mysheets: {
+          enabled: true,
+          oauth: { ...oauth(), apiBaseUrl: 'https://sheets.googleapis.com' },
+          repo,
+          fetchFn: customFetch,
+          fakePickerBaseUrl: google.origin,
+          picker: { apiKey: 'test-picker-key', appId: '123456789' },
+        },
+      });
+      await connect(app, alice);
+
+      const r = await request(app)
+        .post('/api/connections/mysheets/quick-create-spreadsheet')
+        .set('Authorization', bearer(alice))
+        .send({});
+
+      expect(r.status).toBe(200);
+      expect(r.body.createdSpreadsheet).toEqual({
+        id: validSpreadsheetId,
+        title: 'Bảng tính Planora Tự động hoá',
+        canEdit: true,
+        sheets: ['Trang tính1'],
+      });
+    });
+  });
 });

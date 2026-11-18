@@ -845,6 +845,19 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
       ),
       USER_ID,
     );
+    const savedSheetsCred = await credRepo.saveCredentials(
+      'mysheets',
+      encryptCredentials(
+        {
+          email: 'runner.sheets@example.com',
+          refreshToken: 'refresh-sheets-1',
+          selectedSpreadsheets: [{ id: 'sheet_kpi_1', title: 'KPI Sprint 5', canEdit: true }],
+          allowedScope: { spreadsheets: ['sheet_kpi_1'] },
+        },
+        ENCRYPTION_KEY,
+      ),
+      USER_ID,
+    );
     const savedTgCred = await credRepo.getPersonalCredentials('telegram', USER_ID);
 
     const config: TelegramDigestConfig = {
@@ -858,6 +871,12 @@ describe('TelegramDigestRunner & ScheduleRunner integration on PostgreSQL (Task 
           service: 'mysheets',
           tool: 'mysheets.list_spreadsheets',
           label: 'Google Sheets của bạn',
+          mysheetsBinding: {
+            credentialId: savedSheetsCred.id,
+            email: 'runner.sheets@example.com',
+            spreadsheetIds: ['sheet_kpi_1'],
+            truncated: false,
+          },
         },
         await mycalendarSource(),
       ],

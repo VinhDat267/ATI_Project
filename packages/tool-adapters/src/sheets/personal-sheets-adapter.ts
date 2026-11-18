@@ -23,6 +23,7 @@ import {
   invalid,
   mapRecordsToRows,
   queryText,
+  quoteSheetTitle,
   resolveDeduplicationPolicy,
   resolveReadRange,
   safeRows,
@@ -187,6 +188,25 @@ export class PersonalSheetsAdapter extends BaseAdapter {
         },
       });
     }
+  }
+
+  private toPartialWriteError(err: unknown): StepError {
+    if (err instanceof StepError) {
+      const { requestSent: _ignored, ...rest } = (err.details ?? {}) as Record<string, unknown>;
+      return new StepError({
+        message: err.message,
+        category: 'UNKNOWN',
+        statusCode: err.statusCode,
+        retryable: false,
+        details: { ...rest, partialWrite: true, requestSent: true },
+      });
+    }
+    return new StepError({
+      message: 'Sheets write outcome is unknown after partial mutation',
+      category: 'UNKNOWN',
+      retryable: false,
+      details: { partialWrite: true, requestSent: true },
+    });
   }
 
   private async driveRequest(
@@ -477,7 +497,10 @@ export class PersonalSheetsAdapter extends BaseAdapter {
         const id = this.checkedId(args.spreadsheetId);
         const query = queryText(args.query);
         const limit = bounded(args.limit, 10);
-        return (await this.tabs(id, signal, true)).filter(tab => tab.title.toLowerCase().includes(query)).slice(0, limit);
+        const matching = (await this.tabs(id, signal, false))
+          .filter((tab) => tab.title.toLowerCase().includes(query))
+          .slice(0, limit);
+        return this.enrichTabHeaders(id, matching, signal);
       }
 
       if (toolName === 'mysheets.read_range') {
@@ -631,7 +654,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
               }));
               const allLogicalKeys = [
                 ...filtered.updates.map((u) => buildRowDedupSignature(u.row, null)),
-                ...safeRows(rowsToWrite).map((r) => buildRowDedupSignature(r, null)),
+                ...(rowsToWrite.length > 0 ? safeRows(rowsToWrite) : []).map((r) => buildRowDedupSignature(r, null)),
               ];
               const batchDispatchMeta: SheetsAppendDispatchMetadata = {
                 operation: 'upsert',
@@ -679,7 +702,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
             id + '/values/' + encodeURIComponent(range) + ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS',
             signal,
             { majorDimension: 'ROWS', values: rows },
-            (dispatched) => { writeDispatched = dispatched; },
+            (dispatched) => { writeDispatched = batchMutationCommitted || dispatched; },
             async () => {
               activeDispatchMeta = appendDispatchMeta;
               await lease?.beginWriteDispatch?.(appendDispatchMeta);
@@ -702,19 +725,20 @@ export class PersonalSheetsAdapter extends BaseAdapter {
             url: spreadsheetUrl(id),
           };
         } catch (err) {
+          const finalErr = batchMutationCommitted ? this.toPartialWriteError(err) : err;
           if (lease) {
             const isLostLeasePreMutation =
               !batchMutationCommitted &&
-              err instanceof StepError &&
-              err.details?.code === 'SHEETS_APPEND_LEASE_LOST';
+              finalErr instanceof StepError &&
+              finalErr.details?.code === 'SHEETS_APPEND_LEASE_LOST';
             if (!isLostLeasePreMutation) {
               const isAmbiguousWriteOutcome =
                 batchMutationCommitted ||
-                (err instanceof StepError ? err.category === 'UNKNOWN' : writeDispatched);
+                (finalErr instanceof StepError ? finalErr.category === 'UNKNOWN' : writeDispatched);
               if (isAmbiguousWriteOutcome) {
                 writeDispatched = true;
                 await lease.markUnknownOutcome?.(
-                  err instanceof Error ? err.message : 'Ambiguous Sheets append write outcome',
+                  finalErr instanceof Error ? finalErr.message : 'Ambiguous Sheets append write outcome',
                   activeDispatchMeta
                 );
               } else {
@@ -722,7 +746,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
               }
             }
           }
-          throw err;
+          throw finalErr;
         } finally {
           await lease?.release();
         }
@@ -839,10 +863,11 @@ export class PersonalSheetsAdapter extends BaseAdapter {
           rawHeaders = args.headers as string[];
         }
 
-        const existingTabs = await this.tabs(id, signal, true);
+        const existingTabs = await this.tabs(id, signal, false);
         const existing = existingTabs.find((t) => t.title.toLowerCase() === title.toLowerCase());
         let sheetId: number;
         let actualTitle: string;
+        let sheetCreated = false;
 
         if (existing) {
           sheetId = existing.id;
@@ -856,6 +881,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
               writeDispatched = dispatched;
             }
           );
+          sheetCreated = true;
           const props = createRes?.replies?.[0]?.addSheet?.properties;
           sheetId = Number.isSafeInteger(props?.sheetId) ? props.sheetId : 0;
           actualTitle = typeof props?.title === 'string' ? props.title : title;
@@ -880,23 +906,30 @@ export class PersonalSheetsAdapter extends BaseAdapter {
 
         if (rawHeaders && (!existingHeaders || existingHeaders.length === 0)) {
           const quotedTitle = /\s|'/.test(actualTitle) ? "'" + actualTitle.replaceAll("'", "''") + "'" : actualTitle;
-          await this.request(
-            id + '/values:batchUpdate',
-            signal,
-            {
-              valueInputOption: 'USER_ENTERED',
-              data: [
-                {
-                  range: `${quotedTitle}!A1`,
-                  majorDimension: 'ROWS',
-                  values: safeRows([rawHeaders]),
-                },
-              ],
-            },
-            (dispatched) => {
-              writeDispatched = dispatched;
+          try {
+            await this.request(
+              id + '/values:batchUpdate',
+              signal,
+              {
+                valueInputOption: 'USER_ENTERED',
+                data: [
+                  {
+                    range: `${quotedTitle}!A1`,
+                    majorDimension: 'ROWS',
+                    values: safeRows([rawHeaders]),
+                  },
+                ],
+              },
+              (dispatched) => {
+                writeDispatched = sheetCreated || dispatched;
+              }
+            );
+          } catch (headerErr) {
+            if (sheetCreated) {
+              throw this.toPartialWriteError(headerErr);
             }
-          );
+            throw headerErr;
+          }
         }
 
         const finalHeaders = existingHeaders && existingHeaders.length > 0 ? existingHeaders : rawHeaders;
@@ -1164,6 +1197,9 @@ export class PersonalSheetsAdapter extends BaseAdapter {
           });
 
       if (!isWrite) throw e;
+      if (e.details?.partialWrite === true) {
+        throw e;
+      }
       if (writeDispatched) {
         if (e.statusCode === 401) {
           throw new StepError({
@@ -1237,10 +1273,7 @@ export class PersonalSheetsAdapter extends BaseAdapter {
     signal?: AbortSignal,
     includeHeaders = false
   ): Promise<Array<{ id: number; title: string; spreadsheetId: string; headers?: string[] }>> {
-    const query = includeHeaders
-      ? '?ranges=1:1&fields=' +
-        encodeURIComponent('sheets.properties(sheetId,title),sheets.data.rowData.values.formattedValue')
-      : '?fields=' + encodeURIComponent('sheets.properties(sheetId,title)');
+    const query = '?fields=' + encodeURIComponent('properties.locale,sheets.properties(sheetId,title)');
     const value = await this.request(id + query, signal);
     if (typeof value?.properties?.locale === 'string' && value.properties.locale.trim()) {
       this.spreadsheetLocales.set(id, value.properties.locale.trim());
@@ -1251,15 +1284,47 @@ export class PersonalSheetsAdapter extends BaseAdapter {
     ) {
       badResponse();
     }
-    return value.sheets.map((tab: any) => {
+    const baseTabs = value.sheets.map((tab: any) => {
       const headers = extractTabHeaders(tab);
       return {
-        id: tab.properties.sheetId,
-        title: tab.properties.title,
+        id: tab.properties.sheetId as number,
+        title: tab.properties.title as string,
         spreadsheetId: id,
         ...(headers.length > 0 ? { headers } : {}),
       };
     });
+    return includeHeaders ? this.enrichTabHeaders(id, baseTabs, signal) : baseTabs;
+  }
+
+  private async enrichTabHeaders(
+    id: string,
+    tabs: Array<{ id: number; title: string; spreadsheetId: string; headers?: string[] }>,
+    signal?: AbortSignal
+  ): Promise<Array<{ id: number; title: string; spreadsheetId: string; headers?: string[] }>> {
+    const needingHeaders = tabs.filter((tab) => !tab.headers || tab.headers.length === 0);
+    if (needingHeaders.length === 0) return tabs;
+    try {
+      const rangesQuery = needingHeaders
+        .map((tab) => `ranges=${encodeURIComponent(`${quoteSheetTitle(tab.title)}!1:1`)}`)
+        .join('&');
+      const fields = encodeURIComponent('sheets.properties(sheetId,title),sheets.data.rowData.values.formattedValue');
+      const value = await this.request(`${id}?${rangesQuery}&fields=${fields}`, signal);
+      if (!Array.isArray(value?.sheets)) return tabs;
+      const byId = new Map<number, string[]>();
+      const byTitle = new Map<string, string[]>();
+      for (const tab of value.sheets) {
+        const headers = extractTabHeaders(tab);
+        if (headers.length === 0) continue;
+        if (Number.isSafeInteger(tab?.properties?.sheetId)) byId.set(tab.properties.sheetId, headers);
+        if (typeof tab?.properties?.title === 'string') byTitle.set(tab.properties.title, headers);
+      }
+      return tabs.map((tab) => {
+        const headers = byId.get(tab.id) ?? byTitle.get(tab.title);
+        return headers && headers.length > 0 ? { ...tab, headers } : tab;
+      });
+    } catch {
+      return tabs;
+    }
   }
 }
 

@@ -602,6 +602,13 @@ export interface MyCalendarDigestSourceBinding {
   truncated: boolean;
 }
 
+export interface MySheetsDigestSourceBinding {
+  credentialId: string;
+  email: string;
+  spreadsheetIds: string[];
+  truncated: boolean;
+}
+
 export interface TelegramDigestSource {
   service: string;
   tool: string;
@@ -611,6 +618,7 @@ export interface TelegramDigestSource {
   notionBinding?: NotionDigestSourceBinding;
   jiraBinding?: JiraDigestSourceBinding;
   mycalendarBinding?: MyCalendarDigestSourceBinding;
+  mysheetsBinding?: MySheetsDigestSourceBinding;
 }
 
 export interface TelegramDigestConfig {

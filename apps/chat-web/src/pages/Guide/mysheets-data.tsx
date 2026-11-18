@@ -35,9 +35,19 @@ export const MYSHEETS_BASE_PROMPTS: SamplePrompt[] = [
     categoryLabel: 'Bảng tính',
     title: 'Lưu issue Jira vào bảng tính',
     prompt: 'Lấy các issue Jira giao cho tôi tuần này rồi ghi từng cái thành một dòng trong bảng Báo cáo tuần của tôi.',
-    services: ['jira', 'mysheets'],
-    tools: ['jira.search_issues', 'mysheets.append_rows'],
+    services: ['myjira', 'mysheets'],
+    tools: ['myjira.search_issues', 'mysheets.append_rows'],
     workflow: ['Tìm issue Jira', 'Tạo danh sách dòng dữ liệu', 'Duyệt rồi ghi vào bảng tính'],
+  },
+  {
+    id: 'mysheets-kpi-aggregate-slack',
+    category: 'mysheets',
+    categoryLabel: 'Bảng tính',
+    title: 'Tổng hợp KPI bảng tính & gửi báo cáo',
+    prompt: 'Tổng hợp tổng doanh thu và số đơn theo từng phụ trách trong bảng Theo dõi đơn hàng rồi gửi tóm tắt lên Slack.',
+    services: ['mysheets', 'slack'],
+    tools: ['mysheets.aggregate_rows', 'slack.send_message'],
+    workflow: ['Nhóm và tính SUM/COUNT theo cột', 'Tạo bản tóm tắt', 'Duyệt rồi gửi Slack'],
   },
   {
     id: 'mysheets-slack-summary',
@@ -90,8 +100,10 @@ export const MYSHEETS_CAPABILITY: Capability = {
   role: 'Bảng tính riêng',
   canDo: [
     'Đọc dữ liệu ô và tra cứu, lọc dòng theo điều kiện cột trong phạm vi các bảng tính bạn đã chọn',
+    'Thống kê và gom nhóm dữ liệu (SUM, AVG, MIN, MAX, COUNT) theo cột bằng một lệnh duy nhất',
     'Thêm dòng mới hoặc cập nhật dòng trùng khoá sau khi bạn duyệt',
     'Cập nhật chọn lọc từng cột theo khoá hoặc số dòng mà vẫn bảo toàn công thức ở các cột khác',
+    'Xoá dòng theo số dòng hoặc điều kiện đối chiếu sau khi xem trước bản sao dữ liệu bị xoá',
     'Tạo trang tính (tab) mới kèm dòng tiêu đề cột trong bảng tính đã cấp quyền',
   ],
   cannotDo: [
