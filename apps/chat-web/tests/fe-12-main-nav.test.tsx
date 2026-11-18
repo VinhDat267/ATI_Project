@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MainNav, type NavTab } from '../src/components/layout/MainNav';
 import { GuidePage } from '../src/pages/Guide/GuidePage';
 import { PrivacyPage } from '../src/pages/Privacy/PrivacyPage';
@@ -48,18 +48,73 @@ it('FE-12: the inbox has one entry, inside the list, and its count is part of it
 it('FE-12: below 1024 px the menu button opens the sidebar as a sheet; a link or Escape closes it', () => {
   const navigate = vi.fn();
   render(<MainNav user={member} current="workspace" navigate={navigate} onLogout={vi.fn()} />);
+  expect(screen.queryByRole('complementary')).toBeNull();
+  const banner = screen.getByRole('banner');
   const sidebar = document.getElementById('app-sidebar')!;
   const open = screen.getByRole('button', { name: 'Mở menu điều hướng' });
+  const close = screen.getByRole('button', { name: 'Đóng menu điều hướng' });
   expect(open).toHaveAttribute('aria-controls', 'app-sidebar');
   fireEvent.click(open);
   expect(sidebar).toHaveAttribute('data-open');
+  expect(banner).toHaveAttribute('data-menu-open');
   expect(open).toHaveAttribute('aria-expanded', 'true');
+  expect(document.body.style.overflow).toBe('hidden');
+  expect(close).toHaveFocus();
+
+  // Tab wraps from the last sidebar link back to the close button, and Shift+Tab wraps backwards.
+  const lastLink = links().at(-1)!;
+  lastLink.focus();
+  fireEvent.keyDown(document, { key: 'Tab' });
+  expect(close).toHaveFocus();
+  fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+  expect(lastLink).toHaveFocus();
+
+  // Closing with the close button or Escape closes the sheet, restores scroll, and returns focus to the menu button.
+  fireEvent.click(close);
+  expect(sidebar).not.toHaveAttribute('data-open');
+  expect(banner).not.toHaveAttribute('data-menu-open');
+  expect(document.body.style.overflow).toBe('');
+  expect(open).toHaveFocus();
+
+  fireEvent.click(open);
+  expect(close).toHaveFocus();
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(sidebar).not.toHaveAttribute('data-open');
+  expect(banner).not.toHaveAttribute('data-menu-open');
+  expect(document.body.style.overflow).toBe('');
+  expect(open).toHaveFocus();
+
+  fireEvent.click(open);
   fireEvent.click(within(nav()).getByRole('link', { name: 'Nhật ký' }));
   expect(navigate).toHaveBeenCalledWith('/history');
   expect(sidebar).not.toHaveAttribute('data-open');
-  fireEvent.click(open);
-  fireEvent.keyDown(document, { key: 'Escape' });
-  expect(sidebar).not.toHaveAttribute('data-open');
+});
+
+it('FE-12: crossing 1024 px closes an open mobile menu sheet automatically', () => {
+  const listeners = new Set<(event: MediaQueryListEvent) => void>();
+  const originalMatchMedia = window.matchMedia;
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: (_: string, listener: (event: MediaQueryListEvent) => void) => { listeners.add(listener); },
+    removeEventListener: (_: string, listener: (event: MediaQueryListEvent) => void) => { listeners.delete(listener); },
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })) as unknown as typeof window.matchMedia;
+  try {
+    render(<MainNav user={member} current="workspace" navigate={vi.fn()} onLogout={vi.fn()} />);
+    const sidebar = document.getElementById('app-sidebar')!;
+    fireEvent.click(screen.getByRole('button', { name: 'Mở menu điều hướng' }));
+    expect(sidebar).toHaveAttribute('data-open');
+    act(() => {
+      for (const listener of listeners) listener({ matches: true } as MediaQueryListEvent);
+    });
+    expect(sidebar).not.toHaveAttribute('data-open');
+  } finally {
+    window.matchMedia = originalMatchMedia;
+  }
 });
 
 it('FE-12: the shell marks <html> while it is shown, so its theme never reaches signed-out pages', () => {

@@ -120,7 +120,7 @@
     html.dark aside#chat-drawer .bg-neutral-50\/50,
     html.dark aside#history-drawer .bg-neutral-50\/50,
     html.dark #preview-modal-box .bg-neutral-50 {
-      background-color: rgba(24, 35, 67, 0.75) !important;
+      background-color: rgba(34, 28, 24, 0.75) !important;
       border-color: #3a312a !important;
     }
     html.dark aside#chat-drawer .bg-neutral-100 {

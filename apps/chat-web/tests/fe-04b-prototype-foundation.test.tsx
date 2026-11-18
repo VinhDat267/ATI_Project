@@ -96,6 +96,14 @@ it('FE-04b: theme.css keeps every prototype rule, recoloured to the warm palette
   const app = readFileSync('src/prototype/theme.css', 'utf8');
   expect(rules(app)).toBe(rules(readFileSync('../../docs/design/prototypes/theme.css', 'utf8')));
   expect(app).not.toMatch(/#(0B1020|0E1528|131B2F|1F2A44|293653)\b|rgba?\((14,21,40|19,27,47|31,42,68|148,163,184)/i);
+  const cockpitCss = readFileSync('src/pages/Cockpit/page.css', 'utf8');
+  expect(cockpitCss).not.toMatch(/#(0B1020|0E1528|131B2F|182343|1F2A44|293653)\b|rgba?\(\s*(11,\s*16,\s*32|14,\s*21,\s*40|19,\s*27,\s*47|24,\s*35,\s*67|31,\s*42,\s*68|148,\s*163,\s*184)/i);
+  const targetsCss = readFileSync('src/prototype/styles/v3-theme-targets.css', 'utf8');
+  expect(targetsCss).not.toContain('248 248 246');
+  expect(targetsCss).not.toContain('231 231 226');
+  const shellCss = readFileSync('src/styles/app-shell.css', 'utf8');
+  expect(shellCss).toMatch(/\.ps-navlink[^}]*:focus-visible|:is\([^)]*\.ps-navlink[^)]*#app-sidebar[^)]*\):focus-visible/);
+  expect(shellCss).toMatch(/\.ps-navlink\[aria-current="page"\]\s+\.ps-navcount\s*\{[^}]*color:\s*var\(--ps-ink\)/);
 });
 
 it('FE-04b: FE-04 sizing and focus rules only apply outside prototype pages', () => {

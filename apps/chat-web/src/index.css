@@ -184,9 +184,10 @@ html.dark :is(.bg-\[\#F9F9F8\], .bg-\[\#F8F8F7\], .bg-\[\#F4F4F3\], .bg-\[\#F3F2
 html.dark :is(.bg-\[\#F4F4F1\], .bg-\[\#F1F1EF\], .bg-\[\#F3F3F1\], .bg-\[\#F5F5F5\], .bg-\[\#ECECE9\], .bg-neutral-100):not([class*="dark:bg-"]) { background-color: #27211C !important; }
 html.dark :is(.bg-\[\#FFF6EE\], .bg-\[\#FFF3ED\], .bg-\[\#FFF7ED\], .bg-\[\#FEF8EC\]):not([class*="dark:bg-"]) { background-color: rgba(255, 87, 1, 0.14) !important; }
 html.dark .bg-\[\#DCFAE5\]:not([class*="dark:bg-"]) { background-color: rgba(16, 185, 129, 0.16) !important; }
-html.dark .bg-\[\#1A0E08\]:not([class*="dark:bg-"]) { background-color: #312923 !important; }
+html.dark :is(.bg-\[\#1A0E08\], .bg-\[\#1a0e08\], .bg-\[\#E6DED3\]):not([class*="dark:bg-"]) { background-color: #312923 !important; }
 html.dark :is(.hover\:bg-\[\#F3F3F1\]:hover, .hover\:bg-\[\#F5F5F4\]:hover, .hover\:bg-neutral-50:hover, .hover\:bg-neutral-100:hover):not([class*="dark:hover:bg-"]) { background-color: #2A231E !important; }
 
+html.dark :is(.border-\[\#1A0E08\], .border-\[\#1a0e08\]):not([class*="dark:border-"]) { border-color: #D7CEC4 !important; }
 html.dark :is(.border-\[\#E6DED3\], .border-\[\#E5E5E3\], .border-\[\#ECECE9\], .border-\[\#E8E0D6\], .border-\[\#E6E6E3\], .border-\[\#DFDFDC\], .border-\[\#E3DACE\], .border-\[\#F3F4F6\]):not([class*="dark:border-"]) { border-color: rgba(200, 186, 170, 0.2) !important; }
 html.dark :is(.border-\[\#D1D5DB\], .border-\[\#D4D4CE\]):not([class*="dark:border-"]) { border-color: rgba(200, 186, 170, 0.32) !important; }
 html.dark .border-\[\#F7D7BE\]:not([class*="dark:border-"]) { border-color: rgba(255, 87, 1, 0.35) !important; }

@@ -172,6 +172,16 @@ test('FE-12: the shell keeps a fixed sidebar from 1024 px, folds it into a menu 
             expect(layout.sidebar, `${label}: sidebar folded`).toBeNull();
             expect(layout.menuButton, `${label}: menu button shown`).not.toBeNull();
             if (entry.scope !== 'cockpit-plan') await expect(page.locator('[data-nav-page-name]')).toBeVisible();
+            if (entry.scope === 'cockpit-plan' && width === 375 && theme === 'light') {
+              await expect(page.locator('#moment-4-sticky-bar')).toBeVisible();
+              await page.getByRole('button', { name: 'Mở menu điều hướng' }).click();
+              await expect(page.locator('#app-sidebar')).toHaveAttribute('data-open', '');
+              const coversBottom = await page.evaluate(() => Boolean(document.elementFromPoint(180, window.innerHeight - 20)?.closest('#app-sidebar')));
+              expect(coversBottom, `${label}: mobile menu sheet sits above #moment-4-sticky-bar`).toBe(true);
+              await page.keyboard.press('Escape');
+              await expect(page.locator('#app-sidebar')).not.toHaveAttribute('data-open', '');
+              await expect(page.getByRole('button', { name: 'Mở menu điều hướng' })).toBeFocused();
+            }
           }
           const name = `FE12-${entry.scope}-${width}-${theme}.png`;
           const path = info.outputPath(name);

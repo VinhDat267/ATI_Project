@@ -18,7 +18,7 @@
 
 .from-\[\#F8F4EE\] {
   --tw-gradient-from: #F8F4EE var(--tw-gradient-from-position);
-  --tw-gradient-to: rgb(248 248 246 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-to: rgb(248 244 238 / 0) var(--tw-gradient-to-position);
   --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
 }
 .from-amber-50\/80 {
@@ -33,8 +33,8 @@
 }
 
 .via-\[\#F8F4EE\]\/95 {
-  --tw-gradient-to: rgb(248 248 246 / 0) var(--tw-gradient-to-position);
-  --tw-gradient-stops: var(--tw-gradient-from), rgb(248 248 246 / 0.95) var(--tw-gradient-via-position), var(--tw-gradient-to);
+  --tw-gradient-to: rgb(248 244 238 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), rgb(248 244 238 / 0.95) var(--tw-gradient-via-position), var(--tw-gradient-to);
 }
 .via-white {
   --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position);
@@ -46,4 +46,4 @@
 
 /* Màu đường chia giữa các phần tử (app-stage, users), theo cách tính v3: viền ở các phần tử sau phần tử đầu. */
 .divide-neutral-200 > :not([hidden]) ~ :not([hidden]) { --tw-divide-opacity: 1; border-color: rgb(229 229 229 / var(--tw-divide-opacity)); }
-.divide-\[\#E8E0D6\] > :not([hidden]) ~ :not([hidden]) { --tw-divide-opacity: 1; border-color: rgb(231 231 226 / var(--tw-divide-opacity)); }
+.divide-\[\#E8E0D6\] > :not([hidden]) ~ :not([hidden]) { --tw-divide-opacity: 1; border-color: rgb(232 224 214 / var(--tw-divide-opacity)); }

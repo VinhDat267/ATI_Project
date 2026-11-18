@@ -4,7 +4,7 @@
 // mở bằng nút menu trên thanh trên, nên điện thoại vẫn tới được mọi trang mà không phải vào menu avatar.
 // Mỗi đích chỉ còn một lối vào: Hộp thư đề xuất nằm trong danh sách, không còn chip "Sự kiện" riêng.
 // Giao diện của khung nằm ở src/styles/app-shell.css; MainNav gắn data-app-shell lên <html> khi có mặt.
-import { useEffect, useLayoutEffect, useState, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { BookOpen, History, Inbox, Menu, MessagesSquare, Plug, Users, X } from 'lucide-react';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import { PlanoraMark } from '../PlanoraMark';
@@ -50,10 +50,15 @@ export interface MainNavProps {
   children?: ReactNode;
 }
 
+const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pageName, actions, inboxBadgeCount, children }: MainNavProps) {
   const pendingCount = useSchedulePendingCount(user);
   const [activeWorkspace, setActiveWorkspace] = useState(getActiveWorkspaceSummary());
   const [menuOpen, setMenuOpen] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
+  const closeBtnRef = useRef<HTMLButtonElement>(null);
   useEffect(() => subscribeWorkspace(() => setActiveWorkspace(getActiveWorkspaceSummary())), []);
   // Bật lớp giao diện của khung app (app-shell.css) khi khung đang hiện, trả lại khi rời trang.
   useLayoutEffect(() => {
@@ -62,11 +67,49 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
     return () => { delete html.dataset.appShell; };
   }, []);
   useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = (event: MediaQueryListEvent) => { if (event.matches) setMenuOpen(false); };
+    mq.addEventListener?.('change', onChange);
+    return () => mq.removeEventListener?.('change', onChange);
+  }, []);
+  useEffect(() => {
     if (!menuOpen) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false); };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeBtnRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (document.querySelector('[data-testid="create-org-modal-backdrop"], [data-testid="join-org-modal-backdrop"]')) return;
+      if (event.key === 'Escape' && !event.defaultPrevented) {
+        event.preventDefault();
+        setMenuOpen(false);
+        menuBtnRef.current?.focus();
+        return;
+      }
+      if (event.key === 'Tab' && sidebarRef.current && (sidebarRef.current.contains(document.activeElement) || document.activeElement === menuBtnRef.current)) {
+        const items = [...sidebarRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(el => !el.closest('[hidden]'));
+        const first = items[0], last = items.at(-1);
+        if (!first) return;
+        if (event.shiftKey && (document.activeElement === first || document.activeElement === menuBtnRef.current)) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === menuBtnRef.current)) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener('keydown', onKey);
+    };
   }, [menuOpen]);
+
+  const closeMenu = () => {
+    setMenuOpen(false);
+    menuBtnRef.current?.focus();
+  };
 
   // Bấm kèm phím bổ trợ hoặc chuột giữa thì để trình duyệt mở tab mới như link thường.
   const follow = (path: string) => (event: MouseEvent<HTMLAnchorElement>) => {
@@ -107,16 +150,16 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
   };
 
   return (
-    <header className="ps-topbar sticky top-0 z-30 w-full">
-      <aside id="app-sidebar" className="ps-sidebar" data-app-sidebar data-open={menuOpen ? '' : undefined} aria-label="Thanh bên">
+    <header className="ps-topbar sticky top-0 z-30 w-full" data-menu-open={menuOpen ? '' : undefined}>
+      <div ref={sidebarRef} id="app-sidebar" className="ps-sidebar" data-app-sidebar data-open={menuOpen ? '' : undefined}>
         <div className="flex items-center justify-between gap-2 h-9 px-1.5">
-          <a href="/" onClick={follow('/')} aria-label="Planora · Về không gian làm việc" title="Về không gian làm việc" className="flex items-center gap-2 min-w-0">
+          <button ref={closeBtnRef} type="button" className="ps-iconbtn ps-sidebar-close order-2" aria-label="Đóng menu điều hướng" onClick={closeMenu}>
+            <X aria-hidden="true" size={18} />
+          </button>
+          <a href="/" onClick={follow('/')} aria-label="Planora · Về không gian làm việc" title="Về không gian làm việc" className="order-1 flex items-center gap-2 min-w-0">
             <PlanoraMark className="w-6 h-6 text-[#1a0e08] dark:text-[#F3EEE8] flex-shrink-0" />
             <span className="ps-brand">Planora</span>
           </a>
-          <button type="button" className="ps-iconbtn ps-sidebar-close" aria-label="Đóng menu điều hướng" onClick={() => setMenuOpen(false)}>
-            <X aria-hidden="true" size={18} />
-          </button>
         </div>
         <div data-sidebar-workspace className="mt-3 mb-4">
           <WorkspaceSwitcher navigate={navigate} variant="sidebar" />
@@ -125,9 +168,9 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
           <div className="ps-navgroup flex flex-col gap-0.5">{tabs.filter(tab => tab.group === 'work').map(link)}</div>
           <div className="ps-navgroup flex flex-col gap-0.5">{tabs.filter(tab => tab.group === 'more').map(link)}</div>
         </nav>
-      </aside>
+      </div>
       <div data-main-nav className="ps-topbar-row flex items-center gap-2 px-3 sm:px-5">
-        <button type="button" className="ps-iconbtn ps-menu-btn -ml-1" aria-label="Mở menu điều hướng" aria-expanded={menuOpen} aria-controls="app-sidebar" onClick={() => setMenuOpen(true)}>
+        <button ref={menuBtnRef} type="button" className="ps-iconbtn ps-menu-btn -ml-1" aria-label="Mở menu điều hướng" aria-expanded={menuOpen} aria-controls="app-sidebar" onClick={() => setMenuOpen(true)}>
           <Menu aria-hidden="true" size={20} />
         </button>
         <PlanoraMark className="ps-topbar-mark w-5 h-5 text-[#1a0e08] dark:text-[#F3EEE8] flex-shrink-0 lg:hidden" />
