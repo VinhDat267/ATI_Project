@@ -604,6 +604,16 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
           | undefined;
         if (options.telegramConnection) {
           const tg = await options.telegramConnection(run.userId);
+          if (
+            tg?.status === 'unavailable' ||
+            (Array.isArray(tg?.unavailableChatIds) &&
+              tg.unavailableChatIds.includes(String(config.telegramChatId)))
+          ) {
+            return {
+              state: 'digest_failed',
+              error: 'Telegram tạm thời không phản hồi. Lịch sẽ tự thử lại ở kỳ tiếp theo.',
+            };
+          }
           const allowedChatIds = new Set(
             ((tg?.connection?.chatIds ?? []) as string[]).map((id) => String(id))
           );
@@ -656,6 +666,14 @@ export function createTrelloDigestRunner(options: TrelloDigestRunnerOptions): Ru
         });
       }
     } catch (err: any) {
+      signal.throwIfAborted();
+      const cat = err && typeof err === 'object' ? (err as { category?: unknown }).category : undefined;
+      if (typeof cat === 'string' && ['NETWORK', 'SERVER_ERROR', 'RATE_LIMIT', 'TIMEOUT'].includes(cat)) {
+        return {
+          state: 'digest_failed',
+          error: 'Dịch vụ nhận bản tin tạm thời không phản hồi. Lịch sẽ tự thử lại ở kỳ tiếp theo.',
+        };
+      }
       const msg = err?.message || 'Kết nối dịch vụ không khả dụng.';
       return { state: 'blocked', error: msg, pauseReason: msg };
     }

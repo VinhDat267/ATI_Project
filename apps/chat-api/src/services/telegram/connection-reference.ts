@@ -2,7 +2,7 @@ import { decryptCredentials } from '@wap/tool-adapters';
 import { normalizeTelegramChatId, TELEGRAM_CHAT_ID_PATTERN, type PlanConnections } from '@wap/tool-schemas';
 import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import type { TelegramTeamChatItem } from '../../db/repositories/telegram-team-repo.js';
-import type { TelegramBotClient } from './bot-client.js';
+import { TelegramBotError, type TelegramBotClient } from './bot-client.js';
 
 export type TelegramConnectionReference = NonNullable<PlanConnections['telegram']>;
 
@@ -16,9 +16,10 @@ export interface TelegramConnectionLookupOptions {
 }
 
 export interface TelegramConnectionLookupResult {
-  status: 'not_connected' | 'reconnect_required' | 'needs_scope' | 'connected';
+  status: 'not_connected' | 'reconnect_required' | 'needs_scope' | 'unavailable' | 'connected';
   connection?: TelegramConnectionReference;
   selectedChats: TelegramTeamChatItem[];
+  unavailableChatIds?: string[];
   telegramUserId?: string;
   username?: string;
   displayName?: string;
@@ -87,6 +88,7 @@ export function createTelegramConnectionLookup(options: TelegramConnectionLookup
     }
 
     const validChats: TelegramTeamChatItem[] = [];
+    const unavailableChatIds: string[] = [];
     for (const chat of rawChats) {
       if (chat.type === 'private' || chat.chatId === telegramUserId) {
         if (chat.chatId === telegramUserId) {
@@ -102,8 +104,14 @@ export function createTelegramConnectionLookup(options: TelegramConnectionLookup
             AbortSignal.timeout(timeoutMs),
           );
           if (isMember) validChats.push(chat);
-        } catch {
-          // Skip group if membership check fails
+        } catch (err) {
+          if (err instanceof TelegramBotError && err.kind === 'unauthorized') {
+            return { status: 'reconnect_required', selectedChats: [] };
+          }
+          if (err instanceof TelegramBotError && err.kind === 'rejected' && err.status !== 429) {
+            continue;
+          }
+          unavailableChatIds.push(chat.chatId);
         }
       } else {
         validChats.push(chat);
@@ -111,6 +119,16 @@ export function createTelegramConnectionLookup(options: TelegramConnectionLookup
     }
 
     if (validChats.length === 0) {
+      if (unavailableChatIds.length > 0) {
+        return {
+          status: 'unavailable',
+          telegramUserId,
+          username,
+          displayName,
+          selectedChats: [],
+          unavailableChatIds,
+        };
+      }
       return {
         status: 'needs_scope',
         telegramUserId,
@@ -128,6 +146,7 @@ export function createTelegramConnectionLookup(options: TelegramConnectionLookup
       username,
       displayName,
       selectedChats: validChats,
+      ...(unavailableChatIds.length > 0 ? { unavailableChatIds } : {}),
       connection: {
         credentialId: record.id,
         telegramUserId,

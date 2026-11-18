@@ -254,11 +254,28 @@ export async function runJiraDigest(
 
   if (digestConfig.telegramChatId) {
     const text = formatJiraDigestReport(sections);
-    const tgAdapter = await input.getAdapter('telegram', { userId, phase: 'execution' });
+    const tgAdapter = await input.getAdapter('telegram', {
+      userId,
+      phase: 'execution',
+      workspaceId: digestConfig.workspaceId,
+      workspaceMode: 'organization',
+      ...(digestConfig.telegramCredentialId
+        ? {
+            connections: {
+              telegram: {
+                credentialId: digestConfig.telegramCredentialId,
+                telegramUserId: '',
+                username: '',
+                chatIds: [digestConfig.telegramChatId],
+              },
+            },
+          }
+        : {}),
+    });
     await tgAdapter.execute(
       'telegram.send_message',
       { chatId: digestConfig.telegramChatId, text: slackMrkdwnToTelegramPlain(text) },
-      { signal },
+      { signal, chatId: digestConfig.telegramChatId },
     );
     return { state: 'digest_sent', text };
   }
@@ -752,7 +769,36 @@ export function createJiraDigestExecutor(options: CreateJiraDigestExecutorOption
 
     if (isTelegramDest) {
       if (options.telegramConnection) {
-        const tg = await options.telegramConnection(run.userId);
+        let tg: any;
+        try {
+          tg = await options.telegramConnection(run.userId);
+        } catch (err: any) {
+          signal.throwIfAborted();
+          const cat = err && typeof err === 'object' ? (err as { category?: unknown }).category : undefined;
+          if (typeof cat === 'string' && ['NETWORK', 'SERVER_ERROR', 'RATE_LIMIT', 'TIMEOUT'].includes(cat)) {
+            return {
+              state: 'digest_failed',
+              error: 'Telegram tạm thời không phản hồi. Lịch sẽ tự thử lại ở kỳ tiếp theo.',
+            };
+          }
+          if (!isJiraReadAuthError(err)) {
+            return {
+              state: 'digest_failed',
+              error: 'Telegram tạm thời không phản hồi. Lịch sẽ tự thử lại ở kỳ tiếp theo.',
+            };
+          }
+          tg = null;
+        }
+        if (
+          tg?.status === 'unavailable' ||
+          (Array.isArray(tg?.unavailableChatIds) &&
+            tg.unavailableChatIds.includes(String(config.telegramChatId)))
+        ) {
+          return {
+            state: 'digest_failed',
+            error: 'Telegram tạm thời không phản hồi. Lịch sẽ tự thử lại ở kỳ tiếp theo.',
+          };
+        }
         const allowedChatIds = new Set(((tg?.connection?.chatIds ?? []) as string[]).map((id) => String(id)));
         if (!tg || tg.status !== 'connected' || !allowedChatIds.has(String(config.telegramChatId))) {
           const msg = 'Cuộc trò chuyện Telegram nhận bản tin Jira không còn nằm trong phạm vi cho phép.';
@@ -814,8 +860,15 @@ export function createJiraDigestExecutor(options: CreateJiraDigestExecutorOption
       } else {
         slackAdapter = await options.getAdapter('slack', destCtx);
       }
-    } catch (err) {
+    } catch (err: any) {
       signal.throwIfAborted();
+      const cat = err && typeof err === 'object' ? (err as { category?: unknown }).category : undefined;
+      if (typeof cat === 'string' && ['NETWORK', 'SERVER_ERROR', 'RATE_LIMIT', 'TIMEOUT'].includes(cat)) {
+        return {
+          state: 'digest_failed',
+          error: 'Kênh nhận bản tin tạm thời không phản hồi. Lịch sẽ tự thử lại ở kỳ tiếp theo.',
+        };
+      }
       const msg = err instanceof Error ? err.message : 'Kết nối kênh nhận bản tin không khả dụng.';
       return { state: 'blocked', error: msg, pauseReason: msg };
     }

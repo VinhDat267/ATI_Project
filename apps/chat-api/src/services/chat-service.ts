@@ -1145,6 +1145,12 @@ export class ChatService {
       if (!github || github.status === 'not_connected' || github.status === 'reconnect_required') {
         unavailableServices.push({ id: 'github', name: 'GitHub' });
         reasons.push('Tài khoản của bạn chưa Kết nối GitHub hoặc cần kết nối lại.');
+      } else if (github.status === 'unavailable') {
+        return {
+          kind: 'refusal',
+          reason: 'GitHub tạm thời không phản hồi.',
+          suggestion: 'Kết nối GitHub của bạn vẫn còn hiệu lực. Hãy thử lại sau ít phút.',
+        };
       } else if (github.status === 'needs_scope') {
         return {
           kind: 'refusal',
@@ -1280,6 +1286,12 @@ export class ChatService {
       if (!telegram || telegram.status === 'not_connected' || telegram.status === 'reconnect_required') {
         unavailableServices.push({ id: 'telegram', name: 'Telegram' });
         reasons.push('Tài khoản của bạn chưa Kết nối Telegram hoặc cần kết nối lại.');
+      } else if (telegram.status === 'unavailable') {
+        return {
+          kind: 'refusal',
+          reason: 'Telegram tạm thời không phản hồi.',
+          suggestion: 'Kết nối Telegram của bạn vẫn còn hiệu lực. Hãy thử lại sau ít phút.',
+        };
       } else if (telegram.status === 'needs_scope' || !telegram.connection) {
         return {
           kind: 'refusal',

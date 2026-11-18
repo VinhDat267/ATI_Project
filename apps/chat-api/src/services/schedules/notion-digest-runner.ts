@@ -412,8 +412,19 @@ export function createNotionDigestRunner(options: NotionDigestRunnerOptions): Ru
       if (!Array.isArray(channels) || !channels.some((channel) => String(channel.id) === config.channelId)) {
         return blocked('Kênh Slack nhận bản tin không còn nằm trong phạm vi cho phép.');
       }
-    } catch {
-      return blocked('Không xác minh được kênh Slack nhận bản tin.');
+    } catch (err: any) {
+      if (signal.aborted) throw err;
+      if (
+        err?.category === 'AUTH_ERROR' ||
+        err?.category === 'PERMISSION_DENIED' ||
+        err?.category === 'NOT_FOUND'
+      ) {
+        return blocked('Không xác minh được kênh Slack nhận bản tin.');
+      }
+      return {
+        state: 'digest_failed',
+        error: 'Slack tạm thời không phản hồi khi kiểm tra kênh nhận bản tin.',
+      };
     }
 
     let sourceData: Awaited<ReturnType<NotionDigestSourceAuthority['read']>>;

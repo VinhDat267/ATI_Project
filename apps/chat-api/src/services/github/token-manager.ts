@@ -1,12 +1,14 @@
 import { StepError } from '@wap/tool-adapters';
-import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
+import type { CredentialRepo, PersonalSecretSession } from '../../db/repositories/credential-repo.js';
 import { GitHubOAuthError, type GitHubOAuthClient } from './oauth-client.js';
 
 const REFRESH_SKEW_MS = 60_000;
+const LOCK_WAIT_SLACK_MS = 5_000;
 
 export interface GitHubTokenManagerOptions {
   client: Pick<GitHubOAuthClient, 'refresh'>;
-  credentials: Pick<CredentialRepo, 'rotatePersonalSecret' | 'markReconnectRequired'>;
+  credentials: Pick<CredentialRepo, 'rotatePersonalSecret' | 'markReconnectRequired'> &
+    Partial<Pick<CredentialRepo, 'withPersonalSecretLock'>>;
   clock?: () => number;
   refreshTimeoutMs?: number;
   onReconnectRequired?: (userId: string) => void;
@@ -20,6 +22,21 @@ export interface GitHubConnectionSecrets {
 interface Cached {
   accessToken: string;
   expiresAt?: number;
+}
+
+type RefreshResult =
+  | { kind: 'token'; entry: Cached; refreshToken: string }
+  | { kind: 'lost_grant'; marked: boolean };
+
+interface SecretStore {
+  read?: PersonalSecretSession['read'];
+  rotate(next: {
+    previousRefreshToken: string;
+    nextRefreshToken: string;
+    nextAccessToken?: string;
+    nextAccessTokenExpiresAt?: number;
+  }): Promise<'rotated' | 'mismatch' | 'missing'>;
+  markReconnectRequired(): Promise<boolean>;
 }
 
 function isNonExpiringGitHubToken(token?: string): boolean {
@@ -46,11 +63,15 @@ export class GitHubTokenManager {
     this.refreshTimeoutMs = options.refreshTimeoutMs ?? 10_000;
   }
 
-  private failure(category: 'AUTH_ERROR' | 'NETWORK' | 'SERVER_ERROR', statusCode?: number) {
+  private failure(
+    category: 'AUTH_ERROR' | 'NETWORK' | 'SERVER_ERROR' | 'RATE_LIMIT',
+    statusCode?: number
+  ) {
     return new StepError({
       category,
       statusCode,
       retryable: false,
+      details: { requestSent: false },
       message:
         category === 'AUTH_ERROR'
           ? 'GitHub cần được kết nối lại.'
@@ -76,7 +97,12 @@ export class GitHubTokenManager {
       this.cache.set(key, { accessToken: normalized.accessToken.trim() });
     }
     return {
-      getAccessToken: (options) => this.getAccessToken(userId, credentialId, normalized, options),
+      getAccessToken: (options) => {
+        if (normalized.refreshToken?.trim() && !this.refreshTokens.has(key)) {
+          this.refreshTokens.set(key, normalized.refreshToken.trim());
+        }
+        return this.getAccessToken(userId, credentialId, normalized, options);
+      },
     };
   }
 
@@ -132,7 +158,7 @@ export class GitHubTokenManager {
 
     let shared = this.inflight.get(key);
     if (!shared) {
-      shared = this.refresh(userId, credentialId, key);
+      shared = this.refresh(userId, credentialId, key, Boolean(options.forceRefresh));
       this.inflight.set(key, shared);
       const settle = () => {
         if (this.inflight.get(key) === shared) this.inflight.delete(key);
@@ -143,17 +169,112 @@ export class GitHubTokenManager {
     return (await this.wait(shared, options.signal)).accessToken;
   }
 
-  private async refresh(userId: string, credentialId: string, key: string): Promise<Cached> {
+  private async refresh(
+    userId: string,
+    credentialId: string,
+    key: string,
+    forceRefresh: boolean
+  ): Promise<Cached> {
     if (this.revokedConnections.has(key)) {
       throw this.failure('AUTH_ERROR', 400);
     }
 
-    const currentRefreshToken = this.refreshTokens.get(key);
+    const credentials = this.options.credentials;
+    const generation = this.generation.get(userId) ?? 0;
+    const initialRefreshToken = this.refreshTokens.get(key);
+    let result: RefreshResult;
+    try {
+      const run = (store: SecretStore) =>
+        this.refreshWith(initialRefreshToken, forceRefresh, store);
+      if (credentials.withPersonalSecretLock) {
+        result = await credentials.withPersonalSecretLock(
+          {
+            service: 'github',
+            userId,
+            credentialId,
+            lockTimeoutMs: this.refreshTimeoutMs + LOCK_WAIT_SLACK_MS,
+          },
+          run
+        );
+      } else {
+        result = await run({
+          rotate: (next) =>
+            credentials.rotatePersonalSecret({
+              service: 'github',
+              userId,
+              credentialId,
+              previousRefreshToken: next.previousRefreshToken,
+              nextRefreshToken: next.nextRefreshToken,
+              nextAccessToken: next.nextAccessToken,
+            }),
+          markReconnectRequired: () =>
+            credentials.markReconnectRequired('github', userId, credentialId),
+        });
+      }
+    } catch (error) {
+      if (error instanceof StepError) throw error;
+      // A lock, SQL or commit failure does not establish that the grant is invalid.
+      throw this.failure('NETWORK');
+    }
+
+    if ((this.generation.get(userId) ?? 0) === generation) {
+      if (result.kind === 'token') {
+        if (result.refreshToken) {
+          this.refreshTokens.set(key, result.refreshToken);
+        } else {
+          this.refreshTokens.delete(key);
+        }
+        this.cache.set(key, result.entry);
+      } else {
+        this.cache.delete(key);
+        this.refreshTokens.delete(key);
+        this.revokedConnections.add(key);
+        if (result.marked) this.options.onReconnectRequired?.(userId);
+      }
+    }
+    if (result.kind === 'lost_grant') throw this.failure('AUTH_ERROR', 400);
+    return result.entry;
+  }
+
+  private async refreshWith(
+    initialRefreshToken: string | undefined,
+    forceRefresh: boolean,
+    store: SecretStore
+  ): Promise<RefreshResult> {
+    let currentRefreshToken = initialRefreshToken;
+    if (store.read) {
+      const stored = await store.read();
+      if (!stored || stored.status !== 'active') {
+        return { kind: 'lost_grant', marked: await store.markReconnectRequired() };
+      }
+      if (!stored.refreshToken) {
+        if (isNonExpiringGitHubToken(stored.accessToken) && !forceRefresh) {
+          return {
+            kind: 'token',
+            refreshToken: '',
+            entry: { accessToken: stored.accessToken! },
+          };
+        }
+        return { kind: 'lost_grant', marked: await store.markReconnectRequired() };
+      }
+      currentRefreshToken = stored.refreshToken;
+      if (
+        !forceRefresh &&
+        stored.accessToken &&
+        stored.accessTokenExpiresAt !== undefined &&
+        stored.accessTokenExpiresAt - this.clock() > REFRESH_SKEW_MS
+      ) {
+        return {
+          kind: 'token',
+          refreshToken: currentRefreshToken,
+          entry: { accessToken: stored.accessToken, expiresAt: stored.accessTokenExpiresAt },
+        };
+      }
+    }
+
     if (!currentRefreshToken) {
       throw this.failure('AUTH_ERROR', 400);
     }
-
-    const generation = this.generation.get(userId) ?? 0;
 
     let tokens: { accessToken: string; refreshToken?: string; expiresInSeconds?: number };
     try {
@@ -163,8 +284,10 @@ export class GitHubTokenManager {
       );
     } catch (error) {
       if (error instanceof GitHubOAuthError && error.kind === 'invalid_grant') {
-        await this.handleLostGrant(userId, credentialId, key);
-        throw this.failure('AUTH_ERROR', 400);
+        return { kind: 'lost_grant', marked: await store.markReconnectRequired() };
+      }
+      if (error instanceof GitHubOAuthError && error.status === 429) {
+        throw this.failure('RATE_LIMIT', 429);
       }
       if (error instanceof GitHubOAuthError && error.kind !== 'network') {
         throw this.failure('SERVER_ERROR', error.status);
@@ -173,46 +296,30 @@ export class GitHubTokenManager {
     }
 
     if (typeof tokens.refreshToken !== 'string' || !tokens.refreshToken.trim()) {
-      await this.handleLostGrant(userId, credentialId, key);
-      throw this.failure('AUTH_ERROR', 400);
+      return { kind: 'lost_grant', marked: await store.markReconnectRequired() };
     }
 
     const nextRefreshToken = tokens.refreshToken.trim();
+    const expiresAt = tokens.expiresInSeconds
+      ? this.clock() + tokens.expiresInSeconds * 1000
+      : undefined;
 
-    let rotateResult: 'rotated' | 'mismatch' | 'missing';
-    try {
-      rotateResult = await this.options.credentials.rotatePersonalSecret({
-        service: 'github',
-        userId,
-        credentialId,
-        previousRefreshToken: currentRefreshToken,
-        nextRefreshToken,
-        nextAccessToken: tokens.accessToken,
-      });
-    } catch {
-      await this.handleLostGrant(userId, credentialId, key);
-      throw this.failure('AUTH_ERROR', 400);
-    }
+    const rotateResult = await store.rotate({
+      previousRefreshToken: currentRefreshToken,
+      nextRefreshToken,
+      nextAccessToken: tokens.accessToken,
+      ...(expiresAt !== undefined ? { nextAccessTokenExpiresAt: expiresAt } : {}),
+    });
 
     if (rotateResult !== 'rotated') {
-      await this.handleLostGrant(userId, credentialId, key);
-      throw this.failure('AUTH_ERROR', 400);
+      return { kind: 'lost_grant', marked: await store.markReconnectRequired() };
     }
 
-    this.refreshTokens.set(key, nextRefreshToken);
-
-    const entry: Cached = {
-      accessToken: tokens.accessToken,
-      expiresAt: tokens.expiresInSeconds
-        ? this.clock() + tokens.expiresInSeconds * 1000
-        : undefined,
+    return {
+      kind: 'token',
+      refreshToken: nextRefreshToken,
+      entry: { accessToken: tokens.accessToken, expiresAt },
     };
-
-    if ((this.generation.get(userId) ?? 0) === generation) {
-      this.cache.set(key, entry);
-    }
-
-    return entry;
   }
 
   private async handleLostGrant(userId: string, credentialId: string, key: string): Promise<void> {

@@ -10,6 +10,7 @@ export type GitHubLookupStatus =
   | 'reconnect_required'
   | 'needs_scope'
   | 'needs_membership'
+  | 'unavailable'
   | 'connected';
 
 export interface GitHubConnectionLookupResult {
@@ -112,8 +113,9 @@ export function createGitHubConnectionLookup(deps: {
         (err as any)?.category === 'AUTH_ERROR'
       ) {
         await deps.credentialRepo.markReconnectRequired('github', userId, record.id).catch(() => {});
+        return { status: 'reconnect_required', teamRepos, memberRepos: [] };
       }
-      return { status: 'reconnect_required', teamRepos, memberRepos: [] };
+      return { status: 'unavailable', teamRepos, memberRepos: [] };
     }
   };
 }
