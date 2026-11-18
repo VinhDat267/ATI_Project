@@ -22,26 +22,28 @@ export function SidebarRecent(props: SidebarRecentProps) {
 
 function WorkspaceRecent({ follow, workspace }: SidebarRecentProps & { workspace: ReturnType<typeof getActiveWorkspaceSelection> }) {
   const conversationId = useChatStore(state => state.conversationId);
+  const renameRevision = useChatStore(state => state.conversationRenameRevision);
   // Tiêu đề hội thoại mới có sau tin nhắn đầu tiên; tải lại khi tin đó được xác nhận.
   const firstSent = useChatStore(state => state.messages.find(message => message.role === 'user' && message.status === 'sent')?.id);
   const [rows, setRows] = useState<Conversation[] | null>(null);
   useEffect(() => {
     let mounted = true;
     if (typeof apiClient.getConversations !== 'function') return;
-    const isCurrent = () => mounted && workspace === getActiveWorkspaceSelection();
+    const isCurrent = () => mounted && workspace === getActiveWorkspaceSelection()
+      && renameRevision === useChatStore.getState().conversationRenameRevision;
     void Promise.resolve()
       .then(() => apiClient.getConversations({ limit: LIMIT }))
       .then(page => { if (isCurrent()) setRows((page?.conversations ?? []).slice(0, LIMIT)); })
       .catch(() => { if (isCurrent()) setRows(current => current ?? []); });
     return () => { mounted = false; };
-  }, [workspace, conversationId, firstSent]);
+  }, [workspace, conversationId, firstSent, renameRevision]);
 
   if (!rows?.length) return null;
   const current = typeof window === 'undefined' ? null : window.location.pathname.match(/^\/c\/([^/]+)\/?$/)?.[1] ?? null;
   return (
-    <section data-sidebar-recent aria-labelledby="sidebar-recent-heading" className="ps-navgroup flex min-h-0 flex-col">
+    <section data-sidebar-recent aria-labelledby="sidebar-recent-heading" className="ps-navgroup flex flex-col">
       <h2 id="sidebar-recent-heading" className="ps-grouplabel">Gần đây</h2>
-      <ul className="flex flex-col gap-0.5 overflow-y-auto">
+      <ul className="flex flex-col gap-0.5">
         {rows.map(conversation => (
           <li key={conversation.id}>
             <a
