@@ -774,6 +774,9 @@ describe('Cross-Service Combined Runtime Gate (Sheets R2 + Trello #313 + Calenda
         const upgradeUrl = new URL(rawUrl);
         upgradeUrl.pathname = `/${upgradeDbName}`;
         const upgPool = new pg.Pool({ connectionString: upgradeUrl.href, max: 4 });
+        // DROP DATABASE ... WITH (FORCE) can terminate a client that is still closing (57P01);
+        // without a pool listener that error is uncaught and fails the whole run after every test passed.
+        upgPool.on('error', () => {});
         try {
           const preRemediationFiles = files.filter((f) => Number(f.slice(0, 4)) <= 32);
           expect(preRemediationFiles).toHaveLength(44);

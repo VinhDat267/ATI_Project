@@ -279,6 +279,21 @@ describe('W4-00b raw step placeholders', () => {
     }
   });
 
+  // Live audit 18/11/2026: notion.create_page content was written as the literal "{ $ref: read_slack.output.messages }".
+  it.each([
+    '{ $ref: step_1.output.url }',
+    '{"$ref": "step_1.output.url"}',
+    "Nội dung: { '$ref': 'step_1.output.url' }",
+  ])('rejects a stringified structured reference %s', (text) => {
+    const result = validatePlan(notifyPlan(text), catalog);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.layer).toBe('semantic');
+      expect(result.error).toContain('args.text');
+      expect(result.error).toContain('JSON object');
+    }
+  });
+
   it.each([{ $template: `Xem ${placeholder}` }, { $ref: 'step_1.output.url' }])(
     'preserves a valid structured reference %j', (text) => {
       expect(validatePlan(notifyPlan(text), catalog).valid).toBe(true);

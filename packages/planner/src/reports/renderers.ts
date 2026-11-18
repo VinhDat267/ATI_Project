@@ -313,7 +313,7 @@ export function renderJiraProgressReport(
   const isPartial = count > itemsToRender.length;
 
   const lines = [
-    `Báo cáo tiến độ Jira Sprint${sprintLabel}: Tổng số ${count} ticket. (Duyệt từng lượt trước khi gửi - Manual Approval Required)`,
+    `Báo cáo tiến độ Jira Sprint${sprintLabel}: Tổng số ${count} ticket.`,
     `Trạng thái: ${statusSummary}`,
     ...itemsToRender.map((iss) => {
       const key = sanitizeReportString(iss.key);

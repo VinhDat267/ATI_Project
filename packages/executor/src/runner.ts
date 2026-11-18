@@ -1,6 +1,6 @@
 import type { PlanStep, ToolDefinition } from '@wap/tool-schemas';
 import { ALL_TOOLS, GITHUB_OAUTH_TOOLS, TRELLO_OAUTH_TOOLS, TELEGRAM_OAUTH_TOOLS, NOTION_OAUTH_TOOLS, SLACK_EXTENDED_TOOLS, SHEETS_EXTENDED_TOOLS, GMAIL_TOOLS, MYCALENDAR_TOOLS, MYSHEETS_TOOLS, MYJIRA_TOOLS, SLACK_PROPOSAL_WORKFLOW_TOOLS } from '@wap/tool-schemas';
-import { resolveArgs } from './resolver.js';
+import { coerceStringParams, resolveArgs } from './resolver.js';
 import { executeSlackRead } from './slack/read-guard.js';
 import { isSlackReadTool } from '@wap/tool-schemas';
 import type {
@@ -96,7 +96,11 @@ export class StepRunner {
         return {stepId:step.id,status:'success',output,error:null,durationMs:Date.now()-startTime};
       }
       // 1. Resolve arguments ($ref, $template)
-      const resolvedArgs = resolveArgs(step.args || {}, stepOutputs);
+      const resolvedArgs = coerceStringParams(
+        step.args || {},
+        resolveArgs(step.args || {}, stepOutputs),
+        catalog.get(step.tool)?.inputSchema as { properties?: Record<string, any> } | undefined,
+      );
 
       if (step.tool === SLACK_PROPOSAL_WORKFLOW_TOOLS.bugCreateTool && Array.isArray(step.dependsOn) && step.dependsOn.length > 0 && typeof resolvedArgs.summary === 'string') {
         const wanted = resolvedArgs.summary.trim().toLowerCase();

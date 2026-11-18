@@ -192,6 +192,11 @@ function findRawStepPlaceholder(value: unknown, path: string, userTexts: string[
       if (userTexts.some((text) => text.includes(placeholder))) continue;
       return `${path} contains raw step placeholder '${placeholder}'. Use { "$template": "..." } for interpolated text or { "$ref": "..." } for a previous step's output.`;
     }
+    // A reference written as text (e.g. "{ $ref: step.output.x }") is never resolved and would be sent verbatim.
+    for (const [quoted] of value.matchAll(/\{\s*["']?\$(?:ref|template)["']?\s*:\s*["']?[A-Za-z_][\w-]*\.output\b[^}]*\}/g)) {
+      if (userTexts.some((text) => text.includes(quoted))) continue;
+      return `${path} contains a stringified reference '${quoted}'. Write it as a JSON object { "$ref": "step_id.output.field" } or { "$template": "... \${step_id.output.field}" }, not as text.`;
+    }
   } else if (Array.isArray(value)) {
     for (const [index, child] of value.entries()) {
       const error = findRawStepPlaceholder(child, `${path}[${index}]`, userTexts);
