@@ -198,7 +198,8 @@ html[data-app-shell] .ps-segmented > button:focus-visible { outline: 2px solid v
 @media (min-width: 1024px) {
   /* Thanh bên đã có danh sách gần đây: nút ngăn kéo "Gần đây" chỉ còn ở màn hẹp. */
   [data-shell-compact-only] { display: none !important; }
-  .ps-sidebar [data-sidebar-recent] { flex: 1 1 auto; }
+  .ps-sidebar [data-sidebar-recent] { flex: 1 1 auto; min-height: 0; }
+  .ps-sidebar [data-sidebar-recent] ul { overflow-y: auto; }
   html[data-app-shell] body { padding-left: var(--ps-side); }
   html[data-app-shell] #global-bottom-bar { left: var(--ps-side); }
   .ps-sidebar {

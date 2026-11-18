@@ -120,6 +120,24 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
+test('FE-12: all six recent conversations can be reached in a short landscape menu', async ({ page }) => {
+  const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  try {
+    const user = await admin(page);
+    const prefix = `FE12 recent ${randomUUID().slice(0, 8)}`;
+    const oldest = await fixtureConversation(db, user.id, `${prefix} 0`);
+    for (let index = 1; index < 6; index++) await fixtureConversation(db, user.id, `${prefix} ${index}`);
+    await page.setViewportSize({ width: 667, height: 375 });
+    await page.goto('/guide');
+    await page.getByRole('button', { name: 'Mở menu điều hướng' }).click();
+    const recent = page.getByRole('region', { name: 'Gần đây' });
+    await expect(recent.getByRole('link')).toHaveCount(6);
+    const oldestLink = recent.getByRole('link', { name: `${prefix} 0`, exact: true });
+    await oldestLink.click({ timeout: 5000 });
+    await expect(page).toHaveURL(new RegExp(`/c/${oldest}$`));
+  } finally { await db.end(); }
+});
+
 test('FE-12: an admin reaches every tab from every page and the current tab is marked', async ({ page }) => {
   test.setTimeout(240_000);
   await page.setViewportSize({ width: 1440, height: 900 });

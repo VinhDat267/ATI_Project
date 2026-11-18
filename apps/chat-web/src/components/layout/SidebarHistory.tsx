@@ -3,7 +3,7 @@ import { useChatStore } from '../../store/chat-store';
 import { apiClient } from '../../services/api-client';
 import { userErrorMessage } from '../../services/user-error';
 import { formatConversationTime } from '../../services/conversation-time';
-import { getActiveWorkspaceId, subscribeWorkspace } from '../../services/workspace-storage';
+import { getActiveWorkspaceId, getActiveWorkspaceSelection, subscribeWorkspace } from '../../services/workspace-storage';
 import { loadConversationHistory } from '../../hooks/use-conversation-history';
 
 export interface SidebarHistoryProps {
@@ -59,10 +59,11 @@ export function SidebarHistory({ currentConversationId, onSelectConversation, on
     const trimmed = title.trim();
     if (!trimmed || Array.from(trimmed).length > 60) { setError('Tiêu đề cần từ 1 đến 60 ký tự.'); return; }
     setSaving(true); setError(null);
+    const workspace = getActiveWorkspaceSelection();
     try {
-      const data = await apiClient.renameConversation(id, trimmed);
-      const store = useChatStore.getState();
-      store.setConversations(store.conversations.map(row => row.id === id ? data.conversation : row));
+      const { conversation } = await apiClient.renameConversation(id, trimmed);
+      if (workspace !== getActiveWorkspaceSelection()) return;
+      useChatStore.getState().applyConversationRename(conversation);
       setEditing(null);
     } catch (reason) { setError(userErrorMessage(reason)); }
     finally { setSaving(false); }

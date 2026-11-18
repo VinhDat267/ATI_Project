@@ -8,7 +8,7 @@ import { resetWorkspaceStorage } from '../src/services/workspace-storage';
 import type { Conversation } from '../src/types';
 
 const user = { id: 'u1', name: 'Lan Nguyễn', email: 'lan@example.test', role: 'member' as const };
-const saved: Conversation = { id: 'c1', title: 'Báo cáo tuần', status: 'chatting', updatedAt: '2026-11-18T09:00:00.000Z' };
+const saved = { id: 'c1', title: 'Báo cáo tuần', status: 'chatting', updatedAt: '2026-11-18T09:00:00.000Z' } satisfies Conversation;
 const main = () => screen.getByRole('main');
 function mockList(rows: Conversation[]) {
   return vi.spyOn(apiClient, 'getConversations').mockImplementation(async options => ({
@@ -51,6 +51,26 @@ it('a status filter with no match offers to show everything again', async () => 
   fireEvent.click(within(main()).getByRole('button', { name: 'Xem tất cả' }));
   expect(within(main()).getByRole('heading', { name: 'Báo cáo tuần' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: 'Tất cả' })).toHaveAttribute('aria-pressed', 'true');
+});
+
+it('refreshes recent conversations after renaming a conversation in history', async () => {
+  let conversation: Conversation = saved;
+  vi.spyOn(apiClient, 'getConversations').mockImplementation(async () => ({
+    conversations: [conversation], nextCursor: null,
+  }));
+  vi.spyOn(apiClient, 'renameConversation').mockImplementation(async (_id, title) => {
+    conversation = { ...conversation, title };
+    return { conversation };
+  });
+  renderPage();
+  const recent = await screen.findByRole('region', { name: 'Gần đây' });
+  expect(within(recent).getByRole('link', { name: saved.title })).toBeInTheDocument();
+  fireEvent.click(within(main()).getByRole('button', { name: `Đổi tên ${saved.title}` }));
+  fireEvent.change(within(main()).getByRole('textbox', { name: 'Tiêu đề hội thoại' }), { target: { value: 'Kế hoạch tuần' } });
+  fireEvent.click(within(main()).getByRole('button', { name: 'Lưu' }));
+  expect(await within(main()).findByRole('heading', { name: 'Kế hoạch tuần' })).toBeInTheDocument();
+  expect(await within(recent).findByRole('link', { name: 'Kế hoạch tuần' })).toBeInTheDocument();
+  expect(within(recent).queryByRole('link', { name: saved.title })).toBeNull();
 });
 
 it('a failed load shows the error, not an empty list', async () => {

@@ -83,6 +83,9 @@ test('FE-02: history cursor reaches older than 50, literal title search and rena
     await expect(history.getByText(`${prefix} renamed`)).toBeVisible();
     expect((await db.query('SELECT title FROM conversations WHERE id=$1', [oldest])).rows[0].title).toBe(`${prefix} renamed`);
     await page.screenshot({ path: testInfo.outputPath('FE02-paged-renamed-history.png'), fullPage: true });
+    await page.keyboard.press('Escape');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(recent.getByRole('link').first()).toHaveText(`${prefix} renamed`);
   } finally { await db.end(); }
 });
 
