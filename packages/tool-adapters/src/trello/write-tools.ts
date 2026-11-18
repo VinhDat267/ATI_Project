@@ -62,7 +62,13 @@ export class TrelloWriteTools extends TrelloReadTools {
           details: { ...(err.details ?? {}), requestSent: false },
         });
       }
-      throw err;
+      throw new StepError({
+        message: err?.message || 'Trello pre-write verification failed',
+        category: 'NETWORK',
+        retryable: false,
+        cause: err,
+        details: { requestSent: false },
+      });
     }
   }
 

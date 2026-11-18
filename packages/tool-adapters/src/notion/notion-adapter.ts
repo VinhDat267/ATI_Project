@@ -482,7 +482,10 @@ export class NotionAdapter extends BaseAdapter {
     this.databaseIds();
     const page = await this.request('pages/' + id, signal); this.resource(page, 'page', id, allowTrashed);
     if (page.parent?.type !== 'data_source_id') denied();
-    const source = await this.dataSource(uuid(page.parent.data_source_id, true), signal);
+    const sourceId = uuid(page.parent.data_source_id, true);
+    const source = await this.dataSource(sourceId, signal);
+    const databaseId = uuid(source.parent.database_id, true);
+    if (this.expectedDataSources && this.expectedDataSources.get(databaseId) !== sourceId) denied();
     if (!source.properties || typeof source.properties !== 'object' || Array.isArray(source.properties)) badResponse();
     const titles = Object.entries<any>(source.properties).filter(([, value]) => value?.type === 'title');
     if (titles.length !== 1) badResponse();

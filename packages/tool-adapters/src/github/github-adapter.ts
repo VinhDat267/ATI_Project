@@ -132,12 +132,30 @@ function githubIssue(value: any, repo: string, writing: boolean, allowPullReques
       : typeof value.updatedAt === 'string' && value.updatedAt.trim()
         ? value.updatedAt.trim()
         : undefined;
+  const state =
+    typeof value.state === 'string' && value.state.trim()
+      ? value.state.trim()
+      : undefined;
+  const author =
+    typeof value.user?.login === 'string' && value.user.login.trim()
+      ? value.user.login.trim()
+      : undefined;
+  const assignees = Array.isArray(value.assignees)
+    ? value.assignees
+        .filter((entry: any) => typeof entry?.login === 'string' && entry.login.trim())
+        .map((entry: any) => entry.login.trim() as string)
+    : undefined;
+  const commentsCount = Number.isSafeInteger(value.comments) ? (value.comments as number) : undefined;
   return {
     id: String(value.id),
     number: value.number as number,
     title: value.title as string,
     url: value.html_url as string,
     repo,
+    ...(state ? { state } : {}),
+    ...(author ? { author } : {}),
+    ...(assignees ? { assignees } : {}),
+    ...(commentsCount !== undefined ? { commentsCount } : {}),
     ...(createdAt ? { createdAt } : {}),
     ...(updatedAt ? { updatedAt } : {}),
   };
@@ -173,9 +191,10 @@ export class GitHubAdapter extends BaseAdapter {
 
   private checkedRepo(value: unknown, contextRepo?: unknown): string {
     const repos = this.allowedRepositories();
+    let matchedContext: string | undefined;
     if (contextRepo !== undefined && contextRepo !== null) {
       if (!validRepository(contextRepo)) validation('GitHub repo must be owner/repo');
-      const matchedContext = repos.find((repo) => repo.toLowerCase() === contextRepo.toLowerCase());
+      matchedContext = repos.find((repo) => repo.toLowerCase() === contextRepo.toLowerCase());
       if (!matchedContext) {
         throw new StepError({
           message: `GitHub repository '${contextRepo}' is outside allowed scope`,
@@ -191,6 +210,15 @@ export class GitHubAdapter extends BaseAdapter {
     if (!matched) {
       throw new StepError({
         message: `GitHub repository '${value}' is outside allowed scope`,
+        category: 'AUTH_ERROR',
+        statusCode: 403,
+        retryable: false,
+        details: { requestSent: false },
+      });
+    }
+    if (matchedContext && matchedContext.toLowerCase() !== matched.toLowerCase()) {
+      throw new StepError({
+        message: `GitHub repository '${matched}' does not match bound context repository '${matchedContext}'`,
         category: 'AUTH_ERROR',
         statusCode: 403,
         retryable: false,
@@ -626,7 +654,10 @@ export class GitHubAdapter extends BaseAdapter {
       return this.searchIssues({ repo: args.repo, query: rawQuery, limit: max }, options);
     }
 
-    const repos = this.allowedRepositories();
+    const repos =
+      options?.repo !== undefined
+        ? [this.checkedRepo(options.repo, options.repo)]
+        : this.allowedRepositories();
     const collected: Array<{ id: string; number: number; title: string; url: string; repo: string }> = [];
     for (const repo of repos) {
       const remaining = max - collected.length;
@@ -648,7 +679,11 @@ export class GitHubAdapter extends BaseAdapter {
     const max = limit(args.limit, 50);
     const queryLower = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
     const targetRepos =
-      args.repo !== undefined ? [this.checkedRepo(args.repo, options?.repo)] : this.allowedRepositories();
+      args.repo !== undefined
+        ? [this.checkedRepo(args.repo, options?.repo)]
+        : options?.repo !== undefined
+          ? [this.checkedRepo(options.repo, options.repo)]
+          : this.allowedRepositories();
 
     const collected: Array<{
       id: string;

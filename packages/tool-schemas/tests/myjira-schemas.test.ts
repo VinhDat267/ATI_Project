@@ -139,6 +139,9 @@ describe('myjira tool schemas', () => {
     expect(validateInput({ siteId: 'site-1' })).toBe(false); // missing projectKey
     expect(validateInput({ siteId: 'site-1', projectKey: 'PROJ', query: 'a'.repeat(2001) })).toBe(false);
     expect(validateInput({ siteId: 'site-1', projectKey: 'PROJ', jql: 'status = Open' })).toBe(false); // arbitrary JQL forbidden
+    expect(validateInput({ siteId: 'site-1', projectKey: 'PROJ', overdueOnly: true, dueWithinDays: 3 })).toBe(false);
+    expect(validateInput({ siteId: 'site-1', projectKey: 'PROJ', overdueOnly: false, dueWithinDays: 3 })).toBe(true);
+    expect(validateInput({ siteId: 'site-1', projectKey: 'PROJ', overdueOnly: true })).toBe(true);
 
     const validateOutput = ajv.compile(tool.outputSchema);
     expect(validateOutput({

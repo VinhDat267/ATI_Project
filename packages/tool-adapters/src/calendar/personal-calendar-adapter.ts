@@ -904,7 +904,7 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           timeMin = new Date(nowMs - 24 * 60 * 60_000).toISOString();
           timeMax = new Date(nowMs + 90 * 24 * 60 * 60_000).toISOString();
         }
-        const maximum = limit(args.limit, 10);
+        const maximum = limit(args.limit, 20);
 
         // Google can return 200 for an occurrence ID, even when the page has no instances.
         const eventPath = `${encodeURIComponent(id)}/events/`;
