@@ -22,7 +22,7 @@ import {
   type GmailDigestQuery,
 } from './multi-source-digest-candidate.js';
 
-import { bindOrgSheetsDigestSource } from './org-sheets-digest-source.js';
+import { bindOrgSheetsDigestSource, isOrgSheetsDigestSource } from './org-sheets-digest-source.js';
 
 export function computeSlackDigestConfigHash(config: SlackDigestConfig): string {
   const gmailValidation = validateTelegramDigestGmailConfig(config);
@@ -233,12 +233,12 @@ export async function evaluateSlackDigestCandidate(
   }
 
   const sources = sourceResult.sources;
-  const orgSheetsIndex = sources.findIndex((source) => source.service === 'sheets');
+  const orgSheetsIndex = sources.findIndex(isOrgSheetsDigestSource);
   if (orgSheetsIndex !== -1) {
     const bound = await bindOrgSheetsDigestSource(
       sources[orgSheetsIndex]!,
       input.sheetsRequestText?.trim() || requestText,
-      existingDigest?.sources?.find((source) => source.service === 'sheets'),
+      existingDigest?.sources?.find(isOrgSheetsDigestSource),
       { userId, workspaceMode, workspaceId },
       input.getAdapter,
       input.reauthorizeOrgSheets,

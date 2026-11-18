@@ -38,13 +38,16 @@ export function approvedOrgSheetsDigestRead(source: TelegramDigestSource | undef
   return { spreadsheetId, sheetId, range };
 }
 
+export function isOrgSheetsDigestSource(source: TelegramDigestSource | null | undefined): boolean {
+  return source?.service === 'sheets' || (typeof source?.tool === 'string' && source.tool.startsWith('sheets.'));
+}
+
 export function readOrgSheetsDigestScope(
   config: { sources?: unknown } | null | undefined,
   services?: readonly string[] | null,
 ): { kind: 'none' | 'invalid' } | { kind: 'bound'; read: ApprovedRead } {
   const sources = Array.isArray(config?.sources)
-    ? config.sources.filter((source) => source?.service === 'sheets' ||
-        (typeof source?.tool === 'string' && source.tool.startsWith('sheets.')))
+    ? config.sources.filter(isOrgSheetsDigestSource)
     : [];
   if (sources.length === 0) return { kind: services?.includes('sheets') ? 'invalid' : 'none' };
   const read = sources.length === 1 ? approvedOrgSheetsDigestRead(sources[0]) : null;
