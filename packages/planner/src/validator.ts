@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { isSlackReadTool, requiresReportEvidence, reportOutputTargets, type ToolDefinition, type PlannerResponse, type PlanStep, type ReportEvidence } from '@wap/tool-schemas';
+import { isSlackReadTool, MYCALENDAR_RECAP_READ_TOOLS, MYCALENDAR_RECAP_SEND_TOOLS, requiresReportEvidence, reportOutputTargets, type ToolDefinition, type PlannerResponse, type PlanStep, type ReportEvidence } from '@wap/tool-schemas';
 import { normalizedRecipient, observedDrafts, observedThreads, observedWorkspaceRecipients, userEmailAddresses } from './recipients.js';
 import type { ReportArtifactStore } from './reports/artifacts.js';
 
@@ -19,7 +19,7 @@ export interface ValidationFailure {
   valid: false;
   layer: 'json' | 'schema' | 'semantic' | 'security' | 'grounding';
   error: string;
-  code?: 'READ_ONLY_PLAN';
+  code?: 'READ_ONLY_PLAN' | 'DEFERRED_CALENDAR_RECAP';
   ungrounded?: UngroundedArgument[];
 }
 
@@ -52,6 +52,32 @@ export const INJECTION_PATTERNS = [
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function collectReferenceTargets(value: unknown, targets: string[]): void {
+  if (value === null || typeof value !== 'object') return;
+  if (isObject(value)) {
+    if (typeof value.$ref === 'string') targets.push(value.$ref);
+    if (typeof value.$template === 'string') {
+      for (const match of value.$template.matchAll(/\$\{([^}]+)\}/g)) targets.push(match[1]!.trim());
+    }
+  }
+  for (const child of Object.values(value)) collectReferenceTargets(child, targets);
+}
+
+export const DEFERRED_CALENDAR_RECAP_ERROR =
+  'Calendar recap needs literal message text before approval.';
+
+export function hasDeferredCalendarRecap(steps: readonly PlanStep[]): boolean {
+  const eventReadSteps = new Set(
+    steps.filter((step) => MYCALENDAR_RECAP_READ_TOOLS.has(step.tool)).map((step) => step.id),
+  );
+  return eventReadSteps.size > 0 && steps.some((step) => {
+    if (!MYCALENDAR_RECAP_SEND_TOOLS.has(step.tool)) return false;
+    const references: string[] = [];
+    collectReferenceTargets(step.args, references);
+    return references.some((ref) => eventReadSteps.has(ref.split('.')[0]!));
+  });
 }
 
 export function validateSchemaValue(value: unknown, schema: Record<string, any>, path: string): string | null {
@@ -723,24 +749,7 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
     const args = step.args || {};
     const refTargets: string[] = [];
 
-    function extractRefs(val: any) {
-      if (!val) return;
-      if (typeof val === 'object') {
-        if (typeof val.$ref === 'string') {
-          refTargets.push(val.$ref);
-        }
-        if (typeof val.$template === 'string') {
-          const matches = val.$template.matchAll(/\$\{([^}]+)\}/g);
-          for (const m of matches) {
-            refTargets.push(m[1]);
-          }
-        }
-        for (const child of Object.values(val)) {
-          extractRefs(child);
-        }
-      }
-    }
-    extractRefs(args);
+    collectReferenceTargets(args, refTargets);
 
     for (const ref of refTargets) {
       const parts = ref.split('.');
@@ -801,6 +810,15 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
     }
 
     processedStepIds.add(step.id);
+  }
+
+  if (hasDeferredCalendarRecap(steps)) {
+    return {
+      valid: false,
+      layer: 'semantic',
+      code: 'DEFERRED_CALENDAR_RECAP',
+      error: `${DEFERRED_CALENDAR_RECAP_ERROR} Return kind "search" with mycalendar.list_events to read the requested date range first, then draft the send step from the results.`,
+    };
   }
 
   // Check DAG Acyclic (Cycle detection)

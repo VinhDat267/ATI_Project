@@ -48,6 +48,39 @@ const input = {
 };
 
 describe('DeepSeekProvider', () => {
+  it('uses plain text completions for digest summaries, with the same endpoint and model verification', async () => {
+    const { fetchFn, calls } = scriptedFetch([
+      completion('  Hôm nay có một cuộc họp nhóm.  ', 'deepseek-flash'),
+      completion('Tóm tắt sai mô hình.', 'unexpected-model'),
+    ]);
+    const provider = new DeepSeekProvider({ apiKey: 'ds-secret-key', fetch: fetchFn });
+    const system = 'Tóm tắt bản tin bằng văn bản thuần.';
+    const user = '09:00 — Họp nhóm';
+    const signal = new AbortController().signal;
+
+    await expect(provider.generateText(system, user, signal)).resolves.toBe('Hôm nay có một cuộc họp nhóm.');
+    expect(calls[0]!.body).toMatchObject({
+      model: 'deepseek-chat',
+      stream: false,
+      messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+    });
+    expect(calls[0]!.body.response_format).toBeUndefined();
+    await expect(provider.generateText(system, user, signal)).rejects.toThrow(/unexpected-model/);
+  });
+
+  it('keeps the previous planner diagnostics when a digest text call runs', async () => {
+    const { fetchFn } = scriptedFetch([
+      completion('{"kind":"refusal","reason":"test"}', 'deepseek-flash'),
+      completion('Tóm tắt sự kiện.', 'deepseek-chat'),
+    ]);
+    const provider = new DeepSeekProvider({ fetch: fetchFn });
+    await provider.generatePlan(input);
+    const metrics = provider.lastCallMetrics;
+    await provider.generateText('Tóm tắt ngắn gọn.', 'Một sự kiện.');
+    expect(provider.lastCallMetrics).toBe(metrics);
+    expect(provider.lastServedModel).toBe('deepseek-flash');
+  });
+
   it('posts a JSON-mode chat completion to https://api.deepseek.com/chat/completions with deepseek-chat by default', async () => {
     const { fetchFn, calls } = scriptedFetch([completion('{"kind":"refusal","reason":"x"}')]);
     const provider = new DeepSeekProvider({ apiKey: 'ds-secret-key', fetch: fetchFn, retryDelayMs: 1 });

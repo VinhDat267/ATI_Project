@@ -906,7 +906,13 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         }
         const maximum = limit(args.limit, 10);
 
-        let masterEventId = rawEventId;
+        // Google can return 200 for an occurrence ID, even when the page has no instances.
+        const eventPath = `${encodeURIComponent(id)}/events/`;
+        const resolvedEvent = await this.request(`${eventPath}${encodeURIComponent(rawEventId)}`, signal);
+        const recurringEventId =
+          typeof resolvedEvent?.recurringEventId === 'string' ? resolvedEvent.recurringEventId.trim() : '';
+        const masterEventId = recurringEventId || rawEventId;
+        const instancesPath = `${eventPath}${encodeURIComponent(masterEventId)}/instances`;
         const buildInstanceParams = (pageToken?: string) => {
           const p = new URLSearchParams({
             timeMin,
@@ -920,49 +926,38 @@ export class PersonalCalendarAdapter extends BaseAdapter {
         let firstPage: any;
         try {
           firstPage = await this.request(
-            `${encodeURIComponent(id)}/events/${encodeURIComponent(masterEventId)}/instances?${buildInstanceParams()}`,
+            `${instancesPath}?${buildInstanceParams()}`,
             signal,
           );
         } catch (err) {
-          if (!(err instanceof StepError) || (err.category !== 'NOT_FOUND' && err.category !== 'VALIDATION')) {
+          if (recurringEventId || !(err instanceof StepError) ||
+              (err.category !== 'NOT_FOUND' && err.category !== 'VALIDATION')) {
             throw err;
           }
-          const resolvedEvent = await this.request(
-            `${encodeURIComponent(id)}/events/${encodeURIComponent(rawEventId)}`,
-            signal,
-          );
-          if (typeof resolvedEvent?.recurringEventId === 'string' && resolvedEvent.recurringEventId.trim()) {
-            masterEventId = resolvedEvent.recurringEventId.trim();
-            firstPage = await this.request(
-              `${encodeURIComponent(id)}/events/${encodeURIComponent(masterEventId)}/instances?${buildInstanceParams()}`,
-              signal,
-            );
-          } else {
-            const rawStart = resolvedEvent?.start?.dateTime ?? resolvedEvent?.start?.date;
-            const isAllDayItem = typeof rawStart === 'string' && !rawStart.includes('T');
-            const hasItemTz =
-              (typeof resolvedEvent?.start?.timeZone === 'string' && isValidIanaTimeZone(resolvedEvent.start.timeZone)) ||
-              (typeof resolvedEvent?.end?.timeZone === 'string' && isValidIanaTimeZone(resolvedEvent.end.timeZone));
-            if (isAllDayItem && !hasItemTz && !calendarTz) {
-              calendarTz = await this.resolveCalendarTimeZone(id, signal);
-            }
-            const single =
-              resolvedEvent?.status === 'cancelled'
-                ? []
-                : [normalizedEvent(resolvedEvent, false, isAllDayItem ? calendarTz : undefined)];
-            const truncated = single.some((e) => e.clipped);
-            const cleaned = single.map(({ clipped: _clipped, ...ev }) => ev);
-            return {
-              masterEventId,
-              events: cleaned,
-              ...(truncated ? { truncated: true } : {}),
-              coverage: {
-                complete: true,
-                returned: cleaned.length,
-                totalAvailable: cleaned.length,
-              },
-            };
+          const rawStart = resolvedEvent?.start?.dateTime ?? resolvedEvent?.start?.date;
+          const isAllDayItem = typeof rawStart === 'string' && !rawStart.includes('T');
+          const hasItemTz =
+            (typeof resolvedEvent?.start?.timeZone === 'string' && isValidIanaTimeZone(resolvedEvent.start.timeZone)) ||
+            (typeof resolvedEvent?.end?.timeZone === 'string' && isValidIanaTimeZone(resolvedEvent.end.timeZone));
+          if (isAllDayItem && !hasItemTz && !calendarTz) {
+            calendarTz = await this.resolveCalendarTimeZone(id, signal);
           }
+          const single =
+            resolvedEvent?.status === 'cancelled'
+              ? []
+              : [normalizedEvent(resolvedEvent, false, isAllDayItem ? calendarTz : undefined)];
+          const truncated = single.some((e) => e.clipped);
+          const cleaned = single.map(({ clipped: _clipped, ...ev }) => ev);
+          return {
+            masterEventId,
+            events: cleaned,
+            ...(truncated ? { truncated: true } : {}),
+            coverage: {
+              complete: true,
+              returned: cleaned.length,
+              totalAvailable: cleaned.length,
+            },
+          };
         }
 
         const events: Array<ReturnType<typeof normalizedEvent>> = [];
@@ -1021,7 +1016,7 @@ export class PersonalCalendarAdapter extends BaseAdapter {
           }
           seenPages.add(currentPage.nextPageToken);
           currentPage = await this.request(
-            `${encodeURIComponent(id)}/events/${encodeURIComponent(masterEventId)}/instances?${buildInstanceParams(currentPage.nextPageToken)}`,
+            `${instancesPath}?${buildInstanceParams(currentPage.nextPageToken)}`,
             signal,
           );
         }

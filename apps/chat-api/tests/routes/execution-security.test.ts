@@ -10,6 +10,36 @@ const secret = 'execution-security-secret-at-least-32-chars';
 const token = generateTokens({ id: 'user-a', email: 'a@example.test', name: 'A' }, secret).accessToken;
 
 describe('execution ownership', () => {
+  it.each([
+    { $ref: 'read.output.title' },
+    { $template: 'Sự kiện: ${ read.output.title }' },
+  ])('rejects approval of a stored Calendar recap whose Slack body was deferred through %j', async (text) => {
+    const plan = { steps: [
+      { id: 'read', tool: 'mycalendar.get_event', description: 'Read', args: {}, dependsOn: [] },
+      { id: 'send', tool: 'slack.send_message', description: 'Send', args: {
+        channel: 'C123', text,
+      }, dependsOn: ['read'] },
+    ] };
+    const approvePlan = vi.fn();
+    const getAdapterForService = vi.fn();
+    const service = new ExecutionService({
+      planRepo: {
+        getPlan: async () => ({
+          id: 'p', conv_id: 'c', status: 'pending', plan_json: plan,
+          plan_hash: createHash('sha256').update(JSON.stringify(plan)).digest('hex'),
+        }),
+        approvePlan,
+      } as any,
+      convRepo: { getConversation: async () => ({ id: 'c', user_id: 'user-a' }) },
+      adapterFactory: { getAdapterForService },
+    });
+    await expect(service.approveAndStart('p', 'user-a')).resolves.toMatchObject({
+      success: false, status: 409, error: expect.stringContaining('Calendar recap'),
+    });
+    expect(approvePlan).not.toHaveBeenCalled();
+    expect(getAdapterForService).not.toHaveBeenCalled();
+  });
+
   it('rejects stop after completion without overwriting the durable status', async () => {
     const updatePlanStatus = vi.fn();
     const controller = new ExecutionController({

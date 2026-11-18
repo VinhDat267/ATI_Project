@@ -90,7 +90,7 @@ export interface SlackDigestRunnerOptions {
     getAdapterForService(serviceName: string, context?: AdapterContext): Promise<any> | any;
   };
   timeZone: string;
-  summarizeWithAi?: (prompt: string, signal: AbortSignal) => Promise<string | null>;
+  summarizeWithAi?: (prompt: string, signal: AbortSignal, config: SlackDigestConfig) => Promise<string | null>;
   aiTimeoutMs?: number;
   sendTimeoutMs?: number;
   resolveSlackMentions?: boolean;
@@ -583,6 +583,7 @@ export class SlackDigestRunner {
     if (this.options.summarizeWithAi && digestConfig.includeAiSummary !== false) {
       const auth = await this.verifyAuthorityAndMaybeClaim(run, false, gmailBinding, slackCredential, signal);
       if (!auth.allowed) return auth.outcome;
+      signal.throwIfAborted();
 
       const aiTimeoutMs = this.options.aiTimeoutMs ?? 10_000;
       const aiController = new AbortController();
@@ -592,7 +593,7 @@ export class SlackDigestRunner {
       aiTimer.unref?.();
       try {
         const rawSummary = await Promise.race([
-          this.options.summarizeWithAi(sections.join('\n\n'), aiController.signal),
+          this.options.summarizeWithAi(sections.join('\n\n'), aiController.signal, digestConfig),
           new Promise<null>((resolve) => {
             if (aiController.signal.aborted) resolve(null);
             else aiController.signal.addEventListener('abort', () => resolve(null), { once: true });

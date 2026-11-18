@@ -105,7 +105,7 @@ export interface TelegramDigestRunnerOptions {
   };
   botClient?: Pick<TelegramBotClient, 'getChatMember'>;
   timeZone: string;
-  summarizeWithAi?: (prompt: string, signal: AbortSignal) => Promise<string | null>;
+  summarizeWithAi?: (prompt: string, signal: AbortSignal, config: TelegramDigestConfig) => Promise<string | null>;
   aiTimeoutMs?: number;
   sendTimeoutMs?: number;
   notionSources?: Pick<NotionDigestSourceAuthority, 'read' | 'withSource'>;
@@ -1152,7 +1152,7 @@ export class TelegramDigestRunner {
             else aiController.signal.addEventListener('abort', onAiAbort, { once: true });
           });
           const rawSummary = await Promise.race([
-            this.options.summarizeWithAi(sections.join('\n\n'), aiController.signal),
+            this.options.summarizeWithAi(sections.join('\n\n'), aiController.signal, digestConfig),
             abortPromise,
           ]);
           if (typeof rawSummary === 'string' && rawSummary.trim()) {

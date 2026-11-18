@@ -38,6 +38,8 @@ function stripMarkdownFenceIfPresent(raw: string): string {
   return fenced ? fenced[1]!.trim() : raw;
 }
 
+type CompletionMessage = { role: 'system' | 'user' | 'assistant'; content: string };
+
 /**
  * First-class DeepSeek API provider (`https://api.deepseek.com/chat/completions`).
  * Supports both `deepseek-chat` (JSON mode + max_tokens <= 8192) and
@@ -73,34 +75,56 @@ export class DeepSeekProvider implements LLMProvider {
   }
 
   async generatePlan(input: LLMGeneratePlanInput): Promise<string> {
-    validateModelOutputLimit(input.maxOutputTokens);
+    const rawContent = await this.complete([
+      {
+        role: 'system',
+        content: `${input.systemPrompt}\n\nWorking Memory Context:\n${JSON.stringify(input.workingMemory, null, 2)}`,
+      },
+      ...input.conversationHistory.map((message): CompletionMessage => ({
+        role: message.role === 'assistant' ? 'assistant' : 'user',
+        content: message.content,
+      })),
+    ], input, 'plan');
+    return stripMarkdownFenceIfPresent(rawContent);
+  }
+
+  async generateText(systemPrompt: string, userPrompt: string, signal?: AbortSignal): Promise<string> {
+    const rawContent = await this.complete([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], { signal, maxOutputTokens: 4096 }, 'text');
+    return rawContent.trim();
+  }
+
+  private async complete(
+    messages: CompletionMessage[],
+    options: Pick<LLMGeneratePlanInput, 'signal' | 'maxOutputTokens' | 'beforeModelAttempt'>,
+    mode: 'plan' | 'text',
+  ): Promise<string> {
+    validateModelOutputLimit(options.maxOutputTokens);
     const started = performance.now();
     const metrics: ModelCallMetrics = {
       durationMs: 0,
       attempts: [],
       usage: { promptTokens: null, completionTokens: null, reasoningTokens: null },
     };
-    this.lastCallMetrics = metrics;
-    this.lastServedModel = undefined;
+    if (mode === 'plan') {
+      this.lastCallMetrics = metrics;
+      this.lastServedModel = undefined;
+    }
 
     const isReasoner = baseModel(this.model) === 'deepseek-reasoner';
     const maxTokensCeiling = isReasoner ? 65_536 : 8_192;
     const maxTokens =
-      input.maxOutputTokens !== undefined ? Math.min(input.maxOutputTokens, maxTokensCeiling) : undefined;
+      options.maxOutputTokens !== undefined ? Math.min(options.maxOutputTokens, maxTokensCeiling) : undefined;
 
-    const system = `${input.systemPrompt}\n\nWorking Memory Context:\n${JSON.stringify(input.workingMemory, null, 2)}`;
     const body = JSON.stringify({
       model: this.model,
       stream: false,
       ...(maxTokens !== undefined ? { max_tokens: maxTokens } : {}),
-      ...(isReasoner ? {} : { temperature: this.temperature, response_format: { type: 'json_object' } }),
-      messages: [
-        { role: 'system', content: system },
-        ...input.conversationHistory.map((m) => ({
-          role: m.role === 'assistant' ? 'assistant' : 'user',
-          content: m.content,
-        })),
-      ],
+      ...(isReasoner ? {} : { temperature: this.temperature }),
+      ...(!isReasoner && mode === 'plan' ? { response_format: { type: 'json_object' } } : {}),
+      messages,
     });
 
     const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -134,7 +158,7 @@ export class DeepSeekProvider implements LLMProvider {
           };
 
           const served = typeof json.model === 'string' ? json.model : undefined;
-          this.lastServedModel = served;
+          if (mode === 'plan') this.lastServedModel = served;
           metrics.servedModel = served;
 
           const count = (value: unknown) =>
@@ -161,8 +185,7 @@ export class DeepSeekProvider implements LLMProvider {
             );
           }
 
-          const rawContent = messageText(json.choices?.[0]?.message?.content);
-          return stripMarkdownFenceIfPresent(rawContent);
+          return messageText(json.choices?.[0]?.message?.content);
         },
         {
           label: 'DeepSeek API',
@@ -170,9 +193,9 @@ export class DeepSeekProvider implements LLMProvider {
           maxRetries: this.maxRetries,
           timeoutRetries: this.timeoutRetries,
           retryDelayMs: this.retryDelayMs,
-          signal: input.signal,
+          signal: options.signal,
           onAttempt: (attempt) => metrics.attempts.push(attempt),
-          beforeAttempt: input.beforeModelAttempt,
+          beforeAttempt: options.beforeModelAttempt,
         },
       );
     } finally {
