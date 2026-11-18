@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { decryptCredentials } from '@wap/tool-adapters';
 import type { CalendarDigestCandidate, CalendarDigestConfig } from '@wap/tool-schemas';
 import type { Queryable } from '../../db/repositories/schedule-repo.js';
+import { hasGoogleCredentialOrigin } from '../gmail/credential-origin.js';
 import { findSlackDigestCredential } from './multi-source-digest-candidate.js';
 
 const WRITE_INTENT_RE =
@@ -47,6 +48,7 @@ export function computeCalendarDigestHash(config: CalendarDigestConfig): string 
 export interface EvaluateCalendarDigestInput {
   pool: Queryable;
   encryptionKey?: string;
+  mycalendarOAuthClientId?: string;
   userId: string;
   services: string[];
   request: string;
@@ -128,6 +130,19 @@ export async function evaluateCalendarDigestCandidate(
         canAutoDigest: false,
         defaultMode: 'manual',
         disabledReason: 'Hãy kết nối Google Calendar cá nhân trước khi bật chế độ tự động gửi bản tin.',
+      },
+    };
+  }
+  if (
+    input.mycalendarOAuthClientId &&
+    encryptionKey &&
+    !hasGoogleCredentialOrigin(mycalRow.config, encryptionKey, input.mycalendarOAuthClientId)
+  ) {
+    return {
+      candidate: {
+        canAutoDigest: false,
+        defaultMode: 'manual',
+        disabledReason: 'Kết nối Google Calendar cá nhân không khớp cấu hình OAuth hiện tại. Hãy kết nối lại.',
       },
     };
   }

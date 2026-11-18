@@ -17,7 +17,7 @@ import {
 import { DEMO_ADMIN_ID } from './routes/auth-routes.js';
 import { verifyPassword } from './db/repositories/user-repo.js';
 import { createRuntimePlanner, mayUseMemoryStorage } from './config/runtime-policy.js';
-import { createToolRuntimeFactory, gmailServiceRegistry, runtimeToolCatalog, runtimeGmailAdapter, runtimeMyCalendarAdapter, runtimeMySheetsAdapter, runtimeMySheetsEndpoints, serviceRegistryForRuntime, mayFallbackToShared, runtimePlannerSearchMode, sandboxKeepsSharedJira } from './config/gmail-tools-runtime.js';
+import { createToolRuntimeFactory, gmailServiceRegistry, runtimeToolCatalog, runtimeGmailAdapter, runtimeMyCalendarAdapter, runtimeMySheetsAdapter, runtimeMySheetsEndpoints, serviceRegistryForRuntime, mayFallbackToShared, runtimePlannerSearchMode, sandboxKeepsSharedJira, wrapSandboxAdapterWithScope } from './config/gmail-tools-runtime.js';
 import { SSEManager } from './sse/sse-manager.js';
 import { ChatService } from './services/chat-service.js';
 import { ExecutionService } from './services/execution-service.js';
@@ -48,7 +48,7 @@ import { SlackConnectionRepo } from './db/repositories/slack-connection-repo.js'
 import { SlackSourceRepo } from './db/repositories/slack-source-repo.js';
 import { SlackInvalidationService } from './services/slack/slack-invalidation-service.js';
 import { SlackPolicyEventConsumer } from './services/slack/slack-policy-event-consumer.js';
-import { SlackInvalidationRunner } from './services/slack/slack-invalidation-runner.js';
+import { sanitizeSlackInvalidationError, SlackInvalidationRunner } from './services/slack/slack-invalidation-runner.js';
 import { SlackDerivedPolicyFanout } from './services/slack/slack-derived-policy-fanout.js';
 import { SlackMessagePurgeConsumer } from './services/slack/slack-message-purge-consumer.js';
 import { SlackEventReceiptRepo } from './db/repositories/slack-event-receipt-repo.js';
@@ -290,6 +290,8 @@ async function bootstrap() {
   // Gmail, MyCalendar and MySheets need the flag, their own OAuth client and PostgreSQL; otherwise none of it exists.
   const gmailAvailable = Boolean(env.GMAIL_ENABLED && env.GMAIL_OAUTH && pool && userRepo);
   const mycalendarAvailable = Boolean(env.MYCALENDAR_ENABLED && env.MYCALENDAR_OAUTH && pool && userRepo);
+  const mycalendarOAuthClientId =
+    env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined;
   const mysheetsAvailable = Boolean(env.MYSHEETS_ENABLED && env.MYSHEETS_OAUTH && pool && userRepo);
   const mysheetsOAuthClientId =
     env.RUNTIME_MODE === 'live' && mysheetsAvailable ? env.MYSHEETS_OAUTH?.clientId : undefined;
@@ -347,7 +349,7 @@ async function bootstrap() {
     timeZone: env.APP_TIME_ZONE,
     encryptionKey: env.ENCRYPTION_KEY,
     gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
-    mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
+    mycalendarOAuthClientId,
     mysheetsOAuthClientId,
     credentialRepo: credRepo,
     mysheetsEnabled: mysheetsAvailable,
@@ -428,6 +430,7 @@ async function bootstrap() {
       ? createCalendarDigestExecutor({
           pool,
           encryptionKey: env.ENCRYPTION_KEY,
+          mycalendarOAuthClientId,
           timeZone: env.APP_TIME_ZONE,
           getAdapter: (serviceName, context) =>
             (gatherAdapterFactory ?? realAdapterFactory).getAdapterForService(serviceName, context),
@@ -819,6 +822,7 @@ async function bootstrap() {
       notionEnabled: notionAvailable,
       notionConnection,
       myjiraEnabled: jiraPlanningAllowed,
+      myjiraConnection: myjiraDigestConnection,
       jiraWorkspaceRepo: jiraWorkspaceRepo ?? undefined,
     }),
     serviceRegistry: serviceRegistryForRuntime(gmailAvailable || isNineServiceSandbox, mycalendarAvailable, mysheetsAvailable, jiraPlanningAllowed),
@@ -871,7 +875,7 @@ async function bootstrap() {
       ? createMyCalendarConnectionLookup(
           credRepo,
           env.ENCRYPTION_KEY,
-          env.RUNTIME_MODE === 'live' ? env.MYCALENDAR_OAUTH?.clientId : undefined,
+          mycalendarOAuthClientId,
         )
       : undefined,
     mysheetsConnection: mysheetsAvailable
@@ -904,6 +908,7 @@ async function bootstrap() {
           credentialRepo: credRepo,
           encryptionKey: env.ENCRYPTION_KEY,
           gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
+          mycalendarOAuthClientId,
           mysheetsOAuthClientId,
           mysheetsEnabled: mysheetsAvailable,
           emitV2: sheetsDigestEmitV2,
@@ -914,6 +919,7 @@ async function bootstrap() {
                   await evaluateCalendarDigestCandidate({
                     pool,
                     encryptionKey: env.ENCRYPTION_KEY,
+                    mycalendarOAuthClientId,
                     userId: input.userId,
                     request: input.request,
                     services: input.services,
@@ -961,7 +967,7 @@ async function bootstrap() {
     gmailTokens,
     createGmailAdapter: gmailAvailable ? ({ tokens }) => runtimeGmailAdapter(env.RUNTIME_MODE, tokens, env.GMAIL_OAUTH!.apiBaseUrl) : undefined,
     mycalendarTokens,
-    mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
+    mycalendarOAuthClientId,
     createMyCalendarAdapter: mycalendarAvailable ? (input) => runtimeMyCalendarAdapter(env.RUNTIME_MODE, input, env.MYCALENDAR_OAUTH!.apiBaseUrl) : undefined,
     mysheetsTokens,
     mysheetsOAuthClientId,
@@ -988,7 +994,7 @@ async function bootstrap() {
         execute: async (tool, args, ctx) => {
           const targetBoardId = ctx?.boardId ?? args?.boardId;
           if (targetBoardId && !allowedBoardIds.includes(String(targetBoardId))) {
-            throw new StepError({ category: 'AUTH_ERROR', message: 'Bảng không nằm trong phạm vi được phép.' });
+            throw new StepError({ category: 'AUTH_ERROR', message: 'Bảng không nằm trong phạm vi được phép.', details: { requestSent: false } });
           }
           return sandbox.execute(tool, args, ctx);
         },
@@ -1005,7 +1011,7 @@ async function bootstrap() {
         execute: async (tool, args, ctx) => {
           const targetRepo = ctx?.repo ?? args?.repo;
           if (targetRepo && !allowedLower.has(String(targetRepo).toLowerCase())) {
-            throw new StepError({ category: 'AUTH_ERROR', message: 'Repository không nằm trong phạm vi được phép.' });
+            throw new StepError({ category: 'AUTH_ERROR', message: 'Repository không nằm trong phạm vi được phép.', details: { requestSent: false } });
           }
           return sandbox.execute(tool, args, ctx);
         },
@@ -1017,7 +1023,7 @@ async function bootstrap() {
         execute: async (tool, args, ctx) => {
           const targetChatId = ctx?.chatId ?? args?.chatId;
           if (targetChatId && !allowedChats.includes(String(targetChatId))) {
-            throw new StepError({ category: 'AUTH_ERROR', message: 'Cuộc trò chuyện không nằm trong phạm vi được phép.' });
+            throw new StepError({ category: 'AUTH_ERROR', message: 'Cuộc trò chuyện không nằm trong phạm vi được phép.', details: { requestSent: false } });
           }
           return sandbox.execute(tool, args, ctx);
         },
@@ -1027,9 +1033,15 @@ async function bootstrap() {
 
   const adapterFactory = createToolRuntimeFactory(env.RUNTIME_MODE,
     (serviceName, context) => {
-      if (sandboxTrelloConnection && serviceName === 'trello') return Promise.resolve(createSandboxAdapter('trello'));
-      if (sandboxGitHubConnection && serviceName === 'github') return Promise.resolve(createSandboxAdapter('github'));
-      if (sandboxTelegramConnection && serviceName === 'telegram') return Promise.resolve(createSandboxAdapter('telegram'));
+      if (sandboxTrelloConnection && serviceName === 'trello') {
+        return Promise.resolve(wrapSandboxAdapterWithScope('trello', createSandboxAdapter('trello'), context));
+      }
+      if (sandboxGitHubConnection && serviceName === 'github') {
+        return Promise.resolve(wrapSandboxAdapterWithScope('github', createSandboxAdapter('github'), context));
+      }
+      if (sandboxTelegramConnection && serviceName === 'telegram') {
+        return Promise.resolve(wrapSandboxAdapterWithScope('telegram', createSandboxAdapter('telegram'), context));
+      }
       if (sandboxGmailConnection && serviceName === 'gmail') return Promise.resolve(createSandboxAdapter('gmail'));
       return realAdapterFactory.getAdapterForService(serviceName, context);
     },
@@ -1160,7 +1172,7 @@ async function bootstrap() {
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
     gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
-    mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
+    mycalendarOAuthClientId,
     mysheetsOAuthClientId,
     adapterFactory,
     botClient: telegramBotClient,
@@ -1182,7 +1194,7 @@ async function bootstrap() {
     credentialRepo: credRepo,
     encryptionKey: env.ENCRYPTION_KEY,
     gmailOAuthClientId: gmailAvailable ? env.GMAIL_OAUTH?.clientId : undefined,
-    mycalendarOAuthClientId: env.RUNTIME_MODE === 'live' && mycalendarAvailable ? env.MYCALENDAR_OAUTH?.clientId : undefined,
+    mycalendarOAuthClientId,
     mysheetsOAuthClientId,
     adapterFactory,
     timeZone: env.APP_TIME_ZONE,
@@ -1228,6 +1240,7 @@ async function bootstrap() {
     ? new SlackInvalidationRunner(slackSourceRepo, slackInvalidationService, slackPolicyEventConsumer, {
         sweepIntervalMs: 5000,
         batchSize: 50,
+        onError: (err, ctx) => console.warn('[chat-api] Slack invalidation error:', ctx, sanitizeSlackInvalidationError(err)),
         derivedPolicyFanout: pool && slackInvalidationService ? new SlackDerivedPolicyFanout(pool,slackInvalidationService) : undefined,
         messagePurgeConsumer: pool ? new SlackMessagePurgeConsumer(pool) : undefined,
         derivedExpiryFanout:pool?new SlackDerivedExpiryFanout(pool):undefined,
@@ -1266,6 +1279,7 @@ async function bootstrap() {
     ? new CalendarTriggerService({
         pool,
         encryptionKey: env.ENCRYPTION_KEY,
+        mycalendarOAuthClientId,
         timeZone: env.APP_TIME_ZONE,
         webhookSecret: process.env.MYCALENDAR_WEBHOOK_SECRET,
         ...(calendarWatchUrl && mycalendarTokens && env.MYCALENDAR_OAUTH ? {
@@ -1408,6 +1422,32 @@ async function bootstrap() {
     console.warn('[chat-api] Dọn inbox Telegram thất bại:', error instanceof Error ? error.message : error);
   });
 
+  let telegramPollTimer: ReturnType<typeof setInterval> | null = null;
+  let telegramPollInFlight: Promise<void> | null = null;
+  let telegramPollAbort: AbortController | null = null;
+  let telegramPollStopping = false;
+
+  const triggerTelegramPoll = () => {
+    if (!telegramBotClient || env.RUNTIME_MODE !== 'live' || telegramPollStopping || telegramPollInFlight) {
+      return;
+    }
+    const ctrl = new AbortController();
+    telegramPollAbort = ctrl;
+    const signal = AbortSignal.any([ctrl.signal, AbortSignal.timeout(25_000)]);
+    const run = telegramBotClient
+      .pollUpdates(signal)
+      .catch((error) => {
+        if (telegramPollStopping || ctrl.signal.aborted) return;
+        const msg = error instanceof Error ? error.message.replace(/bot\d+:[^\s/]+/gi, 'bot<REDACTED>') : 'UNKNOWN_ERROR';
+        console.warn('[chat-api] Cập nhật Telegram thất bại:', msg);
+      })
+      .finally(() => {
+        if (telegramPollAbort === ctrl) telegramPollAbort = null;
+        if (telegramPollInFlight === run) telegramPollInFlight = null;
+      });
+    telegramPollInFlight = run;
+  };
+
   const host = env.RUNTIME_MODE === 'sandbox' ? '127.0.0.1' : '0.0.0.0';
   app.listen(port, host, () => {
     console.log(`\x1b[32m[chat-api] ✓ Server đang lắng nghe tại http://${host}:${port}\x1b[0m`);
@@ -1418,13 +1458,21 @@ async function bootstrap() {
     slackLifecycleRuntime?.start();
     slackFanoutRuntime?.start();
     slackAssistant?.runner?.start();
+    if (env.RUNTIME_MODE === 'live' && telegramBotClient) {
+      telegramPollTimer = setInterval(triggerTelegramPoll, 30_000);
+      telegramPollTimer.unref?.();
+    }
   });
 
   const shutdown = async () => {
     schedules?.runner.stop();
     stopTelegramMessageCleanup?.();
+    telegramPollStopping = true;
+    if (telegramPollTimer) clearInterval(telegramPollTimer);
+    telegramPollAbort?.abort();
     if (slackReceiptCleanupTimer) clearInterval(slackReceiptCleanupTimer);
     await Promise.all([
+      telegramPollInFlight,
       calendarTriggerService?.stop(),
       slackInvalidationRunner?.stop(),
       slackLifecycleRuntime?.stop(),

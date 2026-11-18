@@ -801,7 +801,7 @@ export async function analyzeSheetsDigestCandidate(
   } else {
     // workspaceMode === 'organization' (Hybrid Source Resolution: TC-02, TC-04, TC-15)
     const checkOrgSheets =
-      !explicitPersonalSource && (hasSharedSheets || !hasMySheets || explicitOrgSource);
+      !explicitPersonalSource && (hasSharedSheets || hasMySheets || explicitOrgSource);
     const checkPersonalMySheets =
       Boolean(mysheetsEnabled) &&
       !explicitOrgSource &&

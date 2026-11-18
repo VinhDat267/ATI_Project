@@ -37,7 +37,7 @@ import { MessageRepo } from '../../db/repositories/message-repo.js';
 import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
 import { calendarDigestCandidateMatches, computeCalendarDigestHash, evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js';
-import { calendarOrGithubDeliveryUnknownKind, getJiraDeliveryUnknown, getSlackDeliveryUnknown, hasUnknownTelegramDispatch, isNotionDeliveryUnknown, matchesDispatchedDigestConfig, runState, runView } from './run-state.js';
+import { calendarOrGithubDeliveryUnknownKind, getJiraDeliveryUnknown, getSheetsDeliveryUnknown, getSlackDeliveryUnknown, getTrelloDeliveryUnknown, hasUnknownTelegramDispatch, isNotionDeliveryUnknown, matchesDispatchedDigestConfig, runState, runView } from './run-state.js';
 import { nextOccurrence, nextRuns } from './next-occurrence.js';
 import { captureScheduleArtifact, guardScheduleArtifact, prelockScheduleArtifacts, registerScheduleFields, scheduleRegistry, scheduleSourceContext, tagScheduleContext } from '../slack/slack-schedule-lineage.js';
 import { messageOutputSelectors } from '../slack/slack-message-selectors.js';
@@ -807,6 +807,7 @@ export class ScheduleService {
           const evaluated = await evaluateCalendarDigestCandidate({
             pool: client,
             encryptionKey: this.options.encryptionKey,
+            mycalendarOAuthClientId: this.options.mycalendarOAuthClientId,
             userId,
             services: metadata.services,
             request: proposal.request!,
@@ -3021,14 +3022,10 @@ export class ScheduleService {
           'Lượt chạy này đã được xử lý trạng thái gửi trước đó.',
         );
       }
-      const isSheetsUnknown =
-        schedule.kind === 'sheets_digest' &&
-        run.status === 'needs_attention' &&
-        run.delivery_started_at != null &&
-        typeof run.error === 'string' &&
-        run.error.includes('SHEETS_DELIVERY_UNKNOWN');
-      const isTrelloOrTelegramUnknown =
-        (schedule.kind === 'trello_digest' || schedule.kind === 'telegram_digest') &&
+      const isSheetsUnknown = getSheetsDeliveryUnknown(run, schedule);
+      const isTrelloUnknown = getTrelloDeliveryUnknown(run, schedule);
+      const isTelegramTextFallback =
+        schedule.kind === 'telegram_digest' &&
         run.status === 'needs_attention' &&
         run.delivery_started_at != null &&
         typeof run.error === 'string' &&
@@ -3036,11 +3033,14 @@ export class ScheduleService {
       const isNotionUnknown = isNotionDeliveryUnknown(run, schedule);
       const jiraUnknown = getJiraDeliveryUnknown(run);
       const slackUnknown = getSlackDeliveryUnknown(run);
-      const unknownDigestKind = jiraUnknown ? 'myjira_digest'
+      const unknownDigestKind: ScheduleKind | null = jiraUnknown ? 'myjira_digest'
         : slackUnknown ? 'slack_digest'
         : hasUnknownTelegramDispatch(run) ? 'telegram_digest'
+        : isTrelloUnknown ? 'trello_digest'
+        : isNotionUnknown ? 'notion_digest'
+        : isSheetsUnknown ? 'sheets_digest'
         : calendarOrGithubDeliveryUnknownKind(run, schedule);
-      if (!isSheetsUnknown && !isTrelloOrTelegramUnknown && !isNotionUnknown && !unknownDigestKind) {
+      if (!isTelegramTextFallback && !unknownDigestKind) {
         throw new ScheduleConflict(
           'RUN_NOT_AWAITING_DELIVERY_RESOLUTION',
           'Lượt chạy này không ở trạng thái chờ xác nhận kết quả gửi.',

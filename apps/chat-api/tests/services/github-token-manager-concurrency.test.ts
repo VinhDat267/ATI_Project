@@ -89,6 +89,7 @@ describe('GitHubTokenManager cross-process locking & resilience (Task 5)', () =>
         authorizationUrl: 'http://127.0.0.1/auth',
         tokenUrl: `http://127.0.0.1:${port}/login/oauth/access_token`,
         apiBaseUrl: 'http://127.0.0.1/api',
+        scope: 'repo read:user',
       });
 
       const now = 1_000_000;

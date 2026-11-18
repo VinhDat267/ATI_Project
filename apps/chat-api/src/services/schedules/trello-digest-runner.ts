@@ -453,13 +453,21 @@ async function claimTrelloDigestDelivery(
 
       const marked = await client.query(
         `UPDATE schedule_runs
-            SET delivery_started_at = now(), updated_at = now()
+            SET delivery_started_at = now(),
+                updated_at = now(),
+                dispatched_config = COALESCE(dispatched_config, $3::jsonb),
+                dispatched_config_hash = COALESCE(dispatched_config_hash, $4)
           WHERE id = $1
             AND schedule_id = $2
             AND status = 'planning'
             AND delivery_started_at IS NULL
         RETURNING id`,
-        [run.runId, run.scheduleId],
+        [
+          run.runId,
+          run.scheduleId,
+          run.digestConfig ? JSON.stringify(run.digestConfig) : null,
+          run.digestConfigHash ?? null,
+        ],
       );
       await client.query('COMMIT');
       return marked.rowCount ? 'claimed' : 'discarded';

@@ -14,6 +14,7 @@ export interface TelegramTeamScope {
 }
 
 export interface ReplaceTelegramTeamScopeInput {
+  scopeId?: string;
   chosenBy: string;
   chats: TelegramTeamChatItem[];
 }
@@ -21,15 +22,17 @@ export interface ReplaceTelegramTeamScopeInput {
 export class TelegramTeamRepo {
   constructor(private pool: pg.Pool) {}
 
-  async get(): Promise<TelegramTeamScope | null> {
+  async get(scopeId = 'default'): Promise<TelegramTeamScope | null> {
     const scopeRes = await this.pool.query<{ chosen_by: string }>(
-      "SELECT chosen_by FROM telegram_team_scope WHERE id = 'default'",
+      'SELECT chosen_by FROM telegram_team_scope WHERE id = $1',
+      [scopeId],
     );
     const scope = scopeRes.rows[0];
     if (!scope) return null;
 
     const chatsRes = await this.pool.query<{ chat_id: string; title: string; chat_type: TelegramChatType }>(
-      "SELECT chat_id, title, chat_type FROM telegram_team_chats WHERE scope_id = 'default' ORDER BY position ASC, created_at ASC",
+      'SELECT chat_id, title, chat_type FROM telegram_team_chats WHERE scope_id = $1 ORDER BY position ASC, created_at ASC',
+      [scopeId],
     );
 
     return {
@@ -43,6 +46,7 @@ export class TelegramTeamRepo {
   }
 
   async replace(input: ReplaceTelegramTeamScopeInput): Promise<TelegramTeamScope> {
+    const scopeId = input.scopeId ?? 'default';
     if (!input.chats || input.chats.length > 10) {
       throw new Error('Cannot select more than 10 Telegram chats');
     }
@@ -53,23 +57,23 @@ export class TelegramTeamRepo {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query("DELETE FROM telegram_team_chats WHERE scope_id = 'default'");
+      await client.query('DELETE FROM telegram_team_chats WHERE scope_id = $1', [scopeId]);
 
       await client.query(
         `INSERT INTO telegram_team_scope (id, chosen_by, updated_at)
-         VALUES ('default', $1, now())
+         VALUES ($1, $2, now())
          ON CONFLICT (id) DO UPDATE SET
            chosen_by = EXCLUDED.chosen_by,
            updated_at = now()`,
-        [input.chosenBy],
+        [scopeId, input.chosenBy],
       );
 
       for (let i = 0; i < input.chats.length; i++) {
         const c = input.chats[i]!;
         await client.query(
           `INSERT INTO telegram_team_chats (scope_id, chat_id, title, chat_type, position)
-           VALUES ('default', $1, $2, $3, $4)`,
-          [c.chatId, c.title, c.type, i + 1],
+           VALUES ($1, $2, $3, $4, $5)`,
+          [scopeId, c.chatId, c.title, c.type, i + 1],
         );
       }
 

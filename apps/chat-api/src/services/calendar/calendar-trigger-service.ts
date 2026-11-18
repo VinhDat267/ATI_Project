@@ -3,6 +3,7 @@ import type pg from 'pg';
 import { decryptCredentials, StepError } from '@wap/tool-adapters';
 import { CALENDAR_ID_PATTERN } from '@wap/tool-schemas';
 import { isUuid } from '../../db/repositories/uuid.js';
+import { hasGoogleCredentialOrigin } from '../gmail/credential-origin.js';
 import { CalendarTriggerWatchRegistry, parseCalendarWatchCallbackUrl, type CalendarTriggerWatchOptions } from './calendar-trigger-watch.js';
 import {
   escapeDigestText,
@@ -104,6 +105,7 @@ const APPROVAL_TTL_MS = 10 * 60_000;
 export interface CalendarTriggerServiceOptions {
   pool: pg.Pool;
   encryptionKey?: string;
+  mycalendarOAuthClientId?: string;
   timeZone?: string;
   clock?: () => Date;
   webhookSecret?: string;
@@ -228,6 +230,7 @@ export class CalendarTriggerService {
   private readonly encryptionKey?: string;
   private readonly timeZone: string;
   private readonly clock: () => Date;
+  private readonly mycalendarOAuthClientId?: string;
   private readonly webhookSecret: string;
   private readonly approvalSecret: string;
   private readonly watch?: CalendarTriggerWatchRegistry;
@@ -241,6 +244,7 @@ export class CalendarTriggerService {
   constructor(options: CalendarTriggerServiceOptions) {
     this.pool = options.pool;
     this.encryptionKey = options.encryptionKey;
+    this.mycalendarOAuthClientId = options.mycalendarOAuthClientId;
     this.timeZone = options.timeZone ?? 'Asia/Ho_Chi_Minh';
     this.clock = options.clock ?? (() => new Date());
     this.webhookSecret =
@@ -271,6 +275,13 @@ export class CalendarTriggerService {
     ).rows[0];
     if (!row || row.status !== 'active') {
       return { ok: false, reason: 'Kết nối Google Calendar cá nhân chưa sẵn sàng hoặc cần kết nối lại.' };
+    }
+    if (
+      this.mycalendarOAuthClientId &&
+      this.encryptionKey &&
+      !hasGoogleCredentialOrigin(row.config, this.encryptionKey, this.mycalendarOAuthClientId)
+    ) {
+      return { ok: false, reason: 'Kết nối Google Calendar cá nhân không khớp cấu hình OAuth hiện tại. Hãy kết nối lại.' };
     }
     try {
       const dec = this.encryptionKey ? decryptCredentials(row.config, this.encryptionKey) : JSON.parse(row.config);

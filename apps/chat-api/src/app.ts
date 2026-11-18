@@ -300,6 +300,7 @@ export function createApp(options: AppOptions): Express {
     onConnectionChanged: options.telegram?.onConnectionChanged,
     conversationOwner: options.convRepo ? async (id: string) => (await options.convRepo!.getConversation(id))?.user_id ?? null : undefined,
     adminUserIds: options.serviceAdminUserIds,
+    workspaceRepo: options.workspaceRepo,
   };
   const notionCfg = options.notion ?? options.mynotion;
   const notionRoutes: NotionConnectionsOptions = {

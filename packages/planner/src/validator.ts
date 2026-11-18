@@ -832,7 +832,8 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
                   error: `Referenced output property '${segment}' does not exist in output schema of tool '${targetStep.tool}'`,
                 };
               }
-              cursorSchema = cursorSchema.properties[segment];
+              const nextSchema = cursorSchema.properties[segment];
+              cursorSchema = isObject(nextSchema) ? nextSchema : undefined;
               continue;
             }
             if (cursorSchema.type === 'array') {

@@ -145,6 +145,7 @@ export async function getToolCatalogFor(
     gmailOAuthClientId?: string;
     mycalendarEnabled?: boolean;
     mycalendarOAuthClientId?: string;
+    mycalendarConnection?: (userId: string) => Promise<any>;
     mysheetsEnabled?: boolean;
     mysheetsOAuthClientId?: string;
     /** Server-owned kill-switch for the 4 MySheets Drive/Docs write tools (defaults to false). */
@@ -444,7 +445,10 @@ export async function getToolCatalogFor(
           myjira?.status === 'connected' ||
           myjira?.connectionState === 'connected' ||
           myjira?.connected === true;
-        if (isConnected && Array.isArray(myjira.sites) && myjira.sites.length > 0) {
+        const hasSitesOrProjects =
+          (Array.isArray(myjira.sites) && myjira.sites.length > 0) ||
+          (Array.isArray(myjira.projects) && myjira.projects.length > 0);
+        if (isConnected && hasSitesOrProjects) {
           catalog = [...catalog, ...MYJIRA_TOOLS];
         }
       } catch {

@@ -19,7 +19,7 @@ import type { JiraDigestConfig } from './jira-digest-candidate.js';
 import { isValidJiraDigestConfig, JIRA_READ_UNAVAILABLE_PREFIX, MYJIRA_DELIVERY_UNKNOWN } from './jira-digest-runner.js';
 import { NOTION_DELIVERY_UNKNOWN } from './notion-digest-runner.js';
 import { TELEGRAM_DELIVERY_UNKNOWN } from './telegram-digest-runner.js';
-import { TRELLO_READ_UNAVAILABLE_PREFIX } from './trello-digest-runner.js';
+import { TRELLO_DELIVERY_UNKNOWN, TRELLO_READ_UNAVAILABLE_PREFIX } from './trello-digest-runner.js';
 
 /** A schedule_runs row joined with the latest plan of its conversation (see RUN_SELECT). */
 export interface RunRow {
@@ -192,9 +192,36 @@ export function getJiraDeliveryUnknown(run: RunRow): { config: JiraDigestConfig 
   return config || run.error?.includes(MYJIRA_DELIVERY_UNKNOWN) ? { config } : null;
 }
 
-export function isNotionDeliveryUnknown(run: RunRow, schedule?: DeliverySchedule): boolean {
+export function getSheetsDeliveryUnknown(
+  run: RunRow,
+  schedule?: Pick<ScheduleRow, 'kind'>,
+): boolean {
   if (
-    schedule?.kind !== 'notion_digest' ||
+    run.status !== 'needs_attention' ||
+    run.delivery_started_at == null ||
+    run.delivery_resolution != null ||
+    typeof run.error !== 'string' ||
+    !run.error.includes('SHEETS_DELIVERY_UNKNOWN')
+  ) {
+    return false;
+  }
+  const config = run.dispatched_config;
+  const hasSheetsSnapshot = Boolean(
+    config &&
+      typeof config === 'object' &&
+      'source' in config &&
+      'destination' in config &&
+      (!('version' in config) || config.version === 2) &&
+      !('calendars' in config),
+  );
+  return hasSheetsSnapshot || schedule?.kind === 'sheets_digest';
+}
+
+export function getTrelloDeliveryUnknown(
+  run: RunRow,
+  schedule?: Pick<ScheduleRow, 'kind'>,
+): boolean {
+  if (
     run.status !== 'needs_attention' ||
     run.delivery_started_at == null ||
     run.delivery_resolution != null ||
@@ -202,27 +229,66 @@ export function isNotionDeliveryUnknown(run: RunRow, schedule?: DeliverySchedule
   ) {
     return false;
   }
-  if (run.error.includes('NOTION_DELIVERY_UNKNOWN') ||
-      run.error.includes('Chưa xác định bản tin Notion đã gửi hay chưa')) {
+  const config = run.dispatched_config;
+  const hasTrelloSnapshot = Boolean(
+    config &&
+      typeof config === 'object' &&
+      'trelloMemberId' in config &&
+      typeof config.trelloMemberId === 'string' &&
+      'boards' in config &&
+      Array.isArray(config.boards),
+  );
+  return (
+    (schedule?.kind === 'trello_digest' && run.error.trim().length > 0) ||
+    (hasTrelloSnapshot && (run.error.includes('TRELLO_DELIVERY_UNKNOWN') || run.error.includes(TRELLO_DELIVERY_UNKNOWN)))
+  );
+}
+
+export function isNotionDeliveryUnknown(run: RunRow, schedule?: DeliverySchedule): boolean {
+  if (
+    run.status !== 'needs_attention' ||
+    run.delivery_started_at == null ||
+    run.delivery_resolution != null ||
+    typeof run.error !== 'string'
+  ) {
+    return false;
+  }
+  const hasNotionError =
+    run.error.includes('NOTION_DELIVERY_UNKNOWN') ||
+    run.error.includes('Chưa xác định bản tin Notion đã gửi hay chưa');
+  const config = run.dispatched_config;
+  const hasNotionSnapshot = Boolean(
+    config &&
+      typeof config === 'object' &&
+      'databases' in config &&
+      Array.isArray(config.databases),
+  );
+  if (schedule?.kind !== 'notion_digest') {
+    return hasNotionError && hasNotionSnapshot;
+  }
+  if (hasNotionError) {
     return true;
   }
   // Some older workers saved neither a Notion-specific error nor the
   // dispatched snapshot. The current config only identifies that run if
   // the schedule still has the exact version that dispatched it.
-  const config = run.dispatched_config ??
+  const effectiveConfig = config ??
     (run.schedule_version === schedule.version ? schedule.digest_config : null);
   return (run.error === CALENDAR_DELIVERY_UNKNOWN || run.error === GITHUB_DELIVERY_UNKNOWN) &&
-    config !== null && typeof config === 'object' && 'databases' in config && Array.isArray(config.databases);
+    effectiveConfig !== null && typeof effectiveConfig === 'object' && 'databases' in effectiveConfig && Array.isArray(effectiveConfig.databases);
 }
 
 export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): ScheduleRunView {
   const jiraUnknown = getJiraDeliveryUnknown(row);
   const slackUnknown = getSlackDeliveryUnknown(row);
   const telegramUnknown = hasUnknownTelegramDispatch(row);
+  const sheetsUnknown = getSheetsDeliveryUnknown(row, schedule);
+  const trelloUnknown = getTrelloDeliveryUnknown(row, schedule);
+  const notionUnknown = isNotionDeliveryUnknown(row, schedule);
   let error = jiraUnknown ? MYJIRA_DELIVERY_UNKNOWN
     : slackUnknown && !row.error?.startsWith(SLACK_DELIVERY_UNKNOWN_PREFIX) ? SLACK_DIGEST_DELIVERY_UNKNOWN
     : telegramUnknown ? TELEGRAM_DELIVERY_UNKNOWN
-    : isNotionDeliveryUnknown(row, schedule) ? NOTION_DELIVERY_UNKNOWN : row.error;
+    : notionUnknown ? NOTION_DELIVERY_UNKNOWN : row.error;
   if (row.status === 'digest_failed' && error?.startsWith(TRELLO_READ_UNAVAILABLE_PREFIX)) {
     error = error.slice(TRELLO_READ_UNAVAILABLE_PREFIX.length);
   }
@@ -243,9 +309,15 @@ export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): Sc
     deliveryFollowupRunId: row.delivery_followup_run_id ?? null,
   };
   const unknownKind = slackUnknown ? 'slack_digest'
-    : telegramUnknown ? 'telegram_digest' : calendarOrGithubDeliveryUnknownKind(row, schedule);
+    : telegramUnknown ? 'telegram_digest'
+    : trelloUnknown ? 'trello_digest'
+    : notionUnknown ? 'notion_digest'
+    : calendarOrGithubDeliveryUnknownKind(row, schedule);
   if (schedule && jiraUnknown) {
     view.canRetryDelivery = schedule.kind === 'myjira_digest' && schedule.status === 'active' &&
+      matchesDispatchedDigestConfig(row, schedule);
+  } else if (schedule && sheetsUnknown) {
+    view.canRetryDelivery = schedule.kind === 'sheets_digest' && schedule.status === 'active' &&
       matchesDispatchedDigestConfig(row, schedule);
   } else if (schedule && unknownKind) {
     view.canRetryDelivery = schedule.kind === unknownKind &&

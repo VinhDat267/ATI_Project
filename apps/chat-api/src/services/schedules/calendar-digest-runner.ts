@@ -7,6 +7,7 @@ import { localLabel } from './next-occurrence.js';
 import type { RunToPlan } from './schedule-runner.js';
 import { slackMrkdwnToTelegramPlain } from './telegram-plain-text.js';
 import { buildSlackMarkdownDigestBlocks } from '../slack/slack-digest-blocks.js';
+import { hasGoogleCredentialOrigin } from '../gmail/credential-origin.js';
 import { isGoogleConnectionChanged } from '../gmail/token-manager.js';
 import type { AdapterContext } from '../adapter-factory.js';
 
@@ -64,6 +65,7 @@ export type RunCalendarDigest = (
 export interface CalendarDigestExecutorOptions {
   pool: pg.Pool;
   encryptionKey?: string;
+  mycalendarOAuthClientId?: string;
   timeZone: string;
   getAdapter: (serviceName: string, context?: any) => Promise<any> | any;
   summarizeDigest?: (events: EnrichedDigestEvent[], signal: AbortSignal) => Promise<string>;
@@ -463,6 +465,16 @@ export function createCalendarDigestExecutor(options: CalendarDigestExecutorOpti
       return {
         state: 'blocked',
         pauseReason: 'Kết nối Google Calendar cá nhân đã thay đổi hoặc cần kết nối lại.',
+      };
+    }
+    if (
+      options.mycalendarOAuthClientId &&
+      options.encryptionKey &&
+      !hasGoogleCredentialOrigin(mycalRow.config, options.encryptionKey, options.mycalendarOAuthClientId)
+    ) {
+      return {
+        state: 'blocked',
+        pauseReason: 'Kết nối Google Calendar cá nhân không khớp cấu hình OAuth hiện tại. Hãy kết nối lại.',
       };
     }
 

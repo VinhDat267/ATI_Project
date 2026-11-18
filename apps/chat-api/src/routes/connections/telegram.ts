@@ -7,6 +7,8 @@ import type { CredentialRepo } from '../../db/repositories/credential-repo.js';
 import type { GoogleAuthRepo } from '../../db/repositories/google-auth-repo.js';
 import type { SessionRepo } from '../../db/repositories/session-repo.js';
 import type { TelegramTeamChatItem, TelegramTeamRepo } from '../../db/repositories/telegram-team-repo.js';
+import type { WorkspaceRepo } from '../../db/repositories/workspace-repo.js';
+import { createWorkspaceContextMiddleware } from '../../middleware/workspace-context.js';
 import { TelegramBotClient, TelegramBotError } from '../../services/telegram/bot-client.js';
 
 export const TELEGRAM_BROWSER_COOKIE = 'ati_telegram_browser';
@@ -35,6 +37,13 @@ export interface TelegramConnectionsOptions {
   onConnectionChanged?: (userId: string) => void;
   conversationOwner?: (conversationId: string) => Promise<string | null>;
   adminUserIds?: string[];
+  workspaceRepo?: WorkspaceRepo;
+}
+
+function telegramScopeId(req: Request): string {
+  return req.workspace?.mode === 'organization' && req.workspace.workspaceId
+    ? req.workspace.workspaceId
+    : 'default';
 }
 
 export function isTelegramConnectAvailable(
@@ -90,6 +99,9 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
   });
 
   router.use(auth);
+  if (options.workspaceRepo) {
+    router.use(createWorkspaceContextMiddleware(options.workspaceRepo));
+  }
   router.use((req, res, next) => {
     if (!isTelegramConnectAvailable(options)) {
       if (req.method === 'GET' && (req.path === '/' || req.path === '')) {
@@ -169,7 +181,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
     }
     if (options.teamRepo) {
       try {
-        const teamScope = await options.teamRepo.get();
+        const teamScope = await options.teamRepo.get(telegramScopeId(req));
         for (const c of teamScope?.chats ?? []) {
           if (c && c.type !== 'private') mergedMap.set(c.chatId, c);
         }
@@ -368,7 +380,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
     candidateMap.set(personalChat.chatId, personalChat);
 
     if (options.teamRepo) {
-      const teamScope = await options.teamRepo.get();
+      const teamScope = await options.teamRepo.get(telegramScopeId(req));
       for (const c of teamScope?.chats ?? []) {
         if (c.type !== 'private') candidateMap.set(c.chatId, c);
       }
@@ -397,7 +409,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
     if (isAdmin(user, options.adminUserIds) && options.teamRepo) {
       const groupChats = selectedChats.filter((c) => c.type !== 'private').slice(0, 10);
       if (groupChats.length > 0) {
-        await options.teamRepo.replace({ chosenBy: user.id, chats: groupChats }).catch(() => {});
+        await options.teamRepo.replace({ scopeId: telegramScopeId(req), chosenBy: user.id, chats: groupChats }).catch(() => {});
       }
     }
 
@@ -465,7 +477,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
     }
 
     if (options.teamRepo) {
-      const teamScope = await options.teamRepo.get();
+      const teamScope = await options.teamRepo.get(telegramScopeId(req));
       for (const c of teamScope?.chats ?? []) {
         if (c.type !== 'private') candidateMap.set(c.chatId, c);
       }
@@ -549,7 +561,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
       if (c && c.type !== 'private') candidateMap.set(c.chatId, c);
     }
     if (options.teamRepo) {
-      const teamScope = await options.teamRepo.get();
+      const teamScope = await options.teamRepo.get(telegramScopeId(req));
       for (const c of teamScope?.chats ?? []) {
         if (c.type !== 'private') candidateMap.set(c.chatId, c);
       }
@@ -599,7 +611,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
     if (isAdmin(user, options.adminUserIds) && options.teamRepo) {
       const groupChats = chosenChats.filter((c) => c.type !== 'private').slice(0, 10);
       if (groupChats.length > 0) {
-        await options.teamRepo.replace({ chosenBy: user.id, chats: groupChats });
+        await options.teamRepo.replace({ scopeId: telegramScopeId(req), chosenBy: user.id, chats: groupChats });
       }
     }
 

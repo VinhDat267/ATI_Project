@@ -870,10 +870,15 @@ export class ScheduleRunner {
         [runId, outcome.error]
       );
       const recent = await client.query(
-        'SELECT status FROM schedule_runs WHERE schedule_id=$1 ORDER BY created_at DESC, id DESC LIMIT 3',
+        "SELECT status FROM schedule_runs WHERE schedule_id=$1 AND trigger='scheduled' ORDER BY created_at DESC, id DESC LIMIT 3",
         [schedule.id]
       );
-      if (recent.rows.length === 3 && recent.rows.every((r) => r.status === 'digest_failed')) {
+      if (
+        started.toPlan.trigger === 'scheduled' &&
+        schedule.status === 'active' &&
+        recent.rows.length === 3 &&
+        recent.rows.every((r) => r.status === 'digest_failed')
+      ) {
         const paused = await this.pause(
           client,
           schedule.id,
@@ -1168,11 +1173,12 @@ export class ScheduleRunner {
       }
 
       const recentRuns = await client.query<{ status: string; error: string | null }>(
-        'SELECT status, error FROM schedule_runs WHERE schedule_id = $1 ORDER BY created_at DESC, id DESC LIMIT 3',
+        "SELECT status, error FROM schedule_runs WHERE schedule_id = $1 AND trigger = 'scheduled' ORDER BY created_at DESC, id DESC LIMIT 3",
         [schedule.id],
       );
       if (
         canPauseSchedule &&
+        started.toPlan.trigger === 'scheduled' &&
         recentRuns.rows.length === 3 &&
         recentRuns.rows.every((r) => r.status === 'digest_failed' &&
           !(started.kind === 'trello_digest' && r.error?.startsWith(TRELLO_READ_UNAVAILABLE_PREFIX)) &&
@@ -1235,14 +1241,15 @@ export class ScheduleRunner {
         controller.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }),
       );
       const beforeSendCheck = async () => {
-        const checkRes = await pool.query('SELECT version, status FROM schedules WHERE id = $1', [
+        const checkRes = await pool.query('SELECT version, status, recurrence FROM schedules WHERE id = $1', [
           started.toPlan.scheduleId,
         ]);
         const current = checkRes.rows[0];
         return Boolean(
           current &&
             current.version === started.toPlan.scheduleVersion &&
-            current.status === 'active',
+            (current.status === 'active' ||
+              (current.status === 'completed' && current.recurrence?.type === 'once')),
         );
       };
       const execPromise =
@@ -1396,7 +1403,8 @@ export class ScheduleRunner {
       );
       const shouldPause =
         outcome.pauseSchedule === true ||
-        (await this.lastThreeDigestFailed(client, started.toPlan.scheduleId));
+        (started.toPlan.trigger === 'scheduled' &&
+          (await this.lastThreeDigestFailed(client, started.toPlan.scheduleId)));
       if (shouldPause && schedule.status === 'active') {
         const reason = outcome.pauseSchedule
           ? outcome.error

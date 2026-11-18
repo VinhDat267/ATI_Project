@@ -238,6 +238,7 @@ export interface ChatServiceOptions {
     credentialRepo?: any;
     encryptionKey?: string;
     gmailOAuthClientId?: string;
+    mycalendarOAuthClientId?: string;
     mysheetsOAuthClientId?: string;
     mysheetsEnabled?: boolean;
     emitV2?: boolean;
@@ -1781,6 +1782,15 @@ export class ChatService {
         /\b(bản\s+tin\s+github|github\s+digest|pull\s+request|pr\b|chờ\s+review|chưa\s+ai\s+nhận|unassigned|issue\s+mới|(?:quá|trên|hơn)\s*\d{1,2}\s*ngày|repo(?:sitory)?\s+[a-z0-9_.-]+|[a-z0-9_.-]+\/[a-z0-9_.-]+)\b/i.test(
           proposal.request!,
         ));
+    const isTrelloDigestOverTelegram =
+      uniqueServices.length === 2 &&
+      uniqueServices.includes('trello') &&
+      uniqueServices.includes('telegram') &&
+      Boolean(this.trelloConnection) &&
+      Boolean(this.telegramConnection) &&
+      Boolean(proposal.request) &&
+      Boolean(recurrence) &&
+      current?.kind !== 'telegram_digest';
     if (
       (proposal.action === 'create' || proposal.action === 'update') &&
       proposal.request &&
@@ -1811,13 +1821,25 @@ export class ChatService {
         telegramConnection: this.telegramConnection,
         getAdapter: this.getAdapter,
       });
+    } else if ((proposal.action === 'create' || proposal.action === 'update') && isTrelloDigestOverTelegram) {
+      digestCandidate = await evaluateTrelloDigestCandidate({
+        userId: actor.userId,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
+        request: proposal.request!,
+        services,
+        recurrence: recurrence!,
+        trelloConnection: this.trelloConnection,
+        telegramConnection: this.telegramConnection,
+        getAdapter: this.getAdapter,
+      });
     } else if (
       (proposal.action === 'create' || proposal.action === 'update') &&
       proposal.request &&
       (services.includes('mysheets') || services.includes('sheets')) &&
       current?.kind !== 'slack_digest' &&
       current?.kind !== 'telegram_digest' &&
-      (current?.kind === 'sheets_digest' || uniqueServices.length <= 2) &&
+      (current?.kind === 'sheets_digest' || uniqueServices.filter((s) => s !== 'sheets' && s !== 'mysheets').length <= 1) &&
       this.schedules.credentialRepo &&
       this.schedules.encryptionKey
     ) {
@@ -1879,6 +1901,7 @@ export class ChatService {
             ? await createMyCalendarConnectionLookup(
                 this.schedules.credentialRepo,
                 this.schedules.encryptionKey,
+                this.schedules.mycalendarOAuthClientId,
               )(actor.userId).catch(() => null)
             : undefined
         : undefined;
@@ -1951,6 +1974,7 @@ export class ChatService {
             ? await createMyCalendarConnectionLookup(
                 this.schedules.credentialRepo,
                 this.schedules.encryptionKey,
+                this.schedules.mycalendarOAuthClientId,
               )(actor.userId).catch(() => null)
             : undefined
         : undefined;
@@ -2086,7 +2110,7 @@ export class ChatService {
         telegramLookup: null,
       });
     }
-    if (proposal.action === 'create' && digestCandidate?.canAutoDigest && digestCandidate.config && 'sources' in digestCandidate.config) {
+    if ((proposal.action === 'create' || proposal.action === 'update') && digestCandidate?.canAutoDigest && digestCandidate.config && 'sources' in digestCandidate.config) {
       const disabledReason = await verifyMySheetsDigestPreview(
         digestCandidate.config,
         { userId: actor.userId, workspaceMode: trustedScope.workspaceMode, workspaceId: trustedScope.workspaceId },
