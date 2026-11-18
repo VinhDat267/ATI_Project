@@ -1961,6 +1961,7 @@ export class ChatService {
         workspaceId: trustedScope.workspaceId,
         gmailBinding,
         gmailUserTexts: userTexts,
+        sheetsRequestText: userTexts.join('\n'),
         existingDigest: current?.kind === 'slack_digest' ? current.digestConfig as SlackDigestConfig : null,
       });
       if (
