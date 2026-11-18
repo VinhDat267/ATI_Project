@@ -42,7 +42,7 @@ const RESULT = {
 function StatusBadge({ service }: { service: Service }) {
   const timeStr = service.lastCheckTime ? ` · kiểm tra lúc ${service.lastCheckTime}` : '';
   if (!service.configured) {
-    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-neutral-100 text-[#6B7280] border border-[#E7E7E2]">
+    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-neutral-100 text-[#6A5F56] border border-[#E8E0D6]">
       <span className="w-1.5 h-1.5 rounded-full bg-[#9CA3AF]" />
       <span>{`Chưa kết nối${timeStr}`}</span>
     </span>;
@@ -76,28 +76,28 @@ function ServiceRow({ service, onOpen }: { service: Service; onOpen: (id: string
     id={`service-row-${service.id}`}
     onClick={() => onOpen(service.id)}
     onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(service.id); } }}
-    className="group bg-white hover:bg-[#FDFDFD] border border-[#E7E7E2] hover:border-[#FF5701]/40 rounded-xl p-4 sm:p-5 transition-all shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none"
+    className="group bg-white hover:bg-[#FDFDFD] border border-[#E8E0D6] hover:border-[#FF5701]/40 rounded-xl p-4 sm:p-5 transition-all shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none"
     aria-haspopup="dialog"
     aria-label={`${service.name} — bấm để xem chi tiết kết nối`}
   >
     <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-      <div className="w-10 h-10 rounded-xl bg-[#F8F8F6] border border-[#E7E7E2] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+      <div className="w-10 h-10 rounded-xl bg-[#F8F4EE] border border-[#E8E0D6] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
         <ServiceLogo service={service.id} className="w-6 h-6" />
       </div>
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <h3 className="font-sans font-semibold text-base text-[#111827] group-hover:text-[#B43E00] transition-colors">
+          <h3 className="font-sans font-semibold text-base text-[#1a0e08] group-hover:text-[#B43E00] transition-colors">
             {service.name}
           </h3>
         </div>
-        <p className="text-xs text-[#4B5563] mt-0.5 line-clamp-1 sm:line-clamp-2">
+        <p className="text-xs text-[#51463E] mt-0.5 line-clamp-1 sm:line-clamp-2">
           {service.capabilities}
         </p>
       </div>
     </div>
-    <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#E7E7E2]/60">
+    <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#E8E0D6]/60">
       <div><StatusBadge service={service} /></div>
-      <div className="text-[#6B7280] group-hover:text-[#FF5701] transition-colors">
+      <div className="text-[#6A5F56] group-hover:text-[#FF5701] transition-colors">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
       </div>
     </div>
@@ -177,31 +177,31 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
         {/* Tiêu đề trang & Nguyên tắc */}
         <div className="mb-8 sm:mb-10">
           {/* Context Pill */}
-          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E7E7E2] dark:border-[#293653] bg-white dark:bg-[#131B2F] text-xs text-[#111827] dark:text-[#F1F5F9] shadow-sm">
+          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E8E0D6] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] text-xs text-[#1a0e08] dark:text-[#F3EEE8] shadow-sm">
             {workspace.id === 'personal' ? (
-              <svg className="w-3.5 h-3.5 text-[#6B7280] dark:text-[#9CA3AF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <svg className="w-3.5 h-3.5 text-[#6A5F56] dark:text-[#9CA3AF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             ) : (
-              <svg className="w-3.5 h-3.5 text-[#6B7280] dark:text-[#9CA3AF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <svg className="w-3.5 h-3.5 text-[#6A5F56] dark:text-[#9CA3AF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
             )}
-            <span className="font-semibold text-[#4B5563] dark:text-[#D1D5DB]">
+            <span className="font-semibold text-[#51463E] dark:text-[#D1D5DB]">
               {workspace.id === 'personal'
                 ? 'Đang cấu hình kết nối cho: Không gian Cá nhân'
                 : `Đang cấu hình kết nối cho: ${workspace.name}`}
             </span>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 mb-3">
-            <h1 className="font-sans text-2xl sm:text-[26px] leading-tight font-semibold text-[#111827] dark:text-white tracking-tight">
+            <h1 className="font-sans text-2xl sm:text-[26px] leading-tight font-semibold text-[#1a0e08] dark:text-white tracking-tight">
               Kết nối dịch vụ
             </h1>
             {hasCatalogue ? (
               <div className="flex flex-wrap items-center gap-2">
                 <div className="inline-flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
-                  <span id="summary-connected-count" className="text-sm sm:text-base font-semibold text-[#111827] dark:text-white">
+                  <span id="summary-connected-count" className="text-sm sm:text-base font-semibold text-[#1a0e08] dark:text-white">
                     {`${configured.length} / ${list.length} dịch vụ đã thiết lập · ${okCount} kết nối tốt`}
                   </span>
                 </div>
@@ -216,30 +216,30 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
             )}
           </div>
           {/* Khung nguyên tắc an toàn dữ liệu */}
-          <div className="bg-white dark:bg-[#131B2F] rounded-xl p-4 sm:p-5 border border-[#E7E7E2] dark:border-[#293653] shadow-sm flex items-start gap-3">
+          <div className="bg-white dark:bg-[#1A1613] rounded-xl p-4 sm:p-5 border border-[#E8E0D6] dark:border-[#3a312a] shadow-sm flex items-start gap-3">
             <div className="w-6 h-6 rounded-full bg-[#FF5701]/10 text-[#FF5701] flex items-center justify-center flex-shrink-0 mt-0.5">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
-            <div className="text-xs sm:text-sm text-[#4B5563] dark:text-[#9CA3AF] leading-relaxed">
-              <strong className="text-[#111827] dark:text-white font-semibold">
+            <div className="text-xs sm:text-sm text-[#51463E] dark:text-[#9CA3AF] leading-relaxed">
+              <strong className="text-[#1a0e08] dark:text-white font-semibold">
                 Nguyên tắc an toàn của nhóm:
               </strong>
               {" Planora chỉ đọc và ghi ở những bảng, lịch, tệp hoặc kênh bạn đã chọn bên dưới. Thông tin xác thực được mã hoá an toàn và bạn có thể ngắt kết nối bất cứ lúc nào."}
             </div>
           </div>
         </div>
-        {loading && <p role="status" className="text-xs text-[#6B7280] mb-4">Đang tải dịch vụ...</p>}
+        {loading && <p role="status" className="text-xs text-[#6A5F56] mb-4">Đang tải dịch vụ...</p>}
         {loadError && <div role="alert" className="text-xs text-[#DC2626] mb-4">{loadError} <button type="button" onClick={() => void refresh()} className="underline">Thử lại</button></div>}
-        {connectedEmail && <p role="status" className="text-sm text-[#111827] dark:text-white mb-4">Đã kết nối {connectedEmail}</p>}
+        {connectedEmail && <p role="status" className="text-sm text-[#1a0e08] dark:text-white mb-4">Đã kết nối {connectedEmail}</p>}
         <section aria-labelledby="heading-personal-services" className="mb-8 v3-space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-[#E7E7E2] dark:border-[#293653]">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-[#E8E0D6] dark:border-[#3a312a]">
             <div>
-              <h2 id="heading-personal-services" className="text-sm font-semibold text-[#111827] dark:text-white">Của riêng bạn</h2>
-              <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] mt-0.5">Liên kết tài khoản trực tiếp · Chỉ truy cập đúng dữ liệu bạn cho phép</p>
+              <h2 id="heading-personal-services" className="text-sm font-semibold text-[#1a0e08] dark:text-white">Của riêng bạn</h2>
+              <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF] mt-0.5">Liên kết tài khoản trực tiếp · Chỉ truy cập đúng dữ liệu bạn cho phép</p>
             </div>
-            <div role="tablist" aria-label="Phân nhóm dịch vụ" className="inline-flex flex-wrap items-center gap-1 p-1 rounded-xl bg-[#F3F2EE] dark:bg-[#0E1528] border border-[#E7E7E2] dark:border-[#293653]">
+            <div role="tablist" aria-label="Phân nhóm dịch vụ" className="inline-flex flex-wrap items-center gap-1 p-1 rounded-xl bg-[#F3F2EE] dark:bg-[#131010] border border-[#E8E0D6] dark:border-[#3a312a]">
               {([
                 { id: 'all', label: 'Tất cả' },
                 { id: 'google', label: 'Google Workspace' },
@@ -254,8 +254,8 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                   onClick={() => setCategoryFilter(tab.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     categoryFilter === tab.id
-                      ? 'bg-white dark:bg-[#1A2540] text-[#111827] dark:text-[#F1F5F9] shadow-sm'
-                      : 'text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#111827] dark:hover:text-white'
+                      ? 'bg-white dark:bg-[#221C18] text-[#1a0e08] dark:text-[#F3EEE8] shadow-sm'
+                      : 'text-[#6A5F56] dark:text-[#9CA3AF] hover:text-[#1a0e08] dark:hover:text-white'
                   }`}
                 >
                   {tab.label}
@@ -268,10 +268,10 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
           {(personal || personalMyCalendar || personalMySheets) && (
             <div className={categoryFilter !== 'all' && categoryFilter !== 'google' ? 'hidden' : 'v3-space-y-3'}>
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-[#111827] dark:text-white">
+                <h3 className="text-sm font-semibold text-[#1a0e08] dark:text-white">
                   Google Workspace · Thư, Lịch họp &amp; Bảng tính
                 </h3>
-                <span className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Cấp quyền riêng từng tệp &amp; lịch</span>
+                <span className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">Cấp quyền riêng từng tệp &amp; lịch</span>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
                 {personal && <PersonalGmail key={`gmail-${user?.id}`} selected={selected} service={personal} refresh={refresh} standalone={false} />}
@@ -288,10 +288,10 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
           {/* Nhóm 2: Quản lý dự án, Tài liệu & Mã nguồn */}
           <div className={categoryFilter !== 'all' && categoryFilter !== 'work' ? 'hidden' : 'v3-space-y-3'}>
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-[#111827] dark:text-white">
+              <h3 className="text-sm font-semibold text-[#1a0e08] dark:text-white">
                 Quản lý dự án, Tài liệu &amp; Mã nguồn
               </h3>
-              <span className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Bảng công việc, kho mã &amp; tài liệu nhóm</span>
+              <span className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">Bảng công việc, kho mã &amp; tài liệu nhóm</span>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
               <TrelloConnection key={`trello-${user?.id}`} user={user} selected={selected} refresh={refresh} standalone={false} />
@@ -308,10 +308,10 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
           {/* Nhóm 3: Tin nhắn & Kênh thông báo */}
           <div className={categoryFilter !== 'all' && categoryFilter !== 'messaging' ? 'hidden' : 'v3-space-y-3'}>
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-[#111827] dark:text-white">
+              <h3 className="text-sm font-semibold text-[#1a0e08] dark:text-white">
                 Tin nhắn &amp; Kênh thông báo tự động
               </h3>
-              <span className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">Nhận báo cáo &amp; nhắc việc tức thì</span>
+              <span className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">Nhận báo cáo &amp; nhắc việc tức thì</span>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
               <div className={slackOAuthEnabled ? '' : 'lg:col-span-2'}>
@@ -326,7 +326,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
           {/* Nhóm 1: Đã thiết lập */}
           <section aria-labelledby="heading-connected-services">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mb-3.5">
-              <h2 id="heading-connected-services" className="text-xs font-bold uppercase tracking-wider text-[#6B7280] flex items-center gap-2 whitespace-nowrap">
+              <h2 id="heading-connected-services" className="text-xs font-bold uppercase tracking-wider text-[#6A5F56] flex items-center gap-2 whitespace-nowrap">
                 <span>
                   Đã thiết lập
                 </span>
@@ -334,53 +334,53 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                   {configured.length}
                 </span>
               </h2>
-              <span className="text-xs text-[#6B7280]">
+              <span className="text-xs text-[#6A5F56]">
                 Bấm vào hàng để xem hoặc đổi nơi được dùng
               </span>
             </div>
             <div id="list-connected-services" className="v3-space-y-3" role="list">
               {configured.length === 0
-                ? <div role="listitem" className="p-6 text-center text-xs text-[#6B7280] dark:text-[#A1AEC0] bg-white dark:bg-[#131B2F] rounded-xl border border-[#E7E7E2] dark:border-[#293653]">Chưa có dịch vụ nào được thiết lập.</div>
+                ? <div role="listitem" className="p-6 text-center text-xs text-[#6A5F56] dark:text-[#AFA59A] bg-white dark:bg-[#1A1613] rounded-xl border border-[#E8E0D6] dark:border-[#3a312a]">Chưa có dịch vụ nào được thiết lập.</div>
                 : configured.map(s => <div key={s.id} role="listitem"><ServiceRow service={s} onOpen={actions.openServiceDrawer} /></div>)}
             </div>
           </section>
           {/* Nhóm 2: Chưa thiết lập */}
           <section aria-labelledby="heading-unconnected-services">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mb-3.5">
-              <h2 id="heading-unconnected-services" className="text-xs font-bold uppercase tracking-wider text-[#6B7280] flex items-center gap-2 whitespace-nowrap">
+              <h2 id="heading-unconnected-services" className="text-xs font-bold uppercase tracking-wider text-[#6A5F56] flex items-center gap-2 whitespace-nowrap">
                 <span>
                   Chưa thiết lập
                 </span>
-                <span id="badge-count-unconnected" className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-200 text-[#4B5563]">
+                <span id="badge-count-unconnected" className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-200 text-[#51463E]">
                   {unconfigured.length}
                 </span>
               </h2>
-              <span className="text-xs text-[#6B7280]">
+              <span className="text-xs text-[#6A5F56]">
                 Bấm để thêm khoá truy cập và kích hoạt
               </span>
             </div>
             <div id="list-unconnected-services" className="v3-space-y-3" role="list">
               {unconfigured.length === 0
-                ? <div role="listitem" className="p-6 text-center text-xs text-[#6B7280] bg-white rounded-xl border border-[#E7E7E2]">{`Tất cả ${list.length} dịch vụ đều đã được thiết lập.`}</div>
+                ? <div role="listitem" className="p-6 text-center text-xs text-[#6A5F56] bg-white rounded-xl border border-[#E8E0D6]">{`Tất cả ${list.length} dịch vụ đều đã được thiết lập.`}</div>
                 : unconfigured.map(s => <div key={s.id} role="listitem"><ServiceRow service={s} onOpen={actions.openServiceDrawer} /></div>)}
             </div>
           </section>
         </div>}
         {/* Chú thích chân trang */}
-        <div className="mt-12 pt-6 border-t border-[#E7E7E2] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6B7280]">
+        <div className="mt-12 pt-6 border-t border-[#E8E0D6] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#6A5F56]">
           <div>
             <p>
               Planora — Nền tảng điều phối công việc liên dịch vụ · 2026
             </p>
-            <p className="text-xs text-[#6B7280] mt-0.5">
+            <p className="text-xs text-[#6A5F56] mt-0.5">
               {personal ? 'Các tích hợp cá nhân (Gmail, Google Calendar, Google Sheets, Slack, Trello, GitHub, Notion, Jira Cloud, Telegram) do mỗi thành viên tự liên kết và chọn phạm vi dữ liệu.' : 'Khoá dịch vụ là tài nguyên dùng chung của cả nhóm · Chỉ quản trị viên có quyền cập nhật'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-xs">
-            <a href="/" className="hover:text-[#111827] transition-colors">
+            <a href="/" className="hover:text-[#1a0e08] transition-colors">
               Không gian làm việc
             </a>
-            <a href="/guide" className="hover:text-[#111827] transition-colors">
+            <a href="/guide" className="hover:text-[#1a0e08] transition-colors">
               Cẩm nang
             </a>
             <a href="/privacy" className="text-[#FF5701] hover:underline font-medium transition-colors">
@@ -399,15 +399,15 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
         <div id="drawer-backdrop" className={`drawer-backdrop fixed inset-0 bg-black/40 opacity-100 transition-opacity`} onClick={() => actions.closeServiceDrawer()} />
         <div className="fixed inset-y-0 right-0 max-w-full flex">
           {/* Panel ngăn chi tiết */}
-          <div id="drawer-panel" className={`drawer-panel w-screen sm:max-w-xl bg-white shadow-2xl flex flex-col translate-x-0 border-l border-[#E7E7E2] transition-transform`}>
+          <div id="drawer-panel" className={`drawer-panel w-screen sm:max-w-xl bg-white shadow-2xl flex flex-col translate-x-0 border-l border-[#E8E0D6] transition-transform`}>
             {/* Header của ngăn chi tiết */}
-            <div className="px-5 sm:px-6 py-4 border-b border-[#E7E7E2] flex items-center justify-between gap-3 bg-[#F8F8F6]">
+            <div className="px-5 sm:px-6 py-4 border-b border-[#E8E0D6] flex items-center justify-between gap-3 bg-[#F8F4EE]">
               <div className="flex items-center gap-3 min-w-0">
                 <div id="drawer-icon-container" className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
                   <ServiceLogo service={drawer.service.id} className="w-6 h-6" />
                 </div>
                 <div className="min-w-0">
-                  <h2 id="drawer-service-title" className="font-sans text-lg font-semibold text-[#111827] truncate">
+                  <h2 id="drawer-service-title" className="font-sans text-lg font-semibold text-[#1a0e08] truncate">
                     {drawer.service.name}
                   </h2>
                   <div id="drawer-header-status-badge" className="mt-0.5">
@@ -415,7 +415,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                   </div>
                 </div>
               </div>
-              <button ref={closeButtonRef} type="button" id="btn-close-drawer" onClick={() => actions.closeServiceDrawer()} className="p-2 text-[#6B7280] hover:text-[#111827] rounded-lg hover:bg-neutral-200 transition-colors" aria-label="Đóng ngăn chi tiết">
+              <button ref={closeButtonRef} type="button" id="btn-close-drawer" onClick={() => actions.closeServiceDrawer()} className="p-2 text-[#6A5F56] hover:text-[#1a0e08] rounded-lg hover:bg-neutral-200 transition-colors" aria-label="Đóng ngăn chi tiết">
                 {' '}
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -440,9 +440,9 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
             <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-6 v3-space-y-8" id="drawer-body">
               {/* PHẦN 1: KHOÁ TRUY CẬP */}
               <section aria-labelledby="section-keys-title" className="v3-space-y-4">
-                <div className="flex items-center justify-between gap-2 border-b border-[#E7E7E2] pb-2">
-                  <h3 id="section-keys-title" className="text-sm font-bold uppercase tracking-wider text-[#111827] flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-[#111827] text-white text-xs flex items-center justify-center font-bold">
+                <div className="flex items-center justify-between gap-2 border-b border-[#E8E0D6] pb-2">
+                  <h3 id="section-keys-title" className="text-sm font-bold uppercase tracking-wider text-[#1a0e08] flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-[#1a0e08] text-white text-xs flex items-center justify-center font-bold">
                       1
                     </span>
                     <span>
@@ -460,11 +460,11 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                   </button>
                 </div>
                 {/* Hộp hướng dẫn Lấy khoá ở đâu (Ẩn mặc định) */}
-                <div id="key-help-box" className={`${keyHelpOpen ? '' : 'hidden '}bg-[#F8F8F6] p-3.5 rounded-xl border border-[#E7E7E2] text-xs text-[#4B5563] leading-relaxed`}>
+                <div id="key-help-box" className={`${keyHelpOpen ? '' : 'hidden '}bg-[#F8F4EE] p-3.5 rounded-xl border border-[#E8E0D6] text-xs text-[#51463E] leading-relaxed`}>
                   <p id="key-help-text">
                     {drawer ? drawer.service.keyHelp : 'Hướng dẫn lấy khoá...'}
                   </p>
-                  <div className="mt-2.5 pt-2 border-t border-[#E7E7E2]">
+                  <div className="mt-2.5 pt-2 border-t border-[#E8E0D6]">
                     <a id="key-help-guide-link" href={drawer.service.guideUrl ?? "/guide"} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#FF5701] hover:underline">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
@@ -476,7 +476,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                   </div>
                 </div>
                 {/* Gợi ý riêng của dịch vụ (nếu có) */}
-                <div id="service-specific-hint" className={`${hint.visible ? '' : 'hidden '}text-xs text-[#6B7280] italic bg-blue-50/70 p-2.5 rounded-lg border border-blue-100 flex items-center gap-2 text-blue-900`}>
+                <div id="service-specific-hint" className={`${hint.visible ? '' : 'hidden '}text-xs text-[#6A5F56] italic bg-blue-50/70 p-2.5 rounded-lg border border-blue-100 flex items-center gap-2 text-blue-900`}>
                   <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
@@ -493,14 +493,14 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                     const locked = isMemberDrawer ? ' bg-neutral-100 cursor-not-allowed' : '';
                     return (
                       <div key={input.id}>
-                        <label htmlFor={input.id} className="block text-xs font-semibold text-[#111827] mb-1.5">
+                        <label htmlFor={input.id} className="block text-xs font-semibold text-[#1a0e08] mb-1.5">
                           {input.label}
                           {' '}
                           <span className="text-[#FF5701]">*</span>
                         </label>
                         {input.type === 'textarea'
-                          ? <textarea id={input.id} aria-label={input.label} rows={3} disabled={isMemberDrawer} value={draft.credentials[input.key] ?? ""} onChange={event => actions.onKeyInputChanged(input.key, event.target.value)} autoComplete="off" spellCheck={false} placeholder={placeholder} className={`key-input-field w-full text-xs font-mono px-3 py-2 bg-[#F8F8F6] border border-[#E7E7E2] rounded-lg text-[#111827] focus:bg-white focus:v3-outline-none focus:border-[#FF5701] transition-all resize-y${locked}`} />
-                          : <input type={input.type} id={input.id} aria-label={input.label} disabled={isMemberDrawer} value={draft.credentials[input.key] ?? ""} onChange={event => actions.onKeyInputChanged(input.key, event.target.value)} autoComplete="off" spellCheck={false} placeholder={placeholder} className={`key-input-field w-full text-xs sm:text-sm px-3 py-2 bg-[#F8F8F6] border border-[#E7E7E2] rounded-lg text-[#111827] focus:bg-white focus:v3-outline-none focus:border-[#FF5701] transition-all${locked}${needsFormatValidation && fieldInvalid ? ' border-rose-400' : ''}`} />}
+                          ? <textarea id={input.id} aria-label={input.label} rows={3} disabled={isMemberDrawer} value={draft.credentials[input.key] ?? ""} onChange={event => actions.onKeyInputChanged(input.key, event.target.value)} autoComplete="off" spellCheck={false} placeholder={placeholder} className={`key-input-field w-full text-xs font-mono px-3 py-2 bg-[#F8F4EE] border border-[#E8E0D6] rounded-lg text-[#1a0e08] focus:bg-white focus:v3-outline-none focus:border-[#FF5701] transition-all resize-y${locked}`} />
+                          : <input type={input.type} id={input.id} aria-label={input.label} disabled={isMemberDrawer} value={draft.credentials[input.key] ?? ""} onChange={event => actions.onKeyInputChanged(input.key, event.target.value)} autoComplete="off" spellCheck={false} placeholder={placeholder} className={`key-input-field w-full text-xs sm:text-sm px-3 py-2 bg-[#F8F4EE] border border-[#E8E0D6] rounded-lg text-[#1a0e08] focus:bg-white focus:v3-outline-none focus:border-[#FF5701] transition-all${locked}${needsFormatValidation && fieldInvalid ? ' border-rose-400' : ''}`} />}
                         {needsFormatValidation ? (
                           <p id={`${input.id}-format-hint`} className={`${fieldInvalid ? '' : 'hidden '}text-[11px] text-[#DC2626] font-medium mt-1`}>
                             {input.formatHint}
@@ -513,16 +513,16 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
               </section>
               {/* PHẦN 2: NƠI Planora ĐƯỢC PHÉP DÙNG */}
               <section aria-labelledby="section-scope-title" className="v3-space-y-4">
-                <div className="border-b border-[#E7E7E2] pb-2">
-                  <h3 id="section-scope-title" className="text-sm font-bold uppercase tracking-wider text-[#111827] flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-[#111827] text-white text-xs flex items-center justify-center font-bold">
+                <div className="border-b border-[#E8E0D6] pb-2">
+                  <h3 id="section-scope-title" className="text-sm font-bold uppercase tracking-wider text-[#1a0e08] flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-[#1a0e08] text-white text-xs flex items-center justify-center font-bold">
                       2
                     </span>
                     <span>
                       Nơi Planora được phép dùng
                     </span>
                   </h3>
-                  <p className="text-xs text-[#6B7280] mt-1" id="scope-description-text">
+                  <p className="text-xs text-[#6A5F56] mt-1" id="scope-description-text">
                     {scopeLabel ? `Planora chỉ đọc và ghi ở những ${scopeLabel} trong danh sách này.` : 'Planora chỉ đọc và ghi ở những nơi trong danh sách này.'}
                   </p>
                 </div>
@@ -530,12 +530,12 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                 <div>
                   <div id="scope-chips-container" className="flex flex-wrap gap-2 mb-3 min-h-[32px]">
                     {scope && scope.items.length === 0 ? (
-                      <span className="text-xs text-[#6B7280] italic py-1">{`Chưa có ${scope.scopeLabel} nào được cấp quyền.`}</span>
+                      <span className="text-xs text-[#6A5F56] italic py-1">{`Chưa có ${scope.scopeLabel} nào được cấp quyền.`}</span>
                     ) : scope?.items.map((item, idx) => (
-                      <div key={`${idx}-${item}`} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[#F8F8F6] border border-[#E7E7E2] text-[#111827] shadow-sm">
+                      <div key={`${idx}-${item}`} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs bg-[#F8F4EE] border border-[#E8E0D6] text-[#1a0e08] shadow-sm">
                         <span className="font-mono text-[11px] truncate max-w-[200px] sm:max-w-[260px]">{item}</span>
                         {!scope.isMember ? (
-                          <button type="button" onClick={() => actions.removeScopeItem(idx)} className="text-[#6B7280] hover:text-[#DC2626] transition-colors p-0.5 rounded-full hover:bg-neutral-200" aria-label={`Xoá mục ${item}`}>
+                          <button type="button" onClick={() => actions.removeScopeItem(idx)} className="text-[#6A5F56] hover:text-[#DC2626] transition-colors p-0.5 rounded-full hover:bg-neutral-200" aria-label={`Xoá mục ${item}`}>
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                           </button>
                         ) : null}
@@ -558,9 +558,9 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                         {scopeLabel ? `Thêm ${scopeLabel}` : 'Thêm mục mới'}
                       </label>
                       {' '}
-                      <input type="text" id="new-scope-input" value={draft.newScope} onChange={event => actions.onScopeInputChanged(event.target.value)} disabled={isMemberDrawer} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); actions.addNewScopeItem(); } }} placeholder={scopeLabel ? `Nhập ${scopeLabel} mới (ví dụ)...` : 'Nhập ID mới...'} className={`w-full text-xs sm:text-sm px-3 py-2 bg-[#F8F8F6] border border-[#E7E7E2] rounded-lg text-[#111827] focus:bg-white focus:v3-outline-none focus:border-[#FF5701] transition-all${newScopeInvalid ? ' border-rose-400' : ''}`} />
+                      <input type="text" id="new-scope-input" value={draft.newScope} onChange={event => actions.onScopeInputChanged(event.target.value)} disabled={isMemberDrawer} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); actions.addNewScopeItem(); } }} placeholder={scopeLabel ? `Nhập ${scopeLabel} mới (ví dụ)...` : 'Nhập ID mới...'} className={`w-full text-xs sm:text-sm px-3 py-2 bg-[#F8F4EE] border border-[#E8E0D6] rounded-lg text-[#1a0e08] focus:bg-white focus:v3-outline-none focus:border-[#FF5701] transition-all${newScopeInvalid ? ' border-rose-400' : ''}`} />
                     </div>
-                    <button type="button" id="btn-add-scope" aria-label="Thêm" onClick={() => actions.addNewScopeItem()} className="px-3.5 py-2 text-xs sm:text-sm font-medium text-[#111827] bg-[#F8F8F6] hover:bg-neutral-200 border border-[#E7E7E2] rounded-lg transition-colors flex-shrink-0">
+                    <button type="button" id="btn-add-scope" aria-label="Thêm" onClick={() => actions.addNewScopeItem()} className="px-3.5 py-2 text-xs sm:text-sm font-medium text-[#1a0e08] bg-[#F8F4EE] hover:bg-neutral-200 border border-[#E8E0D6] rounded-lg transition-colors flex-shrink-0">
                       {" + Thêm "}
                     </button>
                   </div>
@@ -570,9 +570,9 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                 </div>
               </section>
               {/* KHỐI LƯU THAY ĐỔI (Trước khi kiểm tra) */}
-              <div className="bg-[#F8F8F6] p-4 rounded-xl border border-[#E7E7E2] v3-space-y-3">
-                <p className="text-xs text-[#4B5563] leading-relaxed">
-                  <strong className="text-[#111827]">
+              <div className="bg-[#F8F4EE] p-4 rounded-xl border border-[#E8E0D6] v3-space-y-3">
+                <p className="text-xs text-[#51463E] leading-relaxed">
+                  <strong className="text-[#1a0e08]">
                     Lưu ý khi cập nhật:
                   </strong>
                   {" Khi đổi khoá, nhập lại đủ các ô khoá bên trên. Chỉ đổi nơi được dùng thì không cần nhập lại khoá."}
@@ -590,23 +590,23 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                 </button>
               </div>
               {/* PHẦN 3: KIỂM TRA KẾT NỐI */}
-              <section aria-labelledby="section-test-title" className="v3-space-y-4 pt-2 border-t border-[#E7E7E2]">
-                <div className="border-b border-[#E7E7E2] pb-2">
-                  <h3 id="section-test-title" className="text-sm font-bold uppercase tracking-wider text-[#111827] flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-[#111827] text-white text-xs flex items-center justify-center font-bold">
+              <section aria-labelledby="section-test-title" className="v3-space-y-4 pt-2 border-t border-[#E8E0D6]">
+                <div className="border-b border-[#E8E0D6] pb-2">
+                  <h3 id="section-test-title" className="text-sm font-bold uppercase tracking-wider text-[#1a0e08] flex items-center gap-2">
+                    <span className="w-5 h-5 rounded-full bg-[#1a0e08] text-white text-xs flex items-center justify-center font-bold">
                       3
                     </span>
                     <span>
                       Kiểm tra kết nối
                     </span>
                   </h3>
-                  <p className="text-xs text-[#6B7280] mt-1">
+                  <p className="text-xs text-[#6A5F56] mt-1">
                     Gửi một tín hiệu kiểm tra tới máy chủ dịch vụ để xác nhận khoá và quyền hạn vẫn hợp lệ.
                   </p>
                 </div>
                 {/* Nút bấm kiểm tra */}
                 <div>
-                  <button type="button" id="btn-run-test-connection" disabled={testButton.disabled} aria-describedby={!drawer.service.configured ? "test-unconfigured-note" : undefined} onClick={() => void actions.runTestConnection()} className={`w-full py-2.5 px-4 text-xs sm:text-sm font-semibold text-[#111827] bg-white ${testButton.dim ? 'opacity-50 cursor-not-allowed' : 'hover:bg-neutral-50'} border border-[#E7E7E2] rounded-lg shadow-sm transition-all flex items-center justify-center gap-2`}>
+                  <button type="button" id="btn-run-test-connection" disabled={testButton.disabled} aria-describedby={!drawer.service.configured ? "test-unconfigured-note" : undefined} onClick={() => void actions.runTestConnection()} className={`w-full py-2.5 px-4 text-xs sm:text-sm font-semibold text-[#1a0e08] bg-white ${testButton.dim ? 'opacity-50 cursor-not-allowed' : 'hover:bg-neutral-50'} border border-[#E8E0D6] rounded-lg shadow-sm transition-all flex items-center justify-center gap-2`}>
                     {/* Icon hoặc Spinner */}
                     <svg id="test-btn-icon" className={`${testButton.spinning ? 'hidden ' : ''}w-4 h-4 text-[#FF5701]`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -619,7 +619,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                       {testButton.spinning ? 'Đang kiểm tra kết nối...' : 'Kiểm tra kết nối'}
                     </span>
                   </button>
-                  <p id="test-unconfigured-note" className={`${testButton.dim ? '' : 'hidden '}text-xs text-[#6B7280] mt-1.5 leading-relaxed`}>
+                  <p id="test-unconfigured-note" className={`${testButton.dim ? '' : 'hidden '}text-xs text-[#6A5F56] mt-1.5 leading-relaxed`}>
                     Lưu khoá và ít nhất một nơi được dùng trước, rồi mới kiểm tra được.
                   </p>
                 </div>
@@ -633,7 +633,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                       <p id="test-result-message" className="font-medium">
                         {result.message}
                       </p>
-                      <p id="test-result-time" className="text-[11px] text-[#6B7280] mt-0.5">
+                      <p id="test-result-time" className="text-[11px] text-[#6A5F56] mt-0.5">
                         {result.time ? `Thời gian ghi nhận: ${result.time}` : null}
                       </p>
                     </div>

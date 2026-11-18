@@ -397,12 +397,12 @@ export function PersonalMyCalendar({
       <div className="v3-space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="font-sans font-semibold text-base text-[#111827] dark:text-white flex items-center gap-2.5">
+            <h3 className="font-sans font-semibold text-base text-[#1a0e08] dark:text-white flex items-center gap-2.5">
               <ServiceLogo service="mycalendar" className="w-5 h-5" />
               <span>Google Calendar của bạn</span>
             </h3>
             {(status === 'scope_required' || service.email) && (
-              <p className="text-xs font-medium text-[#4B5563] dark:text-[#9CA3AF] break-words mt-0.5 pl-7">
+              <p className="text-xs font-medium text-[#51463E] dark:text-[#9CA3AF] break-words mt-0.5 pl-7">
                 {status === 'scope_required' && <span>Đã cấp quyền · Chưa chọn lịch</span>}
                 {status === 'scope_required' && service.email && ' · '}
                 {service.email}
@@ -430,7 +430,7 @@ export function PersonalMyCalendar({
             </span>
           </span>
         </div>
-        <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] leading-relaxed">
+        <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF] leading-relaxed">
           Planora chỉ đọc sự kiện, tìm khung giờ trống và tạo, cập nhật hoặc huỷ sự kiện trên các lịch bạn
           đã chọn sau khi bạn duyệt kế hoạch (không tự ý gửi lời mời cho người khác).
         </p>
@@ -447,8 +447,8 @@ export function PersonalMyCalendar({
         </div>
 
         {status === 'connected' && service.selectedCalendars && service.selectedCalendars.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#F8F8F6] dark:bg-[#0E1528] border border-[#E7E7E2] dark:border-[#293653]">
-            <span className="text-xs font-medium text-[#4B5563] dark:text-[#9CA3AF]">Lịch được dùng:</span>
+          <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#F8F4EE] dark:bg-[#131010] border border-[#E8E0D6] dark:border-[#3a312a]">
+            <span className="text-xs font-medium text-[#51463E] dark:text-[#9CA3AF]">Lịch được dùng:</span>
             {service.selectedCalendars.map((cal) => (
               <span
                 key={cal.id}
@@ -462,14 +462,14 @@ export function PersonalMyCalendar({
         )}
 
         {status === 'reconnect_required' && (
-          <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+          <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
             Quyền có thể đã bị thu hồi hoặc hết hạn sau 7 ngày ở chế độ thử nghiệm của Google. Hãy kết
             nối lại.
           </p>
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#293653]">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#3a312a]">
         {status === 'not_connected' && (
           <button
             id="mycalendar-action"
@@ -571,7 +571,7 @@ export function PersonalMyCalendar({
       </div>
 
       {busy && (
-        <p role="status" className="text-xs text-[#6B7280]">
+        <p role="status" className="text-xs text-[#6A5F56]">
           {status === 'connected' ? 'Đang cập nhật…' : 'Đang chuyển hướng tới Google…'}
         </p>
       )}
@@ -586,14 +586,14 @@ export function PersonalMyCalendar({
         <div
           id="mycalendar-triggers-panel"
           data-testid="mycalendar-triggers-section"
-          className="mt-1 pt-3 border-t border-[#E7E7E2] dark:border-[#293653] v3-space-y-4"
+          className="mt-1 pt-3 border-t border-[#E8E0D6] dark:border-[#3a312a] v3-space-y-4"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h4 id="mycalendar-triggers-heading" className="text-sm font-semibold text-[#111827] dark:text-white">
+              <h4 id="mycalendar-triggers-heading" className="text-sm font-semibold text-[#1a0e08] dark:text-white">
                 Cảnh báo sự kiện chủ động
               </h4>
-              <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+              <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
                 Tự động nhắc trước giờ họp hoặc báo khi lịch họp có thay đổi.
               </p>
             </div>
@@ -618,7 +618,7 @@ export function PersonalMyCalendar({
           ) : (
             <div className="v3-space-y-2.5">
               {triggers.length === 0 ? (
-                <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+                <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
                   Chưa có quy tắc cảnh báo nào được thiết lập.
                 </p>
               ) : (
@@ -626,11 +626,11 @@ export function PersonalMyCalendar({
                   {triggers.map((item) => (
                     <li
                       key={item.id}
-                      className="p-3 rounded-xl border border-[#E7E7E2] dark:border-[#293653] bg-[#F8F8F6] dark:bg-[#0E1528] flex flex-wrap items-start justify-between gap-2"
+                      className="p-3 rounded-xl border border-[#E8E0D6] dark:border-[#3a312a] bg-[#F8F4EE] dark:bg-[#131010] flex flex-wrap items-start justify-between gap-2"
                     >
                       <div className="min-w-0 v3-space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-semibold text-[#111827] dark:text-white">{item.name}</span>
+                          <span className="text-xs font-semibold text-[#1a0e08] dark:text-white">{item.name}</span>
                           <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-800 border border-blue-200">
                             {item.triggerType === 'pre_meeting_reminder'
                               ? `Nhắc trước ${item.leadMinutes} phút`
@@ -652,7 +652,7 @@ export function PersonalMyCalendar({
                                 : 'Cần kiểm tra'}
                           </span>
                         </div>
-                        <p className="text-[11px] text-[#4B5563] dark:text-[#9CA3AF]">
+                        <p className="text-[11px] text-[#51463E] dark:text-[#9CA3AF]">
                           Gửi tới: {item.destination.channelName || item.destination.channelId}
                         </p>
                         {item.pauseReason && (
@@ -702,10 +702,10 @@ export function PersonalMyCalendar({
               <form
                 aria-labelledby="mycalendar-triggers-heading"
                 onSubmit={(e) => void previewTriggerSubmit(e)}
-                className="p-3 rounded-xl border border-[#E7E7E2] dark:border-[#293653] bg-white dark:bg-[#11192E] v3-space-y-3"
+                className="p-3 rounded-xl border border-[#E8E0D6] dark:border-[#3a312a] bg-white dark:bg-[#161210] v3-space-y-3"
               >
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="mycal-trigger-name" className="text-xs font-semibold text-[#111827] dark:text-white">
+                  <label htmlFor="mycal-trigger-name" className="text-xs font-semibold text-[#1a0e08] dark:text-white">
                     Tên cảnh báo <span aria-hidden="true">*</span>
                   </label>
                   <input
@@ -717,12 +717,12 @@ export function PersonalMyCalendar({
                     value={newTriggerName}
                     onChange={(e) => setNewTriggerName(e.target.value)}
                     placeholder="Ví dụ: Nhắc họp Sprint trước 15 phút"
-                    className="w-full rounded-lg border border-[#D1D5DB] dark:border-[#293653] bg-white dark:bg-[#0E1528] px-3 py-1.5 text-xs text-[#111827] dark:text-[#F1F5F9]"
+                    className="w-full rounded-lg border border-[#D1D5DB] dark:border-[#3a312a] bg-white dark:bg-[#131010] px-3 py-1.5 text-xs text-[#1a0e08] dark:text-[#F3EEE8]"
                   />
                 </div>
 
                 <fieldset className="v3-space-y-1.5">
-                  <legend className="text-xs font-semibold text-[#111827] dark:text-white mb-1">
+                  <legend className="text-xs font-semibold text-[#1a0e08] dark:text-white mb-1">
                     Chế độ theo dõi
                   </legend>
                   <div className="flex flex-wrap items-center gap-4 text-xs">
@@ -753,7 +753,7 @@ export function PersonalMyCalendar({
 
                 {newTriggerType === 'pre_meeting_reminder' && (
                   <div className="flex flex-col gap-1">
-                    <label htmlFor="mycal-trigger-lead" className="text-xs font-semibold text-[#111827] dark:text-white">
+                    <label htmlFor="mycal-trigger-lead" className="text-xs font-semibold text-[#1a0e08] dark:text-white">
                       Nhắc trước (phút)
                     </label>
                     <input
@@ -764,14 +764,14 @@ export function PersonalMyCalendar({
                       max={1440}
                       value={newTriggerLead}
                       onChange={(e) => setNewTriggerLead(Math.max(1, Math.min(1440, Number(e.target.value) || 15)))}
-                      className="w-28 rounded-lg border border-[#D1D5DB] dark:border-[#293653] bg-white dark:bg-[#0E1528] px-3 py-1.5 text-xs text-[#111827] dark:text-[#F1F5F9]"
+                      className="w-28 rounded-lg border border-[#D1D5DB] dark:border-[#3a312a] bg-white dark:bg-[#131010] px-3 py-1.5 text-xs text-[#1a0e08] dark:text-[#F3EEE8]"
                     />
                   </div>
                 )}
 
                 {triggerCalendars.length > 1 || (triggerCalendars.length === 1 && !validTriggerCalendarCount) ? (
                   <fieldset className="v3-space-y-1.5">
-                    <legend className="text-xs font-semibold text-[#111827] dark:text-white mb-1">
+                    <legend className="text-xs font-semibold text-[#1a0e08] dark:text-white mb-1">
                       Lịch được theo dõi
                     </legend>
                     <div className="flex flex-wrap items-center gap-3 text-xs">
@@ -798,7 +798,7 @@ export function PersonalMyCalendar({
                 ) : null}
 
                 <div className="flex flex-col gap-1">
-                  <label htmlFor="mycal-trigger-dest" className="text-xs font-semibold text-[#111827] dark:text-white">
+                  <label htmlFor="mycal-trigger-dest" className="text-xs font-semibold text-[#1a0e08] dark:text-white">
                     Kênh nhận cảnh báo
                   </label>
                   {triggerDestinations.length > 0 ? (
@@ -807,7 +807,7 @@ export function PersonalMyCalendar({
                       name="destinationKey"
                       value={newTriggerDestKey}
                       onChange={(e) => setNewTriggerDestKey(e.target.value)}
-                      className="w-full rounded-lg border border-[#D1D5DB] dark:border-[#293653] bg-white dark:bg-[#0E1528] px-3 py-1.5 text-xs text-[#111827] dark:text-[#F1F5F9]"
+                      className="w-full rounded-lg border border-[#D1D5DB] dark:border-[#3a312a] bg-white dark:bg-[#131010] px-3 py-1.5 text-xs text-[#1a0e08] dark:text-[#F3EEE8]"
                     >
                       {triggerDestinations.map((dest) => (
                         <option key={dest.key} value={dest.key}>
@@ -816,7 +816,7 @@ export function PersonalMyCalendar({
                       ))}
                     </select>
                   ) : (
-                    <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+                    <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
                       Hãy kết nối Slack hoặc Telegram ở trang này để chọn kênh nhận thông báo.
                     </p>
                   )}
@@ -846,7 +846,7 @@ export function PersonalMyCalendar({
         <section aria-labelledby="heading-personal-services" className="mb-8">
           <h2
             id="heading-personal-services"
-            className="text-xs font-bold uppercase tracking-wider text-[#6B7280] mb-3.5"
+            className="text-xs font-bold uppercase tracking-wider text-[#6A5F56] mb-3.5"
           >
             Của riêng bạn
           </h2>
@@ -946,19 +946,19 @@ export function PersonalMyCalendar({
           >
             <div className="p-5 v3-space-y-4 max-h-[75vh] overflow-y-auto">
               {loadingCalendars ? (
-                <p role="status" className="text-sm text-[#4B5563]">
+                <p role="status" className="text-sm text-[#51463E]">
                   Đang tải danh sách lịch…
                 </p>
               ) : (
                 <>
-                  <p className="text-xs text-[#6B7280]">
+                  <p className="text-xs text-[#6A5F56]">
                     Chọn ít nhất 1 lịch mà bạn cho phép Planora đọc và tạo sự kiện:
                   </p>
                   <div className="v3-space-y-2">
                     {calendars.map((cal) => (
                       <label
                         key={cal.id}
-                        className="flex items-start gap-3 p-3 rounded-lg border border-[#E7E7E2] hover:bg-neutral-50 cursor-pointer"
+                        className="flex items-start gap-3 p-3 rounded-lg border border-[#E8E0D6] hover:bg-neutral-50 cursor-pointer"
                       >
                         <input
                           type="checkbox"
@@ -970,17 +970,17 @@ export function PersonalMyCalendar({
                                 : [...prev, cal.id]
                             )
                           }
-                          className="mt-0.5 text-[#FF5701] rounded border-[#E7E7E2] focus:ring-[#FF5701]"
+                          className="mt-0.5 text-[#FF5701] rounded border-[#E8E0D6] focus:ring-[#FF5701]"
                         />
                         <div className="min-w-0 text-xs">
-                          <span className="font-semibold text-[#111827]">{cal.summary}</span>
+                          <span className="font-semibold text-[#1a0e08]">{cal.summary}</span>
                           {cal.primary && (
                             <span className="ml-2 px-1.5 py-0.5 rounded text-xs bg-blue-50 text-blue-700">
                               Lịch chính
                             </span>
                           )}
                           {cal.id !== cal.summary && (
-                            <p className="text-[11px] text-[#6B7280] font-mono">{cal.id}</p>
+                            <p className="text-[11px] text-[#6A5F56] font-mono">{cal.id}</p>
                           )}
                         </div>
                       </label>

@@ -61,10 +61,11 @@ it('uses the source avatar classes and styled keyboard menu on the Account page'
   window.history.replaceState({}, '', '/account');
   render(<App />);
   const avatar = await screen.findByRole('button', { name: 'Menu người dùng: Lan Nguyễn' });
-  expect(avatar).toHaveClass('w-8', 'h-8', 'rounded-full', 'bg-[#FF5701]', 'text-white', 'text-xs', 'font-bold');
+  // Redesign 11/2026: avatar in ink, the accent stays on the one primary action.
+  expect(avatar).toHaveClass('w-8', 'h-8', 'rounded-full', 'bg-[#1A0E08]', 'text-white', 'text-xs', 'font-semibold');
   fireEvent.keyDown(avatar, { key: 'ArrowDown' });
   const first = screen.getByRole('menuitem', { name: 'Nhật ký điều phối' });
-  expect(first).toHaveClass('w-full', 'text-left', 'px-4', 'py-2', 'text-xs');
+  expect(first).toHaveClass('w-full', 'text-left', 'px-4', 'py-2', 'text-sm');
   expect(first).toHaveFocus();
   fireEvent.keyDown(first, { key: 'End' });
   expect(screen.getByRole('menuitem', { name: 'Đăng xuất' })).toHaveFocus();

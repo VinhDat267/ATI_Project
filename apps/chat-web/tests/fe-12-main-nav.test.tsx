@@ -8,9 +8,11 @@ import { apiClient } from '../src/services/api-client';
 
 const member = { id: 'u1', name: 'Lan Nguyễn', email: 'lan@example.test', role: 'member' as const };
 const admin = { ...member, id: 'a1', name: 'Quản Trị', role: 'admin' as const };
+// Redesign 11/2026: thanh bên gồm cả Hộp thư đề xuất (trước là chip "Sự kiện" riêng ngoài danh sách).
 const tabs = [
   ['Không gian làm việc', '/'],
   ['Nhật ký', '/history'],
+  ['Hộp thư đề xuất', '/inbox'],
   ['Kết nối dịch vụ', '/settings'],
   ['Cẩm nang', '/guide'],
   ['Người dùng', '/admin/users'],
@@ -21,18 +23,50 @@ const links = () => within(nav()).getAllByRole('link');
 beforeEach(() => { vi.spyOn(apiClient, 'getRuntime').mockResolvedValue({ runtimeMode: 'sandbox' }); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-it('FE-12: members get four tabs in a fixed order and admins also get Người dùng', () => {
+it('FE-12: members get five links in a fixed order and admins also get Người dùng', () => {
   const view = render(<MainNav user={member} current="workspace" navigate={vi.fn()} onLogout={vi.fn()} />);
-  expect(links()).toHaveLength(4);
+  expect(links()).toHaveLength(5);
   links().forEach((link, index) => {
     expect(link).toHaveAccessibleName(tabs[index][0]);
     expect(link).toHaveAttribute('href', tabs[index][1]);
   });
   view.unmount();
   render(<MainNav user={admin} current="workspace" navigate={vi.fn()} onLogout={vi.fn()} />);
-  expect(links()).toHaveLength(5);
-  expect(links()[4]).toHaveAccessibleName('Người dùng');
-  expect(links()[4]).toHaveAttribute('href', '/admin/users');
+  expect(links()).toHaveLength(6);
+  expect(links()[5]).toHaveAccessibleName('Người dùng');
+  expect(links()[5]).toHaveAttribute('href', '/admin/users');
+});
+
+it('FE-12: the inbox has one entry, inside the list, and its count is part of its name', () => {
+  render(<MainNav user={member} current="inbox" navigate={vi.fn()} onLogout={vi.fn()} inboxBadgeCount={3} />);
+  const inbox = within(nav()).getByTestId('nav-events-inbox-link');
+  expect(inbox).toHaveAccessibleName('Hộp thư đề xuất, 3 đề xuất cần xử lý');
+  expect(inbox).toHaveAttribute('aria-current', 'page');
+  expect(screen.getAllByRole('link', { name: /Hộp thư đề xuất/ })).toHaveLength(1);
+});
+
+it('FE-12: below 1024 px the menu button opens the sidebar as a sheet; a link or Escape closes it', () => {
+  const navigate = vi.fn();
+  render(<MainNav user={member} current="workspace" navigate={navigate} onLogout={vi.fn()} />);
+  const sidebar = document.getElementById('app-sidebar')!;
+  const open = screen.getByRole('button', { name: 'Mở menu điều hướng' });
+  expect(open).toHaveAttribute('aria-controls', 'app-sidebar');
+  fireEvent.click(open);
+  expect(sidebar).toHaveAttribute('data-open');
+  expect(open).toHaveAttribute('aria-expanded', 'true');
+  fireEvent.click(within(nav()).getByRole('link', { name: 'Nhật ký' }));
+  expect(navigate).toHaveBeenCalledWith('/history');
+  expect(sidebar).not.toHaveAttribute('data-open');
+  fireEvent.click(open);
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(sidebar).not.toHaveAttribute('data-open');
+});
+
+it('FE-12: the shell marks <html> while it is shown, so its theme never reaches signed-out pages', () => {
+  const view = render(<MainNav user={member} current="workspace" navigate={vi.fn()} onLogout={vi.fn()} />);
+  expect(document.documentElement).toHaveAttribute('data-app-shell');
+  view.unmount();
+  expect(document.documentElement).not.toHaveAttribute('data-app-shell');
 });
 
 it.each([
@@ -69,12 +103,9 @@ it('FE-12: a plain click navigates inside the app, while modifier and middle cli
   expect(navigate).not.toHaveBeenCalled();
 });
 
-it('FE-12: tabs keep their full accessible name next to the shortened label', () => {
+it('FE-12: sidebar links show the same full name they are announced by', () => {
   render(<MainNav user={admin} current="workspace" navigate={vi.fn()} onLogout={vi.fn()} />);
-  const workspace = within(nav()).getByRole('link', { name: 'Không gian làm việc' });
-  const settings = within(nav()).getByRole('link', { name: 'Kết nối dịch vụ' });
-  expect(workspace).toHaveTextContent('Làm việc');
-  expect(settings).toHaveTextContent('Kết nối');
+  for (const [name] of tabs) expect(within(nav()).getByRole('link', { name })).toHaveTextContent(name);
 });
 
 it('FE-12: the bar keeps the logo outside the tabs, the theme toggle, the avatar menu, extra actions and the page name', () => {

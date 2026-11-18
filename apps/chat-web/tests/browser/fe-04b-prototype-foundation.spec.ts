@@ -35,9 +35,9 @@ test('FE-04b: signed-out 404 uses the prototype layer and leaving installs the c
   await page.getByRole('button', { name: 'Chuyển sang giao diện tối' }).click();
   await expect(page.locator('html')).toHaveClass(/dark/);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  // theme.css đã áp: <body> có class bg-[#F8F8F6], nên quy tắc "html.dark .bg-[#F8F8F6]" (#0E1528) thắng "html.dark body"
-  // (#0B1020), như ở bản React (ảnh 404 tối khớp 0 pixel).
-  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(14, 21, 40)');
+  // theme.css đã áp: <body> có class bg-[#F8F4EE], nên quy tắc "html.dark .bg-[#F8F4EE]" (#131010) thắng "html.dark body"
+  // (#0E0B09), như ở bản React (ảnh 404 tối khớp 0 pixel).
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(19, 16, 16)');
   await page.reload();
   await expect(notFound(page)).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');

@@ -153,7 +153,7 @@ test('FE-10: non-blocking contrast and landmark audit covers every route in both
       const values = hex.match(/[a-f\d]{2}/gi)!.map(value => parseInt(value, 16) / 255).map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
       return .2126 * values[0] + .7152 * values[1] + .0722 * values[2];
     };
-    const values = [lum('#60A5FA'), lum('#0e1528')].sort((a, b) => b - a);
+    const values = [lum('#60A5FA'), lum('#131010')].sort((a, b) => b - a);
     return Number(((values[0] + .05) / (values[1] + .05)).toFixed(2));
   });
   console.log(`FE-10 contrast audit\n${JSON.stringify({ rows, jiraDarkRatio }, null, 2)}`);

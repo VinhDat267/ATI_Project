@@ -2,12 +2,12 @@
 import { useRef } from 'react';
 import { SidebarHistory } from '../../components/layout/SidebarHistory';
 import { useDialogFocus } from './useDialogFocus';
-export function HistoryDrawer({conversationId,onClose,onNewConversation,onSelectConversation}:{conversationId:string|null;onClose:()=>void;onNewConversation:()=>void;onSelectConversation:(id:string)=>void}){const dialog=useRef<HTMLElement>(null);useDialogFocus(dialog,onClose,'btn-open-history');return (<aside ref={dialog} tabIndex={-1} aria-label="Lịch sử yêu cầu" id="history-drawer" className={`fixed inset-y-0 left-0 z-50 w-full sm:w-[380px] bg-white border-r border-[#E5E5E0] shadow-2xl v3-transform transition-transform duration-300 ease-in-out flex flex-col`} role="dialog" aria-modal="true" aria-labelledby="history-drawer-title">
-        <div className="px-5 py-3.5 border-b border-[#EAEAE4] flex items-center justify-between bg-[#F8F8F6]">
-          <h2 id="history-drawer-title" className="font-sans font-semibold text-base text-[#111827]">
+export function HistoryDrawer({conversationId,onClose,onNewConversation,onSelectConversation}:{conversationId:string|null;onClose:()=>void;onNewConversation:()=>void;onSelectConversation:(id:string)=>void}){const dialog=useRef<HTMLElement>(null);useDialogFocus(dialog,onClose,'btn-open-history');return (<aside ref={dialog} tabIndex={-1} aria-label="Lịch sử yêu cầu" id="history-drawer" className={`fixed inset-y-0 left-0 z-50 w-full sm:w-[380px] bg-white border-r border-[#E6DED3] shadow-2xl v3-transform transition-transform duration-300 ease-in-out flex flex-col`} role="dialog" aria-modal="true" aria-labelledby="history-drawer-title">
+        <div className="px-5 py-3.5 border-b border-[#EAEAE4] flex items-center justify-between bg-[#F8F4EE]">
+          <h2 id="history-drawer-title" className="font-sans font-semibold text-base text-[#1a0e08]">
             Lịch sử yêu cầu
           </h2>
-          <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-[#6B7280] hover:text-[#111827] hover:bg-neutral-200/70 transition-colors" aria-label="Đóng Lịch sử yêu cầu">
+          <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-[#6A5F56] hover:text-[#1a0e08] hover:bg-neutral-200/70 transition-colors" aria-label="Đóng Lịch sử yêu cầu">
             {' '}
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />

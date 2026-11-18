@@ -57,9 +57,9 @@ export function ClarificationMoment({
       data-moment="3"
       aria-label="Cockpit"
     >
-      <div className="bg-white rounded-2xl border border-[#E5E5E0] shadow-2xs overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#E6DED3] shadow-2xs overflow-hidden">
         {/* Top Workflow Stepper & Safety Assurance */}
-        <div className="px-4 sm:px-5 py-2.5 bg-[#F8F8F6] border-b border-[#EAEAE4] flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
+        <div className="px-4 sm:px-5 py-2.5 bg-[#F8F4EE] border-b border-[#EAEAE4] flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
           <div className="flex items-center gap-2 text-xs">
             <span className="hidden sm:inline-flex items-center gap-1 text-emerald-700 font-medium">
               <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -70,18 +70,18 @@ export function ClarificationMoment({
             <span className="text-[#9CA3AF] hidden sm:inline" aria-hidden="true">
               →
             </span>
-            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-white border border-[#DEDED8] text-[11px] sm:text-xs font-semibold text-[#111827] shadow-2xs whitespace-nowrap">
+            <span className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full bg-white border border-[#DEDED8] text-[11px] sm:text-xs font-semibold text-[#1a0e08] shadow-2xs whitespace-nowrap">
               <span className="w-2 h-2 rounded-full bg-[#FF5701]" aria-hidden="true" />
               <span>2. Bổ sung thông tin</span>
             </span>
             <span className="text-[#9CA3AF] hidden md:inline" aria-hidden="true">
               →
             </span>
-            <span className="text-[#6B7280] font-medium hidden md:inline">
+            <span className="text-[#6A5F56] font-medium hidden md:inline">
               3. Xem trước kế hoạch
             </span>
           </div>
-          <span className="text-xs font-medium text-[#6B7280]">
+          <span className="text-xs font-medium text-[#6A5F56]">
             Bước 2 / 3
           </span>
         </div>
@@ -91,13 +91,13 @@ export function ClarificationMoment({
           <RequestEcho request={request} />
           <h1
             id="heading-moment-3"
-            className="text-base sm:text-xl font-semibold text-[#111827] leading-snug sm:leading-relaxed [overflow-wrap:anywhere]"
+            className="text-base sm:text-xl font-semibold text-[#1a0e08] leading-snug sm:leading-relaxed [overflow-wrap:anywhere]"
             tabIndex={-1}
           >
             {question}
           </h1>
           {context && (
-            <p className="text-xs sm:text-sm text-[#4B5563] leading-relaxed [overflow-wrap:anywhere]">
+            <p className="text-xs sm:text-sm text-[#51463E] leading-relaxed [overflow-wrap:anywhere]">
               {context}
             </p>
           )}
@@ -155,7 +155,7 @@ export function ClarificationMoment({
             }}
           >
             {options.length > 0 && (
-              <div className="text-xs font-semibold text-[#374151] mb-1">
+              <div className="text-xs font-semibold text-[#4a4038] mb-1">
                 Chọn nhanh từ tài nguyên đã kết nối
               </div>
             )}
@@ -175,7 +175,7 @@ export function ClarificationMoment({
                   className={`w-full text-left px-4 py-3 rounded-xl transition-all flex items-center justify-between gap-3 group cursor-pointer ${
                     isSelected
                       ? 'bg-[#FFF9F5] border-2 border-[#FF5701] shadow-2xs'
-                      : 'bg-white hover:bg-[#FAFAF8] border border-[#E2E2DC] hover:border-[#C7C7C0]'
+                      : 'bg-white hover:bg-[#FAFAF8] border border-[#E3DACE] hover:border-[#C7C7C0]'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -184,7 +184,7 @@ export function ClarificationMoment({
                       className={`w-9 h-9 rounded-lg border flex items-center justify-center flex-shrink-0 ${
                         isSelected
                           ? 'bg-white border-[#FFDFC6]'
-                          : 'bg-[#F8F8F6] border-[#EAEAE4]'
+                          : 'bg-[#F8F4EE] border-[#EAEAE4]'
                       }`}
                     >
                       {service ? (
@@ -192,7 +192,7 @@ export function ClarificationMoment({
                       ) : (
                         <svg
                           aria-hidden="true"
-                          className="w-4 h-4 text-[#4B5563] shrink-0"
+                          className="w-4 h-4 text-[#51463E] shrink-0"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
@@ -214,7 +214,7 @@ export function ClarificationMoment({
                         </svg>
                       )}
                     </div>
-                    <span className="text-sm font-semibold text-[#111827] [overflow-wrap:anywhere]">
+                    <span className="text-sm font-semibold text-[#1a0e08] [overflow-wrap:anywhere]">
                       {option}
                     </span>
                   </div>
@@ -262,20 +262,20 @@ export function ClarificationMoment({
                     aria-hidden="true"
                     className={`w-6 h-6 rounded-md border flex items-center justify-center flex-shrink-0 ${
                       selected === null
-                        ? 'bg-white border-[#111827] text-[#111827]'
-                        : 'bg-white border-[#DEDED8] text-[#6B7280]'
+                        ? 'bg-white border-[#1a0e08] text-[#1a0e08]'
+                        : 'bg-white border-[#DEDED8] text-[#6A5F56]'
                     }`}
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                   </span>
-                  <span className="text-xs font-semibold text-[#374151] group-hover:text-[#111827]">
+                  <span className="text-xs font-semibold text-[#4a4038] group-hover:text-[#1a0e08]">
                     Để tôi gõ tên hoặc link khác
                   </span>
                 </div>
                 {selected !== null && (
-                  <span className="text-[11px] text-[#6B7280] hidden sm:inline">
+                  <span className="text-[11px] text-[#6A5F56] hidden sm:inline">
                     Hoặc gõ thêm chi tiết bên dưới
                   </span>
                 )}
@@ -287,7 +287,7 @@ export function ClarificationMoment({
               >
                 <label
                   htmlFor="custom-sheet-input"
-                  className="block text-xs font-medium text-[#4B5563]"
+                  className="block text-xs font-medium text-[#51463E]"
                 >
                   {selected
                     ? `Bổ sung chi tiết cho "${selected}" (ví dụ: tiêu đề, nội dung cần tạo):`
@@ -310,7 +310,7 @@ export function ClarificationMoment({
                     }}
                     onKeyDown={onKeyDown}
                     aria-label="Nhập câu trả lời làm rõ yêu cầu"
-                    className="w-full px-3 py-2.5 bg-white rounded-lg border border-[#DEDED8] text-sm text-[#111827] placeholder:text-[#9CA3AF] v3-outline-none focus:v3-outline-none focus:border-[#111827] resize-none"
+                    className="w-full px-3 py-2.5 bg-white rounded-lg border border-[#DEDED8] text-sm text-[#1a0e08] placeholder:text-[#9CA3AF] v3-outline-none focus:v3-outline-none focus:border-[#1a0e08] resize-none"
                   />
                 )}
               </div>
@@ -326,7 +326,7 @@ export function ClarificationMoment({
                 className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all !opacity-100 flex items-center gap-1.5 ${
                   canSubmit
                     ? 'bg-[#FF5701] hover:bg-[#E04D00] text-white shadow-2xs cursor-pointer'
-                    : 'bg-[#F4F4F1] text-[#6B7280] border border-[#E5E5E0] cursor-not-allowed'
+                    : 'bg-[#F4F4F1] text-[#6A5F56] border border-[#E6DED3] cursor-not-allowed'
                 }`}
               >
                 <span>Xác nhận và tiếp tục</span>
@@ -337,7 +337,7 @@ export function ClarificationMoment({
               <button
                 type="button"
                 onClick={onBack}
-                className="px-4 py-2.5 text-sm font-medium text-[#4B5563] hover:text-[#111827] hover:bg-[#F4F4F1] rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2.5 text-sm font-medium text-[#51463E] hover:text-[#1a0e08] hover:bg-[#F4F4F1] rounded-xl transition-colors cursor-pointer"
               >
                 Quay lại
               </button>

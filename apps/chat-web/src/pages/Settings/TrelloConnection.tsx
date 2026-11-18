@@ -375,7 +375,7 @@ export function TrelloConnection({
       className={`${CARD_CONTAINER_CLASS} focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none`}
     >
       <div className="flex items-center justify-between gap-3">
-        <h3 className="font-sans font-semibold text-base text-[#111827] dark:text-white flex items-center gap-3">
+        <h3 className="font-sans font-semibold text-base text-[#1a0e08] dark:text-white flex items-center gap-3">
           <ServiceLogo service="trello" className="w-6 h-6" />
           Trello
         </h3>
@@ -416,7 +416,7 @@ export function TrelloConnection({
         </div>
       </div>
 
-      <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+      <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
         Chỉ bạn dùng được tài khoản Trello này để thao tác trên các bảng đã được chọn.
       </p>
 
@@ -441,7 +441,7 @@ export function TrelloConnection({
 
       {/* Status string */}
       {!isInitialLoading && !isStatusOutage && (
-        <div className="text-sm text-[#111827] dark:text-neutral-200 break-words">
+        <div className="text-sm text-[#1a0e08] dark:text-neutral-200 break-words">
           {status === 'connected' ? (
             <span>
               Đã kết nối {data?.username && <>· @{data.username}</>}
@@ -459,7 +459,7 @@ export function TrelloConnection({
               Cần kết nối lại {data?.username && <>· @{data.username}</>}
             </span>
           ) : status === 'unconfigured' ? (
-            <span className="text-[#6B7280] dark:text-[#9CA3AF]">Trello chưa được cấu hình trên máy chủ.</span>
+            <span className="text-[#6A5F56] dark:text-[#9CA3AF]">Trello chưa được cấu hình trên máy chủ.</span>
           ) : null}
         </div>
       )}
@@ -476,7 +476,7 @@ export function TrelloConnection({
                 key={b.boardId}
                 className="flex items-center justify-between p-2.5 bg-neutral-50 rounded-lg text-xs"
               >
-                <span className="font-medium text-[#111827]">{b.boardName}</span>
+                <span className="font-medium text-[#1a0e08]">{b.boardName}</span>
                 <span className="text-[#DC2626] font-medium">Bạn cần được thêm vào bảng</span>
               </div>
             ))}
@@ -488,8 +488,8 @@ export function TrelloConnection({
       {!isInitialLoading && !isStatusOutage && status === 'connected' && data?.boards && (
         <div className="v3-space-y-2 border-t border-[#F3F4F6] pt-3">
           {data.workspaceName && (
-            <p className="text-xs text-[#6B7280]">
-              Workspace: <strong className="text-[#111827]">{data.workspaceName}</strong>
+            <p className="text-xs text-[#6A5F56]">
+              Workspace: <strong className="text-[#1a0e08]">{data.workspaceName}</strong>
             </p>
           )}
           <div className="v3-space-y-1.5">
@@ -502,7 +502,7 @@ export function TrelloConnection({
                   href={`https://trello.com/b/${encodeURIComponent(b.boardId)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-medium text-[#111827] hover:text-[#FF5701] inline-flex items-center gap-1 transition-colors"
+                  className="font-medium text-[#1a0e08] hover:text-[#FF5701] inline-flex items-center gap-1 transition-colors"
                 >
                   <span>{b.boardName}</span>
                   <span aria-hidden="true" className="text-neutral-400">↗</span>
@@ -524,7 +524,7 @@ export function TrelloConnection({
 
       {/* Actions */}
       {!isInitialLoading && !isStatusOutage && (
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#293653]">
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-[#F3F4F6] dark:border-[#3a312a]">
           {status === 'not_connected' || status === 'reconnect_required' || status === 'unconfigured' ? (
             <button
               id="trello-connect"
@@ -571,14 +571,14 @@ export function TrelloConnection({
         <div
           id="trello-scope"
           data-testid="trello-scope"
-          className="mt-4 p-4 border border-[#E7E7E2] dark:border-[#374151] rounded-xl bg-[#F8F8F6] dark:bg-[#1F2937]/50 v3-space-y-3"
+          className="mt-4 p-4 border border-[#E8E0D6] dark:border-[#4a4038] rounded-xl bg-[#F8F4EE] dark:bg-[#2A2420]/50 v3-space-y-3"
         >
-          <h4 className="text-xs font-semibold text-[#374151] dark:text-[#D1D5DB]">
+          <h4 className="text-xs font-semibold text-[#4a4038] dark:text-[#D1D5DB]">
             Chọn bảng Trello cho nhóm
           </h4>
 
           {loadingWorkspaces ? (
-            <p className="text-xs text-[#6B7280]">Đang tải danh sách Trello Workspace…</p>
+            <p className="text-xs text-[#6A5F56]">Đang tải danh sách Trello Workspace…</p>
           ) : workspacesError ? (
             <div
               role="alert"
@@ -600,12 +600,12 @@ export function TrelloConnection({
             <>
               {/* Workspace selection */}
               <div className="v3-space-y-1">
-                <label htmlFor="trello-workspace-select" className="text-xs font-semibold text-[#111827]">
+                <label htmlFor="trello-workspace-select" className="text-xs font-semibold text-[#1a0e08]">
                   Workspace
                 </label>
                 <select
                   id="trello-workspace-select"
-                  className="w-full text-xs p-2 border border-[#E7E7E2] rounded-lg bg-white text-[#111827]"
+                  className="w-full text-xs p-2 border border-[#E8E0D6] rounded-lg bg-white text-[#1a0e08]"
                   value={selectedWorkspaceId}
                   onChange={(e) => {
                     setSelectedWorkspaceId(e.target.value);
@@ -623,18 +623,18 @@ export function TrelloConnection({
               {/* Candidate boards list (checkboxes) */}
               <div className="v3-space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <label className="text-xs font-semibold text-[#111827]">
+                  <label className="text-xs font-semibold text-[#1a0e08]">
                     Các bảng được phép dùng (tối đa 10 bảng)
                   </label>
                   <span
                     data-testid="trello-scope-counter"
-                    className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#E7E7E2] text-[#4B5563]"
+                    className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#E8E0D6] text-[#51463E]"
                   >
                     Đã chọn {selectedBoardIds.length}/10
                   </span>
                 </div>
                 {loadingBoards ? (
-                  <p className="text-xs text-[#6B7280]">Đang tải danh sách bảng Trello…</p>
+                  <p className="text-xs text-[#6A5F56]">Đang tải danh sách bảng Trello…</p>
                 ) : boardsError ? (
                   <div
                     role="alert"
@@ -661,7 +661,7 @@ export function TrelloConnection({
                         onChange={(e) => setBoardFilter(e.target.value)}
                         placeholder="Tìm nhanh theo tên bảng Trello..."
                         aria-label="Tìm nhanh bảng Trello"
-                        className="w-full px-3 py-1.5 text-xs bg-white border border-[#E7E7E2] rounded-lg text-[#111827] focus:ring-2 focus:ring-[#FF5701] focus:v3-outline-none"
+                        className="w-full px-3 py-1.5 text-xs bg-white border border-[#E8E0D6] rounded-lg text-[#1a0e08] focus:ring-2 focus:ring-[#FF5701] focus:v3-outline-none"
                       />
                     )}
                     <div className="v3-space-y-1.5 max-h-48 overflow-y-auto">
@@ -678,7 +678,7 @@ export function TrelloConnection({
                             <label
                               key={b.id}
                               className={`flex items-center gap-2 p-2 rounded-lg text-xs cursor-pointer ${
-                                checked ? 'bg-[#F8F8F6] border border-[#111827]/30' : 'bg-white border border-[#E7E7E2]'
+                                checked ? 'bg-[#F8F4EE] border border-[#1a0e08]/30' : 'bg-white border border-[#E8E0D6]'
                               }`}
                             >
                               <input
@@ -686,14 +686,14 @@ export function TrelloConnection({
                                 checked={checked}
                                 disabled={disabled}
                                 onChange={() => toggleBoard(b.id)}
-                                className="rounded text-[#111827] focus:ring-[#111827]"
+                                className="rounded text-[#1a0e08] focus:ring-[#1a0e08]"
                               />
-                              <span className="font-medium text-[#111827]">{b.name}</span>
+                              <span className="font-medium text-[#1a0e08]">{b.name}</span>
                             </label>
                           );
                         })}
                       {candidateBoards.length === 0 && (
-                        <p className="text-xs text-[#6B7280]">Không có bảng nào trong workspace này.</p>
+                        <p className="text-xs text-[#6A5F56]">Không có bảng nào trong workspace này.</p>
                       )}
                     </div>
                   </>
@@ -726,7 +726,7 @@ export function TrelloConnection({
       )}
 
       {busy && (
-        <p role="status" className="text-xs text-[#6B7280]">
+        <p role="status" className="text-xs text-[#6A5F56]">
           Đang xử lý…
         </p>
       )}

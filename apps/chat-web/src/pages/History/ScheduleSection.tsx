@@ -59,7 +59,7 @@ function RunLink({ run, navigate }: { run: ScheduleRunView; navigate: (path: str
             : ''
         }`
       : null;
-  return <><span>{formatRunTime(run.dueAt)} · </span>{run.convId ? <a className="underline text-[#B43E00]" href={`/c/${run.convId}`} onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(`/c/${run.convId}`); }}>{runLabel(run)}</a> : <span>{runLabel(run)}</span>}{sheetsDelivery && <span className="text-xs text-[#6B7280]"> ({sheetsDelivery.spreadsheetTitle} → {sheetsDelivery.targetLabel ?? sheetsDelivery.targetId})</span>}{githubDest && <span className="text-xs text-[#6B7280]"> ({githubDest})</span>}{telegramDest && <span className="text-xs text-[#6B7280]"> ({telegramDest})</span>}{slackMultiDest && <span className="text-xs text-[#6B7280]"> ({slackMultiDest})</span>}{run.error && <span className="block text-xs text-[#6B7280]">{run.error}</span>}</>;
+  return <><span>{formatRunTime(run.dueAt)} · </span>{run.convId ? <a className="underline text-[#B43E00]" href={`/c/${run.convId}`} onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(`/c/${run.convId}`); }}>{runLabel(run)}</a> : <span>{runLabel(run)}</span>}{sheetsDelivery && <span className="text-xs text-[#6A5F56]"> ({sheetsDelivery.spreadsheetTitle} → {sheetsDelivery.targetLabel ?? sheetsDelivery.targetId})</span>}{githubDest && <span className="text-xs text-[#6A5F56]"> ({githubDest})</span>}{telegramDest && <span className="text-xs text-[#6A5F56]"> ({telegramDest})</span>}{slackMultiDest && <span className="text-xs text-[#6A5F56]"> ({slackMultiDest})</span>}{run.error && <span className="block text-xs text-[#6A5F56]">{run.error}</span>}</>;
 }
 function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: ScheduleView; navigate: (path: string) => void; reload: () => Promise<void>; onChanged: (schedule: ScheduleView) => void }) {
   const [open, setOpen] = useState(false), [runs, setRuns] = useState<ScheduleRunView[]>([]), [error, setError] = useState('');
@@ -80,8 +80,8 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
       isUncertainSheetsDeliveryRun(effectiveLastRun))
       ? effectiveLastRun
       : latestResolvedRun;
-  return <article className="bg-white rounded-2xl border border-[#E5E5E0] p-4 sm:p-5 v3-space-y-3 min-w-0 shadow-2xs">
-    <h3 className="font-sans text-base font-semibold text-[#111827] [overflow-wrap:anywhere] flex flex-wrap items-center gap-2">
+  return <article className="bg-white rounded-2xl border border-[#E6DED3] p-4 sm:p-5 v3-space-y-3 min-w-0 shadow-2xs">
+    <h3 className="font-sans text-base font-semibold text-[#1a0e08] [overflow-wrap:anywhere] flex flex-wrap items-center gap-2">
       <span>{schedule.name}</span>
       {schedule.kind === 'plan' ? (
         <span data-schedule-kind="plan" data-schedule-mode="manual" className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
@@ -108,7 +108,7 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
         Gửi định kỳ theo phạm vi đã xác nhận
       </p>
     )}
-    <p className="text-sm text-[#4B5563]">{describeRecurrence(schedule.recurrence)}</p><p className="text-xs text-[#6B7280]">{scheduleLabel(schedule)}</p>
+    <p className="text-sm text-[#51463E]">{describeRecurrence(schedule.recurrence)}</p><p className="text-xs text-[#6A5F56]">{scheduleLabel(schedule)}</p>
     {schedule.lastRun?.state === 'needs_attention' && (
       <div role="alert" className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 v3-space-y-1">
         <p className="font-semibold">Lượt chạy cần bạn xem:</p>
@@ -142,39 +142,39 @@ function ScheduleRow({ schedule, navigate, reload, onChanged }: { schedule: Sche
         compact
       />
     )}
-    {schedule.lastRun && <p className="text-xs text-[#4B5563]">Lần trước: <RunLink run={schedule.lastRun} navigate={navigate} /></p>}
+    {schedule.lastRun && <p className="text-xs text-[#51463E]">Lần trước: <RunLink run={schedule.lastRun} navigate={navigate} /></p>}
     <ScheduleActions schedule={schedule} navigate={navigate} onChanged={onChanged} onConflict={reload} />
-    <button type="button" className="text-xs font-semibold underline text-[#4B5563]" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Ẩn các lượt gần nhất' : 'Xem 10 lượt gần nhất'}</button>
-    {open && <div className="text-sm text-[#4B5563] v3-space-y-2">{error && <p role="alert">{error}</p>}{!error && !runs.length && <p>Chưa có lượt chạy.</p>}{runs.map(run => <div key={run.id} className="v3-space-y-1.5"><RunLink run={run} navigate={navigate} />{run.id !== primaryRecoveryRun?.id && <SheetsDeliveryRecoveryControl run={run} isSheetsSchedule={schedule.kind === 'sheets_digest'} scheduleStatus={schedule.status} onResolved={res => { setLatestResolvedRun(res.run); setRuns(prev => prev.map(row => (row.id === res.run.id ? res.run : row))); onChanged(res.schedule); schedulesChanged(); }} />}</div>)}</div>}
+    <button type="button" className="text-xs font-semibold underline text-[#51463E]" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Ẩn các lượt gần nhất' : 'Xem 10 lượt gần nhất'}</button>
+    {open && <div className="text-sm text-[#51463E] v3-space-y-2">{error && <p role="alert">{error}</p>}{!error && !runs.length && <p>Chưa có lượt chạy.</p>}{runs.map(run => <div key={run.id} className="v3-space-y-1.5"><RunLink run={run} navigate={navigate} />{run.id !== primaryRecoveryRun?.id && <SheetsDeliveryRecoveryControl run={run} isSheetsSchedule={schedule.kind === 'sheets_digest'} scheduleStatus={schedule.status} onResolved={res => { setLatestResolvedRun(res.run); setRuns(prev => prev.map(row => (row.id === res.run.id ? res.run : row))); onChanged(res.schedule); schedulesChanged(); }} />}</div>)}</div>}
   </article>;
 }
 // PBI-05: chỉ mô tả đúng luồng có thật — lịch được lưu khi người dùng bấm "Xác nhận" trên đề xuất
 // lịch chạy (ScheduleMoment → POST /conversations/:convId/schedule-proposals/:messageId/confirm).
 function ScheduleEmptyState({ navigate }: { navigate: (path: string) => void }) {
-  return <div data-schedule-empty className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#131B2F] border border-[#E5E5E0] dark:border-[#293653] shadow-2xs v3-space-y-4 min-w-0">
+  return <div data-schedule-empty className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#1A1613] border border-[#E6DED3] dark:border-[#3a312a] shadow-2xs v3-space-y-4 min-w-0">
     <div className="flex flex-col sm:flex-row sm:items-start gap-4 min-w-0">
-      <div aria-hidden="true" className="w-10 h-10 rounded-xl bg-[#F8F8F6] dark:bg-[#1A2540] border border-[#E5E5E0] dark:border-[#293653] flex items-center justify-center flex-shrink-0 text-[#4B5563] dark:text-[#CBD5E1]">
+      <div aria-hidden="true" className="w-10 h-10 rounded-xl bg-[#F8F4EE] dark:bg-[#221C18] border border-[#E6DED3] dark:border-[#3a312a] flex items-center justify-center flex-shrink-0 text-[#51463E] dark:text-[#D7CEC4]">
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
       </div>
       <div className="v3-space-y-2 min-w-0 flex-1">
-        <h3 className="font-sans text-base font-semibold text-[#111827] dark:text-white">Chưa có lịch chạy nào</h3>
-        <p className="text-sm text-[#4B5563] dark:text-[#9CA3AF] leading-relaxed [overflow-wrap:anywhere]">
+        <h3 className="font-sans text-base font-semibold text-[#1a0e08] dark:text-white">Chưa có lịch chạy nào</h3>
+        <p className="text-sm text-[#51463E] dark:text-[#9CA3AF] leading-relaxed [overflow-wrap:anywhere]">
           Lịch chạy được tạo trong Không gian làm việc: mô tả việc cần lặp lại kèm thời điểm, ví dụ “Mỗi sáng 08:00, gửi lịch họp hôm nay lên Slack”.
           Khi Planora đưa ra đề xuất lịch chạy, lịch chỉ được lưu sau khi bạn bấm Xác nhận trên đề xuất đó.
         </p>
         <a href="/" onClick={event => { if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate('/'); }}
-          className="inline-flex items-center gap-1.5 mt-1 px-4 py-2 rounded-xl text-sm font-semibold bg-[#111827] dark:bg-[#C84300] text-white hover:opacity-90 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C84300] focus-visible:ring-offset-2">
+          className="inline-flex items-center gap-1.5 mt-1 px-4 py-2 rounded-xl text-sm font-semibold bg-[#1a0e08] dark:bg-[#C84300] text-white hover:opacity-90 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C84300] focus-visible:ring-offset-2">
           Mở Không gian làm việc
         </a>
       </div>
     </div>
-    <div className="pt-3 border-t border-[#E5E5E0] dark:border-[#374151] v3-space-y-2.5">
-      <p className="text-xs font-semibold text-[#6B7280] dark:text-[#9CA3AF]">
+    <div className="pt-3 border-t border-[#E6DED3] dark:border-[#4a4038] v3-space-y-2.5">
+      <p className="text-xs font-semibold text-[#6A5F56] dark:text-[#9CA3AF]">
         Kích hoạt nhanh mẫu sự kiện &amp; bản tin tự động phổ biến:
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5" data-testid="schedule-event-templates">
         {SCHEDULE_EVENT_TEMPLATES.map(tpl => (
-          <div key={tpl.id} className="p-3.5 rounded-xl border border-[#E5E5E0] dark:border-[#374151] bg-[#F8F8F6] dark:bg-[#111827] flex flex-col justify-between gap-2.5">
+          <div key={tpl.id} className="p-3.5 rounded-xl border border-[#E6DED3] dark:border-[#4a4038] bg-[#F8F4EE] dark:bg-[#1a0e08] flex flex-col justify-between gap-2.5">
             <div className="v3-space-y-1">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
@@ -186,8 +186,8 @@ function ScheduleEmptyState({ navigate }: { navigate: (path: string) => void }) 
                   {tpl.cadenceLabel}
                 </span>
               </div>
-              <p className="text-sm font-semibold text-[#111827] dark:text-white">{tpl.title}</p>
-              <p className="text-xs text-[#4B5563] dark:text-[#9CA3AF] leading-relaxed">{tpl.description}</p>
+              <p className="text-sm font-semibold text-[#1a0e08] dark:text-white">{tpl.title}</p>
+              <p className="text-xs text-[#51463E] dark:text-[#9CA3AF] leading-relaxed">{tpl.description}</p>
             </div>
             <div className="pt-1">
               <button
@@ -222,5 +222,5 @@ export function ScheduleSection({ user, navigate }: { user: User | null; navigat
   }, [enabled, user?.id, workspaceId]);
   const reload = async () => { const data = await apiClient.getSchedules(); setSchedules(data.schedules); };
   if (!enabled || !user) return null;
-  return <section aria-labelledby="schedule-section-title" className="v3-space-y-3"><h2 id="schedule-section-title" className="font-sans text-lg font-semibold tracking-tight text-[#111827]">Lịch chạy</h2>{!loaded && <p role="status" className="text-xs text-[#6B7280]">Đang tải lịch chạy…</p>}{error && <p role="alert" className="text-sm text-red-700">{error}</p>}{loaded && !error && !schedules.length && <ScheduleEmptyState navigate={navigate} />}{schedules.map(schedule => <ScheduleRow key={schedule.id} schedule={schedule} navigate={navigate} reload={reload} onChanged={changed => setSchedules(rows => rows.map(row => row.id === changed.id ? changed : row))} />)}</section>;
+  return <section aria-labelledby="schedule-section-title" className="v3-space-y-3"><h2 id="schedule-section-title" className="font-sans text-lg font-semibold tracking-tight text-[#1a0e08]">Lịch chạy</h2>{!loaded && <p role="status" className="text-xs text-[#6A5F56]">Đang tải lịch chạy…</p>}{error && <p role="alert" className="text-sm text-red-700">{error}</p>}{loaded && !error && !schedules.length && <ScheduleEmptyState navigate={navigate} />}{schedules.map(schedule => <ScheduleRow key={schedule.id} schedule={schedule} navigate={navigate} reload={reload} onChanged={changed => setSchedules(rows => rows.map(row => row.id === changed.id ? changed : row))} />)}</section>;
 }

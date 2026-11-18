@@ -15,14 +15,14 @@ const meta = {
   id: 'telegram-callback',
   title: 'Kết nối Telegram — Planora',
   htmlClass: '',
-  bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased',
+  bodyClass: 'min-h-screen bg-[#F8F4EE] text-[#1a0e08] antialiased',
   css: '',
 };
 
 const primaryBtn =
   'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] disabled:opacity-50 transition-colors shadow-sm';
 const secondaryBtn =
-  'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#111827] border border-[#E7E7E2] hover:bg-neutral-50 disabled:opacity-50 transition-colors';
+  'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#1a0e08] border border-[#E8E0D6] hover:bg-neutral-50 disabled:opacity-50 transition-colors';
 
 export function TelegramCallbackView({
   navigate,
@@ -141,7 +141,7 @@ export function TelegramCallbackView({
       : undefined);
 
   return (
-    <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] v3-space-y-5">
+    <main className="max-w-xl mx-auto px-4 py-16 text-[#1a0e08] v3-space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-2xl bg-sky-50 border border-sky-200 flex items-center justify-center shadow-xs">
@@ -149,7 +149,7 @@ export function TelegramCallbackView({
           </div>
           <div>
             <h1 className="font-sans text-2xl font-semibold tracking-tight">Kết nối Telegram</h1>
-            <p className="text-xs text-[#6B7280]">Ghép đôi 1 chạm an toàn · Không cần nhập Bot Token hay Chat ID</p>
+            <p className="text-xs text-[#6A5F56]">Ghép đôi 1 chạm an toàn · Không cần nhập Bot Token hay Chat ID</p>
           </div>
         </div>
         {data?.botUsername && (
@@ -159,8 +159,8 @@ export function TelegramCallbackView({
           </span>
         )}
       </div>
-      <div className="bg-white border border-[#E7E7E2] rounded-2xl p-6 v3-space-y-4 shadow-sm">
-        <p className="text-sm text-[#4B5563] leading-relaxed">
+      <div className="bg-white border border-[#E8E0D6] rounded-2xl p-6 v3-space-y-4 shadow-sm">
+        <p className="text-sm text-[#51463E] leading-relaxed">
           Mở ứng dụng Telegram, bấm <strong>Start</strong> với bot của Planora để liên kết tài khoản cá nhân của bạn trong 1 chạm (không cần tạo BotFather token hay nhập mã số Chat ID).
         </p>
 
@@ -191,7 +191,7 @@ export function TelegramCallbackView({
 
         {pendingPairing && (
           <div className="pt-3 border-t border-[#F3F4F6] v3-space-y-3">
-            <p role="status" className="text-xs sm:text-sm text-[#4B5563]">
+            <p role="status" className="text-xs sm:text-sm text-[#51463E]">
               Sau khi bạn đã nhấn <strong>Start</strong> trong Telegram, hệ thống sẽ tự động nhận diện khi bạn quay lại trang này — hoặc bạn có thể bấm nút dưới đây để hoàn tất ngay.
             </p>
             <button
@@ -207,7 +207,7 @@ export function TelegramCallbackView({
         )}
 
         {!pendingPairing && !error && (
-          <p role="status" className="text-sm text-[#6B7280]">
+          <p role="status" className="text-sm text-[#6A5F56]">
             Đang hoàn tất kết nối Telegram…
           </p>
         )}

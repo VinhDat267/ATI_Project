@@ -2,14 +2,14 @@
    Khác bản React: khai theo :root[data-proto-page] thay vì @theme, để màn chưa chuyển giữ bảng màu v4 của FE-04. */
 :root[data-proto-page] {
   --color-slate-50: #f8fafc;
-  --color-slate-100: #f1f5f9;
-  --color-slate-200: #e2e8f0;
-  --color-slate-300: #cbd5e1;
-  --color-slate-400: #94a3b8;
-  --color-slate-500: #64748b;
-  --color-slate-600: #475569;
-  --color-slate-700: #334155;
-  --color-slate-800: #1e293b;
+  --color-slate-100: #f3eee8;
+  --color-slate-200: #eae3db;
+  --color-slate-300: #d7cec4;
+  --color-slate-400: #a39a90;
+  --color-slate-500: #887d73;
+  --color-slate-600: #5c5148;
+  --color-slate-700: #3d342d;
+  --color-slate-800: #27211c;
   --color-slate-900: #0f172a;
   --color-slate-950: #020617;
   --color-gray-50: #f9fafb;
@@ -17,11 +17,11 @@
   --color-gray-200: #e5e7eb;
   --color-gray-300: #d1d5db;
   --color-gray-400: #9ca3af;
-  --color-gray-500: #6b7280;
-  --color-gray-600: #4b5563;
-  --color-gray-700: #374151;
-  --color-gray-800: #1f2937;
-  --color-gray-900: #111827;
+  --color-gray-500: #6a5f56;
+  --color-gray-600: #51463e;
+  --color-gray-700: #4a4038;
+  --color-gray-800: #2a2420;
+  --color-gray-900: #1a0e08;
   --color-gray-950: #030712;
   --color-zinc-50: #fafafa;
   --color-zinc-100: #f4f4f5;

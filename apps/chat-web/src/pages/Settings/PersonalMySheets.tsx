@@ -178,12 +178,12 @@ export function PersonalMySheets({
       <div className="v3-space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="font-sans font-semibold text-base text-[#111827] dark:text-white flex items-center gap-2.5">
+            <h3 className="font-sans font-semibold text-base text-[#1a0e08] dark:text-white flex items-center gap-2.5">
               <ServiceLogo service="mysheets" className="w-5 h-5" />
               <span>Google Sheets của bạn</span>
             </h3>
             {(status === 'scope_required' || service.email) && (
-              <p className="text-xs font-medium text-[#4B5563] dark:text-[#9CA3AF] break-words mt-0.5 pl-7">
+              <p className="text-xs font-medium text-[#51463E] dark:text-[#9CA3AF] break-words mt-0.5 pl-7">
                 {status === 'scope_required' && <span>Đã cấp quyền · Chưa chọn bảng tính</span>}
                 {status === 'scope_required' && service.email && ' · '}
                 {service.email}
@@ -211,7 +211,7 @@ export function PersonalMySheets({
             </span>
           </span>
         </div>
-        <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] leading-relaxed">
+        <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF] leading-relaxed">
           Planora chỉ thấy những bảng tính bạn chọn trong cửa sổ của Google. Planora chỉ đọc, thêm dòng,
           cập nhật cột, xoá dòng hoặc tạo trang tính (tab) sau khi bạn phê duyệt kế hoạch, và không truy cập tệp Drive nào khác.
         </p>
@@ -230,8 +230,8 @@ export function PersonalMySheets({
         {status === 'connected' &&
           service.selectedSpreadsheets &&
           service.selectedSpreadsheets.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#F8F8F6] dark:bg-[#0E1528] border border-[#E7E7E2] dark:border-[#293653]">
-              <span className="text-xs font-medium text-[#4B5563] dark:text-[#9CA3AF]">Bảng tính được dùng:</span>
+            <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#F8F4EE] dark:bg-[#131010] border border-[#E8E0D6] dark:border-[#3a312a]">
+              <span className="text-xs font-medium text-[#51463E] dark:text-[#9CA3AF]">Bảng tính được dùng:</span>
               {service.selectedSpreadsheets.map((sheet) => (
                 <span
                   key={sheet.id}
@@ -260,7 +260,7 @@ export function PersonalMySheets({
           )}
 
         {status === 'reconnect_required' && (
-          <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+          <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
             Quyền có thể đã bị thu hồi hoặc hết hạn sau 7 ngày ở chế độ thử nghiệm của Google. Hãy kết
             nối lại.
           </p>
@@ -271,7 +271,7 @@ export function PersonalMySheets({
             open
             className="group"
           >
-            <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#111827] dark:hover:text-white select-none">
+            <summary className="cursor-pointer list-none inline-flex items-center gap-1.5 text-xs font-medium text-[#6A5F56] dark:text-[#9CA3AF] hover:text-[#1a0e08] dark:hover:text-white select-none">
               <span className="transition-transform group-open:rotate-90 text-[10px]">▸</span>
               <span>Dán liên kết hoặc ID Google Sheets thủ công</span>
             </summary>
@@ -287,7 +287,7 @@ export function PersonalMySheets({
                   disabled={busy}
                   onChange={(e) => setUrlInput(e.target.value)}
                   placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMd.../edit"
-                  className="flex-1 px-3 py-1.5 rounded-lg border border-[#E7E7E2] dark:border-[#293653] bg-white dark:bg-[#1A2540] text-xs text-[#111827] dark:text-[#F1F5F9] focus:outline-none focus:ring-2 focus:ring-[#FF5701]"
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-[#E8E0D6] dark:border-[#3a312a] bg-white dark:bg-[#221C18] text-xs text-[#1a0e08] dark:text-[#F3EEE8] focus:outline-none focus:ring-2 focus:ring-[#FF5701]"
                 />
                 <button
                   type="button"
@@ -303,7 +303,7 @@ export function PersonalMySheets({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2.5 border-t border-[#F3F4F6] dark:border-[#293653]">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2.5 border-t border-[#F3F4F6] dark:border-[#3a312a]">
         {status === 'not_connected' && (
           <button
             id="mysheets-action"
@@ -408,7 +408,7 @@ export function PersonalMySheets({
       </div>
 
       {busy && (
-        <p role="status" className="text-xs text-[#6B7280]">
+        <p role="status" className="text-xs text-[#6A5F56]">
           {status === 'connected' ? 'Đang cập nhật…' : 'Đang chuyển hướng tới Google…'}
         </p>
       )}
@@ -427,7 +427,7 @@ export function PersonalMySheets({
         <section aria-labelledby="heading-personal-services" className="mb-8">
           <h2
             id="heading-personal-services"
-            className="text-xs font-bold uppercase tracking-wider text-[#6B7280] mb-3.5"
+            className="text-xs font-bold uppercase tracking-wider text-[#6A5F56] mb-3.5"
           >
             Của riêng bạn
           </h2>
@@ -444,7 +444,7 @@ export function PersonalMySheets({
             returnFocusId="mysheets-action"
             onClose={() => setConfirm(false)}
           >
-            <div className="p-4 sm:p-5 v3-space-y-4 text-xs sm:text-sm text-[#4B5563]">
+            <div className="p-4 sm:p-5 v3-space-y-4 text-xs sm:text-sm text-[#51463E]">
               <p>
                 Planora sẽ không thể truy cập các bảng tính này nữa. Bạn có thể kết nối lại bất cứ lúc
                 nào.

@@ -2,12 +2,12 @@
 
     /* Design Tokens Agentic */
     :root {
-      --bg: #F8F8F6;
+      --bg: #F8F4EE;
       --surface: #FFFFFF;
-      --border: #E7E7E2;
-      --fg: #111827;
+      --border: #E8E0D6;
+      --fg: #1a0e08;
       --accent: #FF5701;
-      --muted: #6B7280;
+      --muted: #6A5F56;
     }
     body {
       background-color: var(--bg);

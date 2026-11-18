@@ -21,7 +21,7 @@ export const inboxMeta: PageMeta = {
   id: 'inbox',
   title: 'Hộp thư đề xuất & Bản tóm tắt — Planora',
   htmlClass: '',
-  bodyClass: 'min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]',
+  bodyClass: 'min-h-screen flex flex-col bg-[#F8F4EE] text-[#1a0e08]',
   css,
 };
 
@@ -164,7 +164,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
   });
 
   return (
-    <div className="min-h-screen bg-[#F8F8F6] dark:bg-[#0B1020] text-[#111827] dark:text-[#F1F5F9]">
+    <div className="min-h-screen bg-[#F8F4EE] dark:bg-[#0E0B09] text-[#1a0e08] dark:text-[#F3EEE8]">
       <MainNav
         user={user}
         current="inbox"
@@ -174,12 +174,12 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
         onLogout={onLogout}
       />
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E5E5E0] dark:border-[#293653] pb-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E6DED3] dark:border-[#3a312a] pb-5">
           <div>
-            <h1 className="font-sans text-2xl sm:text-[26px] font-semibold tracking-tight text-[#111827] dark:text-white">
+            <h1 className="font-sans text-2xl sm:text-[26px] font-semibold tracking-tight text-[#1a0e08] dark:text-white">
               Hộp thư đề xuất &amp; Bản tóm tắt
             </h1>
-            <p className="text-sm text-[#4B5563] dark:text-[#9CA3AF] mt-1">
+            <p className="text-sm text-[#51463E] dark:text-[#9CA3AF] mt-1">
               Mọi đề xuất đều cần bạn kiểm tra và phê duyệt trước khi thực thi sang dịch vụ đích.
             </p>
           </div>
@@ -189,7 +189,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
                 <span>Workspace</span>
                 <select
                   aria-label="Chọn workspace"
-                  className="rounded-xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] px-3 py-1.5 text-sm !outline-none focus-visible:!outline-none focus:border-[#111827]"
+                  className="rounded-xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] px-3 py-1.5 text-sm !outline-none focus-visible:!outline-none focus:border-[#1a0e08]"
                   value={selectedConnectionId}
                   onChange={(e) => setSelectedConnectionId(e.target.value)}
                 >
@@ -204,7 +204,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
                 type="button"
                 disabled={loading}
                 onClick={() => setReloadTick((v) => v + 1)}
-                className="rounded-xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#1A2540] px-3 py-1.5 text-xs font-semibold hover:bg-neutral-50 dark:hover:bg-[#24324D] disabled:opacity-50"
+                className="rounded-xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#221C18] px-3 py-1.5 text-xs font-semibold hover:bg-neutral-50 dark:hover:bg-[#312923] disabled:opacity-50"
               >
                 Tải lại hộp thư
               </button>
@@ -214,20 +214,20 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
 
         {connections.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" aria-label="Thống kê đề xuất">
-            <div className="rounded-2xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] p-4 shadow-2xs">
-              <p className="text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">Tổng đề xuất</p>
+            <div className="rounded-2xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] p-4 shadow-2xs">
+              <p className="text-xs font-medium text-[#6A5F56] dark:text-[#9CA3AF]">Tổng đề xuất</p>
               <p className="mt-1 font-sans text-2xl font-semibold tabular-nums">{totalCount}</p>
             </div>
-            <div className="rounded-2xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] p-4 shadow-2xs">
-              <p className="text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">Cần xử lý</p>
+            <div className="rounded-2xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] p-4 shadow-2xs">
+              <p className="text-xs font-medium text-[#6A5F56] dark:text-[#9CA3AF]">Cần xử lý</p>
               <p className="mt-1 font-sans text-2xl font-semibold tabular-nums text-[#B43E00]">{actionNeededCount}</p>
             </div>
-            <div className="rounded-2xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] p-4 shadow-2xs">
-              <p className="text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">Chờ phê duyệt</p>
+            <div className="rounded-2xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] p-4 shadow-2xs">
+              <p className="text-xs font-medium text-[#6A5F56] dark:text-[#9CA3AF]">Chờ phê duyệt</p>
               <p className="mt-1 font-sans text-2xl font-semibold tabular-nums text-amber-700 dark:text-amber-400">{awaitingApprovalCount}</p>
             </div>
-            <div className="rounded-2xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] p-4 shadow-2xs">
-              <p className="text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">Đã xử lý</p>
+            <div className="rounded-2xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] p-4 shadow-2xs">
+              <p className="text-xs font-medium text-[#6A5F56] dark:text-[#9CA3AF]">Đã xử lý</p>
               <p className="mt-1 font-sans text-2xl font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">{resolvedCount}</p>
             </div>
           </div>
@@ -238,15 +238,15 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
             {error}
           </p>
         )}
-        {loading && <p role="status" className="text-xs text-[#6B7280]">Đang tải hộp thư đề xuất…</p>}
+        {loading && <p role="status" className="text-xs text-[#6A5F56]">Đang tải hộp thư đề xuất…</p>}
 
         {!loading && connections.length === 0 && (
-          <div className="rounded-2xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="rounded-2xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1.5">
               <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#B43E00] bg-[#FFF6EE] border border-[#F7D7BE] px-2.5 py-0.5 rounded-full">
                 <span>Đề xuất công việc từ tin nhắn Slack</span>
               </div>
-              <p className="text-sm font-medium text-[#111827] dark:text-white leading-relaxed">
+              <p className="text-sm font-medium text-[#1a0e08] dark:text-white leading-relaxed">
                 Chưa có workspace nào được kết nối. Hãy kết nối trong trang Kết nối dịch vụ để Planora tự động phát hiện công việc được giao và gửi đề xuất về đây.
               </p>
             </div>
@@ -272,7 +272,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
             </h2>
             {proposals.length > 0 && (
               <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#0E1528] p-1 text-xs">
+                <div className="inline-flex rounded-xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#131010] p-1 text-xs">
                   {(
                     [
                       ['all', 'Tất cả'],
@@ -287,8 +287,8 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
                       onClick={() => setStatusFilter(key)}
                       className={`rounded-lg px-2.5 py-1 font-semibold transition-colors ${
                         statusFilter === key
-                          ? 'bg-[#111827] text-white'
-                          : 'text-[#4B5563] dark:text-[#9CA3AF] hover:text-[#111827] dark:hover:text-white'
+                          ? 'bg-[#1a0e08] text-white'
+                          : 'text-[#51463E] dark:text-[#9CA3AF] hover:text-[#1a0e08] dark:hover:text-white'
                       }`}
                     >
                       {label}
@@ -301,15 +301,15 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
                   placeholder="Tìm theo tiêu đề, kênh, nội dung…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="rounded-xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] px-3 py-1.5 text-xs placeholder-[#6B7280] dark:placeholder-[#94A3B8] !outline-none focus-visible:!outline-none focus:border-[#111827]"
+                  className="rounded-xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] px-3 py-1.5 text-xs placeholder-[#6A5F56] dark:placeholder-[#A39A90] !outline-none focus-visible:!outline-none focus:border-[#1a0e08]"
                 />
               </div>
             )}
           </div>
           {proposals.length === 0 && !loading ? (
-            <p className="text-sm text-[#6B7280] dark:text-[#9CA3AF]">Chưa có đề xuất nào cho workspace này.</p>
+            <p className="text-sm text-[#6A5F56] dark:text-[#9CA3AF]">Chưa có đề xuất nào cho workspace này.</p>
           ) : filteredProposals.length === 0 && !loading ? (
-            <p className="text-sm text-[#6B7280] dark:text-[#9CA3AF]">
+            <p className="text-sm text-[#6A5F56] dark:text-[#9CA3AF]">
               Không có đề xuất nào khớp với bộ lọc hiện tại.
             </p>
           ) : (
@@ -333,19 +333,19 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
             Bản tóm tắt hàng ngày
           </h2>
           {digests.length === 0 && !loading ? (
-            <p className="text-sm text-[#6B7280] dark:text-[#9CA3AF]">Chưa có bản tóm tắt hàng ngày nào.</p>
+            <p className="text-sm text-[#6A5F56] dark:text-[#9CA3AF]">Chưa có bản tóm tắt hàng ngày nào.</p>
           ) : (
             <div className="space-y-3">
               {digests.map((digest) => (
                 <article
                   key={digest.id}
-                  className="rounded-2xl border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#131B2F] p-4 sm:p-5 space-y-2 shadow-2xs"
+                  className="rounded-2xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] p-4 sm:p-5 space-y-2 shadow-2xs"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h3 className="font-sans text-base font-semibold">Bản tóm tắt ngày {digest.localDate}</h3>
                     <button
                       type="button"
-                      className="rounded-lg border border-[#E5E5E0] dark:border-[#293653] bg-white dark:bg-[#1A2540] px-3 py-1 text-xs font-medium hover:bg-neutral-50 dark:hover:bg-[#24324D] disabled:opacity-50"
+                      className="rounded-lg border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#221C18] px-3 py-1 text-xs font-medium hover:bg-neutral-50 dark:hover:bg-[#312923] disabled:opacity-50"
                       disabled={refreshingDigestId === digest.id || digest.body === null}
                       onClick={() => void handleRefreshDigest(digest.id)}
                     >
@@ -353,7 +353,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
                     </button>
                   </div>
                   {digest.body === null || digest.status === 'stale' ? (
-                    <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF]">
+                    <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
                       Bản tóm tắt đã hết hiệu lực hoặc nguồn dữ liệu đã thay đổi.
                     </p>
                   ) : (
@@ -373,7 +373,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
                               rejectedCount: entries.filter((e) => e.status === 'rejected').length,
                             };
                       return (
-                        <div className="space-y-2 text-xs text-[#4B5563] dark:text-[#9CA3AF]">
+                        <div className="space-y-2 text-xs text-[#51463E] dark:text-[#9CA3AF]">
                           {typeof digest.body.summary === 'string' && <p>{digest.body.summary}</p>}
                           <p>
                             Tổng {counts.totalProposals} đề xuất · {counts.pendingCount} đang chờ ·{' '}
@@ -387,7 +387,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
                                   • {item.title} ({item.status})
                                 </span>
                                 {digestStatusLabels[item.status] && (
-                                  <span className="rounded bg-[#F3F4F6] dark:bg-[#1A2540] px-1.5 py-0.5 text-[11px] font-medium text-[#374151] dark:text-[#CBD5E1]">
+                                  <span className="rounded bg-[#F3F4F6] dark:bg-[#221C18] px-1.5 py-0.5 text-[11px] font-medium text-[#4a4038] dark:text-[#D7CEC4]">
                                     {digestStatusLabels[item.status]}
                                   </span>
                                 )}
@@ -404,7 +404,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
           )}
         </section>
 
-        <div className="pt-2 border-t border-[#E7E7E2] dark:border-[#293653]">
+        <div className="pt-2 border-t border-[#E8E0D6] dark:border-[#3a312a]">
           <ScheduleSection user={user} navigate={navigate} />
         </div>
       </main>

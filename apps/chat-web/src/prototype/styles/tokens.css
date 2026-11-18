@@ -35,14 +35,14 @@
 }
 
 :root[data-proto-page="404"] {
-  --p-color-brand-bg: #F8F8F6;
-  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-bg: #F8F4EE;
+  --p-color-brand-border: #E8E0D6;
   --p-color-brand-danger: #DC2626;
-  --p-color-brand-muted: #6B7280;
+  --p-color-brand-muted: #6A5F56;
   --p-color-brand-primary: #FF5701;
   --p-color-brand-success: #16A34A;
   --p-color-brand-surface: #FFFFFF;
-  --p-color-brand-text: #111827;
+  --p-color-brand-text: #1a0e08;
   --p-color-brand-warn: #D97706;
   --p-font-display: "Playfair Display", Georgia, serif;
   --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -51,14 +51,14 @@
 }
 
 :root[data-proto-page="account"] {
-  --p-color-brand-bg: #F8F8F6;
-  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-bg: #F8F4EE;
+  --p-color-brand-border: #E8E0D6;
   --p-color-brand-danger: #DC2626;
-  --p-color-brand-muted: #6B7280;
+  --p-color-brand-muted: #6A5F56;
   --p-color-brand-primary: #FF5701;
   --p-color-brand-success: #16A34A;
   --p-color-brand-surface: #FFFFFF;
-  --p-color-brand-text: #111827;
+  --p-color-brand-text: #1a0e08;
   --p-color-brand-warn: #D97706;
   --p-font-display: "Playfair Display", Georgia, serif;
   --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -68,23 +68,23 @@
 }
 
 :root[data-proto-page="app-stage"] {
-  --p-color-brand-bg: #F8F8F6;
-  --p-color-brand-border: #E7E7E2;
-  --p-color-brand-border-subtle: #F0F0EB;
+  --p-color-brand-bg: #F8F4EE;
+  --p-color-brand-border: #E8E0D6;
+  --p-color-brand-border-subtle: #F1EBE3;
   --p-color-brand-danger: #DC2626;
-  --p-color-brand-muted: #6B7280;
+  --p-color-brand-muted: #6A5F56;
   --p-color-brand-primary: #FF5701;
   --p-color-brand-primary-hover: #E04C00;
   --p-color-brand-primary-light: #FFF3ED;
   --p-color-brand-success: #16A34A;
   --p-color-brand-surface: #FFFFFF;
-  --p-color-brand-text: #111827;
+  --p-color-brand-text: #1a0e08;
   --p-color-brand-warning: #D97706;
-  --p-color-dark-bg: #0b1020;
-  --p-color-dark-border: #293653;
-  --p-color-dark-muted: #94a3b8;
-  --p-color-dark-surface: #131b2f;
-  --p-color-dark-surface-warm: #182343;
+  --p-color-dark-bg: #0e0b09;
+  --p-color-dark-border: #3a312a;
+  --p-color-dark-muted: #a39a90;
+  --p-color-dark-surface: #1a1613;
+  --p-color-dark-surface-warm: #221c18;
   --p-color-dark-text: #f8fafc;
   --p-font-body: "Be Vietnam Pro", system-ui, -apple-system, sans-serif;
   --p-font-display: "Playfair Display", Georgia, serif;
@@ -95,14 +95,14 @@
 }
 
 :root[data-proto-page="auth-action"] {
-  --p-color-brand-bg: #F8F8F6;
-  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-bg: #F8F4EE;
+  --p-color-brand-border: #E8E0D6;
   --p-color-brand-danger: #DC2626;
-  --p-color-brand-muted: #6B7280;
+  --p-color-brand-muted: #6A5F56;
   --p-color-brand-primary: #FF5701;
   --p-color-brand-success: #16A34A;
   --p-color-brand-surface: #FFFFFF;
-  --p-color-brand-text: #111827;
+  --p-color-brand-text: #1a0e08;
   --p-color-brand-warn: #D97706;
   --p-font-display: "Playfair Display", Georgia, serif;
   --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -111,14 +111,14 @@
 }
 
 :root[data-proto-page="errors"] {
-  --p-color-brand-bg: #F8F8F6;
-  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-bg: #F8F4EE;
+  --p-color-brand-border: #E8E0D6;
   --p-color-brand-danger: #DC2626;
-  --p-color-brand-muted: #6B7280;
+  --p-color-brand-muted: #6A5F56;
   --p-color-brand-primary: #FF5701;
   --p-color-brand-success: #16A34A;
   --p-color-brand-surface: #FFFFFF;
-  --p-color-brand-text: #111827;
+  --p-color-brand-text: #1a0e08;
   --p-color-brand-warn: #D97706;
   --p-font-display: "Playfair Display", Georgia, serif;
   --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -127,15 +127,15 @@
 }
 
 :root[data-proto-page="guide"] {
-  --p-color-brand-bg: #F8F8F6;
-  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-bg: #F8F4EE;
+  --p-color-brand-border: #E8E0D6;
   --p-color-brand-danger: #DC2626;
-  --p-color-brand-muted: #6B7280;
+  --p-color-brand-muted: #6A5F56;
   --p-color-brand-primary: #FF5701;
   --p-color-brand-primary-hover: #E04D00;
   --p-color-brand-success: #16A34A;
   --p-color-brand-surface: #FFFFFF;
-  --p-color-brand-text: #111827;
+  --p-color-brand-text: #1a0e08;
   --p-color-brand-warn: #D97706;
   --p-font-display: "Playfair Display", Georgia, serif;
   --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -143,14 +143,14 @@
 }
 
 :root[data-proto-page="history"] {
-  --p-color-brand-bg: #F8F8F6;
-  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-bg: #F8F4EE;
+  --p-color-brand-border: #E8E0D6;
   --p-color-brand-danger: #DC2626;
-  --p-color-brand-muted: #6B7280;
+  --p-color-brand-muted: #6A5F56;
   --p-color-brand-primary: #FF5701;
   --p-color-brand-success: #16A34A;
   --p-color-brand-surface: #FFFFFF;
-  --p-color-brand-text: #111827;
+  --p-color-brand-text: #1a0e08;
   --p-color-brand-warn: #D97706;
   --p-font-display: "Playfair Display", Georgia, serif;
   --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -160,18 +160,18 @@
 }
 
 :root[data-proto-page="index"] {
-  --p-color-brand-bg: #F8F8F6;
-  --p-color-brand-border: #E7E7E2;
-  --p-color-brand-border-subtle: #F0F0EB;
+  --p-color-brand-bg: #F8F4EE;
+  --p-color-brand-border: #E8E0D6;
+  --p-color-brand-border-subtle: #F1EBE3;
   --p-color-brand-danger: #DC2626;
-  --p-color-brand-muted: #6B7280;
+  --p-color-brand-muted: #6A5F56;
   --p-color-brand-primary: #FF5701;
   --p-color-brand-primary-hover: #E04C00;
   --p-color-brand-primary-subtle: #FFF3ED;
   --p-color-brand-success: #16A34A;
   --p-color-brand-success-subtle: #F0FDF4;
   --p-color-brand-surface: #FFFFFF;
-  --p-color-brand-text: #111827;
+  --p-color-brand-text: #1a0e08;
   --p-color-brand-warning: #D97706;
   --p-font-display: "Playfair Display", Georgia, serif;
   --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -182,14 +182,14 @@
 }
 
 :root[data-proto-page="privacy"] {
-  --p-color-brand-bg: #F8F8F6;
-  --p-color-brand-border: #E7E7E2;
-  --p-color-brand-muted: #6B7280;
+  --p-color-brand-bg: #F8F4EE;
+  --p-color-brand-border: #E8E0D6;
+  --p-color-brand-muted: #6A5F56;
   --p-color-brand-primary: #FF5701;
   --p-color-brand-primary-hover: #E04D00;
   --p-color-brand-subtle: #F3F4F6;
   --p-color-brand-surface: #FFFFFF;
-  --p-color-brand-text: #111827;
+  --p-color-brand-text: #1a0e08;
   --p-font-display: "Playfair Display", Georgia, serif;
   --p-font-mono: "JetBrains Mono", monospace;
   --p-font-sans: "Be Vietnam Pro", system-ui, sans-serif;
@@ -198,14 +198,14 @@
 }
 
 :root[data-proto-page="responses"] {
-  --p-color-brand-bg: #F8F8F6;
-  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-bg: #F8F4EE;
+  --p-color-brand-border: #E8E0D6;
   --p-color-brand-danger: #DC2626;
-  --p-color-brand-muted: #6B7280;
+  --p-color-brand-muted: #6A5F56;
   --p-color-brand-primary: #FF5701;
   --p-color-brand-success: #16A34A;
   --p-color-brand-surface: #FFFFFF;
-  --p-color-brand-text: #111827;
+  --p-color-brand-text: #1a0e08;
   --p-color-brand-warn: #D97706;
   --p-font-display: "Playfair Display", Georgia, serif;
   --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -214,14 +214,14 @@
 }
 
 :root[data-proto-page="settings"] {
-  --p-color-brand-bg: #F8F8F6;
-  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-bg: #F8F4EE;
+  --p-color-brand-border: #E8E0D6;
   --p-color-brand-danger: #DC2626;
-  --p-color-brand-muted: #6B7280;
+  --p-color-brand-muted: #6A5F56;
   --p-color-brand-primary: #FF5701;
   --p-color-brand-success: #16A34A;
   --p-color-brand-surface: #FFFFFF;
-  --p-color-brand-text: #111827;
+  --p-color-brand-text: #1a0e08;
   --p-color-brand-warn: #D97706;
   --p-font-display: "Playfair Display", Georgia, serif;
   --p-font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -231,14 +231,14 @@
 }
 
 :root[data-proto-page="users"] {
-  --p-color-brand-bg: #F8F8F6;
-  --p-color-brand-border: #E7E7E2;
+  --p-color-brand-bg: #F8F4EE;
+  --p-color-brand-border: #E8E0D6;
   --p-color-brand-danger: #DC2626;
-  --p-color-brand-muted: #6B7280;
+  --p-color-brand-muted: #6A5F56;
   --p-color-brand-primary: #FF5701;
   --p-color-brand-success: #16A34A;
   --p-color-brand-surface: #FFFFFF;
-  --p-color-brand-text: #111827;
+  --p-color-brand-text: #1a0e08;
   --p-color-brand-warn: #D97706;
   --p-font-display: "Playfair Display", Georgia, serif;
   --p-font-mono: "JetBrains Mono", ui-monospace, monospace;

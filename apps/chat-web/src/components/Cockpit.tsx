@@ -252,20 +252,20 @@ export function Cockpit(props: Props) {
       <main ref={stage} id="stage-container" className={`flex-1 w-full ${moment === 6 || moment === 'unsuccessful' ? 'max-w-[1120px]' : 'max-w-4xl'} mx-auto px-4 sm:px-6 ${moment === 'schedule' || moment === 'refusal' || expanded || slow || planningError || moment === 6 || moment === 7 || moment === 8 || moment === 9 ? 'py-4 sm:py-6' : 'py-5 sm:py-8'} flex flex-col min-w-0`}>
         {(moment === 1 || slackSelection !== null || slackWriteSelection !== null) && (slackEnabled || slackWritesEnabled) && (
           slackSelection === null && slackWriteSelection === null ? (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#E5E5E0] bg-white px-3.5 py-2 shadow-2xs">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#E6DED3] bg-white px-3.5 py-2 shadow-2xs">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-[#6B7280] mr-0.5">Slack cá nhân:</span>
+                <span className="text-xs font-medium text-[#6A5F56] mr-0.5">Slack cá nhân:</span>
                 {slackEnabled && <SlackReadControls compact hideInboxLink userId={props.user?.id} busy={state.isPlanning || state.planStatus === 'executing'} value={slackSelection} onChange={value=>{setSlackSelection(value);if(value!==null)setSlackWriteSelection(null);}} onSelectChannel={(channelId)=>setDraft(prev=>prev?`${prev} kênh ${channelId}`:`Đọc 10 tin kênh ${channelId}`)} onSelectUser={(userId)=>setDraft(prev=>prev?`${prev} thành viên ${userId}`:`Xem hồ sơ thành viên ${userId}`)} />}
                 {slackWritesEnabled && <SlackReadControls purpose="write" compact hideInboxLink userId={props.user?.id} busy={state.isPlanning||state.planStatus==='executing'} value={slackWriteSelection} onChange={value=>{setSlackWriteSelection(value);if(value!==null)setSlackSelection(null);}} onSelectChannel={(channelId)=>setSlackChannel(channelId)} />}
               </div>
-              <a href="/inbox" className="text-xs font-medium text-[#4B5563] hover:text-[#111827] underline underline-offset-2">
+              <a href="/inbox" className="text-xs font-medium text-[#51463E] hover:text-[#1a0e08] underline underline-offset-2">
                 Mở hộp thư đề xuất Slack
               </a>
             </div>
           ) : (
             <>
               {slackEnabled && <SlackReadControls userId={props.user?.id} busy={state.isPlanning || state.planStatus === 'executing'} value={slackSelection} onChange={value=>{setSlackSelection(value);if(value!==null)setSlackWriteSelection(null);}} onSelectChannel={(channelId)=>setDraft(prev=>prev?`${prev} kênh ${channelId}`:`Đọc 10 tin kênh ${channelId}`)} onSelectUser={(userId)=>setDraft(prev=>prev?`${prev} thành viên ${userId}`:`Xem hồ sơ thành viên ${userId}`)} />}
-              {slackWritesEnabled && <><SlackReadControls purpose="write" userId={props.user?.id} busy={state.isPlanning||state.planStatus==='executing'} value={slackWriteSelection} onChange={value=>{setSlackWriteSelection(value);if(value!==null)setSlackSelection(null);}} onSelectChannel={(channelId)=>setSlackChannel(channelId)} />{slackWriteSelection!==null&&<label className="mb-5 block text-xs font-semibold text-[#111827]">Mã kênh Slack<input aria-label="Mã kênh Slack" value={slackChannel} onChange={event=>setSlackChannel(event.target.value.trim())} disabled={state.isPlanning||state.planStatus==='executing'} placeholder="C… hoặc G…" className="mt-1.5 block w-full rounded-xl border border-[#D4D4CE] bg-white px-3 py-2 text-sm font-normal !outline-none focus-visible:!outline-none focus:border-[#111827]"/></label>}</>}
+              {slackWritesEnabled && <><SlackReadControls purpose="write" userId={props.user?.id} busy={state.isPlanning||state.planStatus==='executing'} value={slackWriteSelection} onChange={value=>{setSlackWriteSelection(value);if(value!==null)setSlackSelection(null);}} onSelectChannel={(channelId)=>setSlackChannel(channelId)} />{slackWriteSelection!==null&&<label className="mb-5 block text-xs font-semibold text-[#1a0e08]">Mã kênh Slack<input aria-label="Mã kênh Slack" value={slackChannel} onChange={event=>setSlackChannel(event.target.value.trim())} disabled={state.isPlanning||state.planStatus==='executing'} placeholder="C… hoặc G…" className="mt-1.5 block w-full rounded-xl border border-[#D4D4CE] bg-white px-3 py-2 text-sm font-normal !outline-none focus-visible:!outline-none focus:border-[#1a0e08]"/></label>}</>}
             </>
           )
         )}

@@ -55,7 +55,7 @@ export function UserNavMenu({ user, onOpenSettings, onLogout, onManageUsers, onO
     <button ref={trigger} type="button" aria-label={`Menu người dùng: ${user?.name || user?.email || 'Người dùng'}`} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined}
       className={triggerClassName ?? (variant === 'prototype' ? 'user-avatar-btn shadow-sm' : 'flex h-10 w-10 items-center justify-center rounded-full border border-border-strong bg-primary-tint text-primary-text font-semibold')}
       onClick={() => setOpen(!open)} onKeyDown={event => { if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setOpen(true); } }}>{avatarInitials(user)}</button>
-    {open && <div id={id} role="menu" aria-label="Người dùng" className={`${variant === 'prototype' ? 'absolute right-0 top-full mt-2 w-64 sm:w-68 max-w-[calc(100vw-24px)] bg-white dark:bg-[#131B2F] rounded-2xl border border-brand-border dark:border-[#293653] shadow-2xl py-1.5 z-50' : 'absolute right-0 top-full mt-2 z-50 w-72 rounded-2xl border border-border bg-surface p-2 shadow-xl'} max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain`}
+    {open && <div id={id} role="menu" aria-label="Người dùng" className={`${variant === 'prototype' ? 'absolute right-0 top-full mt-2 w-64 sm:w-68 max-w-[calc(100vw-24px)] bg-white dark:bg-[#1A1613] rounded-2xl border border-brand-border dark:border-[#3a312a] shadow-2xl py-1.5 z-50' : 'absolute right-0 top-full mt-2 z-50 w-72 rounded-2xl border border-border bg-surface p-2 shadow-xl'} max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain`}
       onKeyDown={event => {
         const all = items(), index = all.indexOf(document.activeElement as HTMLButtonElement);
         if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
@@ -63,16 +63,16 @@ export function UserNavMenu({ user, onOpenSettings, onLogout, onManageUsers, onO
         } else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setOpen(false); trigger.current?.focus(); }
         else if (event.key === 'Tab') setOpen(false);
       }}>
-      <div className={variant === 'prototype' ? 'px-4 py-3 border-b border-brand-border dark:border-[#24324D] select-none' : 'px-3 py-2 border-b border-border mb-1'}>
+      <div className={variant === 'prototype' ? 'px-4 py-3 border-b border-brand-border dark:border-[#312923] select-none' : 'px-3 py-2 border-b border-border mb-1'}>
         <p className="font-semibold truncate">{user?.name || user?.email || 'Người dùng'}</p>
         {variant === 'prototype' && (
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[11px] text-[#4B5563] dark:text-[#CBD5E1]">
+            <span className="text-[11px] text-[#51463E] dark:text-[#D7CEC4]">
               {workspace.id === 'personal'
                 ? (user?.role === 'admin' ? 'Quản trị viên' : 'Thành viên')
                 : (workspace.role === 'admin' ? 'Quản trị viên' : 'Thành viên')}
             </span>
-            <span className="text-[11px] text-[#4B5563] dark:text-[#94A3B8]">
+            <span className="text-[11px] text-[#51463E] dark:text-[#A39A90]">
               <span aria-hidden="true">·</span> {workspace.id === 'personal' ? 'Cá nhân' : workspace.name}
             </span>
           </div>
@@ -81,10 +81,10 @@ export function UserNavMenu({ user, onOpenSettings, onLogout, onManageUsers, onO
       </div>
       {entries.map(entry => {
         if (entry.kind === 'sep') {
-          return <div key={entry.key} role="separator" className="my-1 border-t border-brand-border dark:border-[#24324D]" />;
+          return <div key={entry.key} role="separator" className="my-1 border-t border-brand-border dark:border-[#312923]" />;
         }
         const active = isPathCurrent(entry.path);
-        const activeClass = active ? 'bg-orange-50/80 dark:bg-[#1F2A44] font-semibold text-[#B43E00] dark:text-[#FB923C]' : '';
+        const activeClass = active ? 'bg-orange-50/80 dark:bg-[#2A231E] font-semibold text-[#B43E00] dark:text-[#FB923C]' : '';
         return (
           <button
             key={entry.label}

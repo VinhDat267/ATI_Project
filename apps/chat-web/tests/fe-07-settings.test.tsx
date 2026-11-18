@@ -286,12 +286,15 @@ it('preserves in-progress credentials when the same user receives a refreshed ac
   expect(await screen.findByLabelText('Token')).toHaveValue('unsaved');
 });
 it('uses the prototype metadata, raw page CSS, layout and brand parts without demo controls', async () => {
+  // Redesign 11/2026: page.css giữ cấu trúc của bản mẫu nhưng đã đổi sang bảng màu ấm.
   const source = readFileSync('../../docs/design/prototypes/react/src/pages/Settings/page.css', 'utf8');
   const port = readFileSync('src/pages/Settings/page.css', 'utf8');
-  expect(port).toBe(source); mount(); await screen.findByRole('button', { name: /Telegram —/ });
+  expect(port.split('\n')).toHaveLength(source.split('\n').length);
+  expect(port).not.toMatch(/#(0B1020|0E1528|131B2F|1F2A44|293653)\b/i); mount(); await screen.findByRole('button', { name: /Telegram —/ });
   expect(document.documentElement).toHaveAttribute('data-proto-page', 'settings'); expect(document.title).toBe('Kết nối dịch vụ — Planora');
   expect(screen.getByRole('main')).toHaveClass('flex-1', 'max-w-5xl', 'px-4', 'sm:px-6', 'py-8', 'sm:py-10');
-  expect(screen.getByRole('banner')).toHaveClass('sticky', 'top-0', 'z-30', 'bg-[#F8F8F6]/90', 'backdrop-blur-md');
+  expect(screen.getByRole('banner')).toHaveClass('ps-topbar', 'sticky', 'top-0', 'z-30');
+  expect(screen.getByRole('banner').className).not.toMatch(/backdrop-blur/);
   expect(screen.getByRole('button', { name: /Menu người dùng/ })).toHaveTextContent('TA');
   expect(screen.queryByText(/Xem như|Kết quả kiểm tra tiếp theo|Kịch bản demo/)).not.toBeInTheDocument();
 });

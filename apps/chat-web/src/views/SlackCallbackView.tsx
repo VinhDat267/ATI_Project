@@ -20,7 +20,7 @@ export function SlackCallbackView({
     id: 'slack-callback',
     title: 'Kết nối Slack — Planora',
     htmlClass: '',
-    bodyClass: 'min-h-screen bg-[#F8F8F6] text-[#111827] antialiased',
+    bodyClass: 'min-h-screen bg-[#F8F4EE] text-[#1a0e08] antialiased',
     css: '',
   });
 
@@ -108,7 +108,7 @@ export function SlackCallbackView({
   }, [navigate]);
 
   return (
-    <main className="max-w-xl mx-auto px-4 py-16 text-[#111827] v3-space-y-5">
+    <main className="max-w-xl mx-auto px-4 py-16 text-[#1a0e08] v3-space-y-5">
       <h1 className="font-sans text-2xl font-semibold tracking-tight">
         {result ? 'Đã kết nối Slack' : 'Kết nối Slack'}
       </h1>
@@ -121,12 +121,12 @@ export function SlackCallbackView({
           <p role="status" className="text-base font-medium">
             <span>{result.workspaceName}</span> · <span>{result.workspaceId}</span>
           </p>
-          <p className="text-sm text-[#4B5563]">
+          <p className="text-sm text-[#51463E]">
             Kết nối workspace đã được lưu thành công. Bạn có thể kiểm tra trạng thái quyền xử lý dữ liệu tại Kết nối dịch vụ.
           </p>
         </>
       ) : (
-        <p role="status" className="text-sm text-[#4B5563]">
+        <p role="status" className="text-sm text-[#51463E]">
           Đang hoàn tất kết nối Slack…
         </p>
       )}

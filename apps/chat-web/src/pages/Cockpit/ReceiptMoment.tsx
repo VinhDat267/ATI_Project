@@ -36,7 +36,7 @@ interface CardProps {
 }
 
 const METRIC_PILL_BASE =
-  'px-2 py-0.5 rounded-[6px] text-[11px] font-medium border bg-[#F4F4F3] text-[#374151] border-[#E5E5E3]';
+  'px-2 py-0.5 rounded-[6px] text-[11px] font-medium border bg-[#F4F4F3] text-[#4a4038] border-[#E5E5E3]';
 const METRIC_PILL_WARN =
   'px-2 py-0.5 rounded-[6px] text-[11px] font-medium border bg-[#FEF8EC] text-[#7A4100] border-[#F2DFB6]';
 
@@ -374,7 +374,7 @@ function TelegramReceiptMetrics({ step, searched }: { step: ExecutionStepInfo; s
         ))}
       </div>
       {readMessages && readMessages.length === 0 && (
-        <p data-testid="telegram-read-empty-hint" className="mt-1.5 text-xs text-[#6B7280] break-words">
+        <p data-testid="telegram-read-empty-hint" className="mt-1.5 text-xs text-[#6A5F56] break-words">
           {searched
             ? 'Không tìm thấy tin nhắn khớp trong 24 giờ qua.'
             : 'Bot chưa nhận được tin nhắn nào trong 24 giờ qua. Với nhóm, hãy tắt Privacy Mode qua @BotFather (/setprivacy → Disable) hoặc đặt bot làm quản trị viên, rồi nhắn thử một tin mới.'}
@@ -455,7 +455,7 @@ function ReceiptConnector({ from, to, sourceIndex, label }: HorizontalConnectorI
       data-receipt-connector
       data-from={from}
       data-to={to}
-      className="connector-stagger-1 mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#F4F4F3] text-[#4B5563] border border-[#E5E5E3] rounded-[6px] text-[11px] font-medium max-w-full"
+      className="connector-stagger-1 mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 bg-[#F4F4F3] text-[#51463E] border border-[#E5E5E3] rounded-[6px] text-[11px] font-medium max-w-full"
       title="Dữ liệu được truyền sang bước tiếp theo"
     >
       <span className="text-[#5F6368] flex-shrink-0">↳ Từ Việc {sourceIndex}:</span>
@@ -504,7 +504,7 @@ function ReceiptCard({
     <div
       data-highlighted-step={highlighted ? 'true' : undefined}
       className={`receipt-stagger-${Math.min(index + 1, 4)} min-w-0 rounded-lg border ${
-        highlighted ? 'bg-[#FAFAFA] border-[#111827]' : 'bg-white border-[#E5E5E3]'
+        highlighted ? 'bg-[#FAFAFA] border-[#1a0e08]' : 'bg-white border-[#E5E5E3]'
       } p-2.5 sm:p-4 flex flex-col hover:border-[#CFCFC9] transition-colors group`}
       aria-label={serviceName(service, services)}
     >
@@ -515,7 +515,7 @@ function ReceiptCard({
             <div className="w-6 h-6 rounded-[6px] bg-[#F8F8F7] border border-[#E6E6E3] flex items-center justify-center p-1 flex-shrink-0">
               <ServiceLogo
                 service={service}
-                className={`w-3.5 h-3.5 ${palette.logo === 'text-white' ? 'text-[#111827]' : (palette.logo ?? '')}`}
+                className={`w-3.5 h-3.5 ${palette.logo === 'text-white' ? 'text-[#1a0e08]' : (palette.logo ?? '')}`}
               />
             </div>
             <span className="text-xs font-medium text-[#5F6368] truncate">
@@ -526,7 +526,7 @@ function ReceiptCard({
             className={`text-[11px] font-medium ${
               step.status === 'succeeded'
                 ? 'bg-[#DCFAE5] text-[#04250E]'
-                : 'bg-[#F3F3F1] text-[#4B5563]'
+                : 'bg-[#F3F3F1] text-[#51463E]'
             } px-2 py-0.5 rounded-[6px] flex-shrink-0 whitespace-nowrap`}
           >
             {step.status === 'succeeded' ? `✓ ${operation(step.tool).receipt}` : statusLabel(step.status)}
@@ -555,42 +555,42 @@ function ReceiptCard({
             )}
           </p>
           {service === 'gmail' && gmailConnection?.email && (
-            <p className="text-xs text-[#6B7280] mt-0.5 break-words">
+            <p className="text-xs text-[#6A5F56] mt-0.5 break-words">
               Gửi từ: {gmailConnection.email} (Gmail của bạn)
             </p>
           )}
           {service === 'mycalendar' && mycalendarConnection?.email && (
-            <p className="text-xs text-[#6B7280] mt-0.5 break-words">
+            <p className="text-xs text-[#6A5F56] mt-0.5 break-words">
               Tài khoản: {mycalendarConnection.email} (Google Calendar của bạn)
             </p>
           )}
           {service === 'mysheets' && mysheetsConnection?.email && (
-            <p className="text-xs text-[#6B7280] mt-0.5 break-words">
+            <p className="text-xs text-[#6A5F56] mt-0.5 break-words">
               Tài khoản: {mysheetsConnection.email} (Google Sheets của bạn)
             </p>
           )}
           {service === 'trello' && trelloConnection?.username && (
-            <p className="text-xs text-[#6B7280] mt-0.5 break-words">
+            <p className="text-xs text-[#6A5F56] mt-0.5 break-words">
               Tài khoản: @{trelloConnection.username} (Trello của bạn)
             </p>
           )}
           {service === 'github' && githubConnection?.login && (
-            <p className="text-xs text-[#6B7280] mt-0.5 break-words">
+            <p className="text-xs text-[#6A5F56] mt-0.5 break-words">
               Tài khoản: @{githubConnection.login} (GitHub của bạn)
             </p>
           )}
           {service === 'notion' && notionConnection?.workspaceName && (
-            <p className="text-xs text-[#6B7280] mt-0.5 break-words">
+            <p className="text-xs text-[#6A5F56] mt-0.5 break-words">
               Workspace Notion: {notionConnection.workspaceName}
             </p>
           )}
           {service === 'telegram' && telegramConnection?.username && (
-            <p className="text-xs text-[#6B7280] mt-0.5 break-words">
+            <p className="text-xs text-[#6A5F56] mt-0.5 break-words">
               Tài khoản: @{telegramConnection.username} (Telegram của bạn)
             </p>
           )}
           {service === 'myjira' && myjiraConnection && (
-            <p className="text-xs text-[#6B7280] mt-0.5 break-words">
+            <p className="text-xs text-[#6A5F56] mt-0.5 break-words">
               Tài khoản Atlassian: {myjiraConnection.atlassianAccountId} · Workspace:{' '}
               {myjiraConnection.workspaceId}
             </p>
@@ -610,7 +610,7 @@ function ReceiptCard({
                     siteStep.projectId)
                   : undefined);
               return (
-                <p className="text-xs text-[#6B7280] mt-0.5 break-words">
+                <p className="text-xs text-[#6A5F56] mt-0.5 break-words">
                   Site đích: {siteLabel}
                   {projectLabel ? ` · Dự án: ${projectLabel}` : ''}
                 </p>
@@ -670,7 +670,7 @@ function ReceiptCard({
                     href={meetUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs font-medium text-[#111827] bg-[#F4F4F3] border border-[#E5E5E3] px-2 py-0.5 rounded-[6px] hover:bg-[#EAEAE8] inline-flex items-center gap-1"
+                    className="text-xs font-medium text-[#1a0e08] bg-[#F4F4F3] border border-[#E5E5E3] px-2 py-0.5 rounded-[6px] hover:bg-[#EAEAE8] inline-flex items-center gap-1"
                   >
                     <span>Tham gia Google Meet</span>
                   </a>
@@ -690,11 +690,11 @@ function ReceiptCard({
 
           {hasDetails && (
             <details className={`group/details ${hasLinks ? 'mt-2' : ''} text-xs text-[#5F6368] min-w-0`}>
-              <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden flex items-center justify-between gap-2 hover:text-[#111827] select-none">
+              <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden flex items-center justify-between gap-2 hover:text-[#1a0e08] select-none">
                 <span className="inline-flex items-center gap-1.5 font-medium">
                   <svg
                     aria-hidden="true"
-                    className="w-3 h-3 text-[#6B7280] transition-transform group-open/details:rotate-90"
+                    className="w-3 h-3 text-[#6A5F56] transition-transform group-open/details:rotate-90"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -708,8 +708,8 @@ function ReceiptCard({
                 )}
               </summary>
               <div className="mt-2 rounded-lg bg-[#F8F8F7] border border-[#E6E6E3] overflow-hidden min-w-0">
-                <div className="px-2.5 py-1.5 bg-[#F1F1EF] dark:bg-[#1E293B] border-b border-[#E6E6E3] dark:border-[#293653] flex flex-wrap items-center justify-between gap-2">
-                  <code className="font-mono text-[11px] font-medium text-[#111827]">{step.tool}</code>
+                <div className="px-2.5 py-1.5 bg-[#F1F1EF] dark:bg-[#27211C] border-b border-[#E6E6E3] dark:border-[#3a312a] flex flex-wrap items-center justify-between gap-2">
+                  <code className="font-mono text-[11px] font-medium text-[#1a0e08]">{step.tool}</code>
                   {step.completedAt && (
                     <time className="font-mono text-[11px] text-[#5F6368] tabular-nums" dateTime={step.completedAt}>
                       {new Date(step.completedAt).toLocaleString('vi-VN', { hour12: false })}
@@ -753,7 +753,7 @@ function ReceiptBetweenRows({
       <div className="hidden md:flex items-center justify-between w-full px-2 gap-3 text-[#9CA3AF]">
         <div className="flex-1 h-px bg-[#ECECE9]" />
         <div
-          className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-[#F8F8F7] border border-[#E5E5E3] rounded-[6px] text-[11px] font-medium text-[#4B5563]"
+          className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-[#F8F8F7] border border-[#E5E5E3] rounded-[6px] text-[11px] font-medium text-[#51463E]"
           title="Dữ liệu được truyền giữa các bước trong kế hoạch đã duyệt"
         >
           <span>{sourceLabel}</span>
@@ -770,7 +770,7 @@ function ReceiptBetweenRows({
       </div>
       <div className="flex md:hidden items-center justify-center py-0.5">
         <span
-          className="px-2 py-0.5 bg-[#F8F8F7] text-[#4B5563] border border-[#E5E5E3] rounded-[6px] text-[11px] font-medium whitespace-nowrap"
+          className="px-2 py-0.5 bg-[#F8F8F7] text-[#51463E] border border-[#E5E5E3] rounded-[6px] text-[11px] font-medium whitespace-nowrap"
           title="Dữ liệu được truyền sang bước tiếp theo"
         >
           {`${sourceLabel} · ${field} → ${targetLabel} ↓`}
@@ -866,7 +866,7 @@ export function ReceiptMoment({
             <div className="inline-flex items-center gap-1.5 font-medium">
               <span
                 className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  terminalStatus ? 'bg-[#F3F3F1] text-[#4B5563]' : 'bg-[#DCFAE5] text-[#04250E]'
+                  terminalStatus ? 'bg-[#F3F3F1] text-[#51463E]' : 'bg-[#DCFAE5] text-[#04250E]'
                 }`}
               >
                 <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -879,7 +879,7 @@ export function ReceiptMoment({
                   />
                 </svg>
               </span>
-              <span className="text-[#111827]">
+              <span className="text-[#1a0e08]">
                 {terminalStatus ? 'Biên nhận phiên thực thi' : 'Hoàn tất thực thi'}
               </span>
             </div>
@@ -894,7 +894,7 @@ export function ReceiptMoment({
                   {steps.length > 0 && <span aria-hidden="true">·</span>}
                   <span
                     id="moment-6-duration-tag"
-                    className="inline-flex items-center px-2 py-0.5 rounded-[6px] bg-[#F4F4F3] border border-[#E5E5E3] text-[#111827] text-xs font-medium tabular-nums"
+                    className="inline-flex items-center px-2 py-0.5 rounded-[6px] bg-[#F4F4F3] border border-[#E5E5E3] text-[#1a0e08] text-xs font-medium tabular-nums"
                   >
                     Trong {totalDuration}
                   </span>
@@ -906,7 +906,7 @@ export function ReceiptMoment({
           <RequestEcho request={request} />
           <h1
             id="heading-moment-6"
-            className="font-sans text-lg sm:text-[22px] text-[#111827] font-semibold tracking-[-0.02em] leading-snug"
+            className="font-sans text-lg sm:text-[22px] text-[#1a0e08] font-semibold tracking-[-0.02em] leading-snug"
             tabIndex={-1}
           >
             {terminalStatus ? (
@@ -932,7 +932,7 @@ export function ReceiptMoment({
                     ? 'Kế hoạch đã hủy; chưa thực thi.'
                     : 'Quy trình không hoàn thành.'}
               </p>
-              <p className="text-sm text-[#4B5563] mt-1 tabular-nums">
+              <p className="text-sm text-[#51463E] mt-1 tabular-nums">
                 Đã làm {succeededCount} việc; {steps.length - succeededCount} việc chưa hoàn thành.
               </p>
             </>
@@ -1048,7 +1048,7 @@ export function ReceiptMoment({
             <button
               type="button"
               onClick={onNewConversation}
-              className="h-8 px-3.5 bg-[#1D1F20] hover:bg-[#111111] text-white text-xs font-medium rounded-lg transition-colors inline-flex items-center justify-center cursor-pointer"
+              className="h-8 px-3.5 bg-[#1A0E08] hover:bg-[#111111] text-white text-xs font-medium rounded-lg transition-colors inline-flex items-center justify-center cursor-pointer"
             >
               Nhờ việc khác
             </button>
@@ -1058,7 +1058,7 @@ export function ReceiptMoment({
               onClick={() =>
                 onFollowup(`Mỗi sáng 08:00, tự động thực hiện: ${request || 'quy trình vừa hoàn tất'}`)
               }
-              className="h-8 px-3 bg-white hover:bg-[#F3F3F1] border border-[#DFDFDC] text-[#111827] text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+              className="h-8 px-3 bg-white hover:bg-[#F3F3F1] border border-[#DFDFDC] text-[#1a0e08] text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5 cursor-pointer"
             >
               <svg
                 aria-hidden="true"
@@ -1084,11 +1084,11 @@ export function ReceiptMoment({
                   key={service.id}
                   type="button"
                   onClick={() => onFollowup(getPrompt(service))}
-                  className="h-8 px-3 bg-white hover:bg-[#F3F3F1] border border-[#E5E5E3] text-[#4B5563] hover:text-[#111827] text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                  className="h-8 px-3 bg-white hover:bg-[#F3F3F1] border border-[#E5E5E3] text-[#51463E] hover:text-[#1a0e08] text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5 cursor-pointer"
                 >
                   <svg
                     aria-hidden="true"
-                    className="w-3 h-3 text-[#6B7280]"
+                    className="w-3 h-3 text-[#6A5F56]"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -1107,7 +1107,7 @@ export function ReceiptMoment({
                     event.preventDefault();
                     onSettings?.();
                   }}
-                  className="underline font-medium text-[#111827]"
+                  className="underline font-medium text-[#1a0e08]"
                 >
                   Kết nối thêm
                 </a>

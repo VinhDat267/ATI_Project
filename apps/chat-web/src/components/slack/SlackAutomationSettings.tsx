@@ -13,8 +13,8 @@ import {slackAssistantApi,type SlackDirectoryChannelDto,type SlackDirectoryUserD
 import {slackSessionOwner} from '../../services/slack-connection';
 import {authStorage} from '../../services/auth-storage';
 
-const field='w-full min-w-0 rounded-lg border border-[#D1D5DB] dark:border-[#293653] bg-white dark:bg-[#0E1528] px-3 py-2 text-sm text-[#111827] dark:text-[#F1F5F9]';
-const button='rounded-lg border border-[#D1D5DB] dark:border-[#293653] bg-white dark:bg-[#1A2540] hover:bg-[#F3F4F6] dark:hover:bg-[#24324D] px-3 py-2 text-sm disabled:opacity-50';
+const field='w-full min-w-0 rounded-lg border border-[#D1D5DB] dark:border-[#3a312a] bg-white dark:bg-[#131010] px-3 py-2 text-sm text-[#1a0e08] dark:text-[#F3EEE8]';
+const button='rounded-lg border border-[#D1D5DB] dark:border-[#3a312a] bg-white dark:bg-[#221C18] hover:bg-[#F3F4F6] dark:hover:bg-[#312923] px-3 py-2 text-sm disabled:opacity-50';
 
 const SERVICE_LABELS: Record<string, string> = {
  trello: 'Trello (Thẻ công việc)',
@@ -107,7 +107,7 @@ export function SlackAutomationSettings({connectionId,workspaceName,active}:{con
   }
  };
  const follow=async(value:boolean)=>{const owns=slackSessionOwner(),epoch=generation.current;if(!/^[A-Za-z0-9_-]{1,64}$/.test(channel)||!/^\d{1,10}(?:\.\d{1,6})?$/.test(thread)){setError('Nhập ID kênh và timestamp gốc hợp lệ.');return;}setBusy(true);setError('');setNotice('');try{await slackAssistantApi.follow(connectionId,channel,thread,value);if(owns()&&epoch===generation.current)setNotice(value?'Đã theo dõi các sự kiện mới trong thread.':'Đã dừng theo dõi các sự kiện mới trong thread.');}catch{if(owns()&&epoch===generation.current)setError('Chưa cập nhật được thread.');}finally{if(owns()&&epoch===generation.current)setBusy(false);}};
- return <div className="mt-4 border-t border-[#E7E7E2] dark:border-[#293653] pt-3 text-[#111827] dark:text-[#F1F5F9]">
+ return <div className="mt-4 border-t border-[#E8E0D6] dark:border-[#3a312a] pt-3 text-[#1a0e08] dark:text-[#F3EEE8]">
   <button type="button" className={button} aria-expanded={open} aria-controls={id} onClick={()=>setOpen(value=>!value)} aria-label={'Tự động hóa '+workspaceName}>Tự động hóa và đề xuất</button>
   {open&&<div id={id} className="mt-3 space-y-4 min-w-0">
    {busy&&!view&&<p role="status">Đang tải tự động hóa…</p>}
@@ -116,26 +116,26 @@ export function SlackAutomationSettings({connectionId,workspaceName,active}:{con
     {!view.available&&<p className="text-sm">Tự động hóa chưa khả dụng. Bạn vẫn có thể xem và lưu tùy chọn khi tắt xử lý.</p>}
     {!active&&<p className="text-sm">Cần kết nối lại workspace trước khi bật xử lý.</p>}
     {view.pausedReason&&<p role="status" className="text-sm text-amber-800 dark:text-amber-300">{view.pausedReason==='budget_exceeded'?'Đã tạm dừng vì hết ngân sách. Việc chưa xử lý vẫn đang chờ.':'Hàng đợi đầy. Các sự kiện chưa xử lý đang chờ thêm chỗ.'}</p>}
-    {view.queue&&<p className="text-sm text-[#4B5563] dark:text-[#9CA3AF]">{view.queue.pending} việc đang chờ · {view.queue.running} đang xử lý · {view.queue.held} chờ ngân sách · {view.queue.needsAttention} cần xem lại (lần tải gần nhất).</p>}
+    {view.queue&&<p className="text-sm text-[#51463E] dark:text-[#9CA3AF]">{view.queue.pending} việc đang chờ · {view.queue.running} đang xử lý · {view.queue.held} chờ ngân sách · {view.queue.needsAttention} cần xem lại (lần tải gần nhất).</p>}
     <label className="flex gap-2 items-start text-sm"><input type="checkbox" checked={draft.enabled} disabled={busy||(!draft.enabled&&(!view.available||!active))} onChange={e=>patch({enabled:e.target.checked})}/>Tự động tạo đề xuất</label>
-    <p className="text-sm text-[#4B5563] dark:text-[#9CA3AF]">Chỉ xử lý sự kiện mới sau khi bật. Đề xuất luôn cần bạn xem và phê duyệt trước khi ghi sang dịch vụ.</p>
+    <p className="text-sm text-[#51463E] dark:text-[#9CA3AF]">Chỉ xử lý sự kiện mới sau khi bật. Đề xuất luôn cần bạn xem và phê duyệt trước khi ghi sang dịch vụ.</p>
     <label className="block text-sm space-y-1"><span>Chế độ</span><select className={field} value={draft.mode} disabled={busy} onChange={e=>patch({mode:e.target.value as SlackAssistantConfig['mode']})}><option value="rules">Rules — dùng luật</option><option value="ai">AI — phân loại mọi sự kiện hợp lệ</option><option value="hybrid">Hybrid — luật lọc rồi AI phân loại</option></select></label>
-    <p className="text-sm text-[#4B5563] dark:text-[#9CA3AF]">{draft.mode==='rules'?'Rules tạo đề xuất theo luật, không gọi AI.':draft.mode==='ai'?'AI xem mọi sự kiện đủ điều kiện. Chỉ đề xuất khi có bằng chứng liên quan trực tiếp đến bạn.':'Hybrid chỉ gọi AI khi sự kiện khớp luật cá nhân.'}</p>
+    <p className="text-sm text-[#51463E] dark:text-[#9CA3AF]">{draft.mode==='rules'?'Rules tạo đề xuất theo luật, không gọi AI.':draft.mode==='ai'?'AI xem mọi sự kiện đủ điều kiện. Chỉ đề xuất khi có bằng chứng liên quan trực tiếp đến bạn.':'Hybrid chỉ gọi AI khi sự kiện khớp luật cá nhân.'}</p>
     <div className="flex flex-wrap items-center gap-2">
      <button type="button" className={button} disabled={busy||loadingDirectory} onClick={()=>void loadDirectory()}>
       {loadingDirectory?'Đang tải danh bạ Slack…':channels.length>0||users.length>0?'Làm mới danh bạ Slack':'Tải danh bạ kênh & thành viên Slack'}
      </button>
-     {(channels.length>0||users.length>0)&&<span className="text-xs text-[#4B5563] dark:text-[#9CA3AF]">Đã tải {channels.length} kênh · {users.length} thành viên</span>}
+     {(channels.length>0||users.length>0)&&<span className="text-xs text-[#51463E] dark:text-[#9CA3AF]">Đã tải {channels.length} kênh · {users.length} thành viên</span>}
     </div>
     <details><summary className="cursor-pointer text-sm font-semibold">Luật dùng cho Rules và Hybrid</summary><div className="mt-3 space-y-4">
-     {draft.rules.map((r,index)=><fieldset key={r.id} className="rounded-lg border border-[#D1D5DB] dark:border-[#293653] p-3 space-y-3 min-w-0"><legend className="px-1 text-sm">Luật {index+1}</legend>
+     {draft.rules.map((r,index)=><fieldset key={r.id} className="rounded-lg border border-[#D1D5DB] dark:border-[#3a312a] p-3 space-y-3 min-w-0"><legend className="px-1 text-sm">Luật {index+1}</legend>
       <label className="flex gap-2 text-sm"><input type="checkbox" checked={r.enabled} onChange={e=>rule(index,{enabled:e.target.checked})}/>Bật luật {index+1}</label>
       <label className="block text-sm">Tên luật<input className={field} value={r.name} maxLength={100} onChange={e=>rule(index,{name:e.target.value})}/></label>
       <label className="block text-sm">Từ khóa (mỗi dòng một từ khóa)<textarea className={field} value={r.keywords.join('\n')} rows={3} onChange={e=>rule(index,{keywords:e.target.value.split('\n')})}/></label>
       <label className="block text-sm">Cách khớp từ khóa<select className={field} value={r.keywordMode} onChange={e=>rule(index,{keywordMode:e.target.value as 'any'|'all'})}><option value="any">Một từ khóa</option><option value="all">Tất cả từ khóa</option></select></label>
       <label className="block text-sm">ID người gửi (cách nhau bởi dấu phẩy)<input className={field} value={r.authorIds.join(',')} onChange={e=>rule(index,{authorIds:e.target.value.split(',')})}/></label>
       {users.length>0&&(
-       <label className="block text-xs text-[#4B5563] dark:text-[#9CA3AF]">
+       <label className="block text-xs text-[#51463E] dark:text-[#9CA3AF]">
         Thêm nhanh người gửi từ danh bạ Slack
         <select
          aria-label="Thêm nhanh người gửi từ danh bạ Slack"
@@ -160,8 +160,8 @@ export function SlackAutomationSettings({connectionId,workspaceName,active}:{con
      </fieldset>)}
      <button type="button" className={button} disabled={draft.rules.length>=20} onClick={()=>{const r=defaultSlackAssistantConfig().rules[0]!;patch({rules:[...draft.rules,{...r,id:crypto.randomUUID(),name:'Luật mới',keywords:[]}]});}}>Thêm luật</button>
     </div></details>
-    <details><summary className="cursor-pointer text-sm font-semibold">Đích dịch vụ mặc định cho đề xuất</summary><div className="mt-3 space-y-3 rounded-lg border border-[#D1D5DB] dark:border-[#293653] p-3 min-w-0">
-     <p className="text-xs text-[#4B5563] dark:text-[#9CA3AF]">Cấu hình nơi ghi mặc định khi bạn bấm &ldquo;Xem trước kế hoạch&rdquo; trong Hộp thư đề xuất. Bạn vẫn có thể đổi đích ngay trên từng thẻ đề xuất.</p>
+    <details><summary className="cursor-pointer text-sm font-semibold">Đích dịch vụ mặc định cho đề xuất</summary><div className="mt-3 space-y-3 rounded-lg border border-[#D1D5DB] dark:border-[#3a312a] p-3 min-w-0">
+     <p className="text-xs text-[#51463E] dark:text-[#9CA3AF]">Cấu hình nơi ghi mặc định khi bạn bấm &ldquo;Xem trước kế hoạch&rdquo; trong Hộp thư đề xuất. Bạn vẫn có thể đổi đích ngay trên từng thẻ đề xuất.</p>
      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <label className="block text-sm">ID danh sách Trello (List ID)<input className={field} placeholder="Ví dụ: list-backlog-123" value={draft.targets.trello?.listId??''} onChange={e=>patchTargets({trello:{boardId:draft.targets.trello?.boardId||'default',listId:e.target.value}})}/></label>
       <label className="block text-sm">Mã dự án Jira (Project Key)<input className={field} placeholder="Ví dụ: OPS, ENG" value={draft.targets.jira?.projectKey??''} onChange={e=>patchTargets({jira:{projectKey:e.target.value}})}/></label>
@@ -176,21 +176,21 @@ export function SlackAutomationSettings({connectionId,workspaceName,active}:{con
       Mặc định phản hồi kết quả vào thread Slack nguồn
      </label>
     </div></details>
-    <fieldset className="space-y-3"><legend className="font-semibold text-sm">Giới hạn xử lý</legend><p className="text-sm text-[#4B5563] dark:text-[#9CA3AF]">Ngân sách đặt lại theo ngày/tháng UTC. Mỗi lần thử lại AI cũng tính một lượt. Token được giữ trước theo giới hạn đầu vào/đầu ra; lần gọi chưa rõ kết quả không được hoàn ngân sách.</p>
+    <fieldset className="space-y-3"><legend className="font-semibold text-sm">Giới hạn xử lý</legend><p className="text-sm text-[#51463E] dark:text-[#9CA3AF]">Ngân sách đặt lại theo ngày/tháng UTC. Mỗi lần thử lại AI cũng tính một lượt. Token được giữ trước theo giới hạn đầu vào/đầu ra; lần gọi chưa rõ kết quả không được hoàn ngân sách.</p>
      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{([{key:'dailyCalls',label:'Số lượt AI mỗi ngày',max:1000000},{key:'monthlyCalls',label:'Số lượt AI mỗi tháng',max:10000000},{key:'dailyTokens',label:'Ngân sách token mỗi ngày',max:1000000000},{key:'monthlyTokens',label:'Ngân sách token mỗi tháng',max:10000000000},{key:'maxOutputTokens',label:'Token đầu ra tối đa mỗi lượt',max:4096}] as const).map(item=><label key={item.key} className="block text-sm">{item.label}<input type="number" className={field} min={item.key==='maxOutputTokens'?256:1} max={item.max} step={1} value={Number.isFinite(draft.budget[item.key])?draft.budget[item.key]:''} onChange={e=>patch({budget:{...draft.budget,[item.key]:e.target.valueAsNumber}})}/></label>)}
       <label className="block text-sm">Tối đa việc trong hàng đợi<input className={field} type="number" min={1} max={10000} value={Number.isFinite(draft.maxQueueLength)?draft.maxQueueLength:''} onChange={e=>patch({maxQueueLength:e.target.valueAsNumber})}/></label>
       <label className="block text-sm">Số ngày lưu nội dung (tối đa theo quyền workspace)<input className={field} type="number" min={1} max={7} value={Number.isFinite(draft.retentionDays)?draft.retentionDays:''} onChange={e=>patch({retentionDays:e.target.valueAsNumber})}/></label>
       <label className="block text-sm">Múi giờ<input className={field} value={draft.timezone} maxLength={80} onChange={e=>patch({timezone:e.target.value})}/></label>
      </div>
     </fieldset>
-    <fieldset className="space-y-3 border-t border-[#E7E7E2] dark:border-[#293653] pt-3"><legend className="font-semibold text-sm">Bản tóm tắt hàng ngày</legend>
+    <fieldset className="space-y-3 border-t border-[#E8E0D6] dark:border-[#3a312a] pt-3"><legend className="font-semibold text-sm">Bản tóm tắt hàng ngày</legend>
      <label className="flex gap-2 items-start text-sm"><input type="checkbox" checked={draft.digest.enabled} onChange={e=>patch({digest:{...draft.digest,enabled:e.target.checked}})}/>Bật bản tóm tắt hàng ngày</label>
      <label className="block text-sm">Giờ gửi bản tóm tắt (HH:MM)<input className={field} value={draft.digest.time} maxLength={5} onChange={e=>patch({digest:{...draft.digest,time:e.target.value}})}/></label>
     </fieldset>
     <div className="flex flex-wrap items-center gap-2"><button type="button" className="rounded-lg bg-[#FF5701] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={busy} onClick={()=>void save()}>Lưu tự động hóa</button><a href="/inbox" className={button}>Mở hộp thư đề xuất</a></div>
-    <fieldset className="space-y-3 border-t border-[#E7E7E2] dark:border-[#293653] pt-3">
+    <fieldset className="space-y-3 border-t border-[#E8E0D6] dark:border-[#3a312a] pt-3">
      <legend className="text-sm font-semibold">Theo dõi một thread</legend>
-     <p className="text-sm text-[#4B5563] dark:text-[#9CA3AF]">Chỉ nhận các sự kiện mới sau khi theo dõi; không quét lại lịch sử. Bạn có thể dán trực tiếp liên kết tin nhắn Slack để tự động điền kênh và timestamp.</p>
+     <p className="text-sm text-[#51463E] dark:text-[#9CA3AF]">Chỉ nhận các sự kiện mới sau khi theo dõi; không quét lại lịch sử. Bạn có thể dán trực tiếp liên kết tin nhắn Slack để tự động điền kênh và timestamp.</p>
      <label className="block text-sm">
       Dán liên kết tin nhắn Slack
       <input

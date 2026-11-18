@@ -34,7 +34,7 @@ async function shot(page: Page, name: string, info: TestInfo) {
   await appendFile(resolve(folder, 'manifest.sha256'), `${sha}  ${path}\n`); console.log(`SCHED-03 screenshot ${sha} ${path}`);
 }
 async function pendingBadge(page: Page, width: number, count: number) {
-  if (width >= 900) await expect(page.getByRole('link', { name: count ? `Nhật ký, ${count} lượt chờ duyệt` : 'Nhật ký', exact: true })).toBeVisible();
+  if (width >= 1024) await expect(page.getByRole('link', { name: count ? `Nhật ký, ${count} lượt chờ duyệt` : 'Nhật ký', exact: true })).toBeVisible();
   else {
     await page.getByRole('button', { name: /Menu người dùng:/ }).click();
     await expect(page.getByRole('menuitem', { name: count ? `Nhật ký điều phối, ${count} lượt chờ duyệt` : 'Nhật ký điều phối', exact: true })).toBeVisible();

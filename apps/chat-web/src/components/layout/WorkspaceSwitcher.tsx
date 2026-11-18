@@ -15,9 +15,12 @@ import type { WorkspaceSummary } from '../../types';
 
 export interface WorkspaceSwitcherProps {
   navigate?: (path: string) => void;
+  /** Trong thanh bên: nút giãn hết bề ngang và luôn hiện tên không gian (redesign 11/2026). */
+  variant?: 'bar' | 'sidebar';
 }
 
-export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
+export function WorkspaceSwitcher({ navigate, variant = 'bar' }: WorkspaceSwitcherProps) {
+  const inSidebar = variant === 'sidebar';
   const [open, setOpen] = useState(false);
   const [activeSummary, setActiveSummary] = useState(getActiveWorkspaceSummary());
   const [organizations, setOrganizations] = useState<WorkspaceSummary[]>(getCachedOrganizations());
@@ -169,7 +172,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
   const isPersonal = activeSummary.id === 'personal';
 
   return (
-    <div ref={menuRef} className="relative inline-flex min-w-0 max-w-full text-left">
+    <div ref={menuRef} className={`relative ${inSidebar ? 'flex w-full' : 'inline-flex'} min-w-0 max-w-full text-left`}>
       <button
         ref={buttonRef}
         type="button"
@@ -183,24 +186,24 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
             ? `${activeSummary.name} (${activeSummary.role === 'admin' ? 'Quản trị viên' : 'Thành viên'})`
             : activeSummary.name
         }
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-[#E7E7E2] bg-white hover:bg-[#F8F8F6] text-[#111827] shadow-sm transition-colors focus:outline-none focus:ring-1 focus:ring-[#FF5701] min-w-0 max-w-full"
+        className={inSidebar ? 'flex w-full items-center justify-between gap-2 h-9 px-2.5 rounded-lg text-sm font-medium border border-[#E3DACE] dark:border-[#2A231E] bg-[#F8F4EE] dark:bg-[#131010] hover:bg-white dark:hover:bg-[#1A1613] text-[#1a0e08] dark:text-[#F3EEE8] transition-colors min-w-0' : 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border border-[#E8E0D6] bg-white hover:bg-[#F8F4EE] text-[#1a0e08] shadow-sm transition-colors focus:outline-none focus:ring-1 focus:ring-[#FF5701] min-w-0 max-w-full'}
       >
         <span className="min-w-0 flex items-center gap-1.5">
           {isPersonal ? (
-            <svg className="w-3.5 h-3.5 text-[#6B7280] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <svg className="w-3.5 h-3.5 text-[#6A5F56] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           ) : (
-            <svg className="w-3.5 h-3.5 text-[#6B7280] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <svg className="w-3.5 h-3.5 text-[#6A5F56] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           )}
-          <span className="font-semibold hidden xl:inline truncate max-w-[130px] 2xl:max-w-[180px]">
+          <span className={inSidebar ? 'font-semibold truncate' : 'font-semibold hidden xl:inline truncate max-w-[130px] 2xl:max-w-[180px]'}>
             {activeSummary.name}
           </span>
         </span>
         <svg
-          className={`w-3.5 h-3.5 text-[#6B7280] flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`w-3.5 h-3.5 text-[#6A5F56] flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -215,9 +218,9 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
           id={menuId}
           role="menu"
           aria-label="Danh sách không gian làm việc"
-          className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 max-w-[calc(100vw-4rem)] bg-white dark:bg-[#131B2F] rounded-xl border border-[#E7E7E2] dark:border-[#293653] shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
+          className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 max-w-[calc(100vw-4rem)] bg-white dark:bg-[#1A1613] rounded-xl border border-[#E8E0D6] dark:border-[#3a312a] shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
         >
-          <div className="px-3 py-1.5 text-xs font-bold text-[#6B7280] dark:text-[#94A3B8]">
+          <div className="px-3 py-1.5 text-xs font-bold text-[#6A5F56] dark:text-[#A39A90]">
             Không gian làm việc
           </div>
 
@@ -227,28 +230,28 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
             role="menuitem"
             onClick={() => handleSelectWorkspace('personal')}
             className={`w-full text-left px-3.5 py-2.5 text-xs flex items-center justify-between transition-colors ${
-              isPersonal ? 'bg-orange-50/80 dark:bg-[#1F2A44] font-semibold text-[#B43E00] dark:text-[#FB923C]' : 'hover:bg-neutral-50 dark:hover:bg-[#1F2A44] text-[#111827] dark:text-[#F1F5F9]'
+              isPersonal ? 'bg-orange-50/80 dark:bg-[#2A231E] font-semibold text-[#B43E00] dark:text-[#FB923C]' : 'hover:bg-neutral-50 dark:hover:bg-[#2A231E] text-[#1a0e08] dark:text-[#F3EEE8]'
             }`}
           >
             <div className="flex items-center gap-2.5">
-              <span className="w-7 h-7 rounded-lg bg-[#F8F8F6] dark:bg-[#19233B] border border-[#E7E7E2] dark:border-[#2C3B5E] flex items-center justify-center text-[#4B5563] dark:text-[#CBD5E1] flex-shrink-0">
+              <span className="w-7 h-7 rounded-lg bg-[#F8F4EE] dark:bg-[#211B17] border border-[#E8E0D6] dark:border-[#3A312A] flex items-center justify-center text-[#51463E] dark:text-[#D7CEC4] flex-shrink-0">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </span>
               <div>
                 <div>Không gian Cá nhân</div>
-                <div className="text-xs text-[#6B7280] dark:text-[#94A3B8]">Gmail, Lịch, Trang tính, Trello & công cụ riêng</div>
+                <div className="text-xs text-[#6A5F56] dark:text-[#A39A90]">Gmail, Lịch, Trang tính, Trello & công cụ riêng</div>
               </div>
             </div>
             {isPersonal && <span className="text-sm font-bold text-[#FF5701]">✓</span>}
           </button>
 
           {/* Organizations List */}
-          <div className="mt-2 border-t border-[#E7E7E2] dark:border-[#24324D] pt-1">
-            <div className="px-3 py-1.5 text-xs font-bold text-[#6B7280] dark:text-[#94A3B8] flex items-center justify-between">
+          <div className="mt-2 border-t border-[#E8E0D6] dark:border-[#312923] pt-1">
+            <div className="px-3 py-1.5 text-xs font-bold text-[#6A5F56] dark:text-[#A39A90] flex items-center justify-between">
               <span>Tổ chức của bạn</span>
-              <span className="text-xs font-normal text-neutral-500 dark:text-[#94A3B8]">{organizations.length}</span>
+              <span className="text-xs font-normal text-neutral-500 dark:text-[#A39A90]">{organizations.length}</span>
             </div>
 
             {organizations.length === 0 ? (
@@ -268,21 +271,21 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
                     onClick={() => handleSelectWorkspace(org.id)}
                     className={`w-full text-left px-3.5 py-2 text-xs flex items-center justify-between transition-colors ${
                       isSelected
-                        ? 'bg-orange-50/80 dark:bg-[#1F2A44] font-semibold text-[#B43E00] dark:text-[#FB923C]'
+                        ? 'bg-orange-50/80 dark:bg-[#2A231E] font-semibold text-[#B43E00] dark:text-[#FB923C]'
                         : isPending || isDisabled
-                        ? 'opacity-60 cursor-not-allowed bg-neutral-50/50 dark:bg-[#0E1528] text-[#6B7280] dark:text-[#94A3B8]'
-                        : 'hover:bg-neutral-50 dark:hover:bg-[#1F2A44] text-[#111827] dark:text-[#F1F5F9]'
+                        ? 'opacity-60 cursor-not-allowed bg-neutral-50/50 dark:bg-[#131010] text-[#6A5F56] dark:text-[#A39A90]'
+                        : 'hover:bg-neutral-50 dark:hover:bg-[#2A231E] text-[#1a0e08] dark:text-[#F3EEE8]'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="w-7 h-7 rounded-lg bg-[#F8F8F6] dark:bg-[#19233B] border border-[#E7E7E2] dark:border-[#2C3B5E] flex items-center justify-center text-[#4B5563] dark:text-[#CBD5E1] flex-shrink-0">
+                      <span className="w-7 h-7 rounded-lg bg-[#F8F4EE] dark:bg-[#211B17] border border-[#E8E0D6] dark:border-[#3A312A] flex items-center justify-center text-[#51463E] dark:text-[#D7CEC4] flex-shrink-0">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                         </svg>
                       </span>
                       <div className="min-w-0">
                         <div className="truncate font-medium">{org.name}</div>
-                        <div className="text-xs text-[#6B7280] dark:text-[#94A3B8] flex items-center gap-1.5">
+                        <div className="text-xs text-[#6A5F56] dark:text-[#A39A90] flex items-center gap-1.5">
                           <span>{org.role === 'admin' ? 'Quản trị viên' : 'Thành viên'}</span>
                           {isPending && <span className="text-amber-600 font-medium">· Đang chờ duyệt</span>}
                           {isDisabled && <span className="text-red-600 font-medium">· Đã khóa</span>}
@@ -305,7 +308,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
           </div>
 
           {/* Action buttons */}
-          <div className="mt-2 border-t border-[#E7E7E2] dark:border-[#24324D] pt-1.5 px-2 v3-space-y-1">
+          <div className="mt-2 border-t border-[#E8E0D6] dark:border-[#312923] pt-1.5 px-2 v3-space-y-1">
             <button
               type="button"
               onClick={() => {
@@ -313,7 +316,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
                 setShowCreateModal(true);
                 setCreateError(null);
               }}
-              className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#111827] dark:text-[#F1F5F9] hover:bg-[#F8F8F6] dark:hover:bg-[#1F2A44] hover:text-[#B43E00] dark:hover:text-[#FB923C] transition-colors flex items-center gap-2"
+              className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#1a0e08] dark:text-[#F3EEE8] hover:bg-[#F8F4EE] dark:hover:bg-[#2A231E] hover:text-[#B43E00] dark:hover:text-[#FB923C] transition-colors flex items-center gap-2"
             >
               <span className="font-bold text-[#FF5701]">+</span>
               <span>Tạo không gian tổ chức mới</span>
@@ -327,9 +330,9 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
                 setJoinError(null);
                 setJoinNotice(null);
               }}
-              className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#111827] dark:text-[#F1F5F9] hover:bg-[#F8F8F6] dark:hover:bg-[#1F2A44] hover:text-[#B43E00] dark:hover:text-[#FB923C] transition-colors flex items-center gap-2"
+              className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#1a0e08] dark:text-[#F3EEE8] hover:bg-[#F8F4EE] dark:hover:bg-[#2A231E] hover:text-[#B43E00] dark:hover:text-[#FB923C] transition-colors flex items-center gap-2"
             >
-              <svg className="w-3.5 h-3.5 text-[#6B7280] dark:text-[#94A3B8] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <svg className="w-3.5 h-3.5 text-[#6A5F56] dark:text-[#A39A90] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
               </svg>
               <span>Tham gia tổ chức bằng mã mời</span>
@@ -348,9 +351,9 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
             data-testid="create-org-modal-backdrop"
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/45"
           >
-            <div className="w-full max-w-md bg-white dark:bg-[#131B2F] rounded-2xl border border-[#E5E5E0] dark:border-[#293653] shadow-2xl p-6 v3-space-y-4 animate-in fade-in zoom-in-95">
+            <div className="w-full max-w-md bg-white dark:bg-[#1A1613] rounded-2xl border border-[#E6DED3] dark:border-[#3a312a] shadow-2xl p-6 v3-space-y-4 animate-in fade-in zoom-in-95">
               <div className="flex items-center justify-between">
-                <h3 id="create-org-modal-title" className="font-sans text-base font-semibold text-[#111827] dark:text-white flex items-center gap-2 tracking-tight">
+                <h3 id="create-org-modal-title" className="font-sans text-base font-semibold text-[#1a0e08] dark:text-white flex items-center gap-2 tracking-tight">
                   <svg className="w-4 h-4 text-[#B43E00] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                   </svg>
@@ -360,7 +363,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
                   type="button"
                   aria-label="Đóng"
                   onClick={() => setShowCreateModal(false)}
-                  className="p-1 rounded-lg text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F3EF] dark:hover:text-white transition-colors"
+                  className="p-1 rounded-lg text-[#6A5F56] hover:text-[#1a0e08] hover:bg-[#F3F3EF] dark:hover:text-white transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -376,7 +379,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
 
               <form onSubmit={handleCreateSubmit} className="v3-space-y-4">
                 <div>
-                  <label htmlFor="create-org-name" className="block text-xs font-semibold text-[#111827] dark:text-white mb-1.5">
+                  <label htmlFor="create-org-name" className="block text-xs font-semibold text-[#1a0e08] dark:text-white mb-1.5">
                     Tên tổ chức
                   </label>
                   <input
@@ -387,7 +390,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
                     placeholder="Nhập tên tổ chức (ví dụ: Công ty ABC, Đội Alpha)..."
                     value={createName}
                     onChange={(e) => setCreateName(e.target.value)}
-                    className="w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-[#D4D4CE] dark:border-[#293653] bg-white dark:bg-[#0E1528] text-[#111827] dark:text-[#F1F5F9] focus:border-[#C84300] focus:ring-1 focus:ring-[#C84300] !outline-none focus-visible:!outline-none"
+                    className="w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-[#D4D4CE] dark:border-[#3a312a] bg-white dark:bg-[#131010] text-[#1a0e08] dark:text-[#F3EEE8] focus:border-[#C84300] focus:ring-1 focus:ring-[#C84300] !outline-none focus-visible:!outline-none"
                   />
                 </div>
 
@@ -399,17 +402,17 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
                     onChange={(e) => setRequireApproval(e.target.checked)}
                     className="mt-0.5 rounded border-[#D4D4CE] text-[#C84300] focus:ring-[#C84300]"
                   />
-                  <label htmlFor="create-org-approval" className="text-xs text-[#4B5563] dark:text-[#9CA3AF] cursor-pointer">
-                    <span className="font-semibold text-[#111827] dark:text-white block">Cần Quản trị viên duyệt thành viên mới</span>
+                  <label htmlFor="create-org-approval" className="text-xs text-[#51463E] dark:text-[#9CA3AF] cursor-pointer">
+                    <span className="font-semibold text-[#1a0e08] dark:text-white block">Cần Quản trị viên duyệt thành viên mới</span>
                     <span>Khi tắt, bất kỳ ai có mã mời đều được vào làm việc ngay lập tức mà không cần phê duyệt.</span>
                   </label>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E5E5E0] dark:border-[#293653]">
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E6DED3] dark:border-[#3a312a]">
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-medium text-[#4B5563] dark:text-[#A1AEC0] hover:bg-[#F3F3EF] dark:hover:bg-[#1F2A44]"
+                    className="px-4 py-2 rounded-xl text-xs font-medium text-[#51463E] dark:text-[#AFA59A] hover:bg-[#F3F3EF] dark:hover:bg-[#2A231E]"
                   >
                     Hủy
                   </button>
@@ -437,9 +440,9 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
             data-testid="join-org-modal-backdrop"
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/45"
           >
-            <div className="w-full max-w-md bg-white dark:bg-[#131B2F] rounded-2xl border border-[#E5E5E0] dark:border-[#293653] shadow-2xl p-6 v3-space-y-4 animate-in fade-in zoom-in-95">
+            <div className="w-full max-w-md bg-white dark:bg-[#1A1613] rounded-2xl border border-[#E6DED3] dark:border-[#3a312a] shadow-2xl p-6 v3-space-y-4 animate-in fade-in zoom-in-95">
               <div className="flex items-center justify-between">
-                <h3 id="join-org-modal-title" className="font-sans text-base font-semibold text-[#111827] dark:text-white flex items-center gap-2 tracking-tight">
+                <h3 id="join-org-modal-title" className="font-sans text-base font-semibold text-[#1a0e08] dark:text-white flex items-center gap-2 tracking-tight">
                   <svg className="w-4 h-4 text-[#B43E00] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                   </svg>
@@ -449,7 +452,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
                   type="button"
                   aria-label="Đóng"
                   onClick={() => setShowJoinModal(false)}
-                  className="p-1 rounded-lg text-[#6B7280] hover:text-[#111827] hover:bg-[#F3F3EF] dark:hover:text-white transition-colors"
+                  className="p-1 rounded-lg text-[#6A5F56] hover:text-[#1a0e08] hover:bg-[#F3F3EF] dark:hover:text-white transition-colors"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -471,7 +474,7 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
 
               <form onSubmit={handleJoinSubmit} className="v3-space-y-4">
                 <div>
-                  <label htmlFor="join-org-code" className="block text-xs font-semibold text-[#111827] dark:text-white mb-1.5">
+                  <label htmlFor="join-org-code" className="block text-xs font-semibold text-[#1a0e08] dark:text-white mb-1.5">
                     Mã mời tổ chức
                   </label>
                   <input
@@ -482,18 +485,18 @@ export function WorkspaceSwitcher({ navigate }: WorkspaceSwitcherProps) {
                     placeholder="ATI-XXXX-XXXX"
                     value={joinCode}
                     onChange={(e) => setJoinCode(e.target.value)}
-                    className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono uppercase tracking-wider rounded-xl border border-[#D4D4CE] dark:border-[#293653] bg-white dark:bg-[#0E1528] text-[#111827] dark:text-[#F1F5F9] focus:border-[#C84300] focus:ring-1 focus:ring-[#C84300] !outline-none focus-visible:!outline-none"
+                    className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono uppercase tracking-wider rounded-xl border border-[#D4D4CE] dark:border-[#3a312a] bg-white dark:bg-[#131010] text-[#1a0e08] dark:text-[#F3EEE8] focus:border-[#C84300] focus:ring-1 focus:ring-[#C84300] !outline-none focus-visible:!outline-none"
                   />
-                  <p className="text-xs text-[#6B7280] dark:text-[#9CA3AF] mt-1">
+                  <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF] mt-1">
                     Nhập mã mời được quản trị viên tổ chức cung cấp (định dạng ATI-XXXX-XXXX).
                   </p>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E5E5E0] dark:border-[#293653]">
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E6DED3] dark:border-[#3a312a]">
                   <button
                     type="button"
                     onClick={() => setShowJoinModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-medium text-[#4B5563] dark:text-[#A1AEC0] hover:bg-[#F3F3EF] dark:hover:bg-[#1F2A44]"
+                    className="px-4 py-2 rounded-xl text-xs font-medium text-[#51463E] dark:text-[#AFA59A] hover:bg-[#F3F3EF] dark:hover:bg-[#2A231E]"
                   >
                     Đóng
                   </button>

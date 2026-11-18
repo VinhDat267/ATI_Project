@@ -22,14 +22,14 @@ function statusBadgeClass(status?: string): string {
 function RequestCard({ req, isEditing, actions, title, saving }: { req: HistoryRow; isEditing: boolean; actions: CardActions; title: string; saving: boolean }) {
   const rawTitle = req.title || 'Hội thoại mới';
   const displayTitle = rawTitle.length > 60 ? rawTitle.slice(0, 60) + '…' : rawTitle;
-  return <article className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E5E5E0] shadow-2xs hover:border-[#B8B8B0] transition-all group">
+  return <article className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E6DED3] shadow-2xs hover:border-[#B8B8B0] transition-all group">
     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
       {/* Cụm trái: Trạng thái, Thời gian, Tiêu đề hội thoại, Kết quả */}
       <div className="v3-space-y-2 flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${statusBadgeClass(req.status)}`}>{req.statusLabel}</span>
           <span className="text-[#9CA3AF]">·</span>
-          <span className="text-[#6B7280] font-medium">{req.timeStr}</span>
+          <span className="text-[#6A5F56] font-medium">{req.timeStr}</span>
         </div>
         {/* Tiêu đề hội thoại (hoặc ô nhập đổi tên inline) */}
         {isEditing ? (
@@ -37,15 +37,15 @@ function RequestCard({ req, isEditing, actions, title, saving }: { req: HistoryR
             <div className="flex items-center gap-2">
               {/* React ghi value bằng thuộc tính DOM nên con trỏ nằm cuối chữ; bản mẫu đọc value từ HTML nên con trỏ ở đầu.
                   Đặt lại về đầu khi tạo ô để khi focus, chữ dài trên màn hẹp cuộn giống bản mẫu. */}
-              <input autoFocus aria-label="Tiêu đề hội thoại" id={`rename-input-${req.id}`} type="text" maxLength={60} value={title} onChange={event => actions.setTitle(event.target.value)} onKeyDown={(event) => actions.handleRenameKey(event, req.id)} className="flex-1 min-w-0 text-sm sm:text-base font-semibold text-[#111827] px-3 py-1.5 border border-[#111827] rounded-xl !outline-none focus-visible:!outline-none bg-white" placeholder="Nhập tiêu đề hội thoại (tối đa 60 ký tự)" />
+              <input autoFocus aria-label="Tiêu đề hội thoại" id={`rename-input-${req.id}`} type="text" maxLength={60} value={title} onChange={event => actions.setTitle(event.target.value)} onKeyDown={(event) => actions.handleRenameKey(event, req.id)} className="flex-1 min-w-0 text-sm sm:text-base font-semibold text-[#1a0e08] px-3 py-1.5 border border-[#1a0e08] rounded-xl !outline-none focus-visible:!outline-none bg-white" placeholder="Nhập tiêu đề hội thoại (tối đa 60 ký tự)" />
               <button type="button" onClick={() => actions.saveInlineRename(req.id)} disabled={saving} className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-[#C84300] hover:bg-[#A83800] text-white transition-colors shadow-2xs flex-shrink-0">
                 Lưu
               </button>
-              <button type="button" onClick={() => actions.cancelInlineRename()} className="px-2.5 py-1.5 text-xs font-medium rounded-xl text-[#6B7280] hover:text-[#111827] hover:bg-neutral-100 transition-colors flex-shrink-0">
+              <button type="button" onClick={() => actions.cancelInlineRename()} className="px-2.5 py-1.5 text-xs font-medium rounded-xl text-[#6A5F56] hover:text-[#1a0e08] hover:bg-neutral-100 transition-colors flex-shrink-0">
                 Huỷ
               </button>
             </div>
-            <div className="text-[11px] text-[#6B7280] flex items-center gap-2">
+            <div className="text-[11px] text-[#6A5F56] flex items-center gap-2">
               <span>
                 {"Nhấn "}
                 <kbd className="px-1.5 py-0.5 bg-neutral-100 border border-neutral-200 rounded text-[11px] font-mono">Enter</kbd>
@@ -59,10 +59,10 @@ function RequestCard({ req, isEditing, actions, title, saving }: { req: HistoryR
           </div>
         ) : (
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-sans text-sm sm:text-base font-semibold text-[#111827] group-hover:text-[#B43E00] transition-colors leading-snug">
+            <h3 className="font-sans text-sm sm:text-base font-semibold text-[#1a0e08] group-hover:text-[#B43E00] transition-colors leading-snug">
               {displayTitle}
             </h3>
-            <button type="button" onClick={(event) => actions.startInlineRename(req.id, event)} className="inline-flex items-center gap-1 px-2 py-1 text-xs text-[#6B7280] hover:text-[#111827] hover:bg-neutral-100 rounded-lg transition-colors" id={`rename-button-${req.id}`} aria-label={`Đổi tên ${rawTitle}`} title="Đổi tên hội thoại">
+            <button type="button" onClick={(event) => actions.startInlineRename(req.id, event)} className="inline-flex items-center gap-1 px-2 py-1 text-xs text-[#6A5F56] hover:text-[#1a0e08] hover:bg-neutral-100 rounded-lg transition-colors" id={`rename-button-${req.id}`} aria-label={`Đổi tên ${rawTitle}`} title="Đổi tên hội thoại">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
               <span className="text-[11px] font-medium">Đổi tên</span>
             </button>
@@ -72,7 +72,7 @@ function RequestCard({ req, isEditing, actions, title, saving }: { req: HistoryR
       {/* Cụm phải: Dải dịch vụ + Nút xem chi tiết */}
       <div className="flex sm:flex-col items-center sm:items-end justify-between gap-3 flex-shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-neutral-100">
         <div className="flex items-center gap-2">
-          <a href={`/c/${encodeURIComponent(req.id)}`} onClick={event => { event.preventDefault(); actions.openConversation(req.id); }} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl bg-[#F8F8F6] group-hover:bg-[#111827] text-[#111827] group-hover:text-white border border-[#E5E5E0] group-hover:border-[#111827] transition-all">
+          <a href={`/c/${encodeURIComponent(req.id)}`} onClick={event => { event.preventDefault(); actions.openConversation(req.id); }} className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-xl bg-[#F8F4EE] group-hover:bg-[#1a0e08] text-[#1a0e08] group-hover:text-white border border-[#E6DED3] group-hover:border-[#1a0e08] transition-all">
             <span>Mở hội thoại</span>
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
           </a>
@@ -86,7 +86,7 @@ export const meta: PageMeta = {
   id: "history",
   title: "Nhật ký điều phối & Lịch sử yêu cầu — Planora",
   htmlClass: "",
-  bodyClass: "min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]",
+  bodyClass: "min-h-screen flex flex-col bg-[#F8F4EE] text-[#1a0e08]",
   css,
 };
 
@@ -121,25 +121,25 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 v3-space-y-6">
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         {notice && <p role="status" className="text-xs text-emerald-600">{notice}</p>}
-        {loading && <p role="status" className="text-xs text-[#6B7280]">Đang tải hội thoại...</p>}
+        {loading && <p role="status" className="text-xs text-[#6A5F56]">Đang tải hội thoại...</p>}
         {/* KHỐI TIÊU ĐỀ & NGUYÊN TẮC AN TOÀN */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#E5E5E0] pb-5">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#E6DED3] pb-5">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white border border-[#E5E5E0] text-[#374151]">
-                <svg className="w-3 h-3 text-[#6B7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white border border-[#E6DED3] text-[#4a4038]">
+                <svg className="w-3 h-3 text-[#6A5F56]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 {"Nhật ký điều phối"}
               </span>
-              <span id="requests-count-badge" className="text-xs text-[#6B7280] font-medium">
+              <span id="requests-count-badge" className="text-xs text-[#6A5F56] font-medium">
                 {`${rows.length} hội thoại đã tải`}
               </span>
             </div>
-            <h1 className="font-sans text-2xl sm:text-[26px] font-semibold tracking-tight text-[#111827]">
+            <h1 className="font-sans text-2xl sm:text-[26px] font-semibold tracking-tight text-[#1a0e08]">
               Nhật ký điều phối &amp; Lịch sử yêu cầu
             </h1>
-            <p className="text-sm text-[#4B5563] mt-1 max-w-2xl leading-relaxed">
+            <p className="text-sm text-[#51463E] mt-1 max-w-2xl leading-relaxed">
               Lịch sử hội thoại của bạn. Tìm theo tiêu đề, đổi tên và mở lại hội thoại để tiếp tục công việc.
             </p>
           </div>
@@ -156,12 +156,12 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
           </div>
         </div>
         {/* NGUYÊN TẮC AN TOÀN */}
-        <div className="px-4 py-3 rounded-xl bg-white border border-[#E5E5E0] flex items-center gap-3">
-          <svg className="w-4 h-4 text-[#4B5563] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="px-4 py-3 rounded-xl bg-white border border-[#E6DED3] flex items-center gap-3">
+          <svg className="w-4 h-4 text-[#51463E] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>
-          <div className="text-xs sm:text-sm text-[#4B5563] leading-relaxed">
-            <strong className="text-[#111827] font-semibold">
+          <div className="text-xs sm:text-sm text-[#51463E] leading-relaxed">
+            <strong className="text-[#1a0e08] font-semibold">
               Minh bạch &amp; An toàn dữ liệu:
             </strong>
             {" Planora chỉ ghi khi bạn duyệt kế hoạch. Trang này chỉ hiển thị hội thoại của chính bạn; mở hội thoại để xem kế hoạch và kết quả đã lưu."}
@@ -169,7 +169,7 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
         </div>
         <ScheduleSection user={user} navigate={navigate} />
         {/* THANH TÌM KIẾM VÀ BỘ LỌC ĐA NĂNG */}
-        <div className="bg-white p-4 rounded-2xl border border-[#E5E5E0] shadow-2xs v3-space-y-3.5">
+        <div className="bg-white p-4 rounded-2xl border border-[#E6DED3] shadow-2xs v3-space-y-3.5">
           <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
             {/* Ô tìm kiếm */}
             <div className="relative flex-1">
@@ -177,13 +177,13 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
                 Tìm kiếm yêu cầu trong nhật ký
               </label>
               {' '}
-              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#6B7280]">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#6A5F56]">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
               {' '}
-              <input value={search} onChange={event => setSearch(event.target.value)} type="search" id="search-input" placeholder="Tìm theo tiêu đề hội thoại…" className="w-full text-xs sm:text-sm pl-10 pr-4 py-2.5 bg-[#F8F8F6] border border-[#E5E5E0] rounded-xl text-[#111827] placeholder-[#6B7280] focus:bg-white !outline-none focus-visible:!outline-none focus:border-[#111827] transition-all" />
+              <input value={search} onChange={event => setSearch(event.target.value)} type="search" id="search-input" placeholder="Tìm theo tiêu đề hội thoại…" className="w-full text-xs sm:text-sm pl-10 pr-4 py-2.5 bg-[#F8F4EE] border border-[#E6DED3] rounded-xl text-[#1a0e08] placeholder-[#6A5F56] focus:bg-white !outline-none focus-visible:!outline-none focus:border-[#1a0e08] transition-all" />
             </div>
             {/* Bộ lọc nhanh theo nhóm kết quả */}
             <div role="group" aria-label="Bộ lọc trạng thái hội thoại" className="flex flex-wrap items-center gap-1.5">
@@ -200,8 +200,8 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
                   onClick={() => setStatusFilter(pill.key)}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
                     statusFilter === pill.key
-                      ? 'bg-[#111827] text-white border-[#111827]'
-                      : 'bg-[#F8F8F6] text-[#4B5563] border-[#E5E5E0] hover:bg-neutral-200/70'
+                      ? 'bg-[#1a0e08] text-white border-[#1a0e08]'
+                      : 'bg-[#F8F4EE] text-[#51463E] border-[#E6DED3] hover:bg-neutral-200/70'
                   }`}
                 >
                   {pill.label}
@@ -218,9 +218,9 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
             return (
               <section key={group.key} className="v3-space-y-3">
                 <div className="flex items-center gap-2 px-1">
-                  <h2 className="font-sans text-xs font-semibold text-[#4B5563]">{group.title}</h2>
+                  <h2 className="font-sans text-xs font-semibold text-[#51463E]">{group.title}</h2>
                   <span className="w-1.5 h-1.5 rounded-full bg-[#D1D5DB]" />
-                  <span className="text-xs text-[#6B7280]">{`${items.length} hội thoại`}</span>
+                  <span className="text-xs text-[#6A5F56]">{`${items.length} hội thoại`}</span>
                 </div>
                 <div className="v3-space-y-3">
                   {items.map(req => <RequestCard key={req.id} req={req} isEditing={editing === req.id} actions={actions} title={title} saving={saving} />)}
@@ -231,7 +231,7 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
         </div>
         {/* NÚT TẢI THÊM CUỐI DANH SÁCH */}
         <div id="load-more-container" className={`pt-2 flex flex-col items-center justify-center gap-2${!!cursor ? '' : ' hidden'}`}>
-          <button type="button" id="btn-load-more" disabled={loading} onClick={() => actions.loadMoreRequests()} className="inline-flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold rounded-xl bg-white border border-[#E5E5E0] hover:border-[#111827] text-[#374151] hover:text-[#111827] shadow-2xs transition-all">
+          <button type="button" id="btn-load-more" disabled={loading} onClick={() => actions.loadMoreRequests()} className="inline-flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold rounded-xl bg-white border border-[#E6DED3] hover:border-[#1a0e08] text-[#4a4038] hover:text-[#1a0e08] shadow-2xs transition-all">
             <span>
               Tải thêm
             </span>
@@ -239,25 +239,25 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
             </svg>
           </button>
-          <div id="load-more-all-loaded" className="hidden text-xs text-[#6B7280]">
+          <div id="load-more-all-loaded" className="hidden text-xs text-[#6A5F56]">
             Đã hiển thị toàn bộ lịch sử hội thoại
           </div>
         </div>
         {/* TRẠNG THÁI RỖNG (EMPTY STATE KHI TÌM KHÔNG THẤY) */}
-        <div id="empty-state" className={`${!loading && rows.length === 0 ? '' : 'hidden '}p-12 text-center bg-white rounded-2xl border border-[#E5E5E0] shadow-2xs v3-space-y-3`}>
-          <div className="w-11 h-11 rounded-xl bg-[#F8F8F6] border border-[#E5E5E0] flex items-center justify-center mx-auto text-[#6B7280]">
+        <div id="empty-state" className={`${!loading && rows.length === 0 ? '' : 'hidden '}p-12 text-center bg-white rounded-2xl border border-[#E6DED3] shadow-2xs v3-space-y-3`}>
+          <div className="w-11 h-11 rounded-xl bg-[#F8F4EE] border border-[#E6DED3] flex items-center justify-center mx-auto text-[#6A5F56]">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
-          <h3 className="font-sans text-base sm:text-lg font-semibold text-[#111827]">
+          <h3 className="font-sans text-base sm:text-lg font-semibold text-[#1a0e08]">
             {search ? "Không tìm thấy hội thoại phù hợp" : "Chưa có hội thoại nào"}
           </h3>
-          <p className="text-xs sm:text-sm text-[#6B7280] max-w-sm mx-auto">
+          <p className="text-xs sm:text-sm text-[#6A5F56] max-w-sm mx-auto">
             Thử thay đổi từ khóa tìm kiếm theo tiêu đề hội thoại.
           </p>
           {' '}
-          <button type="button" onClick={() => setSearch("")} className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-neutral-100 hover:bg-neutral-200 text-[#111827] transition-colors mt-2">
+          <button type="button" onClick={() => setSearch("")} className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-neutral-100 hover:bg-neutral-200 text-[#1a0e08] transition-colors mt-2">
             <span>
               Xoá từ khóa tìm kiếm
             </span>
@@ -265,10 +265,10 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
         </div>
       </main>
       {/* CHÂN TRANG */}
-      <footer className="mt-auto border-t border-[#E5E5E0] bg-[#F8F8F6] py-6 px-4 sm:px-6">
-        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#6B7280]">
+      <footer className="mt-auto border-t border-[#E6DED3] bg-[#F8F4EE] py-6 px-4 sm:px-6">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#6A5F56]">
           <div className="flex items-center gap-2">
-            <span className="font-sans font-semibold text-[#111827]">
+            <span className="font-sans font-semibold text-[#1a0e08]">
               Planora
             </span>
             <span>
@@ -279,19 +279,19 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <a href="/" onClick={event => { event.preventDefault(); navigate("/"); }} className="hover:text-[#111827] transition-colors">
+            <a href="/" onClick={event => { event.preventDefault(); navigate("/"); }} className="hover:text-[#1a0e08] transition-colors">
               Không gian làm việc
             </a>
-            <a href="/settings" onClick={event => { event.preventDefault(); navigate("/settings"); }} className="hover:text-[#111827] transition-colors">
+            <a href="/settings" onClick={event => { event.preventDefault(); navigate("/settings"); }} className="hover:text-[#1a0e08] transition-colors">
               Kết nối dịch vụ
             </a>
-            <a href="/guide" onClick={event => { event.preventDefault(); navigate("/guide"); }} className="hover:text-[#111827] transition-colors">
+            <a href="/guide" onClick={event => { event.preventDefault(); navigate("/guide"); }} className="hover:text-[#1a0e08] transition-colors">
               Cẩm nang &amp; Mẫu lệnh
             </a>
-            <a hidden={role !== "admin"} href="/admin/users" onClick={event => { event.preventDefault(); navigate("/admin/users"); }} className="hover:text-[#111827] transition-colors">
+            <a hidden={role !== "admin"} href="/admin/users" onClick={event => { event.preventDefault(); navigate("/admin/users"); }} className="hover:text-[#1a0e08] transition-colors">
               Quản lý người dùng
             </a>
-            <a href="/account" onClick={event => { event.preventDefault(); navigate("/account"); }} className="hover:text-[#111827] transition-colors">
+            <a href="/account" onClick={event => { event.preventDefault(); navigate("/account"); }} className="hover:text-[#1a0e08] transition-colors">
               Tài khoản
             </a>
             <a href="/privacy" onClick={event => { event.preventDefault(); navigate("/privacy"); }} className="text-[#B43E00] hover:underline font-medium transition-colors">

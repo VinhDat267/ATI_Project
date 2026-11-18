@@ -1,14 +1,14 @@
 /* <style> của guide.html, giữ nguyên thứ tự. */
     :root {
-      --bg: #F8F8F6;
+      --bg: #F8F4EE;
       --surface: #FFFFFF;
-      --border: #E7E7E2;
-      --text: #111827;
+      --border: #E8E0D6;
+      --text: #1a0e08;
       --accent: #FF5701;
     }
     body {
-      background-color: #F8F8F6;
-      color: #111827;
+      background-color: #F8F4EE;
+      color: #1a0e08;
       font-family: "Be Vietnam Pro", system-ui, sans-serif;
     }
     .custom-scrollbar::-webkit-scrollbar {

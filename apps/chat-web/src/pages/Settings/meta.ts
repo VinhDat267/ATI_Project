@@ -4,7 +4,7 @@ export const meta: PageMeta = {
   id: "settings",
   title: "Kết nối dịch vụ — Planora",
   htmlClass: "",
-  bodyClass: "min-h-screen flex flex-col bg-[#F8F8F6] text-[#111827]",
+  bodyClass: "min-h-screen flex flex-col bg-[#F8F4EE] text-[#1a0e08]",
   css,
 };
 

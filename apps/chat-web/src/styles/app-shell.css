@@ -1,0 +1,131 @@
+/* Khung app sau đăng nhập (redesign 11/2026, phong cách "framed sheet").
+   MainNav gắn data-app-shell lên <html> khi có mặt, nên landing, đăng nhập và đăng ký không bị ảnh hưởng.
+   Khung: thanh bên và thanh trên dùng chung một nền ấm (hình chữ L, không có đường kẻ giữa hai phần);
+   nội dung nằm trên tờ giấy (nền trang) có một đường viền 1px, góc trên trái bo 16px, không đổ bóng.
+   Màu lấy từ landing: mực #1A0E08, giấy #F8F4EE, đá #F3EEE7, cam #FF5701. */
+
+html[data-app-shell] {
+  --ps-side: 240px;
+  --ps-bar: 48px;
+  --ps-frame: #EFE8DE;
+  --ps-sheet: #F8F4EE;
+  --ps-edge: #E3DACE;
+  --ps-ink: #1A0E08;
+  --ps-muted: #51463E;
+  --ps-faint: #6A5F56;
+  --ps-hover: #E7DFD3;
+  --ps-active: #E1D7C9;
+  --ps-accent: #FF5701;
+  --ps-accent-text: #B43E00;
+  --ps-font-display: 'Bricolage Grotesque', 'Be Vietnam Pro', system-ui, sans-serif;
+  --ps-font-sans: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ps-font-mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+}
+html.dark[data-app-shell] {
+  --ps-frame: #0A0807;
+  --ps-sheet: #131010;
+  --ps-edge: #2A231E;
+  --ps-ink: #F3EEE8;
+  --ps-muted: #D7CEC4;
+  --ps-faint: #AFA59A;
+  --ps-hover: #1F1A16;
+  --ps-active: #2A231E;
+  --ps-accent-text: #FF8547;
+}
+
+/* Một bộ chữ cho cả app: Be Vietnam Pro cho chữ, Bricolage Grotesque (như landing) cho tiêu đề.
+   Ghi đè token theo trang của bản mẫu (Playfair, ui-sans-serif) — độ ưu tiên (0,2,1) thắng :root[data-proto-page]. */
+html[data-app-shell][data-proto-page], html[data-app-shell] {
+  --p-font-sans: var(--ps-font-sans);
+  --p-font-body: var(--ps-font-sans);
+  --p-font-display: var(--ps-font-display);
+  --ati-font-sans: var(--ps-font-sans);
+  --ati-font-display: var(--ps-font-display);
+}
+html[data-app-shell] body { font-family: var(--ps-font-sans); }
+html[data-app-shell] :is(h1, h2, h3, .font-display) { font-family: var(--ps-font-display); letter-spacing: -0.015em; }
+html[data-app-shell] h1 { font-weight: 650; }
+
+/* Không còn kính mờ và bóng dưới thanh dính ở đáy: nền đặc, một đường kẻ. */
+html[data-app-shell] #global-bottom-bar { backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; background-color: var(--ps-sheet); border-top-color: var(--ps-edge); }
+html[data-app-shell] #drawer-backdrop { backdrop-filter: none; -webkit-backdrop-filter: none; }
+
+/* ---- Thanh trên (một phần của khung) ---- */
+.ps-topbar { background: var(--ps-frame); color: var(--ps-ink); }
+.ps-topbar-row { height: var(--ps-bar); border-bottom: 1px solid var(--ps-edge); }
+.ps-pagename { font-size: 15px; font-weight: 600; color: var(--ps-ink); }
+
+/* ---- Thanh bên ---- */
+.ps-sidebar { background: var(--ps-frame); color: var(--ps-ink); }
+.ps-brand { font-family: var(--ps-font-display); font-weight: 700; font-size: 19px; letter-spacing: -0.02em; color: var(--ps-ink); }
+.ps-navlink {
+  display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px;
+  font-size: 14px; font-weight: 500; color: var(--ps-muted); text-decoration: none;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.ps-navlink:hover { background: var(--ps-hover); color: var(--ps-ink); }
+.ps-navlink[aria-current="page"] { background: var(--ps-active); color: var(--ps-ink); font-weight: 600; }
+.ps-navlink svg { width: 16px; height: 16px; flex: none; color: var(--ps-faint); }
+.ps-navlink[aria-current="page"] svg { color: var(--ps-ink); }
+.ps-navcount { margin-left: auto; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ps-accent-text); }
+.ps-navgroup + .ps-navgroup { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--ps-edge); }
+.ps-iconbtn {
+  display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px;
+  color: var(--ps-muted); background: transparent; border: 0;
+}
+.ps-iconbtn:hover { background: var(--ps-hover); color: var(--ps-ink); }
+/* Nút đổi sáng/tối và nút của trang nằm trên nền khung, không có viền hay bóng riêng. */
+.ps-topbar .ati-theme-toggle { width: 36px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: var(--ps-muted); }
+.ps-topbar .ati-theme-toggle:hover { background: var(--ps-hover); color: var(--ps-ink); }
+html.dark .ps-topbar .ati-theme-toggle { background: transparent; }
+.ps-action {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 8px;
+  font-size: 13px; font-weight: 500; color: var(--ps-muted); background: transparent; border: 0; white-space: nowrap;
+}
+.ps-action:hover { background: var(--ps-hover); color: var(--ps-ink); }
+.ps-action[aria-expanded="true"] { background: var(--ps-active); color: var(--ps-ink); }
+.ps-action svg { width: 15px; height: 15px; flex: none; }
+.ps-action .ps-count { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ps-ink); }
+
+/* Dải chế độ thử nghiệm: nằm trên tờ giấy, một dòng chữ, không tô vàng cả bề ngang. */
+.ps-sandbox { background: var(--ps-sheet); border-bottom: 1px solid var(--ps-edge); color: var(--ps-muted); }
+.ps-sandbox-dot { width: 6px; height: 6px; border-radius: 999px; background: #D97706; flex: none; }
+/* CSS riêng của cockpit tô thanh dính và dải thử nghiệm ở chế độ tối; trong khung mới chúng theo token của khung. */
+html.dark[data-app-shell] header.ps-topbar { background-color: var(--ps-frame) !important; border-bottom-color: transparent !important; }
+html.dark[data-app-shell] #test-mode-banner { background-color: var(--ps-sheet) !important; border-color: var(--ps-edge) !important; color: var(--ps-muted) !important; }
+html.dark[data-app-shell] #btn-toggle-test-mode-explain { color: var(--ps-muted) !important; }
+html[data-app-shell] #global-bottom-bar { background-image: none !important; }
+
+/* ---- Bố cục theo bề ngang ---- */
+@media (min-width: 1024px) {
+  html[data-app-shell] body { padding-left: var(--ps-side); }
+  html[data-app-shell] #global-bottom-bar { left: var(--ps-side); }
+  .ps-sidebar {
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 40; width: var(--ps-side);
+    display: flex; flex-direction: column; padding: 12px 12px 16px;
+  }
+  /* Mép trái của tờ giấy, bắt đầu dưới thanh trên để chữ L không bị cắt. */
+  .ps-sidebar::after { content: ''; position: absolute; top: var(--ps-bar); bottom: 0; right: 0; width: 1px; background: var(--ps-edge); }
+  .ps-sheet-corner {
+    position: fixed; z-index: 35; pointer-events: none; left: var(--ps-side); top: var(--ps-bar); width: 16px; height: 16px;
+    border-top-left-radius: 16px; border-top: 1px solid var(--ps-edge); border-left: 1px solid var(--ps-edge);
+    box-shadow: -8px -8px 0 8px var(--ps-frame);
+  }
+  .ps-menu-btn, .ps-sidebar-close, .ps-topbar-mark { display: none !important; }
+}
+@media (max-width: 1023.98px) {
+  .ps-sheet-corner { display: none; }
+  /* Thanh bên thành tấm menu toàn màn hình, mở bằng nút menu trên thanh trên. */
+  .ps-sidebar { display: none; }
+  .ps-sidebar[data-open] {
+    display: flex; flex-direction: column; position: fixed; inset: 0; z-index: 60; padding: 12px 16px 24px; overflow-y: auto;
+  }
+  .ps-sidebar[data-open] .ps-navlink { height: 44px; font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .ps-navlink, .ps-action, .ps-iconbtn { transition: none; } }
+
+/* Landing, đăng nhập và đăng ký đã có thiết kế riêng: theme.css dùng chung đã đổi sang đen ấm, nhưng trang landing
+   giữ nền tối gốc của nó. */
+html.dark[data-proto-page="index"]:not([data-app-shell]) { scrollbar-color: #334155 transparent; }
+html.dark[data-proto-page="index"]:not([data-app-shell]) body { background-color: #0B1020 !important; }
+html.dark[data-proto-page="index"]:not([data-app-shell]) .bg-white { background-color: rgba(19, 27, 47, 1) !important; }
