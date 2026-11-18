@@ -870,11 +870,10 @@ export class ScheduleRunner {
         [runId, outcome.error]
       );
       const recent = await client.query(
-        "SELECT status FROM schedule_runs WHERE schedule_id=$1 AND trigger='scheduled' ORDER BY created_at DESC, id DESC LIMIT 3",
+        'SELECT status FROM schedule_runs WHERE schedule_id=$1 ORDER BY created_at DESC, id DESC LIMIT 3',
         [schedule.id]
       );
       if (
-        started.toPlan.trigger === 'scheduled' &&
         schedule.status === 'active' &&
         recent.rows.length === 3 &&
         recent.rows.every((r) => r.status === 'digest_failed')
