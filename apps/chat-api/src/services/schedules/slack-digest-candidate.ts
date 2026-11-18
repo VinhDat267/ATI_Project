@@ -22,6 +22,8 @@ import {
   type GmailDigestQuery,
 } from './multi-source-digest-candidate.js';
 
+import { bindOrgSheetsDigestSource, isOrgSheetsDigestSource } from './org-sheets-digest-source.js';
+
 export function computeSlackDigestConfigHash(config: SlackDigestConfig): string {
   const gmailValidation = validateTelegramDigestGmailConfig(config);
   if (gmailValidation.kind === 'invalid') {
@@ -81,6 +83,8 @@ export interface EvaluateSlackDigestInput {
   gmailBinding?: GmailDigestBinding | null;
   existingDigest?: SlackDigestConfig | null;
   gmailUserTexts?: readonly string[];
+  sheetsRequestText?: string;
+  reauthorizeOrgSheets?: boolean;
   reauthorizeGmailQuery?: GmailDigestQuery;
   notionBinding?: NotionDigestSourceBinding;
   includeAiSummary?: boolean;
@@ -228,7 +232,22 @@ export async function evaluateSlackDigestCandidate(
     };
   }
 
-  const hasGmailSource = sourceResult.sources.some((s) => s.service === 'gmail');
+  const sources = sourceResult.sources;
+  const orgSheetsIndex = sources.findIndex(isOrgSheetsDigestSource);
+  if (orgSheetsIndex !== -1) {
+    const bound = await bindOrgSheetsDigestSource(
+      sources[orgSheetsIndex]!,
+      input.sheetsRequestText?.trim() || requestText,
+      existingDigest?.sources?.find(isOrgSheetsDigestSource),
+      { userId, workspaceMode, workspaceId },
+      input.getAdapter,
+      input.reauthorizeOrgSheets,
+    );
+    if ('disabledReason' in bound) return { canAutoDigest: false, disabledReason: bound.disabledReason };
+    sources[orgSheetsIndex] = bound;
+  }
+
+  const hasGmailSource = sources.some((s) => s.service === 'gmail');
   const resolvedIncludeAiSummary =
     typeof input.includeAiSummary === 'boolean'
       ? input.includeAiSummary
@@ -245,7 +264,7 @@ export async function evaluateSlackDigestCandidate(
     channelName: matchedChannel.name,
     ...(hasGmailSource ? { sourceBindingVersion: 1 as const } : {}),
     ...(typeof resolvedIncludeAiSummary === 'boolean' ? { includeAiSummary: resolvedIncludeAiSummary } : {}),
-    sources: sourceResult.sources,
+    sources,
     recurrence: proposal.recurrence!,
     timeZone,
   };

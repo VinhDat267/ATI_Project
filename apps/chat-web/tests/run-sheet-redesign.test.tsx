@@ -67,7 +67,13 @@ it('the receipt lists one step per row in plan order, data from the previous ste
   await screen.findByRole('heading', { level: 1, name: 'Đã xong 3 việc trên 2 công cụ' });
   const rows = [...document.querySelectorAll('#receipt-chain > div:not([data-receipt-connector])')];
   expect(rows).toHaveLength(3);
-  for (const row of rows) expect(row.querySelectorAll('article, [data-od-id]').length).toBeLessThanOrEqual(1);
+  for (const row of rows) {
+    expect(row).toHaveClass('grid-cols-1');
+    expect(row.children).toHaveLength(1);
+  }
+  expect(rows[0]).toHaveTextContent('Lỗi đăng nhập Google');
+  expect(rows[1]).toHaveTextContent('Gán Minh vào thẻ vừa tạo');
+  expect(rows[2]).toHaveTextContent('Báo kênh #ati-test');
   const connector = document.querySelector('[data-receipt-connector]')!;
   expect(connector).toHaveAttribute('data-from', 'step_1');
   expect(connector).toHaveAttribute('data-to', 'step_2');
@@ -82,4 +88,55 @@ it('a Trello member step is titled by what it did, never by the raw card id', as
   expect(screen.getByText('Gán Minh vào thẻ vừa tạo')).toBeInTheDocument();
   // Mã thô chỉ còn trong "Chi tiết kỹ thuật" (JSON gốc), không làm tiêu đề hay dòng nào của thẻ.
   expect(screen.queryByText('card_1794997447841')).toBeNull();
+});
+
+it('from 1280 px the sticky thread panel reserves space for --cockpit-bottom-space when the bottom bar is active', async () => {
+  viewport(true);
+  useChatStore.setState({ conversationId: 'c1', messages, activePlan: plan, planStatus: 'completed', executionSnapshot: done });
+  view();
+  await screen.findByRole('heading', { level: 1, name: 'Đã xong 3 việc trên 2 công cụ' });
+  const thread = screen.getByRole('complementary', { name: 'Hội thoại của lượt chạy' });
+  expect(document.documentElement.style.getPropertyValue('--cockpit-bottom-space')).toBe('96px');
+  expect(thread.className).toContain('--cockpit-bottom-space');
+});
+
+it('on Gmail step cards, Xem trước comes after the inline email preview in mobile stacking order', async () => {
+  viewport(false);
+  const gmailPlan: ActivePlan = {
+    id: 'p-gmail',
+    summary: 'Gửi email báo cáo',
+    resourceLabels: {},
+    connections: { gmail: { credentialId: 'cred-1', email: 'me@example.test' } },
+    steps: [
+      { id: 'step_gmail', tool: 'gmail.send_message', description: 'Gửi email báo cáo', args: { to: ['lan@example.test'], subject: 'Báo cáo tuần', body: 'Nội dung email' } },
+    ],
+  };
+  useChatStore.setState({ conversationId: 'c1', messages, activePlan: gmailPlan, planStatus: 'preview' });
+  view();
+  await screen.findByRole('heading', { level: 1, name: 'Tôi sẽ làm 1 việc' });
+  const previewCard = screen.getByTestId('gmail-preview-card');
+  const previewButton = document.getElementById('preview-step_gmail')!;
+  expect(previewCard.compareDocumentPosition(previewButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+it('the approval gate divider sits flush at the top edge and passive plan status avoids the orange primary signal', async () => {
+  viewport(false);
+  useChatStore.setState({ conversationId: 'c1', messages, activePlan: plan, planStatus: 'preview' });
+  view();
+  await screen.findByRole('heading', { level: 1, name: 'Tôi sẽ làm 3 việc, theo thứ tự' });
+  const gate = document.getElementById('moment-4-sticky-bar')!;
+  expect(gate).not.toHaveClass('pt-4');
+  expect(gate.firstElementChild).toHaveClass('h-0.5');
+
+  const statusBadge = document.querySelector('[data-plan-status]')!;
+  expect(statusBadge.querySelector('.bg-\\[\\#FF5701\\]')).toBeNull();
+});
+
+it('receipt result links include a dark-mode underline class', async () => {
+  viewport(false);
+  useChatStore.setState({ conversationId: 'c1', messages, activePlan: plan, planStatus: 'completed', executionSnapshot: done });
+  view();
+  await screen.findByRole('heading', { level: 1, name: 'Đã xong 3 việc trên 2 công cụ' });
+  const link = screen.getByRole('link', { name: 'Mở card' });
+  expect(link.className).toMatch(/\bdark:decoration-/);
 });

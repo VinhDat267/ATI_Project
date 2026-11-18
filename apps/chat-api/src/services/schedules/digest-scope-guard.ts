@@ -13,6 +13,8 @@ import { getDigestSourceDisabledReason, matchesSlackDigestCredentialOwner } from
 import { loadLiveMyCalendarDigestConnection, matchesMyCalendarDigestBinding, MYCALENDAR_DIGEST_REAPPROVAL, readMyCalendarDigestBinding } from './mycalendar-digest-source.js';
 import { loadLiveMySheetsDigestConnection, matchesMySheetsDigestBinding, MYSHEETS_DIGEST_REAPPROVAL, readMySheetsDigestBinding } from './mysheets-digest-source.js';
 
+import { allowsOrgSheetsDigestRead, ORG_SHEETS_DIGEST_REAPPROVAL, readOrgSheetsDigestScope } from './org-sheets-digest-source.js';
+
 type Queryable = pg.Pool | Pick<pg.Pool, 'query'>;
 
 export type DigestScopeGuardCode =
@@ -43,6 +45,7 @@ export interface DigestScopeGuardInput {
   lockTelegramJiraAuthority?: boolean;
   lockMyCalendarAuthority?: 'share' | 'nowait';
   lockMySheetsAuthority?: 'share' | 'nowait';
+  lockOrgSheetsAuthority?: 'nowait';
 }
 
 export interface DigestScopeGuardResult {
@@ -382,6 +385,11 @@ export async function assertDigestScheduleLiveScopeAndAuth(
         : computeTelegramDigestConfigHash(cfg as unknown as TelegramDigestConfig);
 
     if (isSlackMulti) {
+      const sheets = readOrgSheetsDigestScope(cfg, row.services);
+      if (sheets.kind === 'invalid' || (sheets.kind === 'bound' &&
+        !(await allowsOrgSheetsDigestRead(pool, trustedWorkspaceId, input.encryptionKey, sheets.read, input.lockOrgSheetsAuthority)))) {
+        return deny('DIGEST_SCOPE_REVOKED', ORG_SHEETS_DIGEST_REAPPROVAL, trustedWorkspaceId, trustedWorkspaceMode);
+      }
       const slackCredId = typeof cfg.slackCredentialId === 'string' ? cfg.slackCredentialId : '';
       if (!slackCredId || !isUuid(slackCredId)) {
         return deny(

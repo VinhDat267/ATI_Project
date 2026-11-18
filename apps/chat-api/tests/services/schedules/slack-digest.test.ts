@@ -245,6 +245,52 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
     expect(wrongCredCandidate.config?.workspaceId).toBe(orgWsId);
   });
 
+  it('persists the previewed Sheets IDs and range only while the organization scope still allows them', async () => {
+    const spreadsheetId = 'spreadsheet_sprint_fixture';
+    const replacement = 'spreadsheet_replacement_fixture';
+    const encryptedSheets = (id: string) => encryptCredentials({ allowedScope: { spreadsheets: [id] } }, KEY);
+    await creds.upsertCredentials('sheets', encryptedSheets(spreadsheetId), 'active', owner.email, orgWsId);
+    const scheduling = new ScheduleService({ pool: db.pool, timeZone: TZ, encryptionKey: KEY });
+    const conv = await new ConversationRepo(db.pool).createConversation(owner.id, 'Scoped Slack Digest', {
+      workspaceMode: 'organization', workspaceId: orgWsId,
+    });
+    const proposal = {
+      kind: 'schedule' as const, action: 'create' as const, name: 'Scoped Slack Digest',
+      request: 'Tổng hợp bảng tính Sprint tab Backlog A1:C10 và lịch nhóm, gửi Slack #org-eng.',
+      recurrence: { type: 'daily' as const, time: '09:00' }, summary: 'Digest',
+    };
+    const services = ['sheets', 'calendar', 'slack'];
+    const candidate = await evaluateSlackDigestCandidate({
+      proposal, services, pool: db.pool, timeZone: TZ, userId: owner.id,
+      workspaceMode: 'organization', workspaceId: orgWsId,
+      getAdapter: async () => ({
+        execute: async (tool: string) => {
+          if (tool === 'slack.search_channels') return [{ id: 'C_ORG_ENG', name: 'org-eng' }];
+          if (tool === 'sheets.list_spreadsheets') return [{ id: spreadsheetId, title: 'Sprint' }];
+          if (tool === 'sheets.list_sheets') return [{ id: 0, title: 'Backlog', spreadsheetId }];
+          throw new Error('Unexpected test tool ' + tool);
+        },
+      }),
+    });
+    expect(candidate.canAutoDigest, candidate.disabledReason).toBe(true);
+    const preview = await new MessageRepo(db.pool).createMessage(conv.id, 'assistant', 'Preview', {
+      type: 'schedule_proposal', proposal, services, digestCandidate: candidate,
+    });
+    const confirm = () => scheduling.confirmProposal({
+      userId: owner.id, convId: conv.id, messageId: preview.id, approvalMode: 'auto_digest', now: NOW,
+    });
+
+    await creds.updateCredentials('sheets', () => encryptedSheets(replacement), orgWsId);
+    await expect(confirm()).rejects.toMatchObject({ code: 'DIGEST_PREVIEW_CHANGED' });
+    await creds.updateCredentials('sheets', () => encryptedSheets(spreadsheetId), orgWsId);
+    const { schedule } = await confirm();
+    const { rows: [row] } = await db.pool.query('SELECT digest_config, digest_config_hash FROM schedules WHERE id = $1', [schedule.id]);
+    expect(row.digest_config.sources[0]).toMatchObject({
+      args: { spreadsheetId, sheetId: 0, range: 'Backlog!A1:C10' },
+    });
+    expect(row.digest_config_hash).toBe(candidate.configHash);
+  });
+
   it('executes multi-source Slack digest via real HTTP Slack mock with Block Kit blocks, atomic claim, failure recovery & reconciliation', async () => {
     const convRepo = new ConversationRepo(db.pool);
     const msgRepo = new MessageRepo(db.pool);
@@ -503,7 +549,7 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
     }
   });
 
-  it.each(['once', 'scope changed', 'scope changed during throttling', 'calendar scope changed during read', 'large workspace'] as const)('handles a scheduled delivery when %s', async (scenario) => {
+  it.each(['once', 'scope changed', 'scope changed during throttling', 'calendar scope changed during read', 'Sheets scope changed during read', 'large workspace'] as const)('handles a scheduled delivery when %s', async (scenario) => {
     const scheduling = new ScheduleService({ pool: db.pool, timeZone: TZ, encryptionKey: KEY });
     const conv = await new ConversationRepo(db.pool).createConversation(owner.id, 'Digest authority', {
       workspaceMode: 'organization', workspaceId: orgWsId,
@@ -515,6 +561,16 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
     const token = 'xoxb-org-valid';
     const encrypt = (scope: typeof allowedScope) => encryptCredentials({ botToken: token, allowedScope: scope }, KEY);
     await creds.updateCredentials('slack', () => encrypt(allowedScope), orgWsId);
+    const sheetId = 'spreadsheet_sprint_fixture';
+    const revokeSheets = scenario === 'Sheets scope changed during read';
+    const encryptedSheets = (spreadsheets: string[]) => encryptCredentials({ allowedScope: { spreadsheets } }, KEY);
+    if (revokeSheets) {
+      await creds.upsertCredentials('sheets', encryptedSheets([sheetId]), 'active', owner.email, orgWsId);
+    }
+    const sheetSource = {
+      service: 'sheets', tool: 'sheets.read_range', label: 'Sprint · Backlog!A1:C10',
+      args: { spreadsheetId: sheetId, sheetId: 7, range: 'Backlog!A1:C10' },
+    };
     const config: SlackDigestConfig = {
       destination: 'slack',
       workspaceMode: 'organization',
@@ -522,7 +578,7 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
       slackCredentialId: wsOrgSlackCredId,
       channelId: target.id,
       channelName: target.name,
-      sources: [mycalendarSource()],
+      sources: revokeSheets ? [mycalendarSource(), sheetSource] : [mycalendarSource()],
       recurrence: scenario === 'once' ? { type: 'once', date: '2026-11-17', time: '08:00' } : { type: 'daily', time: '08:00' },
       timeZone: TZ,
     };
@@ -531,7 +587,7 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
         kind, digest_config, digest_config_hash, digest_approved_at, workspace_mode, workspace_id)
        VALUES($1, $2, 'Digest', 'Calendar to Slack', $3, $4, 'active', $5,
         'slack_digest', $6, $7, now(), 'organization', $8) RETURNING id`,
-      [owner.id, conv.id, JSON.stringify(config.recurrence), ['mycalendar', 'slack'], NOW,
+      [owner.id, conv.id, JSON.stringify(config.recurrence), [...config.sources.map((source) => source.service), 'slack'], NOW,
         JSON.stringify(config), computeSlackDigestConfigHash(config), orgWsId],
     )).rows[0];
 
@@ -575,7 +631,13 @@ describe('Multi-service Slack auto_digest (slack_digest) + migration 0038 + reco
       pool: db.pool, credentialRepo: creds, encryptionKey: KEY, timeZone: TZ,
       adapterFactory: {
         getAdapterForService: async (service) => service === 'slack' ? slackAdapter : {
-          execute: async () => {
+          execute: async (tool: string, args: Record<string, unknown>) => {
+            if (service === 'sheets') {
+              expect(tool).toBe(sheetSource.tool);
+              expect(args).toEqual(sheetSource.args);
+              await creds.updateCredentials('sheets', () => encryptedSheets(['different_spreadsheet_fixture']), orgWsId);
+              return { range: 'Backlog!A1:C10', values: [['Task', 'Status'], ['Sprint task', 'Pending']] };
+            }
             if (scenario === 'scope changed') {
               await revokeChannel();
             }

@@ -429,7 +429,7 @@ function GmailReceiptMetrics({ step }: { step: ExecutionStepInfo }) {
   );
 }
 
-interface HorizontalConnectorInfo {
+interface StepConnectorInfo {
   from: string;
   to: string;
   sourceIndex: number;
@@ -449,7 +449,7 @@ function resolveSecondaryTitle(step: ExecutionStepInfo, primaryTitle: string): s
   return candidate;
 }
 
-function ReceiptConnector({ from, to, sourceIndex, label }: HorizontalConnectorInfo) {
+function ReceiptConnector({ from, to, sourceIndex, label }: StepConnectorInfo) {
   return (
     <div
       data-receipt-connector
@@ -468,7 +468,7 @@ function ReceiptCard({
   step,
   index,
   highlighted,
-  horizontalConnector,
+  stepConnector,
   services,
   planSteps,
   labels,
@@ -485,7 +485,7 @@ function ReceiptCard({
   step: ExecutionStepInfo;
   index: number;
   highlighted?: boolean;
-  horizontalConnector?: HorizontalConnectorInfo;
+  stepConnector?: StepConnectorInfo;
 }) {
   const service = serviceId(step.tool);
   const palette = servicePalette(service);
@@ -617,7 +617,7 @@ function ReceiptCard({
               );
             })()}
 
-          {horizontalConnector && <ReceiptConnector {...horizontalConnector} />}
+          {stepConnector && <ReceiptConnector {...stepConnector} />}
 
           <SheetsReceiptMetrics step={step} />
           <NotionReceiptMetrics step={step} />
@@ -646,7 +646,7 @@ function ReceiptCard({
                     href={directUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs font-semibold text-[#1A0E08] dark:text-[#F3EEE8] underline underline-offset-2 decoration-[#D9D0C4] hover:decoration-current inline-flex items-center gap-1"
+                    className="text-xs font-semibold text-[#1A0E08] dark:text-[#F3EEE8] underline underline-offset-2 decoration-[#D9D0C4] dark:decoration-[#5C5148] hover:decoration-current inline-flex items-center gap-1"
                   >
                     <span>{operation(step.tool).link}</span>
                     <svg
@@ -1008,12 +1008,12 @@ export function ReceiptMoment({
                       step={step}
                       index={index}
                       highlighted={selectedService === serviceId(step.tool)}
-                      horizontalConnector={
+                      stepConnector={
                         previous && inline.length > 0
                           ? {
                               from: previous.id,
                               to: step.id,
-                              sourceIndex: index,
+                              sourceIndex: (index - 1) + 1,
                               label: inline.map((edge) => friendlyFieldLabel(edge.field)).join(' + '),
                             }
                           : undefined

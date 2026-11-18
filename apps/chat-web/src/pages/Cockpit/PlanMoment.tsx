@@ -132,8 +132,8 @@ export function PlanMoment({
   const dataFlows = planStepDataFlows(plan.steps);
   const uniqueServicesCount = new Set(plan.steps.map((step) => serviceId(step.tool))).size;
   const showFlowDiagram = uniqueServicesCount >= 2 || dataFlows.length > 0;
-  const isReadOnlyPlan =
-    plan.steps.length > 0 && plan.steps.every((step) => toolDefinition(step.tool)?.sideEffect === 'read');
+  const writeCount = plan.steps.filter((step) => toolDefinition(step.tool)?.sideEffect !== 'read').length;
+  const isReadOnlyPlan = plan.steps.length > 0 && writeCount === 0;
   const isPersonalWorkspace = (getActiveWorkspaceSummary()?.id || 'personal') === 'personal';
 
   const accountChips: Array<{ key: string; service: string; text: string }> = [];
@@ -224,7 +224,6 @@ export function PlanMoment({
 
   const isSafeTone = runtimeMode === 'sandbox' || slackRead || (runtimeMode === 'live' && isReadOnlyPlan && !slackPost);
   // Cổng duyệt: tóm tắt điều sắp xảy ra ngay cạnh nút duyệt, sau khi người dùng đã đọc hết các bước.
-  const writeCount = plan.steps.filter((step) => toolDefinition(step.tool)?.sideEffect !== 'read').length;
   const gateSummary = [
     writeCount > 0 ? `${writeCount} thao tác ghi` : 'Chỉ đọc',
     `${uniqueServicesCount} công cụ`,
@@ -245,7 +244,7 @@ export function PlanMoment({
           <div className="flex items-center justify-between gap-3">
             <RequestEcho request={request} />
             <span data-plan-status className="inline-flex flex-shrink-0 items-center gap-1.5 text-xs font-medium text-[#51463E]">
-              <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-[#FF5701]" />
+              <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-[#8A7E74] dark:bg-[#AFA59A]" />
               Chưa thực thi
             </span>
           </div>
@@ -345,15 +344,14 @@ export function PlanMoment({
                 <article
                   key={step.id}
                   data-highlighted-step={isHighlighted ? 'true' : undefined}
-                  className={`plan-card-stagger-${Math.min(index + 1, 4)} bg-white rounded-xl border ${
+                  className={`plan-card-stagger-${Math.min(index + 1, 4)} grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start gap-3 sm:gap-x-4 bg-white rounded-xl border ${
                     isHighlighted
                       ? 'border-brand-primary ring-2 ring-brand-primary/20'
                       : 'border-[#E6DED3] hover:border-[#D4D4CE]'
                   } p-4 transition-all`}
                   data-od-id={`plan-item-${index + 1}`}
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-                    <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                  <div className="flex items-start gap-3.5 min-w-0 sm:col-start-1 sm:row-start-1">
                       <div className="hidden sm:flex w-9 h-9 rounded-xl bg-[#F8F4EE] border border-[#E6DED3] text-[#1a0e08] items-center justify-center flex-shrink-0 mt-0.5">
                         <ServiceLogo service={service} className="w-4 h-4" />
                       </div>
@@ -827,11 +825,17 @@ export function PlanMoment({
                       </div>
                     </div>
 
+                    {service === 'gmail' && (
+                      <div className="min-w-0 sm:col-span-2 sm:row-start-2">
+                        <GmailPreview step={step} labels={plan.resourceLabels} />
+                      </div>
+                    )}
+
                     <button
                       id={`preview-${step.id}`}
                       type="button"
                       onClick={() => onPreview(step)}
-                      className="self-start flex-shrink-0 px-3 py-1.5 bg-white hover:bg-[#F8F4EE] border border-[#DEDED8] text-[#1a0e08] text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5"
+                      className="justify-self-start self-start flex-shrink-0 sm:col-start-2 sm:row-start-1 px-3 py-1.5 bg-white hover:bg-[#F8F4EE] border border-[#DEDED8] text-[#1a0e08] text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5"
                       aria-label="Xem trước"
                     >
                       <svg className="w-3.5 h-3.5 text-[#6A5F56]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -845,13 +849,6 @@ export function PlanMoment({
                       </svg>
                       <span>Xem trước</span>
                     </button>
-                  </div>
-
-                  {service === 'gmail' && (
-                    <div className="mt-3 min-w-0">
-                      <GmailPreview step={step} labels={plan.resourceLabels} />
-                    </div>
-                  )}
                 </article>
               );
             })}
@@ -922,7 +919,7 @@ export function PlanMoment({
 
         {/* Cổng duyệt (redesign 11/2026): đứng sau bước cuối, không dính đáy, nên nút duyệt chỉ tới sau khi đã đọc kế hoạch.
             Giữ id moment-4-sticky-bar cho ô sửa qua chat và các test đang trỏ tới. */}
-        <div id="moment-4-sticky-bar" data-approval-gate className="px-5 sm:px-6 pt-4 pb-5 bg-[#F8F4EE] rounded-b-2xl">
+        <div id="moment-4-sticky-bar" data-approval-gate className="px-5 sm:px-6 pb-5 bg-[#F8F4EE] rounded-b-2xl">
           <div aria-hidden="true" className="h-0.5 -mx-5 sm:-mx-6 mb-4 bg-[#1A0E08] dark:bg-[#F3EEE8]" />
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h2 className="text-base font-semibold text-[#1a0e08]">Cổng duyệt</h2>
