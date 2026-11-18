@@ -79,13 +79,13 @@ ALTER TABLE schedules ADD COLUMN IF NOT EXISTS digest_approved_at TIMESTAMPTZ;
 
 ALTER TABLE schedules DROP CONSTRAINT IF EXISTS schedules_kind_check;
 ALTER TABLE schedules ADD CONSTRAINT schedules_kind_check
-  CHECK (kind IN ('plan', 'sheets_digest', 'calendar_digest', 'github_digest', 'telegram_digest', 'trello_digest', 'notion_digest'));
+  CHECK (kind IN ('plan', 'sheets_digest', 'calendar_digest', 'github_digest', 'telegram_digest', 'slack_digest', 'trello_digest', 'notion_digest', 'myjira_digest'));
 
 ALTER TABLE schedules DROP CONSTRAINT IF EXISTS schedules_kind_digest_check;
 ALTER TABLE schedules ADD CONSTRAINT schedules_kind_digest_check CHECK (
   (kind = 'plan' AND digest_config IS NULL AND digest_config_hash IS NULL AND digest_approved_at IS NULL)
   OR (
-    kind IN ('sheets_digest', 'calendar_digest', 'github_digest', 'telegram_digest', 'trello_digest', 'notion_digest')
+    kind IN ('sheets_digest', 'calendar_digest', 'github_digest', 'telegram_digest', 'slack_digest', 'trello_digest', 'notion_digest', 'myjira_digest')
     AND digest_config IS NOT NULL
     AND jsonb_typeof(digest_config) = 'object'
     AND digest_config_hash IS NOT NULL
