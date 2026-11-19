@@ -4,7 +4,7 @@ import { MYJIRA_SCOPES } from '../myjira.js';
 export const MYJIRA_SERVICE: ServiceDefinition = {
   id: 'myjira',
   name: 'Jira',
-  description: 'Đọc danh mục site, project và issue trong các Jira site được kết nối qua OAuth cá nhân và workspace của bạn (G2A Read-Only)',
+  description: 'Đọc và quản lý dự án, issue trong các Jira site được kết nối qua OAuth cá nhân và không gian tổ chức của bạn',
   connection: 'personal',
   scopes: [...MYJIRA_SCOPES],
   scopeKey: 'sites',

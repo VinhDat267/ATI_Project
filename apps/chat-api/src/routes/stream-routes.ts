@@ -54,6 +54,12 @@ export function createStreamRoutes(options: StreamRoutesOptions): Router {
       return;
     }
 
+    // The conversation may have been deleted while workspace access was being checked.
+    if (sseManager.isConversationClosed(convId)) {
+      res.status(404).json({ error: 'Không tìm thấy hội thoại.' });
+      return;
+    }
+
     // Set headers for standard SSE streaming
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');

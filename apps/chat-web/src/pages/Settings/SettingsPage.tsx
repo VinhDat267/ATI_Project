@@ -152,11 +152,10 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
       <MainNav user={user} current="settings" pageName="Kết nối dịch vụ" navigate={navigate} onLogout={onLogout} />
       {/* NỘI DUNG CHÍNH */}
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-10">
-        {/* Tiêu đề trang: phạm vi đang cấu hình và nguyên tắc an toàn trong một câu (bước 5b). */}
         <div className="ps-pagehead mb-8 sm:mb-10">
           <h1>Kết nối dịch vụ</h1>
           <p data-testid="settings-oauth-summary">
-            {`${workspace.id === 'personal' ? 'Đang cấu hình kết nối cho: Không gian Cá nhân' : `Đang cấu hình kết nối cho: ${workspace.name}`}. Planora chỉ đọc và ghi ở những bảng, lịch, tệp hoặc kênh bạn chọn, và bạn ngắt kết nối được bất cứ lúc nào.`}
+            {`Đang cấu hình kết nối cho: ${workspace.id === 'personal' ? 'Không gian Cá nhân' : workspace.name}. Planora chỉ truy cập tài nguyên bạn chọn.`}
           </p>
         </div>
         {loading && <p role="status" className="text-xs text-[#6A5F56] mb-4">Đang tải dịch vụ...</p>}
@@ -168,7 +167,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
               <h2 id="heading-personal-services">Của riêng bạn</h2>
               <p className="ps-note mt-0.5">Tài khoản bạn tự liên kết; Planora chỉ dùng đúng phần dữ liệu bạn cho phép.</p>
             </div>
-            <div role="tablist" aria-label="Phân nhóm dịch vụ" className="ps-segmented">
+            <div role="group" aria-label="Phân nhóm dịch vụ" className="ps-segmented ps-filter-grid">
               {([
                 { id: 'all', label: 'Tất cả' },
                 { id: 'google', label: 'Google Workspace' },
@@ -178,8 +177,7 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                 <button
                   key={tab.id}
                   type="button"
-                  role="tab"
-                  aria-selected={categoryFilter === tab.id}
+                  aria-pressed={categoryFilter === tab.id}
                   onClick={() => setCategoryFilter(tab.id)}
                 >
                   {tab.label}
@@ -198,6 +196,9 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                 {personalMySheets && <PersonalMySheets key={`mysheets-${user?.id}`} selected={selected} service={personalMySheets} refresh={refresh} navigate={navigate} standalone={false} />}
               </div>
             </div>
+          )}
+          {categoryFilter === 'google' && !loading && !loadError && !personal && !personalMyCalendar && !personalMySheets && (
+            <p role="status" className="ps-panel ps-note p-4">Chưa có dịch vụ Google Workspace để kết nối tại đây.</p>
           )}
 
           {/* Nhóm 2: Quản lý dự án, Tài liệu & Mã nguồn */}

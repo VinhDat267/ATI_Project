@@ -9,8 +9,9 @@ import type { MessageRepo } from '../db/repositories/message-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ChatService } from '../services/chat-service.js';
 import type { JiraHistorySanitizer } from '../services/jira/jira-history-sanitizer.js';
+import type { SSEManager } from '../sse/sse-manager.js';
 import { validateJiraApprovalBinding } from '../services/jira/jira-approval-guard.js';
-import { HistoryValidationError, validateConversationTitle } from '../db/repositories/conversation-history.js';
+import { ConversationDeleteConflictError, HistoryValidationError, validateConversationTitle } from '../db/repositories/conversation-history.js';
 import {
   assertConversationAccessWithFallback,
   ConversationAccessDeniedError,
@@ -24,6 +25,7 @@ export interface ConversationRoutesOptions {
   pool?: pg.Pool;
   enableWorkspaceConversations?: boolean;
   jiraHistorySanitizer?: JiraHistorySanitizer;
+  sseManager?: SSEManager;
 }
 
 export function createConversationRoutes(options: ConversationRoutesOptions): Router {
@@ -481,6 +483,33 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
       res
         .status(error instanceof HistoryValidationError ? 400 : 500)
         .json({ error: error instanceof HistoryValidationError ? error.message : 'Không đổi được tên hội thoại.' });
+    }
+  });
+
+  router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    const conversationId = req.params.id as string;
+    try {
+      const removed = await convRepo.deleteConversation(conversationId, userId, {
+        workspaceMode: req.workspace?.mode ?? 'legacy',
+        workspaceId: req.workspace?.workspaceId ?? null,
+      });
+      if (!removed) {
+        res.status(404).json({ error: 'Không tìm thấy hội thoại.' });
+        return;
+      }
+      options.sseManager?.closeConversation(conversationId);
+      res.status(204).end();
+    } catch (error) {
+      if (error instanceof ConversationDeleteConflictError) {
+        res.status(409).json({ error: error.message });
+        return;
+      }
+      res.status(500).json({ error: 'Không thể xoá hội thoại.' });
     }
   });
 

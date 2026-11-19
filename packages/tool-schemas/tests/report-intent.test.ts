@@ -3,8 +3,23 @@ import {
   githubIssueAgingDays,
   reportLiteralBodies,
   requestedReportPrefix,
+  requestsOpenJiraIssues,
   requiresReportEvidence,
 } from '../src/report-evidence.js';
+
+it.each([
+  ['Tra cứu tối đa 3 công việc đang mở trong dự án Jira ATIT rồi gửi vào Slack.', true],
+  ['List open Jira issues for ATIT and send them to Slack.', true],
+  ['Đọc issue Jira ATIT rồi gửi danh sách issue đang mở trên GitHub.', false],
+  ['Liệt kê issue Jira đang mở của ATIT. Kiểm tra ticket Jira ở dự án khác.', false],
+  ['Liệt kê ticket Jira đang mở và đã xong.', false],
+  ['Do not list open Jira issues. List only closed issues.', false],
+  ['Không lấy các issue Jira đang mở.', false],
+  ['Gửi Slack nguyên văn "Danh sách issue Jira đang mở".', false],
+])('defaults open-only Jira search for %s: %s', (request, expected) => {
+  expect(requestsOpenJiraIssues([request])).toBe(expected);
+});
+
 describe('Original report request versus ordinary source writes and literal messages', () => {
   it.each([
     'Create an issue in GitHub acme/web. Summarize open PRs and send the report to Slack #dev',

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import type pg from 'pg';
 import { mergeSlackMessageContexts, slackMessageContext, type MessageRepo, type SlackMessageWriteContext } from '../db/repositories/message-repo.js';
 import { messageOutputSelectors, memoryOutputSelectors, messageSelectorValue, messageFingerprint } from './slack/slack-message-selectors.js';
-import type { ConversationRepo } from '../db/repositories/conversation-repo.js';
+import type { ConversationRepo, ConversationRow } from '../db/repositories/conversation-repo.js';
 import type { PlanRepo } from '../db/repositories/plan-repo.js';
 import type { ScheduleRepo } from '../db/repositories/schedule-repo.js';
 import type { WorkspaceRepo } from '../db/repositories/workspace-repo.js';
@@ -420,9 +420,18 @@ export class ChatService {
     onGitHubTeamRepos?: (repos: Array<{ repoId: string; fullName: string; name: string }>) => void,
     onTelegramChats?: (chats: Array<{ chatId: string; title: string }>) => void,
     onNotionDatabases?: (databases: Array<{ id: string; title: string }>) => void,
-    conversationId?: string,
+    conversation?: string | { id: string; row: ConversationRow | null },
   ): Promise<PlannerResponse> {
     signal?.throwIfAborted();
+    const conversationId = typeof conversation === 'string' ? conversation : conversation?.id;
+    let resolvedConversationRow: ConversationRow | null | undefined =
+      conversation && typeof conversation !== 'string' ? conversation.row : undefined;
+    const getConversationRow = async (): Promise<ConversationRow | null> => {
+      if (resolvedConversationRow !== undefined) return resolvedConversationRow;
+      resolvedConversationRow =
+        conversationId && this.convRepo ? await this.convRepo.getConversation(conversationId) : null;
+      return resolvedConversationRow;
+    };
     const bound = withoutConnections(plan);
     const usesGmail = bound.steps.some((step) => step.tool.startsWith('gmail.'));
     const usesMyCalendar = bound.steps.some((step) => step.tool.startsWith('mycalendar.'));
@@ -1013,8 +1022,7 @@ export class ChatService {
                   { signal: precheckSignal }
                 );
               } else if (this.getAdapter) {
-                const convForTrello =
-                  conversationId && this.convRepo ? await this.convRepo.getConversation(conversationId) : null;
+                const convForTrello = await getConversationRow();
                 const trelloWorkspaceMode =
                   convForTrello?.workspace_mode ?? (scopeId !== 'default' ? 'organization' : 'legacy');
                 const trelloWorkspaceId =
@@ -1431,7 +1439,7 @@ export class ChatService {
     }
 
     if (usesNotion) {
-      const conv = conversationId && this.convRepo ? await this.convRepo.getConversation(conversationId) : null;
+      const conv = await getConversationRow();
       const isOrgConv = conv?.workspace_mode === 'organization' || Boolean(conv?.workspace_id);
       const usesPersonalOnlyNotion = bound.steps.some((step) => PERSONAL_NOTION_TOOL_NAMES.has(step.tool));
       if (isOrgConv) {
@@ -1606,9 +1614,7 @@ export class ChatService {
         unavailableServices.push({ id: 'myjira', name: 'Jira' });
         reasons.push('Tính năng Jira chưa được kích hoạt trên hệ thống.');
       } else {
-        const conv = conversationId && this.convRepo
-          ? await this.convRepo.getConversation(conversationId)
-          : null;
+        const conv = await getConversationRow();
         if (!conv) {
           unavailableServices.push({ id: 'myjira', name: 'Jira' });
           reasons.push('Hội thoại không tồn tại.');
@@ -2130,26 +2136,26 @@ export class ChatService {
     };
   }
 
-  private async actorForConversation(
-    conversationId: string,
+  private async requirePlanningConversation(conversationId: string, userId: string): Promise<ConversationRow | null> {
+    if (!this.convRepo) return null;
+    const conversation = await this.convRepo.getConversation(conversationId);
+    if (!conversation || conversation.user_id !== userId) throw new Error('Conversation not found');
+    return conversation;
+  }
+
+  private actorForConversation(
+    conv: ConversationRow | null,
     userId: string
-  ): Promise<{ userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization'; jiraContext?: boolean }> {
-    const fallbackMode = this.workspaceRepo ? ('personal' as const) : undefined;
-    if (!this.convRepo) return { userId, ...(fallbackMode ? { workspaceMode: fallbackMode } : {}) };
-    try {
-      const conv = await this.convRepo.getConversation(conversationId);
-      if (conv?.workspace_mode && conv.workspace_mode !== 'legacy') {
-        return {
-          userId,
-          workspaceId: conv.workspace_id ?? null,
-          workspaceMode: conv.workspace_mode,
-          jiraContext: conv.jira_context === true,
-        };
-      }
-    } catch {
-      // ignore
+  ): { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization'; jiraContext?: boolean } {
+    if (conv?.workspace_mode && conv.workspace_mode !== 'legacy') {
+      return {
+        userId,
+        workspaceId: conv.workspace_id ?? null,
+        workspaceMode: conv.workspace_mode,
+        jiraContext: conv.jira_context === true,
+      };
     }
-    return { userId, ...(fallbackMode ? { workspaceMode: fallbackMode } : {}) };
+    return this.workspaceRepo ? { userId, workspaceMode: 'personal' } : { userId };
   }
 
   /**
@@ -2169,8 +2175,8 @@ export class ChatService {
     let githubTeamRepos: Array<{ repoId: string; fullName: string; name: string }> | undefined;
     let telegramChats: Array<{ chatId: string; title: string }> | undefined;
     let notionDatabases: Array<{ id: string; title: string }> | undefined;
-    const actor = await this.actorForConversation(conversationId, target.userId);
-    const conv = this.convRepo ? await this.convRepo.getConversation(conversationId) : null;
+    const conv = await this.requirePlanningConversation(conversationId, target.userId);
+    const actor = this.actorForConversation(conv, target.userId);
     let scopeId = 'default';
     if (actor.workspaceMode === 'organization' && actor.workspaceId) {
       scopeId = actor.workspaceId;
@@ -2188,7 +2194,7 @@ export class ChatService {
           (repos) => { githubTeamRepos = repos; },
           (chats) => { telegramChats = chats; },
           (databases) => { notionDatabases = databases; },
-          conversationId,
+          { id: conversationId, row: conv },
         )
       : planned;
     signal?.throwIfAborted();
@@ -2469,7 +2475,12 @@ export class ChatService {
     userId: string,
     actor?: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' },
   ): Promise<PlanConnections> {
-    const scopeId = actor?.workspaceMode === 'organization' && actor.workspaceId ? actor.workspaceId : 'default';
+    const scopeId =
+      actor?.workspaceMode === 'organization' && actor.workspaceId
+        ? actor.workspaceId
+        : actor?.workspaceMode === 'personal'
+          ? `personal:${userId}`
+          : 'default';
     const githubScopeId = scopeId !== 'default' ? scopeId : `personal:${userId}`;
     const [gmail, mycalendar, mysheets, trello, github, telegram, notion, myjiraCaps] = await Promise.all([
       this.gmailConnection?.(userId).catch(() => null),
@@ -2534,7 +2545,7 @@ export class ChatService {
     });
 
     // Retrieve previous messages for conversation context
-    const conv = this.convRepo ? await this.convRepo.getConversation(conversationId) : null;
+    const conv = await this.requirePlanningConversation(conversationId, userId);
     const isJiraTurn =
       (this.enforceJiraG2AContainment || !sandboxKeepsSharedJira()) &&
       (Boolean(conv?.jira_context) || /\bmyjira\b/i.test(content) ||
@@ -2599,7 +2610,7 @@ export class ChatService {
     }
     const previousState = structuredClone(memory.toJSON());
     if (slackContext) await this.msgRepo.inSlackTransaction(conversationId, slackContext, async () => undefined, undefined, 'planning');
-    const actor = await this.actorForConversation(conversationId, userId);
+    const actor = this.actorForConversation(await this.requirePlanningConversation(conversationId, userId), userId);
 
     // FLOW-04: Validate workflowContext defaults against user's actual connections and seed into memory
     if (workflowContext) {
@@ -2672,14 +2683,14 @@ export class ChatService {
     if ((run as any).services?.some((s: string) => s === 'myjira' || s.startsWith('myjira')) || run.request?.toLowerCase().includes('myjira')) {
       throw new Error('Scheduled runs do not support personal Jira (myjira)');
     }
+    const convForRun = await this.requirePlanningConversation(convId, run.userId);
     const actor = run.workspaceMode && run.workspaceMode !== 'legacy'
       ? { userId: run.userId, workspaceId: run.workspaceId ?? null, workspaceMode: run.workspaceMode }
-      : await this.actorForConversation(convId, run.userId);
+      : this.actorForConversation(convForRun, run.userId);
     if (!actor.userId || (actor.workspaceMode === 'organization' && !actor.workspaceId)) {
       throw new Error('Scheduler execution requires valid actor and workspace');
     }
     const runServices: string[] | undefined = Array.isArray((run as any).services) ? (run as any).services : undefined;
-    const convForRun = this.convRepo ? await this.convRepo.getConversation(convId).catch(() => null) : null;
     const usesOrgMyJira =
       actor.workspaceMode === 'organization' &&
       Boolean(actor.workspaceId) &&

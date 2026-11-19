@@ -111,7 +111,7 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     // From 1024px "Yêu cầu mới" sits in the sidebar; on a phone it stays in the history drawer.
     if (width >= 1024) await page.getByRole('button', { name: 'Yêu cầu mới', exact: true }).click();
     else { await page.locator('#btn-open-history').click(); await page.getByRole('button', { name: 'Cuộc hội thoại mới', exact: true }).click(); }
-    await page.waitForURL(url => url.pathname.startsWith('/c/') && url.pathname !== conversationPath);
+    await expect(page).toHaveURL(/\/$/);
     await page.goBack();
     await expect(page).toHaveURL(new RegExp(`${conversationPath}$`));
     await expect(page.getByText('Gửi từ: gmail-owner@example.test', { exact: true })).toBeVisible();

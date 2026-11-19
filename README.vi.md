@@ -1,222 +1,259 @@
-# ATI: Nền tảng tự động hoá quy trình bằng AI
+<div align="center">
+
+# Planora
+
+**Tự động hoá quy trình trên các công cụ của nhóm bằng một câu chat, mọi lệnh ghi đều chờ người duyệt.**
 
 [English](README.md) · **Tiếng Việt**
 
 [![v3 check](https://github.com/VinhDat267/ATI_Project/actions/workflows/v3-check.yml/badge.svg)](https://github.com/VinhDat267/ATI_Project/actions/workflows/v3-check.yml)
-![Node.js](https://img.shields.io/badge/node-%5E22.12%20%7C%7C%20%3E%3D24-339933)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6)
+![Node.js](https://img.shields.io/badge/node-%5E22.12%20%7C%7C%20%3E%3D24-339933?logo=nodedotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 
-Mô tả công việc bằng một câu tiếng Việt hoặc tiếng Anh. ATI tìm đúng bảng, kênh, repository, lập kế hoạch nhiều bước trên các công cụ đã kết nối, và chỉ chạy sau khi bạn duyệt.
+</div>
 
-ATI là đồ án đề tài #26 của môn ATI (2026), do một nhóm nhỏ làm cùng các AI coding agent. Mã hiện tại là **v3**: chat agent điều phối công cụ theo kiểu lập kế hoạch rồi mới thực thi (plan-then-execute).
+Planora biến một yêu cầu viết bằng tiếng Việt hoặc tiếng Anh thành một quy trình nhiều bước trên Trello, GitHub, Slack, Jira, Notion, Google Workspace và Telegram. Câu hỏi chỉ đọc được trả lời ngay. Việc nào ghi ra dịch vụ ngoài thì Planora lập kế hoạch, và chỉ chạy sau khi bạn duyệt đúng các bước và nơi nhận. Lịch bản tin định kỳ gửi tóm tắt từ các nguồn đã kết nối vào Slack hoặc Telegram.
 
-| Duyệt kế hoạch | Biên nhận |
-|---|---|
-| ![Kế hoạch 3 bước chờ duyệt](docs/images/plan-review.png) | ![Biên nhận sau khi chạy trên GitHub, Trello và Slack](docs/images/receipt.png) |
+Planora là bản v3 của đồ án đề tài #26, môn ATI (2026).
+
+| Trước khi duyệt | Sau khi chạy |
+| --- | --- |
+| ![Kế hoạch 3 bước GitHub, Trello và Slack đang chờ duyệt](docs/images/plan-review.png) | ![Biên nhận kết quả từng bước](docs/images/receipt.png) |
 | **Trang giới thiệu** | **Kết nối dịch vụ** |
-| ![Trang giới thiệu](docs/images/landing.png) | ![Trang kết nối dịch vụ](docs/images/settings.png) |
+| ![Trang giới thiệu Planora](docs/images/landing.png) | ![Trang kết nối dịch vụ](docs/images/settings.png) |
 
-*Ảnh chụp ở chế độ thử nghiệm (sandbox): kế hoạch soạn sẵn, không gọi dịch vụ thật.*
+<sub>Ảnh chụp ở chế độ sandbox: dữ liệu mẫu và phản hồi dịch vụ giả lập, không gọi API thật.</sub>
 
 ## Mục lục
 
-- [Cách hoạt động](#cách-hoạt-động)
+- [Điểm nổi bật](#điểm-nổi-bật)
+- [Ví dụ](#ví-dụ)
 - [Dịch vụ hỗ trợ](#dịch-vụ-hỗ-trợ)
+- [Cách hoạt động](#cách-hoạt-động)
+- [Cam kết an toàn](#cam-kết-an-toàn)
 - [Công nghệ](#công-nghệ)
-- [Cấu trúc repository](#cấu-trúc-repository)
 - [Bắt đầu](#bắt-đầu)
-- [Kiểm thử](#kiểm-thử)
+- [Cấu trúc repository](#cấu-trúc-repository)
+- [Kiểm thử và đánh giá](#kiểm-thử-và-đánh-giá)
 - [Trạng thái dự án](#trạng-thái-dự-án)
-- [Làm việc trong repository](#làm-việc-trong-repository)
+- [Đóng góp](#đóng-góp)
 - [Tài liệu](#tài-liệu)
+- [Giấy phép](#giấy-phép)
+
+## Điểm nổi bật
+
+- **Lập kế hoạch, xem trước, duyệt, rồi mới chạy.** Mọi lệnh ghi gắn với hash SHA-256 của đúng kế hoạch bạn đã xem (`plan_hash`). Không có đường nào ghi mà không qua duyệt.
+- **Dựa trên tài nguyên thật của bạn.** Planner đổi các tên như "bảng Sprint" hay "#ati-test" thành ID thật bằng tool tra cứu chỉ đọc, và hỏi lại thay vì đoán.
+- **Nhiều bước, xuyên dịch vụ.** Bước sau dùng kết quả bước trước qua `$ref` và `$template`, nên thẻ Trello có thể chứa link issue GitHub vừa tạo ở bước trước.
+- **Xử lý lỗi trung thực.** Lệnh ghi không rõ kết quả sẽ dừng lượt chạy ở `needs_attention`. Planora không bao giờ tự gửi lại.
+- **Bản tin định kỳ và trigger.** Bản tin hằng ngày hoặc hằng tuần từ Trello, GitHub, Jira, Sheets, Calendar và Gmail gửi vào Slack hoặc Telegram, cùng trigger nhắc họp và theo dõi thay đổi trên Google Calendar.
+- **Workspace cá nhân và tổ chức.** Kết nối OAuth cá nhân chỉ thuộc về chủ của nó; kết nối tổ chức bị giới hạn trong một workspace và một allowlist tài nguyên rõ ràng.
+- **Chạy được không cần mạng.** Chế độ sandbox dùng dữ liệu mẫu, không cần khoá model hay thông tin đăng nhập dịch vụ, nên demo và test browser cho kết quả lặp lại được.
+
+## Ví dụ
+
+> Tạo issue GitHub, thẻ Trello và thông báo Slack.
+
+Planora xem trước ba bước. Sau khi bạn duyệt, hệ thống tạo issue GitHub, thêm thẻ Trello có link tới issue đó, rồi gửi tin Slack chứa cả hai link. Biên nhận ghi lại kết quả và nơi nhận của từng bước.
+
+Một số yêu cầu khác:
+
+| Yêu cầu | Điều xảy ra |
+| --- | --- |
+| "Những thẻ nào trên bảng Sprint đã quá hạn?" | Trả lời chỉ đọc từ Trello, không cần duyệt |
+| "Mỗi sáng thứ Hai gửi bản tin issue Jira quá hạn vào #ati-test" | Xem trước lịch bản tin hằng tuần, sau khi duyệt thì tự chạy |
+| "Nhắc tôi 15 phút trước mỗi cuộc họp qua Telegram" | Xem trước trigger nhắc họp trên Google Calendar |
+| "Soạn thư trả lời khách hàng và chờ tôi duyệt" | Soạn thư nháp Gmail và xem trước trước khi gửi |
+
+## Dịch vụ hỗ trợ
+
+Số tool là số tool khai báo trong [`packages/tool-schemas`](packages/tool-schemas/). Tập tool planner thực sự thấy còn tuỳ workspace, kết nối, tài nguyên đã chọn và các cờ tính năng trong `.env`.
+
+| Dịch vụ | Kết nối | Tool (đọc / ghi) | Thao tác tiêu biểu |
+| --- | --- | :---: | --- |
+| Trello | OAuth cá nhân | 6 / 11 | Tìm bảng và thẻ; tạo, chuyển, cập nhật thẻ; nhãn, checklist |
+| GitHub | OAuth cá nhân | 7 / 6 | Tìm issue và PR, tạo issue, bình luận, yêu cầu review |
+| Slack | Bot dùng chung | 4 / 1 | Tìm kênh và người dùng, đọc tin và thread, gửi tin Block Kit |
+| Slack (cá nhân) <sup>1</sup> | OAuth cá nhân | 8 / 1 | Đọc kênh và DM của chính bạn, trả lời thread có duyệt, hộp đề xuất |
+| Telegram | Bot cá nhân | 2 / 1 | Đọc tin gần đây trong chat (lưu 24 giờ), gửi tin và bản tin |
+| Jira | OAuth cá nhân (3LO) | 5 / 4 | Tìm project và issue; tạo, cập nhật, bình luận, chuyển trạng thái |
+| Notion | Integration token hoặc OAuth | 6 / 5 | Tìm trang, truy vấn database, thêm block, bình luận |
+| Google Sheets (tổ chức) | Service account | 5 / 4 | Đọc vùng ô, lọc và tổng hợp dòng, thêm và upsert |
+| Google Sheets (cá nhân) <sup>1</sup> | OAuth cá nhân | 7 / 8 | Bảng tính chọn qua Picker, kèm tool Drive và Docs <sup>2</sup> |
+| Google Calendar (cá nhân) <sup>1</sup> | OAuth cá nhân | 5 / 5 | Sự kiện lặp, RSVP, trigger nhắc họp và theo dõi thay đổi |
+| Gmail <sup>1</sup> | OAuth cá nhân | 5 / 10 | Tìm và đọc thư, thư nháp, nhãn, trả lời, chuyển tiếp, chuyển vào thùng rác (không xoá vĩnh viễn) |
+
+<sup>1</sup> Tắt mặc định; bật bằng cờ `*_ENABLED` và OAuth client riêng.
+<sup>2</sup> Bốn tool ghi Drive và Docs vẫn bị chặn trừ khi `ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS=on`.
+
+Mức nghiệm thu live của từng dịch vụ được theo dõi ở [`docs/handoff/CURRENT-STATE.md`](docs/handoff/CURRENT-STATE.md).
 
 ## Cách hoạt động
 
 ```mermaid
 flowchart LR
-  U([Tin nhắn người dùng]) --> R[Router<br/>luật từ khoá]
-  R --> P[Planner<br/>nạp trước tài nguyên,<br/>LLM + tool tra cứu]
-  P --> V[Validator<br/>json · schema · semantic<br/>security · grounding]
-  V -->|kế hoạch + hash SHA-256| DB[(PostgreSQL)]
-  DB --> W[Duyệt kế hoạch<br/>trên chat-web]
-  W -->|duyệt| E[Executor<br/>tuần tự, $ref / $template]
-  E --> A[Tool adapter<br/>allowlist, rate limit]
-  A --> S([Trello · Slack · GitHub · Sheets<br/>Calendar · Notion · Telegram · Jira])
+  U([Yêu cầu chat]) --> R[Router<br/>chọn dịch vụ]
+  R --> G[Gather<br/>danh mục tài nguyên +<br/>tool tra cứu chỉ đọc]
+  G -->|chỉ đọc| A([Câu trả lời hoặc<br/>câu hỏi làm rõ])
+  G --> P[Planner<br/>LLM soạn kế hoạch]
+  P --> V[Validator<br/>schema · ngữ nghĩa ·<br/>an toàn · grounding]
+  V -->|kế hoạch + plan_hash| DB[(PostgreSQL)]
+  DB --> W[Xem trước trên chat-web]
+  W -->|người dùng duyệt| E[Executor<br/>chạy tuần tự,<br/>$ref / $template]
+  E --> T[Tool adapter<br/>allowlist · rate limit]
+  T --> S([Dịch vụ ngoài])
   E -.->|tiến độ qua SSE| W
 ```
 
-1. **Hiểu yêu cầu.** Router dùng luật từ khoá để chọn các dịch vụ liên quan. Planner nạp trước danh sách tài nguyên được phép, và model có thể gọi các tool tra cứu (chỉ đọc) để đổi tên thành ID thật. Yêu cầu chưa rõ hoặc chỉ đọc thì ATI hỏi lại, không đoán.
-2. **Lập kế hoạch.** Model trả toàn bộ kế hoạch trong một lần trả lời. Validator kiểm 5 lớp: JSON, schema, ngữ nghĩa, an toàn và grounding (mọi ID phải đến từ kết quả tra cứu hoặc từ chính câu của người dùng). Kế hoạch không có bước ghi nào bị từ chối.
-3. **Duyệt.** Kế hoạch được lưu kèm hash SHA-256 và hết hạn sau 30 phút. Người dùng thấy từng bước và nơi sẽ ghi, rồi duyệt, huỷ hoặc sửa qua chat. Lệnh duyệt là compare-and-set trên `status = 'pending'`, nên bấm hai lần không chạy kế hoạch hai lần.
-4. **Thực thi.** Các bước chạy tuần tự. Kết quả bước trước đi vào bước sau qua `$ref` và `$template`; timeout dùng `AbortSignal` thật; tiến độ đẩy về trình duyệt qua SSE.
+1. **Định tuyến và thu thập.** Router chọn các dịch vụ liên quan từ yêu cầu. Planner nạp danh mục tài nguyên mà kết nối được phép chạm tới, và model gọi tool tra cứu chỉ đọc để đổi tên thành ID. Yêu cầu chỉ đọc được hỗ trợ thì trả lời ngay.
+2. **Lập và kiểm tra kế hoạch.** Model trả toàn bộ kế hoạch trong một lần. Validator kiểm cấu trúc JSON, schema của tool, luật ngữ nghĩa, ràng buộc an toàn và grounding: mọi ID phải đến từ kết quả tra cứu hoặc từ chính câu của người dùng.
+3. **Xem trước và duyệt.** Kế hoạch được lưu kèm hash SHA-256 và thời hạn. Bản xem trước hiện từng bước và nơi nhận. Lệnh duyệt là compare-and-set trên kế hoạch đang chờ, nên bấm hai lần cũng không chạy hai lần.
+4. **Thực thi và báo cáo.** Các bước chạy tuần tự với timeout bằng `AbortSignal` thật. Tiến độ đẩy về trình duyệt qua Server-Sent Events, và biên nhận giữ kết quả của từng bước.
+5. **Khôi phục.** Sau khi khởi động lại, các lượt đang chạy dở được đối soát trước khi API nhận request. Lệnh ghi không rõ kết quả chuyển sang `needs_attention`; người dùng kiểm tra dịch vụ thật rồi đánh dấu đã gửi hoặc chạy lượt mới.
 
-**An toàn khi ghi.** Lệnh ghi hết thời gian chờ hoặc lỗi mà không rõ kết quả thì bước đó thành `unknown` và kế hoạch tạm dừng. ATI không bao giờ tự thử lại lệnh ghi đó. Người dùng kiểm tra dịch vụ thật rồi chọn bỏ qua bước hoặc dừng kế hoạch. Sau khi khởi động lại, các kế hoạch đang chạy dở được đối soát theo cùng cách trước khi API nhận request.
+## Cam kết an toàn
 
-## Dịch vụ hỗ trợ
+Các bất biến dưới đây được thực thi trong code và có test bao phủ. Thay đổi nào làm yếu chúng sẽ không được chấp nhận.
 
-Catalog có 33 tool trên 8 dịch vụ: 19 tool đọc, 14 tool ghi.
+| Cam kết | Cơ chế |
+| --- | --- |
+| Không ghi khi chưa duyệt | Chỉ thực thi kế hoạch đã duyệt có `plan_hash` lưu trữ khớp với kế hoạch đã xem |
+| Không tự gửi lại | Kết quả ghi không rõ (`unknown`) chuyển lượt chạy sang `needs_attention`; không gì tự gửi lại |
+| Quyền tối thiểu | Adapter từ chối mọi tài nguyên ngoài allowlist của kết nối và workspace đang dùng |
+| Cô lập credential | Credential cá nhân và tổ chức không bao giờ lẫn giữa các workspace; bí mật được mã hoá AES-256-GCM khi lưu |
+| Đổi schema an toàn | Migration database chỉ thêm, chạy lại được; migration đã merge không bao giờ bị sửa |
 
-| Dịch vụ | Số tool | Lệnh ghi tiêu biểu |
-|---|---:|---|
-| Trello | 9 | tạo/cập nhật thẻ, gán thành viên, thêm checklist |
-| GitHub | 5 | tạo issue, gắn nhãn |
-| Google Sheets | 4 | thêm dòng |
-| Notion | 4 | tạo trang, thêm đoạn văn |
-| Jira | 4 | tạo issue, thêm bình luận |
-| Google Calendar | 3 | tạo sự kiện (không mời người khác) |
-| Slack | 2 | gửi tin nhắn |
-| Telegram | 2 | gửi tin nhắn |
-
-Mỗi adapter từ chối tài nguyên nằm ngoài allowlist do quản trị viên cấu hình. Khoá dịch vụ được mã hoá AES-256-GCM khi lưu. Mức nghiệm thu của từng dịch vụ (sandbox, chạy thật qua script, chạy thật qua giao diện) ghi ở [CURRENT-STATE](docs/handoff/CURRENT-STATE.md).
+Gửi tin ra Slack, Telegram và Gmail là "tối đa một lần", không phải "đúng một lần": khi không rõ kết quả, Planora dừng lại và hỏi thay vì liều gửi trùng.
 
 ## Công nghệ
 
 | Tầng | Công nghệ |
-|---|---|
-| Frontend | React 19, Vite 8, Tailwind CSS 4, Zustand, `fetch-event-source` |
-| Backend | Node.js 22+, Express 5, PostgreSQL 16 (`pg`), Nodemailer |
-| AI | DeepSeek API (`deepseek-chat` / `deepseek-reasoner`), Gemini (`@google/genai`) hoặc endpoint tương thích OpenAI |
-| Xác thực | Access token JWT + refresh token xoay vòng lưu dạng SHA-256, xác minh email có quản trị viên duyệt, Google OIDC (PKCE) |
-| Kiểm thử | Vitest, Testing Library, Playwright (Chromium) trên PostgreSQL thật |
-| Công cụ | npm workspaces, TypeScript 5, GitHub Actions |
-
-## Cấu trúc repository
-
-```text
-ATI_Project/
-├── apps/
-│   ├── chat-api/        API Express: xác thực, hội thoại, duyệt, thực thi, SSE
-│   └── chat-web/        App React: giới thiệu, đăng nhập, cockpit, kết nối, lịch sử, cẩm nang
-├── packages/
-│   ├── tool-schemas/    Kiểu dùng chung, catalog tool, registry dịch vụ
-│   ├── tool-adapters/   Mỗi dịch vụ một adapter, allowlist, mã hoá, rate limit
-│   ├── planner/         Router, working memory, prompt, provider, validator
-│   └── executor/        Executor tuần tự, $ref/$template, timeout, trạng thái unknown
-├── db/v3/               Migration PostgreSQL 0001–0008 (11 bảng) và script chạy
-├── evaluations/         Golden set, chấm điểm offline, chạy thật có kiểm soát
-├── scripts/             Launcher, script chạy test, OIDC giả cho test
-├── docs/                Đặc tả, kế hoạch, bàn giao, bản mẫu giao diện, bằng chứng
-└── compose.v3.yaml      PostgreSQL 16 cho máy cá nhân
-```
-
-Mã v1/v2 đã xoá khỏi `main` ngày 05/10/2026. Tag `archive/v2-final` giữ ảnh chụp cuối; đọc một file bằng `git show archive/v2-final:<đường dẫn>`.
+| --- | --- |
+| Web app | React 19, Vite 8, Tailwind CSS 4, Zustand, Server-Sent Events |
+| API | Node.js, TypeScript, Express 5, phiên JWT (HS256), đăng nhập Google |
+| Lập kế hoạch | Gemini, DeepSeek hoặc bất kỳ gateway tương thích OpenAI `/v1/chat/completions` |
+| Dữ liệu | PostgreSQL 16, migration SQL đánh số trong [`db/v3`](db/v3/) |
+| Kiểm thử | Vitest, Playwright, đánh giá golden set |
+| CI | GitHub Actions trên Ubuntu, Node 24, PostgreSQL 16 |
 
 ## Bắt đầu
 
 ### Yêu cầu
 
-- Node.js `^22.12` hoặc `>=24`, npm
-- Docker có Compose (để chạy PostgreSQL)
-- Chromium cho test browser: chạy `npx playwright install chromium` một lần
+- Node.js `^22.12` hoặc `>=24`, kèm npm
+- Docker có Compose (để chạy container PostgreSQL ở máy)
 
-### 1. Cài đặt và cấu hình
+### Chạy ở chế độ sandbox
 
-```bash
+Chế độ sandbox dùng dữ liệu mẫu, không cần khoá model hay thông tin đăng nhập dịch vụ. Chạy các lệnh ở thư mục gốc repository.
+
+```sh
 npm ci
-cp .env.example .env        # PowerShell: Copy-Item .env.example .env
+cp .env.example .env          # PowerShell: Copy-Item .env.example .env
+npm run db:up:v3              # PostgreSQL 16 tại 127.0.0.1:55533
 ```
 
-Git bỏ qua `.env`. Không commit file này, không dán giá trị trong đó vào log, issue hay PR.
-
-### 2. Chạy sandbox có PostgreSQL (khuyến nghị)
-
-Chế độ sandbox dùng planner soạn sẵn và phản hồi dịch vụ giả, nên không gọi model hay dịch vụ thật nào.
-
-```bash
-npm run db:up:v3            # PostgreSQL 16 tại 127.0.0.1:55533
-```
-
-Trong `.env`, giữ `RUNTIME_MODE=sandbox` và đặt:
+Đặt các giá trị sau trong `.env` ở máy bạn. Mật khẩu admin dài ít nhất 12 ký tự.
 
 ```dotenv
+RUNTIME_MODE=sandbox
 DATABASE_URL=postgresql://ati_v3:ati_v3_local_only@127.0.0.1:55533/ati_v3
 CHAT_ADMIN_EMAIL=admin@localhost.test
-CHAT_ADMIN_PASSWORD=<mật khẩu cục bộ, ít nhất 12 ký tự>
+CHAT_ADMIN_PASSWORD=<mật-khẩu-cục-bộ>
+SANDBOX_SCENARIO=three_service
 ```
 
-Sau đó migrate, tạo tài khoản (một lần) và chạy app:
+Sau đó migrate, tạo tài khoản admin (một lần) và chạy API cùng web app:
 
-```bash
+```sh
 npm run db:migrate:local:v3
 npm run admin:provision:local:v3
 npm run up:local:v3
 ```
 
-Mở <http://127.0.0.1:5174> và đăng nhập bằng `CHAT_ADMIN_*`. API health ở <http://127.0.0.1:3000/api/health>. `npm run db:down:v3` dừng container và giữ volume dữ liệu.
+Mở <http://127.0.0.1:5174>, đăng nhập bằng tài khoản admin và gửi [yêu cầu ví dụ](#ví-dụ). API health ở <http://127.0.0.1:3000/api/health>.
 
-Các lệnh `:local:v3` từ chối chạy nếu `DATABASE_URL` không trỏ đúng container cục bộ này. Trên Windows, nếu cổng 55533 nằm trong dải cổng hệ thống đã giữ, đặt `V3_LOCAL_DB_PORT` sang cổng khác (ví dụ 56533) và dùng cổng đó trong `DATABASE_URL`. Chi tiết: [V3-LOCAL-SETUP](docs/V3-LOCAL-SETUP.md).
+Bỏ `SANDBOX_SCENARIO` rồi khởi động lại để dùng sandbox mặc định. Dừng app bằng <kbd>Ctrl</kbd>+<kbd>C</kbd>; `npm run db:down:v3` dừng PostgreSQL và giữ volume dữ liệu. [Hướng dẫn môi trường cục bộ](docs/V3-LOCAL-SETUP.md) có thêm chi tiết về database và test.
 
-### Xem nhanh không cần database
+### Chạy ở chế độ live
 
-Giữ `DATABASE_URL` như trong `.env.example` (trỏ tới cổng không mở, nên dữ liệu chỉ nằm trong bộ nhớ), đặt `SANDBOX_USER_EMAIL` và `SANDBOX_USER_PASSWORD`, rồi chạy `npm run up`.
+Chế độ live gọi dịch vụ thật. Trong `.env` ở máy bạn:
 
-### Chế độ live
+1. Đặt `RUNTIME_MODE=live`, `DATABASE_URL`, `JWT_SECRET` và `ENCRYPTION_KEY`.
+2. Cấu hình một model lập kế hoạch: `GEMINI_API_KEY`, hoặc `LLM_PROVIDER=deepseek` kèm `DEEPSEEK_API_KEY`, hoặc `LLM_PROVIDER=openai-compatible` kèm `LLM_BASE_URL`, `LLM_API_KEY` và `LLM_MODEL`.
+3. Đăng ký OAuth app cho các dịch vụ định dùng và bật các dịch vụ tuỳ chọn (`GMAIL_ENABLED`, `MYCALENDAR_ENABLED`, `MYSHEETS_ENABLED`, `MYSLACK_ENABLED`, `MYJIRA_ENABLED`). Mỗi tích hợp Google cần một Google Cloud project riêng.
 
-Chế độ live gọi model thật và dịch vụ thật. Cần:
-
-- PostgreSQL thật trong `DATABASE_URL`;
-- `JWT_SECRET` (ít nhất 32 byte) và `ENCRYPTION_KEY` (32 byte hoặc 64 ký tự hex);
-- một LLM: `GEMINI_API_KEY`, hoặc `LLM_PROVIDER=openai-compatible` kèm `LLM_BASE_URL`, `LLM_API_KEY` và đúng một `LLM_MODEL` cố định;
-- `CHAT_ADMIN_*`, rồi chạy `npm run db:migrate:v3` và `npm run admin:provision:v3`.
-
-Khởi động bằng `RUNTIME_MODE=live npm run up`. Thiếu cấu hình bắt buộc thì live từ chối khởi động. SMTP và Google OAuth là tuỳ chọn; xem chú thích trong [`.env.example`](.env.example) và mục "Through the app" của [evaluations/README.md](evaluations/README.md). Thêm khoá dịch vụ và allowlist tài nguyên ở trang **Kết nối dịch vụ**. Chỉ ghi lên dịch vụ thật qua kế hoạch bạn đã xem kỹ, và dùng bảng, kênh, repository dành cho thử nghiệm.
-
-## Kiểm thử
-
-| Lệnh | Nội dung |
-|---|---|
-| `npm run check` | Typecheck, unit và integration test của cả sáu workspace, test bộ đánh giá offline, build web, quét bản build tìm bí mật, test launcher và env |
-| `npm run test:browser:v3` | E2E Playwright trên API, web và PostgreSQL thật, 11 kịch bản sandbox. Cần database đã tạo tài khoản (bước 2 ở trên) |
-| `npm run check:local:v3` | `check`, kèm kiểm `DATABASE_URL` là container cục bộ |
-
-CI ([`v3-check.yml`](.github/workflows/v3-check.yml)) chạy `npm ci`, migration, `npm run check` và bộ browser trên một PostgreSQL 16 mới cho mỗi pull request và mỗi lần đẩy lên `main`.
-
-Tính đến 11/10/2026 (CI trên `828c21a`): **1.674** unit và integration test, **173** test bộ đánh giá, **101** test browser qua 11 kịch bản (thêm một ca bỏ qua có chủ đích).
-
-Chạy riêng một test browser (Playwright tự khởi động server theo config):
-
-```bash
-node node_modules/playwright/cli.js test --config apps/chat-web/playwright.config.ts --grep "FE-11:"
+```sh
+npm run db:migrate:v3
+npm run admin:provision:v3
+npm run up
 ```
+
+Mọi biến đều có chú thích trong [`.env.example`](.env.example). Không bao giờ commit `.env` hay đưa bí mật vào prompt, log hoặc file bằng chứng. Để chạy có kiểm soát trên dịch vụ thật, xem [`evaluations/README.md`](evaluations/README.md).
+
+## Cấu trúc repository
+
+```text
+.
+├── apps/
+│   ├── chat-web/        App React + Vite: chat, xem trước, kết nối, lịch, lịch sử
+│   └── chat-api/        API Express: xác thực, workspace, hội thoại, thực thi, lịch
+├── packages/
+│   ├── tool-schemas/    Registry dịch vụ, định nghĩa tool và kiểu dùng chung
+│   ├── tool-adapters/   Client API dịch vụ, kiểm phạm vi, rate limit, mã hoá
+│   ├── planner/         Định tuyến, tra cứu tài nguyên, provider LLM, kiểm tra kế hoạch
+│   └── executor/        Thực thi tuần tự, tham chiếu giữa các bước, xử lý lỗi
+├── db/v3/               Migration PostgreSQL và script chạy migration
+├── evaluations/         Golden set, chấm điểm offline, chạy thật có kiểm soát
+├── prompts/             Mẫu prompt
+├── scripts/             Launcher, bộ kiểm môi trường cục bộ, script chạy test
+└── docs/                Thiết kế, bàn giao, runbook và báo cáo
+```
+
+## Kiểm thử và đánh giá
+
+| Lệnh | Mục đích |
+| --- | --- |
+| `npm run typecheck:v3` | Kiểm kiểu cho API và web app |
+| `npm run test:v3` | Unit và integration test (test PostgreSQL dùng `DATABASE_URL`) |
+| `npm run test:eval:v3` | Logic đánh giá offline |
+| `npm run test:browser:v3` | Test end-to-end Playwright trên app sandbox |
+| `npm run check` | Toàn bộ: kiểm kiểu, test, đánh giá, build web và kiểm launcher |
+| `npm run check:local:v3` | Toàn bộ, kèm kiểm `DATABASE_URL` là database sandbox cục bộ |
+
+Test browser cần Chromium (`npx playwright install chromium`), một database sandbox riêng đã tạo tài khoản admin, và `.env` không có `SANDBOX_SCENARIO` để bộ chạy tự chọn dữ liệu mẫu. Dừng app trước để Playwright tự khởi động server của nó.
+
+Thay đổi planner và prompt được đo bằng golden set trong [`evaluations/`](evaluations/), cả offline lẫn với model thật. CI chạy song song hai job `check` và `browser` cho mỗi pull request ([workflow](.github/workflows/v3-check.yml)).
 
 ## Trạng thái dự án
 
-[`docs/handoff/CURRENT-STATE.md`](docs/handoff/CURRENT-STATE.md) là nguồn chuẩn (một trang) cho trạng thái từng dịch vụ và lỗi đã biết. Tóm tắt dưới đây là ảnh chụp lịch sử tính đến 11/10/2026:
+- Luồng chính (chat, lập kế hoạch, duyệt, thực thi, biên nhận) và lịch bản tin chạy được ở cả sandbox lẫn live.
+- Mọi dịch vụ trong bảng trên đã được chạy thử với tài khoản thật trong workspace test. Các kiểm tra live còn lại của từng dịch vụ ghi ở [`CURRENT-STATE.md`](docs/handoff/CURRENT-STATE.md).
+- **Chưa triển khai production.** Google OAuth project ở chế độ Testing làm refresh token hết hạn sau 7 ngày, nên hãy kết nối lại ngay trước buổi demo.
 
-- **Đã xong:** adapter cho cả 8 dịch vụ; tài khoản (đăng ký email có quản trị viên duyệt, Gmail SMTP, đăng nhập Google, quản lý phiên); giao diện mới (FE-04 → FE-11).
-- **Đã đo với model thật** (08/10/2026, mỗi bộ 3 lần): bộ cơ bản 150/150 đúng, câu tự do 52/54, đa dịch vụ 129/132.
-- **Chưa đạt:** mục tiêu p95 dưới 15 giây cho yêu cầu đa dịch vụ (hiện 20,1 s). Tỉ lệ kế hoạch dùng được với người dùng thật chưa đo.
-- **Tiếp theo:** đường LLM dự phòng (W4-00), chạy thật 5 dịch vụ mới qua giao diện (W3-11), các phép đánh giá tuần 4. Xem [lộ trình](docs/handoff/ROADMAP.md).
+Việc sắp làm nằm trong [lộ trình](docs/handoff/ROADMAP.md).
 
-Chưa tuyên bố sẵn sàng cho production.
+## Đóng góp
 
-## Làm việc trong repository
+1. Đọc [quy trình nhóm](docs/team-workflow.md) và [quy tắc repository](AGENTS.md), gồm cả các bất biến an toàn.
+2. Tách nhánh từ `origin/main` theo dạng `feat|fix|chore|docs/<tên-ngắn>` và dùng [Conventional Commits](https://www.conventionalcommits.org/).
+3. Thêm test cho hành vi bạn thay đổi; sửa bug thì kèm test tái hiện bug.
+4. Chạy test phần mình sửa và `npm run typecheck:v3`, rồi mở pull request mô tả làm gì, vì sao, và đã test gì.
 
-Nhóm làm bằng AI agent (Codex, Antigravity, Claude Code và các agent khác), và không agent nào nhớ phiên của agent khác. Quy tắc làm việc nằm ở [`AGENTS.md`](AGENTS.md): ship nhỏ, CI gác cổng.
-
-1. **Bắt đầu**: đọc [`CURRENT-STATE.md`](docs/handoff/CURRENT-STATE.md) (một trang), rồi tách nhánh từ `origin/main`. Nếu thư mục có thay đổi không phải của bạn, dùng `git worktree` riêng.
-2. **Làm**: có test cho hành vi thay đổi. Logic database test trên PostgreSQL thật, timeout test bằng `AbortSignal` thật; không mock hình thức.
-3. **Mở PR** (làm gì / vì sao / đã test gì). Nếu trạng thái dịch vụ đổi, sửa dòng của dịch vụ đó trong `CURRENT-STATE.md` ngay trong PR.
-4. **CI xanh thì merge.** PR đụng migration DB, OAuth/token, ghi ra dịch vụ thật, xoá dữ liệu hoặc CI thì nhờ thêm một lượt đọc diff ([checklist](docs/handoff/REVIEW-CHECKLIST.md)).
-
-Quy ước:
-
-- Conventional Commits; chỉ `git add` đúng các file của thay đổi. Quy ước nhánh và commit: [`docs/team-workflow.md`](docs/team-workflow.md).
-- Mô tả PR theo [mẫu](.github/pull_request_template.md).
-- Quy trình cũ (nhật ký trạng thái chi tiết, lộ trình theo tuần, task card, log mỗi PR) được lưu ở [`docs/archive/handoff-2026-11-12/`](docs/archive/handoff-2026-11-12/README.md).
-- Repository công khai: không commit `.env`, token, bằng chứng chạy thật (`docs/ai-evidence/V3-LIVE-EXECUTION/`, `docs/ai-evidence/AUTH-LIVE/`) hay báo cáo môn học.
+Pull request đụng tới migration, OAuth hoặc token, luồng gửi hay ghi ra dịch vụ thật, xoá dữ liệu hoặc CI cần thêm một lượt review trước khi merge ([checklist](docs/handoff/REVIEW-CHECKLIST.md)).
 
 ## Tài liệu
 
 | Tài liệu | Nội dung |
-|---|---|
-| [CURRENT-STATE](docs/handoff/CURRENT-STATE.md) | Một trang: trạng thái từng dịch vụ, việc đang làm, lỗi đã biết |
-| [ROADMAP](docs/handoff/ROADMAP.md) | Danh sách việc ưu tiên ngắn |
-| [Đặc tả v3](docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md) | Chuẩn về hành vi, luồng xử lý, catalog tool và schema |
-| [Đặc tả giao diện mới](docs/superpowers/specs/2026-10-05-ui-redesign-agentic-design.md) và [design system](docs/design/design-system.md) | Giao diện Agentic và 12 bản mẫu |
-| [Phạm vi đa dịch vụ](docs/MULTI-SERVICE-SCOPE.md) | Tiêu chí nghiệm thu khi thêm dịch vụ |
-| [Đánh giá](evaluations/README.md) | Golden set, cách chấm, chạy thật có kiểm soát |
-| [Môi trường cục bộ](docs/V3-LOCAL-SETUP.md) | Từng bước dựng sandbox PostgreSQL |
-| [Chỉ mục tài liệu](docs/README.md) | Các tài liệu còn lại, gồm tài liệu đề tài ban đầu |
+| --- | --- |
+| [Đặc tả v3](docs/superpowers/specs/2026-09-29-ai-workflow-platform-v3-design.md) | Kiến trúc và hành vi nghiệp vụ chuẩn |
+| [Trạng thái hiện tại](docs/handoff/CURRENT-STATE.md) | Trạng thái và mức nghiệm thu live của từng dịch vụ |
+| [Môi trường cục bộ](docs/V3-LOCAL-SETUP.md) | Chi tiết database, sandbox và môi trường test |
+| [Đánh giá](evaluations/README.md) | Golden set và chạy thật có kiểm soát |
+| [Chỉ mục tài liệu](docs/README.md) | Các tài liệu còn lại: ADR, runbook, báo cáo |
 
-Dự án chưa chọn giấy phép mã nguồn mở.
+## Giấy phép
+
+Repository chưa có giấy phép mã nguồn mở. Mọi quyền thuộc về nhóm dự án.

@@ -19,6 +19,10 @@ export function getPool(config?: pg.PoolConfig): pg.Pool {
       connectionTimeoutMillis: config?.connectionTimeoutMillis ?? 5000,
       ...config,
     });
+    // Prevent an idle client disconnect or transient PG reset from crashing the API process.
+    globalPool.on('error', (err) => {
+      console.warn('[chat-api] PostgreSQL idle pool client error:', err?.message || err);
+    });
   }
   return globalPool;
 }

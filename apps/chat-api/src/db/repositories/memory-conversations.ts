@@ -9,7 +9,7 @@ import {
 } from './conversation-history.js';
 
 /** Development fallback with the same history contract as PostgreSQL. */
-export function createMemoryConversationRepositories() {
+export function createMemoryConversationRepositories(removeLinkedData?: (conversationId: string) => void) {
   const convMap = new Map<string, ConversationRow>();
   const msgMap = new Map<string, MessageRow[]>();
 
@@ -86,6 +86,7 @@ export function createMemoryConversationRepositories() {
       const timestamp = cursor ? Date.parse(cursor.updatedAt) : null;
       const rows = sorted(userId, scope).filter(
         (row) =>
+          (row.title !== null || !!msgMap.get(row.id)?.length) &&
           (!search || row.title?.toLowerCase().includes(search.toLowerCase())) &&
           (!cursor ||
             row.updated_at.getTime() < timestamp! ||
@@ -108,6 +109,13 @@ export function createMemoryConversationRepositories() {
       row.title = validated;
       row.updated_at = new Date();
       return { ...row };
+    },
+    async deleteConversation(id: string, userId: string, scope: ConversationScope) {
+      const row = convMap.get(id);
+      if (!row || row.user_id !== userId || row.workspace_id || scope.workspaceMode === 'organization') return false;
+      removeLinkedData?.(id);
+      msgMap.delete(id);
+      return convMap.delete(id);
     },
     async updateStatus(id: string, status: string) {
       const row = convMap.get(id);

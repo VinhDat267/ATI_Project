@@ -445,18 +445,21 @@ export class ApiClient {
       credentials: 'include',
     });
   }
+  // Phạm vi bảng Trello lưu theo không gian (personal:<user>, mã tổ chức). Luôn gửi không gian đang chọn như GitHub;
+  // không gửi thì máy chủ dùng phạm vi 'default', lệch với phạm vi planner dùng khi lập kế hoạch.
   getTrelloConnection() {
     return this.request<{
       status: 'unconfigured' | 'not_connected' | 'reconnect_required' | 'needs_scope' | 'needs_membership' | 'connected';
       username?: string;
       workspaceName?: string;
       boards: Array<{ boardId: string; boardName: string; member: boolean }>;
-    }>('/api/connections/trello', { credentials: 'include' });
+    }>('/api/connections/trello', { credentials: 'include', headers: { 'X-Workspace-Id': getActiveWorkspaceId() } });
   }
   startTrelloConnection(options: { returnTo?: string } = {}) {
     return this.request<{ url: string }>('/api/connections/trello/start', {
       method: 'POST',
       credentials: 'include',
+      headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
       ...(options.returnTo ? { body: JSON.stringify({ returnTo: options.returnTo }) } : {}),
     });
   }
@@ -476,12 +479,13 @@ export class ApiClient {
   getTrelloWorkspaces() {
     return this.request<{ workspaces: Array<{ id: string; name: string }> }>('/api/connections/trello/workspaces', {
       credentials: 'include',
+      headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
     });
   }
   getTrelloBoards(workspaceId: string) {
     return this.request<{ boards: Array<{ id: string; name: string; member: boolean }> }>(
       `/api/connections/trello/workspaces/${encodeURIComponent(workspaceId)}/boards`,
-      { credentials: 'include' }
+      { credentials: 'include', headers: { 'X-Workspace-Id': getActiveWorkspaceId() } }
     );
   }
   saveTrelloScope(workspaceId: string, boardIds: string[]) {
@@ -493,6 +497,7 @@ export class ApiClient {
     }>('/api/connections/trello/scope', {
       method: 'PUT',
       credentials: 'include',
+      headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
       body: JSON.stringify({ workspaceId, boardIds }),
     });
   }
@@ -557,7 +562,7 @@ export class ApiClient {
       username?: string;
       displayName?: string;
       chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean; selected: boolean }>;
-    }>('/api/connections/telegram', { credentials: 'include' });
+    }>('/api/connections/telegram', { credentials: 'include', headers: { 'X-Workspace-Id': getActiveWorkspaceId() } });
   }
   startTelegramConnection(options: { returnTo?: string } = {}) {
     return this.request<{
@@ -568,6 +573,7 @@ export class ApiClient {
     }>('/api/connections/telegram/start', {
       method: 'POST',
       credentials: 'include',
+      headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
       ...(options.returnTo ? { body: JSON.stringify({ returnTo: options.returnTo }) } : {}),
     });
   }
@@ -581,13 +587,14 @@ export class ApiClient {
     }>('/api/connections/telegram/callback', {
       method: 'POST',
       credentials: 'include',
+      headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
       body: JSON.stringify({ state }),
     }, true);
   }
   getTelegramCandidateChats() {
     return this.request<{
       chats: Array<{ chatId: string; title: string; type: 'private' | 'group' | 'supergroup' | 'channel'; username?: string; member: boolean; selected: boolean }>;
-    }>('/api/connections/telegram/candidate-chats', { credentials: 'include' });
+    }>('/api/connections/telegram/candidate-chats', { credentials: 'include', headers: { 'X-Workspace-Id': getActiveWorkspaceId() } });
   }
   saveTelegramScope(chatIds: string[]) {
     return this.request<{
@@ -595,6 +602,7 @@ export class ApiClient {
     }>('/api/connections/telegram/scope', {
       method: 'PUT',
       credentials: 'include',
+      headers: { 'X-Workspace-Id': getActiveWorkspaceId() },
       body: JSON.stringify({ chatIds }),
     });
   }
@@ -999,6 +1007,13 @@ export class ApiClient {
 
   async renameConversation(id: string, title: string): Promise<{ conversation: Conversation }> {
     return this.request(`/api/conversations/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ title }) });
+  }
+
+  async deleteConversation(id: string, workspaceId: string): Promise<void> {
+    await this.request(`/api/conversations/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: { 'X-Workspace-Id': workspaceId },
+    });
   }
 
   async getConversation(

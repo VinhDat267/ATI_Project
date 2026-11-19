@@ -464,7 +464,8 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
       const convPRes = await request(app)
         .post('/api/conversations')
         .set('Authorization', `Bearer ${aliceToken}`)
-        .set('X-Workspace-Id', 'personal');
+        .set('X-Workspace-Id', 'personal')
+        .send({ title: 'Personal conversation' });
       expect(convPRes.status).toBe(201);
       const convPId = convPRes.body.conversation.id;
 
@@ -472,7 +473,8 @@ describe('Task 4: Workspace Isolation (Services, Trello, Conversations, Schedule
       const convOrgRes = await request(app)
         .post('/api/conversations')
         .set('Authorization', `Bearer ${aliceToken}`)
-        .set('X-Workspace-Id', org.id);
+        .set('X-Workspace-Id', org.id)
+        .send({ title: 'Organization conversation' });
       expect(convOrgRes.status).toBe(201);
       const convOrgId = convOrgRes.body.conversation.id;
 

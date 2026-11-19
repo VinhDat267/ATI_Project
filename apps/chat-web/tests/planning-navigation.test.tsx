@@ -64,6 +64,8 @@ async function select(id: 'c1' | 'c2') {
 it('replaces the temporary New draft so one Back returns to the previous conversation', async () => {
   render(<App />); await transcriptText('Saved c1');
   fireEvent.click(newConversationButton());
+  expect(window.location.pathname).toBe('/');
+  send('First request in the draft');
   await waitFor(() => expect(creations).toHaveLength(1));
   await act(async () => reply(creations[0]!, { conversation: { id: 'c-new' } }, 201));
   await waitFor(() => expect(window.location.pathname).toBe('/c/c-new'));
@@ -194,26 +196,30 @@ it('clears every conversation planning record when the authenticated session is 
 });
 async function historyReady() { await openHistory(); await within(await screen.findByRole('dialog', { name: 'Lịch sử yêu cầu' })).findByRole('button', { name: 'Conversation one' }); closeCockpitDialog(); }
 const newConversationButton = () => { closeCockpitDialog(); fireEvent.click(screen.getByRole('button', {name:'Mở danh sách hội thoại'})); return screen.getByRole('button', { name: /Cuộc hội thoại mới/ }); };
-it('restores the previous conversation when New fails without replacing its planning record', async () => {
+it('keeps the draft open on creation failure and retains the previous conversation planning record', async () => {
   render(<App />); await transcriptText('Saved c1');
   send('Existing c1 request'); await waitFor(() => expect(sends).toHaveLength(1));
   const requestId = sends[0]!.requestId;
-  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
+  fireEvent.click(newConversationButton());
+  send('Request from the draft');
+  await waitFor(() => expect(creations).toHaveLength(1));
   await act(async () => reply(creations[0]!, { error: 'Creation failed' }, 500));
-  await screen.findByRole('alert');
+  await screen.findByText(/Không thể tạo phiên hội thoại mới/);
+  expect(window.location.pathname).toBe('/');
+  act(() => window.history.back());
+  await transcriptText('Saved c1');
   expect(window.location.pathname).toBe('/c/c1');
-  expect(await transcriptText('Saved c1')).toBeInTheDocument();
-  expect(within(screen.getByRole('log')).getByText('Existing c1 request')).toBeInTheDocument();
   expect(useChatStore.getState().planningByConversation.c1?.requestId).toBe(requestId);
   fireEvent.change(screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ }), { target: { value: 'Still locked' } });
   expect(sendButton()).toBeDisabled();
 });
-it('keeps another selected conversation when an abandoned New response fails', async () => {
+it('keeps another selected conversation when draft creation fails', async () => {
   render(<App />); await transcriptText('Saved c1');
-  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
+  fireEvent.click(newConversationButton()); send('Request that will fail');
+  await waitFor(() => expect(creations).toHaveLength(1));
   await select('c2');
   await act(async () => reply(creations[0]!, { error: 'Creation failed' }, 500));
-  await screen.findByRole('alert');
+  await waitFor(() => expect(useChatStore.getState().planningByConversation.__draft__).toBeUndefined());
   expect(window.location.pathname).toBe('/c/c2');
   expect(within(screen.getByRole('log')).getByText('Saved c2')).toBeInTheDocument();
   expect(screen.queryByText('Saved c1')).toBeNull();
@@ -240,8 +246,9 @@ async function leaveWorkspaceAndReturn() {
 it('releases an unsent draft when leaving Workspace in the same authenticated session', async () => {
   window.history.replaceState({}, '', '/'); render(<App />);
   await historyReady();
-  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
+  fireEvent.click(newConversationButton());
   send('Queued request before changing view');
+  await waitFor(() => expect(creations).toHaveLength(1));
   const input = await leaveWorkspaceAndReturn();
   fireEvent.change(input, { target: { value: 'Sendable after returning' } });
   expect(sendButton()).toBeEnabled();
@@ -252,8 +259,8 @@ it('releases an unsent draft when leaving Workspace in the same authenticated se
 it('keeps a newer draft owned after an abandoned creation responds late', async () => {
   window.history.replaceState({}, '', '/'); render(<App />);
   await historyReady();
-  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
-  send('Abandoned request'); await leaveWorkspaceAndReturn();
+  fireEvent.click(newConversationButton()); send('Abandoned request');
+  await waitFor(() => expect(creations).toHaveLength(1)); await leaveWorkspaceAndReturn();
   send('New request after returning'); await waitFor(() => expect(creations).toHaveLength(2));
   const requestId = useChatStore.getState().planningByConversation.__draft__?.requestId;
   await act(async () => { reply(creations[0]!, { conversation: { id: 'c-old' } }, 201); await nativeFetch(`${base}/api/runtime`); });
@@ -263,11 +270,12 @@ it('keeps a newer draft owned after an abandoned creation responds late', async 
   await waitFor(() => expect(sends).toHaveLength(1));
   expect(sends[0]).toMatchObject({ convId: 'c-fresh', content: 'New request after returning', requestId });
 });
-it.each(['logout', 'unmount'])('discards a pending New response and queued send after %s', async reason => {
+it.each(['logout', 'unmount'])('discards a late draft creation response after %s', async reason => {
   window.history.replaceState({}, '', '/'); render(<App />);
   await historyReady();
-  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
+  fireEvent.click(newConversationButton());
   send('Request from the previous workspace');
+  await waitFor(() => expect(creations).toHaveLength(1));
   if (reason === 'logout') act(() => authStorage.clearStoredTokens());
   else { cleanup(); useChatStore.getState().reset(); }
   await act(async () => {
@@ -279,21 +287,25 @@ it.each(['logout', 'unmount'])('discards a pending New response and queued send 
   expect(useChatStore.getState().planningByConversation).toEqual({});
   expect(sends).toHaveLength(0);
 });
-it('sends to an explicitly selected conversation while another New request is pending', async () => {
+it('sends to the selected conversation while a separate draft is being saved', async () => {
   window.history.replaceState({}, '', '/'); render(<App />);
   await historyReady();
-  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
+  fireEvent.click(newConversationButton()); send('Message in the draft');
+  await waitFor(() => expect(creations).toHaveLength(1));
   await select('c2'); send('Message intended for c2');
-  await act(async () => reply(creations[0]!, { conversation: { id: 'c-new' } }, 201));
   await waitFor(() => expect(sends).toHaveLength(1));
+  await act(async () => reply(creations[0]!, { conversation: { id: 'c-new' } }, 201));
+  await waitFor(() => expect(sends).toHaveLength(2));
   expect(sends[0]).toMatchObject({ convId: 'c2', content: 'Message intended for c2' });
+  expect(sends[1]).toMatchObject({ convId: 'c-new', content: 'Message in the draft' });
   expect(window.location.pathname).toBe('/c/c2');
   expect(useChatStore.getState().planningByConversation.c2?.requestId).toBe(sends[0]!.requestId);
 });
-it('locks a queued New request and retains the next typed message before the ID arrives', async () => {
+it('locks the first send and retains the next typed message before the ID arrives', async () => {
   render(<App />); await transcriptText('Saved c1');
-  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
+  fireEvent.click(newConversationButton());
   send('First queued request');
+  await waitFor(() => expect(creations).toHaveLength(1));
   const input = screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   fireEvent.change(input, { target: { value: 'Second typed request' } });
   expect(sendButton()).toBeDisabled();
@@ -304,11 +316,12 @@ it('locks a queued New request and retains the next typed message before the ID 
   await waitFor(() => expect(sends).toHaveLength(1));
   expect(sends[0]).toMatchObject({ convId: 'c-new', content: 'First queued request' });
 });
-it('sends a message typed while New conversation is pending into that conversation', async () => {
+it('creates a conversation on the first send and displays the request being planned', async () => {
   window.history.replaceState({}, '', '/'); render(<App />);
   await historyReady();
-  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
+  fireEvent.click(newConversationButton());
   send('Plan in the new conversation');
+  await waitFor(() => expect(creations).toHaveLength(1));
   await act(async () => reply(creations[0]!, { conversation: { id: 'c-new' } }, 201));
   await waitFor(() => expect(sends.map(row => [row.convId, row.content])).toEqual([['c-new', 'Plan in the new conversation']]));
   expect(creations).toHaveLength(1);
@@ -317,42 +330,55 @@ it('sends a message typed while New conversation is pending into that conversati
   expect(document.querySelector('#moment-2-query-display')).toHaveTextContent('Plan in the new conversation');
   expect(screen.getByText('Đang lập kế hoạch…')).toBeInTheDocument();
 });
-it('sends into the pending new conversation instead of the conversation being left', async () => {
+it('sends the draft into a new conversation after leaving a saved one', async () => {
   render(<App />); await transcriptText('Saved c1');
-  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
+  fireEvent.click(newConversationButton());
   send('Plan after leaving c1');
+  await waitFor(() => expect(creations).toHaveLength(1));
   await act(async () => reply(creations[0]!, { conversation: { id: 'c-new' } }, 201));
   await waitFor(() => expect(sends).toHaveLength(1));
   expect(sends[0]).toMatchObject({ convId: 'c-new', content: 'Plan after leaving c1' });
   expect(window.location.pathname).toBe('/c/c-new');
   expect(screen.getByText('Đang lập kế hoạch…')).toBeInTheDocument();
 });
-it('creates one conversation when New conversation is clicked twice before the first reply', async () => {
+it('keeps a fresh draft open when the earlier request gets its conversation ID', async () => {
   window.history.replaceState({}, '', '/'); render(<App />);
   await historyReady();
-  fireEvent.click(newConversationButton()); fireEvent.click(newConversationButton());
+  fireEvent.click(newConversationButton()); send('First draft request');
+  await waitFor(() => expect(creations).toHaveLength(1));
+  fireEvent.click(newConversationButton());
+  const composer = () => screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện/ });
+  fireEvent.change(composer(), { target: { value: 'Second draft' } });
+  await act(async () => reply(creations[0]!, { conversation: { id: 'c-new' } }, 201));
+  await waitFor(() => expect(sends).toHaveLength(1));
+  expect(sends[0]).toMatchObject({ convId: 'c-new', content: 'First draft request' });
+  expect(window.location.pathname).toBe('/');
+  expect(composer()).toHaveValue('Second draft');
+  expect(sendButton()).toBeEnabled();
+  fireEvent.keyDown(composer(), { key: 'Enter' });
+  await waitFor(() => expect(creations).toHaveLength(2));
+  await act(async () => reply(creations[1]!, { conversation: { id: 'c-next' } }, 201));
+  await waitFor(() => expect(sends).toHaveLength(2));
+  expect(sends[1]).toMatchObject({ convId: 'c-next', content: 'Second draft' });
+});
+it('opens another draft without a POST after the first conversation opens', async () => {
+  window.history.replaceState({}, '', '/'); render(<App />);
+  await historyReady();
+  fireEvent.click(newConversationButton()); send('Plan in the first conversation');
   await waitFor(() => expect(creations).toHaveLength(1));
   await act(async () => reply(creations[0]!, { conversation: { id: 'c-new' } }, 201));
   await waitFor(() => expect(window.location.pathname).toBe('/c/c-new'));
+  fireEvent.click(newConversationButton());
+  expect(window.location.pathname).toBe('/');
+  await nativeFetch(`${base}/api/runtime`);
   expect(creations).toHaveLength(1);
 });
-it('creates another conversation when New conversation is clicked again after the first one opened', async () => {
+it('unlocks the draft and reports a failed first send when creation fails', async () => {
   window.history.replaceState({}, '', '/'); render(<App />);
   await historyReady();
-  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
-  await act(async () => reply(creations[0]!, { conversation: { id: 'c-new' } }, 201));
-  await waitFor(() => expect(window.location.pathname).toBe('/c/c-new'));
-  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(2));
-  await act(async () => reply(creations[1]!, { conversation: { id: 'c-next' } }, 201));
-  await waitFor(() => expect(window.location.pathname).toBe('/c/c-next'));
-  send('Plan in the second new conversation');
-  await waitFor(() => expect(sends.map(row => row.convId)).toEqual(['c-next']));
-});
-it('releases a message sent while New conversation fails and reports the failure', async () => {
-  window.history.replaceState({}, '', '/'); render(<App />);
-  await historyReady();
-  fireEvent.click(newConversationButton()); await waitFor(() => expect(creations).toHaveLength(1));
+  fireEvent.click(newConversationButton());
   send('Plan without a conversation');
+  await waitFor(() => expect(creations).toHaveLength(1));
   await act(async () => reply(creations[0]!, { error: 'Máy chủ lỗi' }, 500));
   expect(await screen.findByText(/Không thể tạo phiên hội thoại mới/)).toBeInTheDocument();
   expect(sends).toHaveLength(0); expect(creations).toHaveLength(1);

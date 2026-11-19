@@ -2,6 +2,7 @@ import {createPersonalSlackAssistantRuntime} from './config/slack-assistant-runt
 import {SlackDerivedExpiryFanout} from './services/slack/slack-derived-expiry.js';
 import { EventEmitter } from 'node:events';
 import { createMemoryConversationRepositories } from './db/repositories/memory-conversations.js';
+import { ConversationDeleteConflictError, isRemovableConversationPlanStatus } from './db/repositories/conversation-history.js';
 import { validateEnv, JIRA_ENDPOINTS } from './config/env.js';
 import { getPool } from './db/pool.js';
 import {
@@ -164,11 +165,21 @@ async function bootstrap() {
     );
 
     // In-memory fallback repositories
-    const { convRepo: memoryConvRepo, msgRepo: memoryMsgRepo, convMap } = createMemoryConversationRepositories();
-    convRepo = memoryConvRepo;
-    msgRepo = memoryMsgRepo;
     const planMap = new Map<string, any>();
     const stepMap = new Map<string, any>();
+    const { convRepo: memoryConvRepo, msgRepo: memoryMsgRepo, convMap } = createMemoryConversationRepositories(id => {
+      const plans = [...planMap.values()].filter(plan => plan.conv_id === id);
+      const planIds = new Set(plans.map(plan => plan.id));
+      const steps = [...stepMap.values()].filter(step => planIds.has(step.plan_id));
+      if (plans.some(plan => !isRemovableConversationPlanStatus(plan.status))
+        || steps.some(step => ['running', 'unknown'].includes(step.status))) {
+        throw new ConversationDeleteConflictError('Hãy xử lý lượt chạy còn dang dở trước khi xoá hội thoại.');
+      }
+      for (const step of steps) stepMap.delete(step.id);
+      for (const planId of planIds) planMap.delete(planId);
+    });
+    convRepo = memoryConvRepo;
+    msgRepo = memoryMsgRepo;
 
     const setMemoryPlanStatus = (plan: any, status: string) => {
       plan.status = status;
@@ -176,6 +187,7 @@ async function bootstrap() {
     };
     planRepo = {
       createPlan: async (data: any) => {
+        if (!convMap.has(data.convId)) throw new Error('Conversation not found');
         const id = `plan_${Date.now()}`;
         for (const previous of planMap.values()) {
           if (previous.conv_id === data.convId && previous.status === 'pending') setMemoryPlanStatus(previous, 'superseded');
@@ -232,6 +244,7 @@ async function bootstrap() {
 
     stepRepo = {
       createStep: async (data: any) => {
+        if (!planMap.has(data.planId)) throw new Error('Plan not found');
         const id = `step_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
         const row = { id, plan_id: data.planId, step_id: data.stepId, tool: data.tool,
           args_json: data.argsJson ?? {}, requested_by: data.requestedBy || 'system', status: 'pending',

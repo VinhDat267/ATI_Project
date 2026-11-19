@@ -1,5 +1,9 @@
 import type { Response } from 'express';
 import { randomUUID } from 'node:crypto';
+import { isUuid } from '../db/repositories/uuid.js';
+
+const CLOSED_CONVERSATION_GRACE_MS = 5 * 60_000;
+const conversationKey = (id: string) => isUuid(id) ? id.toLowerCase() : id;
 
 export interface SSEEvent {
   id: number;
@@ -13,18 +17,20 @@ export class SSEManager {
   private seqMap = new Map<string, number>();
   private bufferMap = new Map<string, SSEEvent[]>();
   private clientsMap = new Map<string, Set<Response>>();
+  private recentlyClosed = new Map<string, number>();
   private maxBufferSize = 100;
 
   emitEvent(convId: string, eventName: string, data: any): SSEEvent {
+    convId = conversationKey(convId);
     const currentSeq = (this.seqMap.get(convId) || 0) + 1;
-    this.seqMap.set(convId, currentSeq);
-
     const sseEvent: SSEEvent = {
       id: currentSeq,
       event: eventName,
       data,
       timestamp: Date.now(),
     };
+    if (this.isConversationClosed(convId)) return sseEvent;
+    this.seqMap.set(convId, currentSeq);
 
     // Store in circular buffer (supersede older buffered plan previews when emitting a new one)
     if (eventName === 'plan' || eventName === 'plan_preview') {
@@ -57,6 +63,7 @@ export class SSEManager {
   }
 
   getMissedEvents(convId: string, lastEventId: number): SSEEvent[] {
+    convId = conversationKey(convId);
     const buffer = this.bufferMap.get(convId);
     if (!buffer) {
       return [];
@@ -65,6 +72,7 @@ export class SSEManager {
   }
 
   clearPlanEvents(convId: string, planId?: string): void {
+    convId = conversationKey(convId);
     const buffer = this.bufferMap.get(convId);
     if (!buffer) {
       return;
@@ -104,6 +112,7 @@ export class SSEManager {
   }
 
   addClient(convId: string, res: Response): () => void {
+    convId = conversationKey(convId);
     let clients = this.clientsMap.get(convId);
     if (!clients) {
       clients = new Set<Response>();
@@ -117,6 +126,7 @@ export class SSEManager {
   }
 
   removeClient(convId: string, res: Response): void {
+    convId = conversationKey(convId);
     const clients = this.clientsMap.get(convId);
     if (clients) {
       clients.delete(res);
@@ -127,7 +137,26 @@ export class SSEManager {
   }
 
   getClientCount(convId: string): number {
-    return this.clientsMap.get(convId)?.size || 0;
+    return this.clientsMap.get(conversationKey(convId))?.size || 0;
+  }
+
+  closeConversation(convId: string): void {
+    convId = conversationKey(convId);
+    const now = Date.now();
+    for (const [id, expires] of this.recentlyClosed) {
+      if (expires > now) break;
+      this.recentlyClosed.delete(id);
+    }
+    this.recentlyClosed.set(convId, now + CLOSED_CONVERSATION_GRACE_MS);
+    const clients = this.clientsMap.get(convId);
+    this.clientsMap.delete(convId);
+    this.bufferMap.delete(convId);
+    this.seqMap.delete(convId);
+    for (const client of clients ?? []) client.end();
+  }
+
+  isConversationClosed(convId: string): boolean {
+    return (this.recentlyClosed.get(conversationKey(convId)) ?? 0) > Date.now();
   }
 
   formatSSE(event: SSEEvent): string {

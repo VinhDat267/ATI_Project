@@ -19,6 +19,7 @@ export interface ConversationAccessOptions {
   expectedWorkspaceId?: string | null;
   expectedWorkspaceMode?: 'legacy' | 'personal' | 'organization';
   ordinaryOrgAccessDeniedAs403?: boolean;
+  lockMembership?: boolean;
 }
 
 export interface ConversationAccessContext {
@@ -119,7 +120,7 @@ export async function assertConversationAccess(
        FROM workspace_members wm
        JOIN users u ON u.id = wm.user_id
        JOIN workspaces w ON w.id = wm.workspace_id
-       WHERE wm.workspace_id = $1 AND wm.user_id = $2`,
+       WHERE wm.workspace_id = $1 AND wm.user_id = $2${options?.lockMembership ? ' FOR SHARE OF wm, u' : ''}`,
       [conv.workspace_id, userId]
     );
 
@@ -134,9 +135,9 @@ export async function assertConversationAccess(
     if (conv.jira_context) {
       const jiraMemberRes = await poolOrClient.query<{ active: boolean }>(
         `SELECT (jm.status = 'active' AND jw.status = 'active') AS active
-         FROM ati_workspace_memberships jm
-         JOIN ati_workspaces jw ON jw.id = jm.workspace_id
-         WHERE jm.workspace_id = $1 AND jm.user_id = $2`,
+         FROM ati_workspaces jw
+         JOIN ati_workspace_memberships jm ON jm.workspace_id = jw.id
+         WHERE jw.id = $1 AND jm.user_id = $2${options?.lockMembership ? ' FOR SHARE OF jw, jm' : ''}`,
         [conv.workspace_id, userId]
       );
 

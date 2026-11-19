@@ -145,13 +145,13 @@ async function assertActiveMember(
   poolOrClient: pg.Pool | pg.PoolClient,
   workspaceId: string,
   actorId: string
-): Promise<{ role: string }> {
+): Promise<{ role: string; workspaceVersion: number }> {
   if (!isUuid(workspaceId) || !isUuid(actorId)) {
     throw new WorkspaceRepoError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
   }
 
   const res = await poolOrClient.query(
-    `SELECT m.role, m.status, w.status AS ws_status, u.status AS user_status, wm.status AS gen_mem_status
+    `SELECT m.role, m.status, w.status AS ws_status, w.version AS ws_version, u.status AS user_status, wm.status AS gen_mem_status
      FROM ati_workspaces w
      LEFT JOIN workspace_members wm
        ON wm.workspace_id = w.id AND wm.user_id = $2
@@ -178,7 +178,7 @@ async function assertActiveMember(
     throw new WorkspaceRepoError(404, 'WORKSPACE_NOT_FOUND', 'Workspace not found');
   }
 
-  return { role: row.role };
+  return { role: row.role, workspaceVersion: Number(row.ws_version ?? 1) };
 }
 
 async function assertAdminMemberPreCheck(
@@ -1107,8 +1107,14 @@ export class WorkspaceSiteProjectRepo {
     workspaceId: string,
     actorId: string
   ): Promise<WorkspaceJiraCapabilitiesResponse> {
-    await assertActiveMember(this.pool, workspaceId, actorId);
+    const initialMember = await assertActiveMember(this.pool, workspaceId, actorId);
     const directory: WorkspaceJiraCapabilitiesResponse = { workspaceId, sites: [] };
+    Object.defineProperty(directory, 'workspaceVersion', {
+      value: initialMember.workspaceVersion,
+      enumerable: false,
+      configurable: true,
+      writable: true,
+    });
     const account = await this.pool.query<{ id: string; identity_version: number }>(
       `SELECT id, identity_version FROM jira_accounts WHERE user_id = $1 AND status = 'connected'`, [actorId]
     );
@@ -1165,7 +1171,13 @@ export class WorkspaceSiteProjectRepo {
     } catch {
       throw new WorkspaceRepoError(503, 'NATIVE_VERIFIER_UNAVAILABLE', 'Jira native permission verifier unavailable');
     }
-    await assertActiveMember(this.pool, workspaceId, actorId);
+    const currentMember = await assertActiveMember(this.pool, workspaceId, actorId);
+    Object.defineProperty(directory, 'workspaceVersion', {
+      value: currentMember.workspaceVersion,
+      enumerable: false,
+      configurable: true,
+      writable: true,
+    });
     const currentAccount = await this.pool.query<{ id: string; identity_version: number }>(
       `SELECT id, identity_version FROM jira_accounts WHERE user_id = $1 AND status = 'connected'`, [actorId]
     );

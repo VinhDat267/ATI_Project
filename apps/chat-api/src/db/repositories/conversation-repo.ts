@@ -5,12 +5,15 @@ import { sealMessageOrigin } from '../../services/slack/slack-message-origin.js'
 import { validateJiraApprovalBinding } from '../../services/jira/jira-approval-guard.js';
 import {
   encodeConversationCursor,
+  ConversationDeleteConflictError,
+  isRemovableConversationPlanStatus,
   validateConversationPage,
   validateConversationTitle,
   type ConversationPageOptions,
 } from './conversation-history.js';
 import { isUuid } from './uuid.js';
 import { EXECUTION_PLAN_STATUSES, PlanRepo, type PlanRow } from './plan-repo.js';
+import { assertConversationAccess, ConversationAccessDeniedError } from '../../services/conversation-access.js';
 
 export class ConversationAccessError extends Error {
   readonly status = 404;
@@ -392,6 +395,11 @@ export class ConversationRepo {
     const { limit, search, cursor } = validateConversationPage(options);
     const values: unknown[] = [userId];
     const where = this.visibleConversationConditions(values, scope);
+    where.push(`(
+      title IS NOT NULL
+      OR EXISTS (SELECT 1 FROM messages WHERE messages.conv_id = conversations.id)
+      OR EXISTS (SELECT 1 FROM plans WHERE plans.conv_id = conversations.id)
+    )`);
     if (cursor) {
       values.push(cursor.updatedAt, cursor.id);
       where.push(`(updated_at, id) < ($${values.length - 1}::timestamptz, $${values.length}::uuid)`);
@@ -664,6 +672,86 @@ export class ConversationRepo {
       return row;
     } catch (error) {
       await client.query('ROLLBACK').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteConversation(id: string, userId: string, scope: ConversationScope): Promise<boolean> {
+    const workspaceId = scope.workspaceMode === 'organization' ? scope.workspaceId : null;
+    if (!isUuid(id) || !isUuid(userId) || (scope.workspaceMode === 'organization' && (!workspaceId || !isUuid(workspaceId)))) return false;
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("SET LOCAL lock_timeout = '5s'");
+      // Lock conversations first, then let assertConversationAccess lock workspace_members -> users
+      // (and ati_workspaces -> ati_workspace_memberships) in the repo's canonical lock order.
+      const locked = await client.query(
+        `SELECT id FROM conversations
+         WHERE id = $1 AND user_id = $2 AND workspace_id IS NOT DISTINCT FROM $3::uuid
+         FOR UPDATE`,
+        [id, userId, workspaceId],
+      );
+      if (!locked.rowCount) {
+        await client.query('COMMIT');
+        return false;
+      }
+      await assertConversationAccess(client, id, userId, {
+        expectedWorkspaceMode: scope.workspaceMode,
+        expectedWorkspaceId: workspaceId ?? null,
+        lockMembership: true,
+      });
+      if (!workspaceId) {
+        const activeUser = await client.query(
+          `SELECT id FROM users WHERE id = $1 AND status = 'active' FOR SHARE`,
+          [userId],
+        );
+        if (!activeUser.rowCount) {
+          await client.query('COMMIT');
+          return false;
+        }
+      }
+
+      // Serialize with plan approval and execution claims before deciding which rows can be removed.
+      const plans = await client.query<{ id: string; status: string }>(
+        'SELECT id, status FROM plans WHERE conv_id = $1 ORDER BY id FOR UPDATE',
+        [id],
+      );
+      if (plans.rows.some(plan => !isRemovableConversationPlanStatus(plan.status))) {
+        throw new ConversationDeleteConflictError('Hãy xử lý lượt chạy còn dang dở trước khi xoá hội thoại.');
+      }
+      const planIds = plans.rows.map(plan => plan.id);
+      const { rows: [links] } = await client.query<{
+        unresolved: boolean; scheduled: boolean; slack: boolean;
+      }>(`
+        SELECT EXISTS (
+          SELECT 1 FROM execution_steps WHERE plan_id = ANY($2::uuid[]) AND status IN ('running', 'unknown')
+        ) AS unresolved,
+        (EXISTS (SELECT 1 FROM schedules WHERE conv_id = $1)
+          OR EXISTS (SELECT 1 FROM schedule_runs WHERE conv_id = $1 OR plan_id = ANY($2::uuid[]))
+        ) AS scheduled,
+        (EXISTS (SELECT 1 FROM slack_write_outbox WHERE plan_id = ANY($2::uuid[]))
+          OR EXISTS (SELECT 1 FROM slack_assistant_artifacts WHERE conv_id = $1 OR active_plan_id = ANY($2::uuid[]))
+          OR EXISTS (SELECT 1 FROM slack_derived_artifact_payloads WHERE conv_id = $1)
+        ) AS slack`, [id, planIds]);
+      if (!links) throw new Error('Conversation links lookup returned no row');
+      if (links.unresolved) throw new ConversationDeleteConflictError('Hãy xử lý lượt chạy còn dang dở trước khi xoá hội thoại.');
+      if (links.scheduled) throw new ConversationDeleteConflictError('Hội thoại này gắn với lịch tự động hoặc nhật ký chạy của lịch.');
+      if (links.slack) throw new ConversationDeleteConflictError('Hội thoại này có dữ liệu Slack cần giữ để đối soát.');
+
+      await client.query('DELETE FROM execution_steps WHERE plan_id = ANY($1::uuid[])', [planIds]);
+      await client.query('DELETE FROM plans WHERE conv_id = $1', [id]);
+      await client.query('DELETE FROM messages WHERE conv_id = $1', [id]);
+      await client.query('DELETE FROM conversations WHERE id = $1', [id]);
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK').catch(() => {});
+      if (error instanceof ConversationAccessDeniedError) return false;
+      if (error && typeof error === 'object' && 'code' in error && error.code === '23503') {
+        throw new ConversationDeleteConflictError('Hội thoại còn dữ liệu liên kết cần giữ lại.');
+      }
       throw error;
     } finally {
       client.release();

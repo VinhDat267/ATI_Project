@@ -207,7 +207,7 @@
     }
     html.dark input::placeholder,
     html.dark textarea::placeholder {
-      color: #887d73 !important;
+      color: var(--ps-faint, #887d73) !important;
     }
 
     /* Selection & Scrollbar in Dark Mode */

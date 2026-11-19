@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 // Redesign 11/2026 bước 5a: trang Nhật ký nói đúng lý do danh sách trống và chỉ đưa nút hợp với lý do đó.
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { HistoryPage } from '../src/pages/History/HistoryPage';
 import { apiClient } from '../src/services/api-client';
 import { resetWorkspaceStorage } from '../src/services/workspace-storage';
@@ -78,4 +78,64 @@ it('a failed load shows the error, not an empty list', async () => {
   renderPage();
   expect(await within(main()).findByRole('alert')).toBeInTheDocument();
   expect(within(main()).queryByText('Chưa có hội thoại nào')).toBeNull();
+});
+
+it('requires confirmation and removes a deleted conversation from history and recent links', async () => {
+  const rows: Conversation[] = [saved];
+  mockList(rows);
+  const request = vi.spyOn(apiClient, 'request').mockImplementation(async (path, options) => {
+    if (path === '/api/conversations/c1' && options?.method === 'DELETE') rows.splice(0, 1);
+    return null as any;
+  });
+  renderPage();
+  const remove = await within(main()).findByRole('button', { name: `Xoá ${saved.title}` });
+  await screen.findByRole('region', { name: 'Gần đây' });
+  remove.focus();
+  fireEvent.click(remove);
+  const dialog = () => within(screen.getByRole('alertdialog'));
+  expect(dialog().getByRole('button', { name: 'Huỷ' })).toHaveFocus();
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(remove).toHaveFocus();
+  expect(request.mock.calls.some(([, options]) => options?.method === 'DELETE')).toBe(false);
+  fireEvent.click(remove);
+  fireEvent.click(dialog().getByRole('button', { name: 'Xác nhận xoá' }));
+  expect(await within(main()).findByText('Chưa có hội thoại nào')).toBeInTheDocument();
+  expect(within(main()).getByText('Đã xoá hội thoại.')).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByRole('link', { name: saved.title })).toBeNull());
+  expect(request.mock.calls.filter(([, options]) => options?.method === 'DELETE')).toEqual([
+    ['/api/conversations/c1', { method: 'DELETE', headers: { 'X-Workspace-Id': 'personal' } }],
+  ]);
+});
+
+it('removes the deleted row from a history page that reopened during the request', async () => {
+  const rows = [{ ...saved, id: 'c-reopened' }];
+  mockList(rows);
+  let finishDelete!: () => void;
+  vi.spyOn(apiClient, 'request').mockImplementation(async (_path, options) => {
+    if (options?.method === 'DELETE') {
+      await new Promise<void>(resolve => { finishDelete = resolve; });
+      rows.splice(0, 1);
+    }
+    return null as any;
+  });
+  const first = renderPage();
+  fireEvent.click(await within(main()).findByRole('button', { name: `Xoá ${saved.title}` }));
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Xác nhận xoá' }));
+  first.unmount();
+  renderPage();
+  await within(main()).findByRole('heading', { name: saved.title });
+  await act(async () => finishDelete());
+  expect(await within(main()).findByText('Chưa có hội thoại nào')).toBeInTheDocument();
+});
+
+it('keeps a protected conversation visible when deletion is denied', async () => {
+  mockList([saved]);
+  vi.spyOn(apiClient, 'request').mockRejectedValue(Object.assign(new Error('Hội thoại có lịch tự động.'), { status: 409 }));
+  renderPage();
+  fireEvent.click(await within(main()).findByRole('button', { name: `Xoá ${saved.title}` }));
+  const dialog = within(screen.getByRole('alertdialog'));
+  fireEvent.click(dialog.getByRole('button', { name: 'Xác nhận xoá' }));
+  expect(await dialog.findByRole('alert')).toHaveTextContent('Hội thoại có lịch tự động.');
+  fireEvent.click(dialog.getByRole('button', { name: 'Huỷ' }));
+  expect(within(main()).getByRole('heading', { name: saved.title })).toBeInTheDocument();
 });

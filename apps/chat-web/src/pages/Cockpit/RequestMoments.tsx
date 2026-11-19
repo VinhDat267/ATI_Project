@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef, type KeyboardEvent, type RefObject, type ReactNode } from 'react';
 import { toolDefinition } from '../../services/tool-definitions';
 import { ServiceLogo } from '../../components/ServiceLogo';
-import presentation from '../../assets/cockpit-services.json';
 import type { ServiceInfo, GatherState } from '../../types';
 import { RequestEcho, useScheduledOrigin } from './RequestEcho';
 import { multiServicePlaybooks, serviceName } from './presentation';
@@ -51,18 +50,6 @@ const connections = {
   unchecked: 'Chưa kiểm tra',
   unconfigured: 'Chưa kết nối',
 };
-// Presentation metadata uses the same service-keyed asset table as logos and prompts.
-interface CardColors { icon: string; decoration: string; name: string; logo?: string }
-const cardColors: Record<string, CardColors> = Object.fromEntries(
-  Object.entries(presentation.services).map(([id, asset]) => [id, asset.suggestion]),
-);
-const neutralCard: CardColors = {
-  icon: 'bg-neutral-100 border-neutral-200',
-  decoration: 'bg-neutral-900/5 group-hover:bg-neutral-900/10',
-  name: 'text-neutral-800',
-  logo: 'text-neutral-900',
-};
-
 export function extractPlaybookVariables(text: string): string[] {
   const vars: string[] = [];
   const regex = /\{\{\s*([^}{]+?)\s*\}\}/g;
@@ -321,6 +308,7 @@ export function RequestMoment({
   };
 
   const handleSend = () => {
+    if (planning) return;
     const currentTemplate = templateText || draft;
     const vars = extractPlaybookVariables(currentTemplate);
     const unfulfilled = vars.filter((v) => !variableValues[v]?.trim());
@@ -410,8 +398,7 @@ export function RequestMoment({
       data-moment="1"
       aria-label="Cockpit"
     >
-      {/* Clean Hero Header */}
-      <div className="v3-space-y-2 text-center sm:text-left">
+      <div className="v3-space-y-2">
         {workspace.id !== 'personal' && services.some((s) => s.id === 'myjira' && s.configured) && (
           <div>
             <span
@@ -433,15 +420,12 @@ export function RequestMoment({
         </h1>
         <p className="text-sm sm:text-[15px] text-[#6A5F56] max-w-2xl leading-relaxed">
           {resume
-            ? 'Xem lại yêu cầu trước bên dưới, rồi gửi tiếp hoặc mô tả việc mới.'
-            : workspace.id === 'personal'
-            ? 'Mô tả bằng lời thường điều bạn cần trong Không gian Cá nhân — tôi sẽ lên kế hoạch từng bước để bạn kiểm tra trước khi thực hiện.'
-            : `Mô tả bằng lời thường điều bạn cần — tôi sẽ phối hợp trên các công cụ của ${workspace.name} sau khi bạn duyệt.`}
+            ? 'Xem yêu cầu trước hoặc nhập việc tiếp theo.'
+            : `${workspace.id === 'personal' ? 'Không gian Cá nhân' : workspace.name} · Xem và duyệt kế hoạch trước khi chạy.`}
         </p>
       </div>
       {resume}
       {feedback}
-      {/* Smart Composer */}
       <form
         aria-label="Nhập yêu cầu"
         aria-busy={planning}
@@ -449,13 +433,13 @@ export function RequestMoment({
           event.preventDefault();
           handleSend();
         }}
-        className="relative bg-white rounded-2xl border border-[#E6DED3] shadow-2xs p-3.5 sm:p-4 focus-within:border-[#FF5701] transition-colors"
+        className="request-composer ps-panel p-3.5 sm:p-4"
       >
         <label htmlFor="prompt-input" className="sr-only">
           Nội dung bạn muốn nhờ
         </label>
         {templateVariables.length > 0 && (
-          <div className="flex items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-[#F1F1EC]">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-[var(--ps-edge)]">
             <div className="inline-flex items-center gap-1.5 text-xs font-medium text-[#51463E]">
               <span className="w-1.5 h-1.5 rounded-full bg-[#FF5701]" aria-hidden="true" />
               <span>Mẫu câu lệnh điền nhanh</span>
@@ -465,6 +449,7 @@ export function RequestMoment({
                 <button
                   type="button"
                   data-testid="tab-preview-mode"
+                  aria-pressed={composerTab === 'preview'}
                   onClick={() => setComposerTab('preview')}
                   className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
                     composerTab === 'preview'
@@ -477,6 +462,7 @@ export function RequestMoment({
                 <button
                   type="button"
                   data-testid="tab-template-mode"
+                  aria-pressed={composerTab === 'template'}
                   onClick={() => {
                     setComposerTab('template');
                     requestAnimationFrame(() => input.current?.focus());
@@ -534,6 +520,8 @@ export function RequestMoment({
             spellCheck={false}
             value={composerTab === 'preview' ? draft : (templateText || draft)}
             readOnly={templateVariables.length > 0 && composerTab === 'preview'}
+            tabIndex={templateVariables.length > 0 && composerTab === 'preview' ? -1 : undefined}
+            aria-hidden={templateVariables.length > 0 && composerTab === 'preview' ? true : undefined}
             onChange={(event) => {
               const nextVal = event.target.value;
               setTemplateText(nextVal);
@@ -542,6 +530,7 @@ export function RequestMoment({
               onDraft(rendered);
             }}
             onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) return;
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
                 handleSend();
@@ -553,9 +542,9 @@ export function RequestMoment({
             className={
               templateVariables.length > 0 && composerTab === 'preview'
                 ? 'sr-only'
-                : 'w-full text-base sm:text-[17px] leading-relaxed text-brand-text placeholder-neutral-400 bg-transparent resize-none border-0 focus:ring-0 focus:v3-outline-none p-1'
+                : 'request-input w-full text-base leading-relaxed bg-transparent resize-y border-0 p-1'
             }
-            placeholder="Ví dụ: Tạo card Trello cho lỗi đăng nhập Google, tạo issue GitHub, ghi vào Google Sheets và báo kênh Slack..."
+            placeholder="Ví dụ: Tổng hợp thẻ Trello đang làm và báo tiến độ trên Slack."
           />
         )}
         {validationError && (
@@ -624,6 +613,7 @@ export function RequestMoment({
                     value={variableValues[varName] ?? ''}
                     onChange={(e) => handleVariableChange(varName, e.target.value)}
                     onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing) return;
                       if (e.key === 'Enter') {
                         e.preventDefault();
                         const nextUnfilled = templateVariables.find(
@@ -663,6 +653,7 @@ export function RequestMoment({
               value={newPlaybookTitle}
               onChange={(e) => setNewPlaybookTitle(e.target.value)}
               onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing) return;
                 if (e.key === 'Enter') {
                   e.preventDefault();
                   handleConfirmSavePlaybook();
@@ -698,21 +689,15 @@ export function RequestMoment({
             ✓ {savedToast}
           </div>
         )}
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-[#F1F1EC] mt-3">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="hidden sm:inline-flex text-xs text-[#6A5F56] items-center gap-1 mr-1.5">
-              <kbd className="px-1.5 py-0.5 bg-[#F4F4F1] border border-[#E6DED3] rounded text-[11px] font-mono text-[#51463E]">
-                Enter
-              </kbd>
-              <span>để gửi</span>
-            </span>
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--ps-edge)] mt-2">
+          <div className="flex flex-wrap items-center gap-1">
             <button
               type="button"
               data-testid="btn-insert-variable"
               disabled={planning}
               title="Thêm một ô điền nhanh vào câu lệnh để tái sử dụng nhiều lần"
               onClick={handleInsertVariableToken}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#51463E] hover:text-[#1a0e08] hover:bg-[#F4F4F1] transition-colors cursor-pointer"
+              className="request-tool"
             >
               + Thêm ô điền nhanh
             </button>
@@ -721,16 +706,15 @@ export function RequestMoment({
               data-testid="btn-save-playbook"
               disabled={(!draft.trim() && !templateText.trim()) || planning}
               onClick={handleOpenSavePlaybook}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#51463E] hover:text-[#1a0e08] hover:bg-[#F4F4F1] disabled:opacity-40 transition-colors cursor-pointer"
+              className="request-tool"
             >
               Lưu làm mẫu
             </button>
           </div>
           <button
-            type="button"
+            type="submit"
             disabled={(!draft.trim() && !templateText.trim()) || planning}
-            onClick={handleSend}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-primary hover:bg-brand-primary-hover disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-xs transition-all cursor-pointer"
+            className="ps-btn request-submit"
           >
             <span>Gửi yêu cầu</span>
             <svg
@@ -826,55 +810,31 @@ export function RequestMoment({
 
       {queue}
 
-      {/* Quick Single-Tool Starter Pills directly below Composer */}
       {services.some((service) => service.configured) ? (
-        <div className="v3-space-y-2">
-          <div className="text-xs font-semibold text-[#51463E]">
+        <section aria-labelledby="request-suggestions" className="v3-space-y-2">
+          <h2 id="request-suggestions" className="ps-grouptitle">
             Gợi ý việc phổ biến theo công cụ của bạn
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+          </h2>
+          <div className="request-suggestions-grid">
             {services
               .filter((service) => service.configured)
               .slice(0, 4)
-              .map((service) => {
-                const colors = cardColors[service.id] ?? neutralCard;
-                return (
+              .map((service) => (
                   <button
                     key={service.id}
                     type="button"
-                    aria-label={servicePrompt(service)}
                     disabled={planning}
-                    onClick={() => {
-                      onDraft(servicePrompt(service));
-                      input.current?.focus();
-                    }}
-                    className="relative overflow-hidden text-left p-3 bg-white hover:bg-neutral-50 rounded-xl border border-brand-border hover:border-brand-primary/40 shadow-2xs transition-all group flex items-center gap-2.5 cursor-pointer"
+                    onClick={() => handleSelectPlaybook(servicePrompt(service))}
+                    className="request-suggestion"
                   >
-                    <div
-                      className={`absolute -right-6 -bottom-6 w-16 h-16 rounded-full ${colors.decoration} transition-colors pointer-events-none`}
-                    />
-                    <div
-                      title={service.name}
-                      className={`w-7 h-7 rounded-lg ${colors.icon} border flex items-center justify-center p-1.5 shrink-0 group-hover:scale-105 transition-transform`}
-                    >
-                      <ServiceLogo
-                        service={service.id}
-                        className={`w-3.5 h-3.5 ${colors.logo ?? ''}`}
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0 relative z-10">
-                      <div className="text-xs font-medium leading-snug text-brand-text group-hover:text-brand-primary transition-colors truncate">
-                        {servicePrompt(service)}
-                      </div>
-                      <div className={`text-[11px] ${colors.name} font-medium truncate mt-0.5`}>
-                        {service.name}
-                      </div>
-                    </div>
+                    <span title={service.name} className="shrink-0">
+                      <ServiceLogo service={service.id} className="w-4 h-4" />
+                    </span>
+                    <span className="min-w-0 [overflow-wrap:anywhere]">{servicePrompt(service)}</span>
                   </button>
-                );
-              })}
+                ))}
           </div>
-        </div>
+        </section>
       ) : !loading && !error ? (
         <div className="v3-space-y-2">
           <p className="text-sm text-brand-muted">
@@ -1115,21 +1075,21 @@ export function RequestMoment({
                       <div className="text-sm font-semibold text-brand-text group-hover:text-brand-primary transition-colors leading-snug">
                         {job.title}
                       </div>
-                      <p className="text-xs text-brand-muted line-clamp-2 mt-1 leading-relaxed">
+                      <p className="text-[13px] text-brand-muted mt-1 leading-relaxed">
                         {job.description}
                       </p>
                     </button>
                   </div>
 
-                  <div className="pt-2.5 border-t border-[#F3F4F6] flex items-center justify-between gap-2 text-xs">
-                    <span className="text-[11px] text-[#6A5F56] truncate" title={job.outputDescription}>
+                  <div className="pt-2.5 border-t border-[var(--ps-edge)] flex flex-wrap items-baseline justify-between gap-2 text-xs">
+                    <span className="min-w-0 flex-1 basis-40 text-xs text-[#6A5F56] [overflow-wrap:anywhere]">
                       Đầu ra: {job.outputDescription}
                     </span>
                     {!readiness.isReady ? (
                       <button
                         type="button"
                         onClick={() => navigate(readiness.ctaPath)}
-                        className="text-xs font-semibold text-brand-primary hover:underline shrink-0 cursor-pointer"
+                        className="text-left text-xs font-semibold text-brand-primary hover:underline cursor-pointer"
                       >
                         {readiness.ctaLabel} →
                       </button>

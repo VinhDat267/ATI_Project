@@ -63,7 +63,14 @@ export function createTrelloConnectionLookup(options: TrelloConnectionLookupOpti
       return { status: 'reconnect_required', teamBoards: [], memberBoards: [] };
     }
 
-    const scope = options.teamRepo ? await options.teamRepo.get(scopeId) : null;
+    let scope = options.teamRepo
+      ? scopeId === 'default'
+        ? await options.teamRepo.get(`personal:${userId}`)
+        : await options.teamRepo.get(scopeId)
+      : null;
+    if (scopeId === 'default' && (!scope || !scope.boards || scope.boards.length === 0) && options.teamRepo) {
+      scope = await options.teamRepo.get('default');
+    }
     if (!scope || !scope.boards || scope.boards.length === 0) {
       return {
         status: 'needs_scope',

@@ -13,7 +13,7 @@ const RUN_LABEL: Record<AttentionSummary['needsAttention'][number]['status'], st
   unknown: 'Chưa rõ kết quả',
   reconciliation_required: 'Cần đối soát',
 };
-const ROW = 'group flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-[#F8F4EE] dark:hover:bg-[#1F1A16] transition-colors';
+const ROW = 'group flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-4 py-3 text-left hover:bg-[var(--ps-sheet)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--ps-accent-text)] transition-colors';
 const ACTION = 'flex-shrink-0 text-sm font-medium text-[#1A0E08] dark:text-[#F3EEE8] underline underline-offset-2 decoration-[#D9D0C4] group-hover:decoration-current';
 const time = (iso: string) => new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
 
@@ -72,10 +72,10 @@ function WorkspaceHomeQueue({ user, onOpenConversation, navigate, workspace }: H
         {pending.map(item => (
           <li key={item.planId}>
             <button type="button" className={ROW} onClick={() => onOpenConversation(item.conversationId)}>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium text-[#1a0e08]">{item.title || item.summary || 'Kế hoạch chờ duyệt'}</span>
+              <span className="min-w-0 flex-1 basis-44">
+                <span className="block text-sm font-medium text-[#1a0e08] [overflow-wrap:anywhere]">{item.title || item.summary || 'Kế hoạch chờ duyệt'}</span>
                 <span className="mt-0.5 flex items-center gap-1.5 text-[13px] text-[#6A5F56] tabular-nums">
-                  <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-[#FF5701]" />
+                  <span aria-hidden="true" className="w-1.5 h-1.5 shrink-0 rounded-full bg-[#FF5701]" />
                   Chờ duyệt · {item.stepCount} bước · hết hạn {time(item.expiresAt)}
                 </span>
               </span>
@@ -86,10 +86,10 @@ function WorkspaceHomeQueue({ user, onOpenConversation, navigate, workspace }: H
         {runs.map(item => (
           <li key={item.planId}>
             <button type="button" className={ROW} onClick={() => onOpenConversation(item.conversationId)}>
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium text-[#1a0e08]">{item.title || 'Lượt chạy cần xử lý'}</span>
+              <span className="min-w-0 flex-1 basis-44">
+                <span className="block text-sm font-medium text-[#1a0e08] [overflow-wrap:anywhere]">{item.title || 'Lượt chạy cần xử lý'}</span>
                 <span className="mt-0.5 flex items-center gap-1.5 text-[13px] text-[#6A5F56]">
-                  <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-[#B45309]" />
+                  <span aria-hidden="true" className="w-1.5 h-1.5 shrink-0 rounded-full bg-[#B45309]" />
                   {RUN_LABEL[item.status]}
                 </span>
               </span>

@@ -75,7 +75,7 @@ describe('App message sending', () => {
 
     // Verify empty state text and prompt chips
     expect(
-      await screen.findByText(/Mô tả bằng lời thường điều bạn cần/i)
+      await screen.findByText(/Xem và duyệt kế hoạch trước khi chạy/i)
     ).toBeInTheDocument();
     expect(
       await screen.findByText(/Tạo công việc mới trên Trello/i)

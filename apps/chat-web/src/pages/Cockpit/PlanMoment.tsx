@@ -240,9 +240,9 @@ export function PlanMoment({
     >
       <div className="bg-white rounded-2xl border border-[#E6DED3]">
         {/* Redesign 11/2026: một dòng trạng thái thay cho thanh 1-2-3; kế hoạch chưa chạy cho tới khi qua Cổng duyệt. */}
-        <div className="px-5 sm:px-6 pt-5 pb-4 border-b border-[#F1EBE3] v3-space-y-2.5">
-          <div className="flex items-center justify-between gap-3">
-            <RequestEcho request={request} />
+        <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-4 border-b border-[var(--ps-edge)] v3-space-y-2.5">
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:justify-between sm:gap-3">
+            <RequestEcho request={request} expandable />
             <span data-plan-status className="inline-flex flex-shrink-0 items-center gap-1.5 text-xs font-medium text-[#51463E]">
               <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full bg-[#8A7E74] dark:bg-[#AFA59A]" />
               Chưa thực thi
@@ -262,8 +262,8 @@ export function PlanMoment({
               {slackRead
                 ? 'Xem workspace và phạm vi tra cứu trước khi duyệt.'
                 : plan.steps.length === 1
-                  ? 'Kiểm tra đích đến và nội dung chi tiết bên dưới trước khi bấm duyệt.'
-                  : 'Kiểm tra thứ tự các bước và nội dung sẽ được ghi vào từng công cụ trước khi duyệt.'}
+                  ? 'Kiểm tra đích đến và nội dung trước khi duyệt.'
+                  : 'Kiểm tra thứ tự, đích đến và nội dung trước khi duyệt.'}
             </p>
           </div>
 
@@ -283,7 +283,7 @@ export function PlanMoment({
         </div>
 
         {/* Plan Review Body */}
-        <div className="px-5 sm:px-6 py-5 v3-space-y-4 bg-white">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 v3-space-y-4 bg-white">
           {plan.reportEvidence && (
             <div
               data-testid="verified-report-evidence-badge"
@@ -835,7 +835,7 @@ export function PlanMoment({
                       id={`preview-${step.id}`}
                       type="button"
                       onClick={() => onPreview(step)}
-                      className="justify-self-start self-start flex-shrink-0 sm:col-start-2 sm:row-start-1 px-3 py-1.5 bg-white hover:bg-[#F8F4EE] border border-[#DEDED8] text-[#1a0e08] text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5"
+                      className="ps-btn-quiet min-h-10 sm:min-h-0 justify-self-start self-start sm:col-start-2 sm:row-start-1"
                       aria-label="Xem trước"
                     >
                       <svg className="w-3.5 h-3.5 text-[#6A5F56]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -919,8 +919,8 @@ export function PlanMoment({
 
         {/* Cổng duyệt (redesign 11/2026): đứng sau bước cuối, không dính đáy, nên nút duyệt chỉ tới sau khi đã đọc kế hoạch.
             Giữ id moment-4-sticky-bar cho ô sửa qua chat và các test đang trỏ tới. */}
-        <div id="moment-4-sticky-bar" data-approval-gate className="px-5 sm:px-6 pb-5 bg-[#F8F4EE] rounded-b-2xl">
-          <div aria-hidden="true" className="h-0.5 -mx-5 sm:-mx-6 mb-4 bg-[#1A0E08] dark:bg-[#F3EEE8]" />
+        <div id="moment-4-sticky-bar" data-approval-gate className="px-4 sm:px-6 pb-5 bg-[#F8F4EE] rounded-b-2xl">
+          <div aria-hidden="true" className="h-0.5 -mx-4 sm:-mx-6 mb-4 bg-[var(--ps-edge)]" />
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
             <h2 className="text-base font-semibold text-[#1a0e08]">Cổng duyệt</h2>
             <p data-gate-summary className="text-sm font-medium text-[#51463E] tabular-nums">{gateSummary}</p>
@@ -958,8 +958,7 @@ export function PlanMoment({
               </svg>
             )}
             <p className="text-sm leading-relaxed text-[#51463E]">
-              <span className="font-medium text-[#1a0e08]">{safetyTitle}</span>{' '}
-              <span>Kế hoạch giữ hiệu lực trong 30 phút — bạn có thể sửa qua chat hoặc bấm duyệt để chạy ngay.</span>
+              <span className="font-medium text-[#1a0e08]">{safetyTitle}</span>
             </p>
           </div>
 
@@ -973,7 +972,7 @@ export function PlanMoment({
                 aria-label="Duyệt kế hoạch"
                 disabled={!plan.id}
                 onClick={onApprove}
-                className="w-full sm:w-auto px-5 py-2.5 bg-[#C84300] hover:bg-[#B03B00] disabled:opacity-50 text-white text-sm font-semibold rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-2 flex-shrink-0"
+                className="ps-btn w-full min-h-11 sm:w-auto sm:min-h-10"
               >
                 <span>Duyệt kế hoạch</span>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -984,7 +983,7 @@ export function PlanMoment({
                 id="btn-edit-plan"
                 type="button"
                 onClick={() => onEdit()}
-                className="px-3.5 py-2.5 bg-white hover:bg-neutral-50 border border-[#DEDED8] text-[#1a0e08] text-xs sm:text-sm font-medium rounded-xl shadow-2xs transition-colors flex items-center justify-center gap-1.5 flex-shrink-0"
+                className="ps-btn-quiet min-h-10"
               >
                 <svg className="w-4 h-4 text-[#6A5F56]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -999,7 +998,7 @@ export function PlanMoment({
               <button
                 type="button"
                 onClick={onCancel}
-                className="px-3 py-2.5 text-xs sm:text-sm font-medium text-[#6A5F56] hover:text-[#DC2626] hover:bg-red-50/60 rounded-xl transition-colors flex-shrink-0"
+                className="ps-btn-quiet ps-btn-danger min-h-10"
               >
                 Hủy
               </button>
@@ -1009,7 +1008,7 @@ export function PlanMoment({
                 type="button"
                 onClick={() => setTechOpen(!techOpen)}
                 aria-controls="tech-details-panel"
-                className="text-xs text-[#6A5F56] hover:text-[#1a0e08] font-mono inline-flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg hover:bg-white/80 transition-colors"
+                className="request-tool inline-flex items-center gap-1.5"
                 aria-expanded={techOpen ? 'true' : 'false'}
                 id="btn-tech-toggle"
               >

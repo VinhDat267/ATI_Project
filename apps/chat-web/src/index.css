@@ -149,7 +149,7 @@ html.dark svg[fill="#0052cc"], html.dark svg[fill="#0052CC"] { fill: #60A5FA; }
 /* app-stage scrolls the document; unconverted routes keep their FE-04 shell. */
 :root[data-proto-page="app-stage"] .workspace, :root[data-proto-page="app-stage"] .workspace > div { display: contents; }
 :root[data-proto-page="app-stage"] :is(button, a, textarea, input, summary):not(#prompt-input, #custom-sheet-input):focus-visible { outline: 2px solid #FF5701; outline-offset: 2px; }
-:root[data-proto-page="app-stage"] button:disabled { opacity: .5; cursor: not-allowed; }
+:root[data-proto-page="app-stage"] button:disabled:not(.ps-btn, .ps-btn-quiet, .request-tool, .request-suggestion) { opacity: .5; cursor: not-allowed; }
 /* Multiline replacements for the prototype's inputs, and space for their fixed footer.
    The cockpit's refusal, answer and error screens (responses, errors) keep the same footer. */
 :root:is([data-proto-page="app-stage"], [data-proto-page="responses"], [data-proto-page="errors"]) body { padding-bottom: calc(var(--cockpit-bottom-space, 96px) + 16px); scroll-padding-bottom: calc(var(--cockpit-bottom-space, 96px) + 24px); }

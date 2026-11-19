@@ -339,8 +339,9 @@ export function renderJiraProgressReport(
     projectKey?: string;
     sprintName?: string;
     limit?: number;
+    sourcePartial?: boolean;
     /** Filters the read actually applied; the title names them instead of assuming a sprint. */
-    filters?: { overdueOnly?: boolean; unassignedOnly?: boolean; dueWithinDays?: number };
+    filters?: { openOnly?: boolean; overdueOnly?: boolean; unassignedOnly?: boolean; dueWithinDays?: number };
   }
 ): RenderedReport {
   if (!Array.isArray(issues)) {
@@ -355,6 +356,7 @@ export function renderJiraProgressReport(
     : '';
   const filters = options?.filters;
   const filterLabel = [
+    filters?.openOnly ? 'đang mở' : '',
     filters?.overdueOnly ? 'quá hạn' : '',
     filters?.unassignedOnly ? 'chưa có người phụ trách' : '',
     Number.isInteger(filters?.dueWithinDays) ? `sắp đến hạn trong ${filters!.dueWithinDays} ngày` : '',
@@ -365,12 +367,11 @@ export function renderJiraProgressReport(
 
   const count = issues.length;
   if (count === 0) {
+    const empty = options?.sprintName ? 'Hiện không có ticket nào trong Sprint.' : 'Hiện không có ticket nào.';
     return {
-      text: options?.sprintName
-        ? `${title}: Hiện không có ticket nào trong Sprint.`
-        : `${title}: Hiện không có ticket nào.`,
+      text: `${title}: ${options?.sourcePartial ? 'Chưa thấy ticket nào trong phần dữ liệu đã đọc.' : empty}`,
       itemCount: 0,
-      coverage: 'complete',
+      coverage: options?.sourcePartial ? 'partial' : 'complete',
     };
   }
 
@@ -390,7 +391,7 @@ export function renderJiraProgressReport(
   const isPartial = count > itemsToRender.length;
 
   const lines = [
-    `${title}: Tổng số ${count} ticket.`,
+    `${title}: ${options?.sourcePartial ? `Đã đọc ${count} ticket trong phạm vi truy vấn.` : `Tổng số ${count} ticket.`}`,
     `Trạng thái: ${statusSummary}`,
     ...itemsToRender.map((iss) => {
       const key = sanitizeReportString(iss.key);
@@ -404,11 +405,14 @@ export function renderJiraProgressReport(
   if (isPartial) {
     lines.push(`(hiển thị ${itemsToRender.length}/${count} ticket đầu tiên)`);
   }
+  if (options?.sourcePartial) {
+    lines.push('Có thể còn ticket ngoài phần dữ liệu đã đọc.');
+  }
 
   return {
     text: lines.join('\n'),
     itemCount: count,
-    coverage: isPartial ? 'partial' : 'complete',
+    coverage: isPartial || options?.sourcePartial ? 'partial' : 'complete',
   };
 }
 

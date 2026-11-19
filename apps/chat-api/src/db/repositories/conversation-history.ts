@@ -1,6 +1,13 @@
 export interface ConversationPageOptions { limit?: number; cursor?: string; search?: string }
 export interface ConversationCursor { updatedAt: string; id: string }
 export class HistoryValidationError extends Error { readonly status = 400 }
+export class ConversationDeleteConflictError extends Error {}
+
+const removablePlanStatuses = new Set(['pending', 'expired', 'rejected', 'superseded', 'completed', 'stopped', 'failed']);
+
+export function isRemovableConversationPlanStatus(status: string): boolean {
+  return removablePlanStatuses.has(status);
+}
 
 export function decodeConversationCursor(value: string): ConversationCursor {
   try {

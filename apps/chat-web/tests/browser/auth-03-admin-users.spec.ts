@@ -56,8 +56,8 @@ test('AUTH-03: admin approves a pending account, member logs in, disable revokes
     await expect(admin.getByRole('dialog')).toContainText('bị đăng xuất khỏi mọi thiết bị');
     await admin.getByRole('button', { name: 'Xác nhận khóa', exact: true }).click();
     await expect(admin.getByRole('dialog')).toHaveCount(0);
-    // Starting a new request makes the next authenticated request and detects revocation.
-    await member.getByRole('button', { name: 'Yêu cầu mới', exact: true }).click();
+    // Reloading validates the current session against the server.
+    await member.reload();
     await expect(member.getByLabel('Email', { exact: true })).toBeVisible();
     expect((await member.request.get('/api/auth/me', { headers: { Authorization: `Bearer ${oldAccess}` } })).status()).toBe(401);
     expect((await member.request.post('/api/auth/refresh', { data: { refreshToken: oldRefresh } })).status()).toBe(401);

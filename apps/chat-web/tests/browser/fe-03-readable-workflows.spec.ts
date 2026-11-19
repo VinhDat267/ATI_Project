@@ -58,7 +58,7 @@ test('FE-03: grounded display names survive preview reload and approved result l
 test('FE-03: Shift Enter creates a newline and planning disables a second send', async ({ page }) => {
   await login(page);
   await page.getByRole('button', { name: 'Yêu cầu mới', exact: true }).click();
-  await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}$/);
+  await expect(page).toHaveURL(/\/$/);
   const input = page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
   await input.fill('Tạo công việc Trello'); await input.press('Shift+Enter'); await page.keyboard.insertText('Thông báo Slack');
   await expect(input).toHaveValue('Tạo công việc Trello\nThông báo Slack');
@@ -67,6 +67,7 @@ test('FE-03: Shift Enter creates a newline and planning disables a second send',
   let sent = 0;
   await page.route('**/api/conversations/*/messages', async route => { sent++; await gate; await route.continue(); });
   await input.press('Enter');
+  await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}$/);
   await expect(composer(page).getByRole('button', { name: /^(Gửi|Gửi tin nhắn|Gửi yêu cầu)$/ })).toBeDisabled();
   await expect(page.getByText('Đang lập kế hoạch…')).toBeVisible();
   await input.fill('Tin nhắn trùng'); await input.press('Enter');

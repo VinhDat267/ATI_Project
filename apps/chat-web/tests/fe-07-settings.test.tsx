@@ -85,6 +85,15 @@ const roleInMenu = async () => {
 };
 const addScope = (value = 'chat-1') => { fireEvent.change(screen.getByLabelText('Thêm Chat ID'), { target: { value } }); fireEvent.click(screen.getByRole('button', { name: /Thêm/ })); };
 
+it('explains when the Google Workspace filter has no personal connections available', async () => {
+  mount();
+  await screen.findByRole('heading', { name: 'Khoá dịch vụ' });
+  const filter = screen.getByRole('button', { name: 'Google Workspace' });
+  fireEvent.click(filter);
+  expect(filter).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByText('Chưa có dịch vụ Google Workspace để kết nối tại đây.')).toBeVisible();
+});
+
 it('uses field placeholders for Jira site and email without suggesting a secret', async () => {
   services = [{ ...service('jira'), name: 'Jira', credentialFields: [
     { key: 'siteUrl', label: 'Site URL', type: 'text' },

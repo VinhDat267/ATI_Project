@@ -98,6 +98,20 @@ export function stripRequestedReportPrefixes(text: string): string {
   );
 }
 
+/** Keep explicit open-issue requests scoped to their Jira clause. */
+export function requestsOpenJiraIssues(userTexts: readonly string[]): boolean {
+  const subject = '(?:issues?|tickets?|tasks?|cong viec)';
+  const open = new RegExp(`\\b(?:open (?:jira )?${subject}|${subject}(?: jira)? (?:dang mo|chua dong|chua hoan thanh|chua xong|(?:that are )?open))\\b`);
+  const request = foldVietnamese(userTexts.map(stripRequestedReportPrefixes).join('\n'))
+    .replace(/"[^"\n]*"|“[^”\n]*”|'[^'\n]*'/g, ' ');
+  // Let the planner set filters explicitly for mixed, qualified and comparative requests.
+  if ((request.match(/\bjira\b/g)?.length ?? 0) !== 1 ||
+      /\b(?:closed|done|resolved|da dong|da xong|da hoan thanh)\b/.test(request)) return false;
+  return request.split(/[.\n;!?]/)
+    .some((clause) => /\bjira\b/.test(clause) &&
+      !/\b(?:github|do not|don['’]t|exclude|khong|bo qua|loai tru)\b/.test(clause) && open.test(clause));
+}
+
 /**
  * The opening text the user asked the message to start with ("mở đầu bằng [X]"), taken verbatim
  * from the user's own words so it can be prepended to a grounded report without model-written content.

@@ -24,21 +24,20 @@ beforeEach(() => {
 });
 afterEach(() => {cleanup(); vi.restoreAllMocks(); authStorage.clearStoredTokens(); window.history.replaceState({}, '', '/');});
 async function openApp() { render(<App />); await screen.findByRole('heading',{level:1}); }
-it('preserves the current conversation and messages when creating a conversation fails', async () => {
+it('opens a blank draft and leaves without creating a conversation', async () => {
   window.history.replaceState({}, '', '/c/older-c2');
-  window.history.pushState({}, '', '/c/valid-c1');
-  const replace = vi.spyOn(window.history, 'replaceState');
-  useChatStore.setState({conversationId:'valid-c1',messages:[{id:'m1',role:'user',content:'Keep this conversation'}]});
-  vi.spyOn(apiClient,'createConversation').mockRejectedValue(new TypeError('Failed to fetch'));
+  const request = vi.mocked(apiClient.request);
   await openApp();
-  fireEvent.click(screen.getByRole('button',{name:'Mở danh sách hội thoại'}));
-  fireEvent.click(screen.getByRole('button',{name:/Cuộc hội thoại mới/}));
-  await screen.findByText(/Không thể kết nối máy chủ/);
-  expect(useChatStore.getState().conversationId).toBe('valid-c1');
-  expect(await transcriptText('Keep this conversation')).toBeInTheDocument();
-  expect(replace).toHaveBeenCalledWith({}, '', '/c/valid-c1');
+  await transcriptText('Older conversation');
+  fireEvent.click(screen.getByRole('button', { name: 'Yêu cầu mới' }));
+  expect(window.location.pathname).toBe('/');
+  expect(useChatStore.getState().conversationId).toBeNull();
+  const composer = screen.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện/ });
+  fireEvent.change(composer, { target: { value: 'Bản nháp chưa gửi' } });
   window.history.back();
   await waitFor(() => expect(window.location.pathname).toBe('/c/older-c2'));
+  expect(await transcriptText('Older conversation')).toBeInTheDocument();
+  expect(request.mock.calls.filter(([url, options]) => url === '/api/conversations' && options?.method === 'POST')).toEqual([]);
 });
 it('disables approval without a real plan id', async () => {
   useChatStore.setState({conversationId:'c1',activePlan:{summary:'Invalid plan',steps:[]} as any,planStatus:'preview'});

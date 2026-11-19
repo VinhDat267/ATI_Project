@@ -88,6 +88,9 @@ for (const theme of ['light', 'dark'] as const) {
 
 test('FE-04: mobile prototype drawers preserve scope editing with source-sized touch targets', async ({ page }, info) => {
   await login(page); await page.getByRole('button', { name: 'Yêu cầu mới', exact: true }).click();
+  const input = page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện/ });
+  await input.fill('Tạo một công việc Trello cho FE-04');
+  await input.press('Enter');
   await expect(page).toHaveURL(/\/c\//);
   await page.setViewportSize({ width: 375, height: 812 });
   const open = page.getByRole('button', { name: 'Mở danh sách hội thoại' });

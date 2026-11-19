@@ -25,6 +25,20 @@ describe('personal Jira routing', () => {
     expect(routeIntent('Tạo card Trello rồi liên kết ticket Jira', enabled, services).services).toEqual(['trello', 'myjira']);
   });
 
+  it('does not require Trello when the scheduled tasks are explicitly in a Jira project', () => {
+    const tools = enabled.filter((tool) => tool.service !== 'trello');
+    const request = 'Mỗi ngày làm việc lúc 08:00 giờ Việt Nam, gửi bản tóm tắt các công việc quá hạn trong dự án Jira ATIT vào kênh Slack #ati-test.';
+    expect(routeIntent(request, tools, services)).toEqual({ services: ['slack', 'myjira'], unavailable: [] });
+    expect(routeIntent(`${request} Sau đó tạo một thẻ Trello theo dõi.`, tools, services)).toEqual({
+      services: [],
+      unavailable: [{ id: 'trello', name: 'Trello' }],
+    });
+    expect(routeIntent('Create a task from Jira ticket ATIT-12', tools, services)).toEqual({
+      services: [],
+      unavailable: [{ id: 'trello', name: 'Trello' }],
+    });
+  });
+
   it('does not silently route back to legacy Jira when personal Jira is unavailable', () => {
     expect(routeIntent('Tạo ticket Jira', ALL_TOOLS, services)).toEqual({
       services: [],

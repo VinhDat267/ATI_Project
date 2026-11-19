@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
 import request, { type Response } from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ConversationRepo } from '../../src/db/repositories/conversation-repo.js';
 import { MessageRepo } from '../../src/db/repositories/message-repo.js';
 import { PlanRepo } from '../../src/db/repositories/plan-repo.js';
@@ -11,7 +11,9 @@ import { StepRepo } from '../../src/db/repositories/step-repo.js';
 import { createApp } from '../../src/app.js';
 import { generateTokens } from '../../src/auth/jwt.js';
 import { ExecutionService } from '../../src/services/execution-service.js';
+import { ChatService } from '../../src/services/chat-service.js';
 import { SSEManager } from '../../src/sse/sse-manager.js';
+import { WorkspaceRepo } from '../../src/db/repositories/workspace-repo.js';
 import { createIsolatedTestSchema, validateDatabaseUrl, type IsolatedTestContext } from '../helpers/jira-test-db.js';
 
 let ctx: IsolatedTestContext;
@@ -23,7 +25,7 @@ const secret = 'fe02_history_integration_jwt_secret';
 
 async function user() {
   const id = randomUUID();
-  await pool.query('INSERT INTO users(id,email,password,name) VALUES($1,$2,$3,$4)', [id, `${id}@example.test`, 'test-only-hash', 'History test']);
+  await pool.query("INSERT INTO users(id,email,password,name,status) VALUES($1,$2,$3,$4,'active')", [id, `${id}@example.test`, 'test-only-hash', 'History test']);
   return id;
 }
 function bearer(id: string) { return `Bearer ${generateTokens({ id, email: `${id}@example.test`, name: 'History test' }, secret).accessToken}`; }
@@ -123,11 +125,36 @@ describe('FE-02 conversation history: real PostgreSQL and HTTP', () => {
     expect(absent.body.conversations).toEqual([]);
   });
 
+  it('excludes old blank drafts before pagination and includes them after the first message', async () => {
+    const owner = await user();
+    const named = await repo.createConversation(owner, 'Named conversation');
+    const untitled = await repo.createConversation(owner);
+    await messages.createMessage(untitled.id, 'assistant', 'Saved reply without a title');
+    const draft = await repo.createConversation(owner);
+    await pool.query("UPDATE conversations SET updated_at = '2099-01-01T00:00:00Z' WHERE id = $1", [draft.id]);
+    const app = createApp({ jwtSecret: secret, convRepo: repo, msgRepo: messages, chatService: {} as any });
+    const history = (query = {}) => request(app).get('/api/conversations').query(query).set('Authorization', bearer(owner));
+
+    const first = await history({ limit: 1 });
+    expect(first.status).toBe(200);
+    expect(first.body.conversations.map((row: { id: string }) => row.id)).toEqual([untitled.id]);
+    const second = await history({ limit: 1, cursor: first.body.nextCursor });
+    expect(second.status).toBe(200);
+    expect(second.body.conversations.map((row: { id: string }) => row.id)).toEqual([named.id]);
+    expect(second.body.nextCursor).toBeNull();
+
+    expect(await repo.getConversation(draft.id)).not.toBeNull();
+    await messages.createMessage(draft.id, 'user', 'Sent first request');
+    const sent = await history({ search: 'Sent first request' });
+    expect(sent.status).toBe(200);
+    expect(sent.body.conversations.map((row: { id: string }) => row.id)).toEqual([draft.id]);
+  });
+
   it('preserves PostgreSQL cursor precision for rows inside the same millisecond', async () => {
     const owner = await user();
     const ids = [];
     for (let index = 0; index < 3; index++) {
-      const row = await repo.createConversation(owner); ids.push(row.id);
+      const row = await repo.createConversation(owner, `Conversation ${index}`); ids.push(row.id);
       await pool.query('UPDATE conversations SET updated_at=$2 WHERE id=$1', [row.id, `2026-10-03T12:00:00.12345${index}Z`]);
     }
     const first = await (repo as any).listConversationPage(owner, { limit: 1 });
@@ -135,6 +162,116 @@ describe('FE-02 conversation history: real PostgreSQL and HTTP', () => {
     const third = await (repo as any).listConversationPage(owner, { limit: 1, cursor: second.nextCursor });
     expect([first.conversations[0].id, second.conversations[0].id, third.conversations[0].id]).toEqual(ids.reverse());
     expect(third.nextCursor).toBeNull();
+  });
+
+  it('deletes saved conversation data once and only for the owner in its workspace', async () => {
+    const owner = await user(), other = await user();
+    const workspaceRepo = new WorkspaceRepo(pool);
+    const workspace = await workspaceRepo.create(owner, 'Conversation workspace', false);
+    const target = await repo.createConversation(owner, 'Delete me', { workspaceMode: 'organization', workspaceId: workspace.id });
+    const keep = await repo.createConversation(owner, 'Keep me');
+    await messages.createMessage(target.id, 'user', 'Conversation content');
+    const planId = randomUUID();
+    await pool.query(
+      "INSERT INTO plans (id, conv_id, plan_json, plan_hash, status, expires_at) VALUES ($1,$2,'{}','test','completed',now())",
+      [planId, target.id],
+    );
+    await pool.query(
+      "INSERT INTO execution_steps (plan_id, step_id, tool, args_json, status, requested_by) VALUES ($1,'s1','test.read','{}','succeeded',$2)",
+      [planId, owner],
+    );
+    const sseManager = new SSEManager();
+    sseManager.emitEvent(target.id, 'text_delta', { delta: 'Buffered old message' });
+    const app = createApp({ jwtSecret: secret, convRepo: repo, msgRepo: messages, chatService: {} as any, workspaceRepo, sseManager });
+    const path = `/api/conversations/${target.id.toUpperCase()}`;
+    expect((await request(app).delete(path)).status).toBe(401);
+    expect((await request(app).delete(path).set('Authorization', bearer(other))).status).toBe(404);
+    expect((await request(app).delete(path).set('Authorization', bearer(owner)).set('X-Workspace-Id', 'personal')).status).toBe(404);
+    expect(await repo.getConversation(target.id)).not.toBeNull();
+
+    const authorized = () => request(app).delete(path).set('Authorization', bearer(owner)).set('X-Workspace-Id', workspace.id);
+    const results = await Promise.all([authorized(), authorized()]);
+    expect(results.map(result => result.status).sort()).toEqual([204, 404]);
+    const detail = await request(app).get(path).set('Authorization', bearer(owner)).set('X-Workspace-Id', workspace.id);
+    const list = await request(app).get('/api/conversations').set('Authorization', bearer(owner)).set('X-Workspace-Id', workspace.id);
+    expect(detail.status).toBe(404);
+    expect(list.body.conversations).toEqual([]);
+    expect(await repo.getConversation(keep.id)).not.toBeNull();
+    expect((await pool.query('SELECT 1 FROM messages WHERE conv_id = $1', [target.id])).rowCount).toBe(0);
+    expect((await pool.query('SELECT 1 FROM plans WHERE id = $1', [planId])).rowCount).toBe(0);
+    expect((await pool.query('SELECT 1 FROM execution_steps WHERE plan_id = $1', [planId])).rowCount).toBe(0);
+    sseManager.emitEvent(target.id.toUpperCase(), 'text_delta', { delta: 'Late planner event' });
+    expect(sseManager.getMissedEvents(target.id, 0)).toEqual([]);
+    expect(sseManager.getMissedEvents(target.id.toUpperCase(), 0)).toEqual([]);
+    await pool.query("UPDATE users SET status = 'disabled' WHERE id = $1", [owner]);
+    const disabled = await request(app).delete(`/api/conversations/${keep.id}`)
+      .set('Authorization', bearer(owner)).set('X-Workspace-Id', 'personal');
+    expect(disabled.status).toBe(404);
+    expect(await repo.getConversation(keep.id)).not.toBeNull();
+  });
+
+  it.each(['unresolved execution', 'schedule', 'Slack lineage'])('keeps a conversation linked to %s', async link => {
+    const owner = await user();
+    const target = await repo.createConversation(owner, 'Keep linked conversation');
+    await messages.createMessage(target.id, 'user', 'Keep its message');
+    if (link === 'unresolved execution') {
+      await pool.query(
+        "INSERT INTO plans (conv_id, plan_json, plan_hash, status, expires_at) VALUES ($1,'{}','test','unknown',now())",
+        [target.id],
+      );
+    } else if (link === 'schedule') {
+      await pool.query(
+        "INSERT INTO schedules (user_id, conv_id, name, request, recurrence, services, status) VALUES ($1,$2,'test','test','{}','{}','paused')",
+        [owner, target.id],
+      );
+    } else {
+      await pool.query(
+        "INSERT INTO slack_derived_copies (ati_user_id, target_kind, target_id, target_sub_id, target_fingerprint) VALUES ($1,'scheduled_workflow_arg',$2,'title',$3)",
+        [owner, target.id, 'a'.repeat(64)],
+      );
+    }
+    const app = createApp({ jwtSecret: secret, convRepo: repo, msgRepo: messages, chatService: {} as any });
+    const response = await request(app).delete(`/api/conversations/${target.id}`).set('Authorization', bearer(owner));
+    expect(response.status).toBe(409);
+    expect(await repo.getConversation(target.id)).not.toBeNull();
+    expect(await messages.listMessages(target.id)).toHaveLength(1);
+  });
+
+  it('blocks planner dispatch when a workspace conversation is deleted after loading its history', async () => {
+    const owner = await user();
+    const workspaceRepo = new WorkspaceRepo(pool);
+    const workspace = await workspaceRepo.create(owner, 'Planner workspace', false);
+    const target = await repo.createConversation(owner, 'Delete during planning', { workspaceMode: 'organization', workspaceId: workspace.id });
+    const messageRepo = new MessageRepo(pool);
+    const listMessages = messageRepo.listMessages.bind(messageRepo);
+    let onHistoryLoaded!: () => void, resume!: () => void, onFinished!: () => void;
+    const historyLoaded = new Promise<void>(resolve => { onHistoryLoaded = resolve; });
+    const resumePlanning = new Promise<void>(resolve => { resume = resolve; });
+    const finished = new Promise<void>(resolve => { onFinished = resolve; });
+    vi.spyOn(messageRepo, 'listMessages').mockImplementationOnce(async (...args) => {
+      const loaded = await listMessages(...args);
+      onHistoryLoaded();
+      await resumePlanning;
+      return loaded;
+    });
+    const processMessage = vi.fn(async () => ({ kind: 'refusal' as const, reason: 'Fixture', suggestion: 'Fixture' }));
+    const chatService = new ChatService({
+      msgRepo: messageRepo, convRepo: repo, workspaceRepo,
+      planner: { processMessage } as any,
+      eventEmitter: { emit: event => { if (event === 'error') onFinished(); } },
+    });
+    const app = createApp({ jwtSecret: secret, convRepo: repo, msgRepo: messageRepo, chatService, workspaceRepo });
+    const path = `/api/conversations/${target.id}`;
+    const authorized = { Authorization: bearer(owner), 'X-Workspace-Id': workspace.id };
+    try {
+      expect((await request(app).post(`${path}/messages`).set(authorized).send({ content: 'Summarize private workspace data' })).status).toBe(202);
+      await historyLoaded;
+      expect((await request(app).delete(path).set(authorized)).status).toBe(204);
+    } finally {
+      resume();
+    }
+    await finished;
+    expect(processMessage).not.toHaveBeenCalled();
   });
 
   it('treats percent, underscore and backslash literally and excludes wildcard decoys', async () => {
