@@ -4,7 +4,11 @@
    nội dung nằm trên tờ giấy (nền trang) có một đường viền 1px, góc trên trái bo 16px, không đổ bóng.
    Màu lấy từ landing: mực #1A0E08, giấy #F8F4EE, đá #F3EEE7, cam #FF5701. */
 
-html[data-app-shell] {
+/* Token màu .ps-* áp cho khung sau đăng nhập, hai trang đọc công khai (Cẩm nang, Chính sách) và các màn callback OAuth. */
+html[data-app-shell],
+html[data-proto-page="guide"],
+html[data-proto-page="privacy"],
+html[data-proto-page$="-callback"] {
   --ps-side: 240px;
   --ps-bar: 48px;
   --ps-frame: #EFE8DE;
@@ -17,11 +21,15 @@ html[data-app-shell] {
   --ps-active: #E1D7C9;
   --ps-accent: #FF5701;
   --ps-accent-text: #B43E00;
+  --ps-panel: #FFFFFF;
   --ps-font-display: 'Bricolage Grotesque', 'Be Vietnam Pro', system-ui, sans-serif;
   --ps-font-sans: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --ps-font-mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
 }
-html.dark[data-app-shell] {
+html.dark[data-app-shell],
+html.dark[data-proto-page="guide"],
+html.dark[data-proto-page="privacy"],
+html.dark[data-proto-page$="-callback"] {
   --ps-frame: #0A0807;
   --ps-sheet: #131010;
   --ps-edge: #2A231E;
@@ -31,6 +39,7 @@ html.dark[data-app-shell] {
   --ps-hover: #1F1A16;
   --ps-active: #2A231E;
   --ps-accent-text: #FF8547;
+  --ps-panel: #1A1613;
 }
 
 /* Một bộ chữ cho cả app: Be Vietnam Pro cho chữ, Bricolage Grotesque (như landing) cho tiêu đề.
@@ -119,8 +128,6 @@ html[data-app-shell] #global-bottom-bar { background-image: none !important; }
    Mặt phẳng: một tầng nền giấy, một tầng bảng trắng viền 1px, không đổ bóng. Tiêu đề là danh từ, câu dưới nói về dữ liệu.
    Bộ nút: .ps-btn (việc chính, cam đậm như nút Duyệt kế hoạch) và .ps-btn-quiet (việc phụ); trường nhập và chọn cùng cao 36px.
    Nút không dùng được có nền trung tính, không phải màu cam nhạt (trông như lỗi). */
-html[data-app-shell] { --ps-panel: #FFFFFF; }
-html.dark[data-app-shell] { --ps-panel: #1A1613; }
 .ps-pagehead h1 { font-size: 28px; line-height: 1.15; color: var(--ps-ink); }
 .ps-pagehead p { margin-top: 6px; font-size: 14px; line-height: 1.5; color: var(--ps-muted); max-width: 64ch; }
 .ps-sectionhead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
@@ -154,9 +161,10 @@ html.dark .ps-status-error { color: #F87171; }
   height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--ps-edge); background: var(--ps-panel);
   color: var(--ps-ink); font-size: 14px; min-width: 0;
 }
+.ps-field.pl-9 { padding-left: 2.25rem; }
 .ps-field::placeholder { color: var(--ps-faint); }
 .ps-field:focus { outline: none; border-color: var(--ps-ink); }
-html[data-app-shell] :is(.ps-btn, .ps-btn-quiet, .ps-stat):focus-visible { outline: 2px solid var(--ps-accent); outline-offset: 2px; }
+:is(html[data-app-shell], html[data-proto-page="guide"], html[data-proto-page="privacy"], html[data-proto-page$="-callback"]) :is(.ps-btn, .ps-btn-quiet, .ps-stat):focus-visible { outline: 2px solid var(--ps-accent); outline-offset: 2px; }
 /* Số đếm kiêm bộ lọc: một khung chia bằng đường 1px, ô đang chọn có gạch chân 2px màu mực. */
 .ps-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); overflow: hidden; }
 .ps-stat {
@@ -195,8 +203,9 @@ html[data-app-shell] :is(.ps-btn, .ps-btn-quiet, .ps-stat):focus-visible { outli
   font-size: 13px; font-weight: 500; color: var(--ps-muted); transition: background-color 120ms ease, color 120ms ease;
 }
 .ps-segmented > button:hover { color: var(--ps-ink); }
-.ps-segmented > button[aria-selected="true"] { background: var(--ps-panel); color: var(--ps-ink); font-weight: 600; }
-html[data-app-shell] .ps-segmented > button:focus-visible { outline: 2px solid var(--ps-accent); outline-offset: 1px; }
+.ps-segmented > button[aria-selected="true"],
+.ps-segmented > button[aria-pressed="true"] { background: var(--ps-panel); color: var(--ps-ink); font-weight: 600; }
+:is(html[data-app-shell], html[data-proto-page="guide"], html[data-proto-page="privacy"]) .ps-segmented > button:focus-visible { outline: 2px solid var(--ps-accent); outline-offset: 1px; }
 /* Mẫu gợi ý: các hàng trong một bảng, không phải lưới thẻ có nhãn màu. */
 .ps-rows > * + * { border-top: 1px solid var(--ps-edge); }
 

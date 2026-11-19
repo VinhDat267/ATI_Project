@@ -316,7 +316,7 @@ export function MyCalendarCallbackView({
               type="button"
               disabled={selectedIds.length === 0 || saving}
               onClick={handleSave}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-[#FF5701] text-white hover:bg-[#E04C00] disabled:opacity-50 transition-colors shadow-sm"
+              className="ps-btn w-full sm:w-auto"
             >
               {saving
                 ? 'Đang lưu…'
@@ -328,7 +328,7 @@ export function MyCalendarCallbackView({
               type="button"
               disabled={saving}
               onClick={handleLater}
-              className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium bg-white text-[#51463E] border border-[#E8E0D6] hover:bg-neutral-50 transition-colors"
+              className="ps-btn-quiet w-full sm:w-auto"
             >
               Để sau (về trang Cài đặt)
             </button>

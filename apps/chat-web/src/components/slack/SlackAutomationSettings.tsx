@@ -187,7 +187,7 @@ export function SlackAutomationSettings({connectionId,workspaceName,active}:{con
      <label className="flex gap-2 items-start text-sm"><input type="checkbox" checked={draft.digest.enabled} onChange={e=>patch({digest:{...draft.digest,enabled:e.target.checked}})}/>Bật bản tóm tắt hàng ngày</label>
      <label className="block text-sm">Giờ gửi bản tóm tắt (HH:MM)<input className={field} value={draft.digest.time} maxLength={5} onChange={e=>patch({digest:{...draft.digest,time:e.target.value}})}/></label>
     </fieldset>
-    <div className="flex flex-wrap items-center gap-2"><button type="button" className="rounded-lg bg-[#FF5701] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" disabled={busy} onClick={()=>void save()}>Lưu tự động hóa</button><a href="/inbox" className={button}>Mở hộp thư đề xuất</a></div>
+    <div className="flex flex-wrap items-center gap-2"><button type="button" className="ps-btn" disabled={busy} onClick={()=>void save()}>Lưu tự động hóa</button><a href="/inbox" className="ps-btn-quiet">Mở hộp thư đề xuất</a></div>
     <fieldset className="space-y-3 border-t border-[#E8E0D6] dark:border-[#3a312a] pt-3">
      <legend className="text-sm font-semibold">Theo dõi một thread</legend>
      <p className="text-sm text-[#51463E] dark:text-[#9CA3AF]">Chỉ nhận các sự kiện mới sau khi theo dõi; không quét lại lịch sử. Bạn có thể dán trực tiếp liên kết tin nhắn Slack để tự động điền kênh và timestamp.</p>

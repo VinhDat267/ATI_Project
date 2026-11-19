@@ -97,142 +97,97 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
         </header>
       )}
       {/* ==================== MAIN CONTENT CONTAINER ==================== */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12" id="main-content">
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-10" id="main-content">
         {/* HERO HEADER */}
-        <section className="mb-10 text-center sm:text-left border-b border-[#E8E0D6] pb-8" aria-labelledby="privacy-title">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-[#FF5701]/10 text-[#FF5701] border border-[#FF5701]/20 mb-3">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              {' '}
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              {' '}
-            </svg>
-            <span>
-              CAM KẾT AN TOÀN &amp; MINH BẠCH DỮ LIỆU
-            </span>
+        <section className="mb-10 border-b border-[var(--ps-edge)] pb-8" aria-labelledby="privacy-title">
+          <div className="ps-pagehead">
+            <h1 id="privacy-title" className="max-w-[70ch]">
+              Dữ liệu và quyền quyết định luôn thuộc về bạn và nhóm của bạn.
+            </h1>
+            <p className="text-sm sm:text-base text-[var(--ps-muted)] leading-relaxed max-w-[70ch] mt-3 font-normal">
+              {"Planora được thiết kế từ đầu với một ranh giới rõ ràng: "}
+              <strong className="text-[var(--ps-ink)] font-semibold">
+                không tự ý hành động khi chưa có lệnh duyệt, không hiển thị lại khoá truy cập đã lưu, chỉ hoạt động trong phạm vi được quản trị viên cấp phép
+              </strong>
+              , và luôn dừng lại hỏi ý kiến bạn khi đường truyền mạng gặp gián đoạn. Áp dụng cho toàn bộ không gian làm việc Planora.
+            </p>
           </div>
-          {' '}
-          <h1 id="privacy-title" className="font-display font-medium text-3xl sm:text-4xl lg:text-[42px] text-[#1a0e08] tracking-tight leading-tight mb-4">
-            Dữ liệu và quyền quyết định luôn thuộc về bạn và nhóm của bạn.
-          </h1>
-          <p className="text-base sm:text-lg text-[#51463E] leading-relaxed max-w-3xl mb-4 font-normal">
-            {"Planora được thiết kế từ đầu với một ranh giới rõ ràng: "}
-            <strong className="text-[#1a0e08] font-semibold">
-              không tự ý hành động khi chưa có lệnh duyệt, không hiển thị lại khoá truy cập đã lưu, chỉ hoạt động trong phạm vi được quản trị viên cấp phép
-            </strong>
-            , và luôn dừng lại hỏi ý kiến bạn khi đường truyền mạng gặp gián đoạn.
-          </p>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-[#6A5F56]">
-            <span className="inline-flex items-center gap-1.5">
-              <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                {' '}
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                {' '}
-              </svg>
-              {" Áp dụng cho toàn bộ không gian làm việc Planora"}
-            </span>
-          </div>
-          {/* Quick Anchor Pills */}
-          <nav className="mt-6 flex flex-wrap gap-2 pt-4 border-t border-[#E8E0D6]/60 text-xs font-medium" aria-label="Mục lục chính sách">
-            <a href="#core-commitments" className="px-3 py-1.5 rounded-lg bg-white border border-[#E8E0D6] hover:border-[#FF5701] hover:text-[#FF5701] transition-colors shadow-sm">
-              {" 1. Bốn cam kết cốt lõi "}
+          {/* Mục lục link phẳng */}
+          <nav className="mt-6 flex flex-wrap gap-x-5 gap-y-2 pt-4 border-t border-[var(--ps-edge)] text-[13px] font-medium" aria-label="Mục lục chính sách">
+            <a href="#core-commitments" className="text-[var(--ps-muted)] hover:text-[var(--ps-ink)] underline underline-offset-4 decoration-[var(--ps-edge)] hover:decoration-[var(--ps-ink)] transition-colors">
+              Bốn cam kết cốt lõi
             </a>
-            <a href="#access-keys" className="px-3 py-1.5 rounded-lg bg-white border border-[#E8E0D6] hover:border-[#FF5701] hover:text-[#FF5701] transition-colors shadow-sm">
-              {" 2. Lưu trữ khoá an toàn "}
+            <a href="#access-keys" className="text-[var(--ps-muted)] hover:text-[var(--ps-ink)] underline underline-offset-4 decoration-[var(--ps-edge)] hover:decoration-[var(--ps-ink)] transition-colors">
+              Lưu trữ khoá an toàn
             </a>
-            <a href="#google-oauth" className="px-3 py-1.5 rounded-lg bg-white border border-[#E8E0D6] hover:border-[#FF5701] hover:text-[#FF5701] transition-colors shadow-sm">
-              {" 3. Đăng nhập bằng Google "}
+            <a href="#google-oauth" className="text-[var(--ps-muted)] hover:text-[var(--ps-ink)] underline underline-offset-4 decoration-[var(--ps-edge)] hover:decoration-[var(--ps-ink)] transition-colors">
+              Đăng nhập bằng Google
             </a>
-            <a href="#member-roles" className="px-3 py-1.5 rounded-lg bg-white border border-[#E8E0D6] hover:border-[#FF5701] hover:text-[#FF5701] transition-colors shadow-sm">
-              {" 4. Phân quyền thành viên & Quản trị "}
+            <a href="#member-roles" className="text-[var(--ps-muted)] hover:text-[var(--ps-ink)] underline underline-offset-4 decoration-[var(--ps-edge)] hover:decoration-[var(--ps-ink)] transition-colors">
+              Phân quyền thành viên &amp; Quản trị
             </a>
-            <a href="#network-fail" className="px-3 py-1.5 rounded-lg bg-white border border-[#E8E0D6] hover:border-[#FF5701] hover:text-[#FF5701] transition-colors shadow-sm">
-              {" 5. Mạng gián đoạn & Khắc phục "}
+            <a href="#network-fail" className="text-[var(--ps-muted)] hover:text-[var(--ps-ink)] underline underline-offset-4 decoration-[var(--ps-edge)] hover:decoration-[var(--ps-ink)] transition-colors">
+              Mạng gián đoạn &amp; Khắc phục
             </a>
-            <a href="#retention-delete" className="px-3 py-1.5 rounded-lg bg-white border border-[#E8E0D6] hover:border-[#FF5701] hover:text-[#FF5701] transition-colors shadow-sm">
-              {" 6. Lưu trữ & Quyền xoá dữ liệu "}
+            <a href="#retention-delete" className="text-[var(--ps-muted)] hover:text-[var(--ps-ink)] underline underline-offset-4 decoration-[var(--ps-edge)] hover:decoration-[var(--ps-ink)] transition-colors">
+              Lưu trữ &amp; Quyền xoá dữ liệu
             </a>
           </nav>
         </section>
         {/* ======================================================= */}
         {/* PHẦN 1: BỐN CAM KẾT AN TOÀN CỐT LÕI (TRỌNG TÂM SẢN PHẨM) */}
         {/* ======================================================= */}
-        <section id="core-commitments" className="mb-14 scroll-mt-20" data-od-id="section-core-commitments">
-          <div className="flex items-center justify-between gap-3 mb-6">
-            <div>
-              <h2 className="font-display font-medium text-2xl sm:text-[26px] text-[#1a0e08] tracking-tight">
-                1. Bốn cam kết an toàn cốt lõi
-              </h2>
-              <p className="text-sm text-[#6A5F56] mt-1">
-                Đây là những nguyên tắc bất di bất dịch định hình toàn bộ kiến trúc sản phẩm của Planora.
-              </p>
-            </div>
+        <section id="core-commitments" className="mb-12 scroll-mt-20" data-od-id="section-core-commitments">
+          <div className="mb-5">
+            <h2 className="text-xl sm:text-2xl font-semibold text-[var(--ps-ink)] tracking-tight">
+              Bốn cam kết an toàn cốt lõi
+            </h2>
+            <p className="text-sm text-[var(--ps-muted)] mt-1 max-w-[70ch]">
+              Đây là những nguyên tắc bất di bất dịch định hình toàn bộ kiến trúc sản phẩm của Planora.
+            </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Cam kết 1: Không ghi khi chưa duyệt */}
-            <article className="p-5 sm:p-6 bg-white rounded-2xl border border-[#E8E0D6] shadow-soft-card flex flex-col justify-between hover:border-[#FF5701]/40 transition-colors">
+            <article className="ps-panel p-5 sm:p-6 flex flex-col justify-between gap-4">
               <div>
-                <div className="flex items-center justify-between gap-2 mb-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FF5701]">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      {' '}
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      {' '}
-                    </svg>
-                  </div>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-orange-100/70 text-orange-800">
-                    {" Cam kết #1 "}
-                  </span>
-                </div>
-                <h3 className="text-base sm:text-lg font-bold text-[#1a0e08] mb-2 leading-snug">
+                <h3 className="text-base font-semibold text-[var(--ps-ink)] mb-2 leading-snug">
                   Không ghi gì khi chưa được duyệt
                 </h3>
-                <p className="text-xs sm:text-sm text-[#51463E] leading-relaxed mb-4">
+                <p className="text-sm text-[var(--ps-muted)] leading-relaxed">
                   {"Planora phân tách rạch ròi giữa việc "}
-                  <strong className="text-[#1a0e08]">
+                  <strong className="text-[var(--ps-ink)]">
                     lên kế hoạch
                   </strong>
                   {" và "}
-                  <strong className="text-[#1a0e08]">
+                  <strong className="text-[var(--ps-ink)]">
                     ghi dữ liệu
                   </strong>
                   . Khi bạn gõ một câu yêu cầu, hệ thống chỉ tra cứu tìm đúng bảng, kênh, kho mã và trình bày bản xem trước nguyên văn từng nội dung.
                 </p>
               </div>
-              <div className="pt-3 border-t border-[#F3F4F6] text-xs text-[#6A5F56] bg-[#F8F4EE]/60 p-3 rounded-xl border border-[#E8E0D6]/50">
-                <span className="font-semibold text-[#1a0e08]">
+              <div className="text-[13px] text-[var(--ps-muted)] bg-[var(--ps-sheet)] p-3.5 rounded-xl border border-[var(--ps-edge)]">
+                <span className="font-semibold text-[var(--ps-ink)]">
                   Hành vi thực tế:
                 </span>
                 {" Với thao tác tương tác trong hội thoại, chỉ khi bạn bấm nút cam "}
-                <strong className="text-[#FF5701]">
+                <strong className="text-[var(--ps-accent-text)]">
                   “Duyệt kế hoạch ✓”
                 </strong>
                 {" thì từng kế hoạch mới được thực thi; nếu bạn huỷ bỏ hoặc đóng trang, không có ký tự nào bị ghi lên công cụ của bạn. Riêng với lịch trình tổng hợp định kỳ (digest tự động), khi bạn chủ động chọn chế độ gửi tự động và xác nhận một lần cho phạm vi nguồn đọc cùng đích nhận đã ghim, các kỳ định kỳ tiếp theo sẽ tự động tổng hợp và gửi trong đúng phạm vi đã duyệt cho tới khi bạn tạm dừng, chỉnh sửa, xoá lịch trình hoặc ngắt kết nối nguồn."}
               </div>
             </article>
             {/* Cam kết 2: Khoá lưu trữ an toàn, không hiển thị lại */}
-            <article className="p-5 sm:p-6 bg-white rounded-2xl border border-[#E8E0D6] shadow-soft-card flex flex-col justify-between hover:border-[#FF5701]/40 transition-colors">
+            <article className="ps-panel p-5 sm:p-6 flex flex-col justify-between gap-4">
               <div>
-                <div className="flex items-center justify-between gap-2 mb-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      {' '}
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      {' '}
-                    </svg>
-                  </div>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100/70 text-blue-800">
-                    {" Cam kết #2 "}
-                  </span>
-                </div>
-                <h3 className="text-base sm:text-lg font-bold text-[#1a0e08] mb-2 leading-snug">
+                <h3 className="text-base font-semibold text-[var(--ps-ink)] mb-2 leading-snug">
                   Khoá lưu trữ an toàn, không hiển thị lại
                 </h3>
-                <p className="text-xs sm:text-sm text-[#51463E] leading-relaxed mb-4">
+                <p className="text-sm text-[var(--ps-muted)] leading-relaxed">
                   Các khoá truy cập (Slack Bot token, GitHub Personal access token, Google Service Account PEM...) chỉ do Quản trị viên nhập. Sau khi lưu, khoá được mã hoá tức thì và không bao giờ hiển thị lại trên giao diện của bất kỳ ai — kể cả chính Quản trị viên.
                 </p>
               </div>
-              <div className="pt-3 border-t border-[#F3F4F6] text-xs text-[#6A5F56] bg-[#F8F4EE]/60 p-3 rounded-xl border border-[#E8E0D6]/50">
-                <span className="font-semibold text-[#1a0e08]">
+              <div className="text-[13px] text-[var(--ps-muted)] bg-[var(--ps-sheet)] p-3.5 rounded-xl border border-[var(--ps-edge)]">
+                <span className="font-semibold text-[var(--ps-ink)]">
                   Hành vi thực tế:
                 </span>
                 {" Các ô nhập khoá đã lưu luôn ở trạng thái trống với gợi ý: "}
@@ -243,66 +198,42 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
               </div>
             </article>
             {/* Cam kết 3: Chỉ hoạt động trong phạm vi được cấp phép */}
-            <article className="p-5 sm:p-6 bg-white rounded-2xl border border-[#E8E0D6] shadow-soft-card flex flex-col justify-between hover:border-[#FF5701]/40 transition-colors">
+            <article className="ps-panel p-5 sm:p-6 flex flex-col justify-between gap-4">
               <div>
-                <div className="flex items-center justify-between gap-2 mb-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      {' '}
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      {' '}
-                    </svg>
-                  </div>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100/70 text-purple-800">
-                    {" Cam kết #3 "}
-                  </span>
-                </div>
-                <h3 className="text-base sm:text-lg font-bold text-[#1a0e08] mb-2 leading-snug">
+                <h3 className="text-base font-semibold text-[var(--ps-ink)] mb-2 leading-snug">
                   Chỉ hoạt động trong phạm vi được cấp phép
                 </h3>
-                <p className="text-xs sm:text-sm text-[#51463E] leading-relaxed mb-4">
+                <p className="text-sm text-[var(--ps-muted)] leading-relaxed">
                   Planora không có quyền lục soát tài khoản của bạn. Hệ thống bị giới hạn nghiêm ngặt, chỉ được phép đọc và ghi trên đúng những bảng Trello, kênh Slack, kho mã GitHub, bảng tính Sheets mà Quản trị viên đã chỉ định rõ ràng.
                 </p>
               </div>
-              <div className="pt-3 border-t border-[#F3F4F6] text-xs text-[#6A5F56] bg-[#F8F4EE]/60 p-3 rounded-xl border border-[#E8E0D6]/50">
-                <span className="font-semibold text-[#1a0e08]">
+              <div className="text-[13px] text-[var(--ps-muted)] bg-[var(--ps-sheet)] p-3.5 rounded-xl border border-[var(--ps-edge)]">
+                <span className="font-semibold text-[var(--ps-ink)]">
                   Hành vi thực tế:
                 </span>
                 {" Nếu bạn yêu cầu gửi tin vào kênh "}
-                <code className="font-mono text-[#1a0e08]">
+                <code className="font-mono text-[var(--ps-ink)]">
                   #marketing
                 </code>
                 {" nhưng trong Cài đặt chỉ cho phép "}
-                <code className="font-mono text-[#1a0e08]">
+                <code className="font-mono text-[var(--ps-ink)]">
                   #ati-test
                 </code>
                 , Planora sẽ hỏi lại bạn muốn gửi vào kênh nào trong các kênh được phép, không tự gửi nhầm chỗ.
               </div>
             </article>
             {/* Cam kết 4: Dừng lại hỏi người dùng khi mạng gián đoạn */}
-            <article className="p-5 sm:p-6 bg-white rounded-2xl border border-[#E8E0D6] shadow-soft-card flex flex-col justify-between hover:border-[#FF5701]/40 transition-colors">
+            <article className="ps-panel p-5 sm:p-6 flex flex-col justify-between gap-4">
               <div>
-                <div className="flex items-center justify-between gap-2 mb-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      {' '}
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      {' '}
-                    </svg>
-                  </div>
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100/70 text-amber-800">
-                    {" Cam kết #4 "}
-                  </span>
-                </div>
-                <h3 className="text-base sm:text-lg font-bold text-[#1a0e08] mb-2 leading-snug">
+                <h3 className="text-base font-semibold text-[var(--ps-ink)] mb-2 leading-snug">
                   Dừng lại hỏi người dùng khi mạng gián đoạn
                 </h3>
-                <p className="text-xs sm:text-sm text-[#51463E] leading-relaxed mb-4">
+                <p className="text-sm text-[var(--ps-muted)] leading-relaxed">
                   Nếu đường truyền bị ngắt đúng vào thời điểm Planora đang gửi lệnh ghi (ví dụ: đang ghi dòng vào Sheets), hệ thống không thể chắc chắn dữ liệu đã vào hay chưa. Thay vì tự ý thử lại để tránh trùng lặp, Planora dừng lại ngay lập tức và hỏi ý kiến bạn.
                 </p>
               </div>
-              <div className="pt-3 border-t border-[#F3F4F6] text-xs text-[#6A5F56] bg-[#F8F4EE]/60 p-3 rounded-xl border border-[#E8E0D6]/50">
-                <span className="font-semibold text-[#1a0e08]">
+              <div className="text-[13px] text-[var(--ps-muted)] bg-[var(--ps-sheet)] p-3.5 rounded-xl border border-[var(--ps-edge)]">
+                <span className="font-semibold text-[var(--ps-ink)]">
                   Hành vi thực tế:
                 </span>
                 {" Planora hiển thị màn hình cảnh báo rõ ràng những việc đã hoàn tất, việc đang làm dở, và để bạn bấm kiểm tra công cụ thực tế trước khi quyết định tiếp tục hay bỏ qua."}
@@ -313,128 +244,98 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
         {/* ======================================================= */}
         {/* PHẦN 2: LƯU TRỮ KHOÁ DỊCH VỤ AN TOÀN */}
         {/* ======================================================= */}
-        <section id="access-keys" className="mb-14 scroll-mt-20 bg-white p-6 sm:p-8 rounded-3xl border border-[#E8E0D6] shadow-soft-card" data-od-id="section-access-keys">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-xl bg-neutral-100 flex items-center justify-center text-[#1a0e08]">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                {' '}
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                {' '}
-              </svg>
-            </div>
-            <h2 className="font-display font-medium text-2xl text-[#1a0e08] tracking-tight">
-              2. Quản lý và lưu trữ khoá dịch vụ
-            </h2>
-          </div>
-          <p className="text-sm sm:text-base text-[#51463E] leading-relaxed mb-6 font-normal">
+        <section id="access-keys" className="mb-12 scroll-mt-20 ps-panel p-6 sm:p-8" data-od-id="section-access-keys">
+          <h2 className="text-xl sm:text-2xl font-semibold text-[var(--ps-ink)] tracking-tight mb-3">
+            Quản lý và lưu trữ khoá dịch vụ
+          </h2>
+          <p className="text-sm text-[var(--ps-muted)] leading-relaxed mb-6 font-normal max-w-[70ch]">
             Trong Planora, các khoá kết nối là tài sản bảo mật chung của cả nhóm. Chúng tôi áp dụng quy chế nghiêm ngặt trong việc tiếp nhận, lưu trữ và sử dụng khoá:
           </p>
-          <div className="v3-space-y-4 text-xs sm:text-sm text-[#51463E]">
-            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[#F8F4EE] border border-[#E8E0D6]">
-              <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold">
-                ✓
-              </div>
+          <div className="v3-space-y-3 text-sm text-[var(--ps-muted)] max-w-[70ch]">
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)]">
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold flex-shrink-0 mt-0.5" aria-hidden="true">✓</span>
               <div>
-                <strong className="text-[#1a0e08]">
+                <strong className="text-[var(--ps-ink)]">
                   Chỉ Quản trị viên mới được cấu hình khoá:
                 </strong>
                 {" Thành viên thường chỉ có thể xem trạng thái kết nối (Chưa kiểm tra / Kết nối tốt / Không kết nối được) và bấm nút kiểm tra kết nối, hoàn toàn không xem được chuỗi khoá hay chỉnh sửa nơi được phép dùng."}
               </div>
             </div>
-            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[#F8F4EE] border border-[#E8E0D6]">
-              <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold">
-                ✓
-              </div>
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)]">
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold flex-shrink-0 mt-0.5" aria-hidden="true">✓</span>
               <div>
-                <strong className="text-[#1a0e08]">
+                <strong className="text-[var(--ps-ink)]">
                   Không lưu trữ ngược ra giao diện:
                 </strong>
                 {" Khi mở ngăn chỉnh sửa dịch vụ, các trường khoá luôn được bảo vệ ở trạng thái trống."}
               </div>
             </div>
-            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[#F8F4EE] border border-[#E8E0D6]">
-              <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold">
-                ✓
-              </div>
+            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)]">
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold flex-shrink-0 mt-0.5" aria-hidden="true">✓</span>
               <div>
-                <strong className="text-[#1a0e08]">
+                <strong className="text-[var(--ps-ink)]">
                   Bắt buộc nhập lại đủ khoá khi cập nhật:
                 </strong>
                 {" Hiện tại, muốn lưu bất kỳ thay đổi nào (kể cả chỉ thêm một kênh) đều phải nhập lại đủ khoá."}
               </div>
             </div>
           </div>
-          <div className="mt-6 pt-5 border-t border-[#E8E0D6] flex items-center justify-between flex-wrap gap-3">
-            <span className="text-xs text-[#6A5F56]">
+          <div className="mt-6 pt-5 border-t border-[var(--ps-edge)] flex items-center justify-between flex-wrap gap-3">
+            <span className="text-[13px] text-[var(--ps-faint)]">
               Muốn kiểm tra hoặc cấu hình các dịch vụ đang kết nối?
             </span>
-            <a href="/settings" onClick={appLink(navigate, '/settings')} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-[#1a0e08] text-xs font-medium transition-colors">
-              <span>
-                Xem màn Kết nối dịch vụ
-              </span>
-              <span>
-                →
-              </span>
+            <a href="/settings" onClick={appLink(navigate, '/settings')} className="ps-btn-quiet">
+              <span>Xem màn Kết nối dịch vụ →</span>
             </a>
           </div>
         </section>
         {/* ======================================================= */}
         {/* PHẦN 3: ĐĂNG NHẬP BẰNG GOOGLE (GOOGLE OAUTH POLICY) */}
         {/* ======================================================= */}
-        <section id="google-oauth" className="mb-14 scroll-mt-20 bg-white p-6 sm:p-8 rounded-3xl border border-[#E8E0D6] shadow-soft-card" data-od-id="section-google-oauth">
-          <div className="flex items-center gap-3 mb-4">
-            {/* Google Logo chuẩn SVG */}
-            <div className="w-8 h-8 rounded-xl bg-white border border-[#E8E0D6] p-1.5 shadow-sm flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5" viewBox="0 0 24 24">
-                {' '}
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                {' '}
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                {' '}
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
-                {' '}
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
-                {' '}
-              </svg>
-            </div>
-            <h2 className="font-display font-medium text-2xl text-[#1a0e08] tracking-tight">
-              3. Chính sách đăng nhập bằng tài khoản Google
+        <section id="google-oauth" className="mb-12 scroll-mt-20 ps-panel p-6 sm:p-8" data-od-id="section-google-oauth">
+          <div className="flex items-center gap-3 mb-3">
+            <svg className="w-6 h-6 flex-shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+            </svg>
+            <h2 className="text-xl sm:text-2xl font-semibold text-[var(--ps-ink)] tracking-tight">
+              Chính sách đăng nhập bằng tài khoản Google
             </h2>
           </div>
-          <p className="text-sm sm:text-base text-[#51463E] leading-relaxed mb-6 font-normal">
+          <p className="text-sm text-[var(--ps-muted)] leading-relaxed mb-6 font-normal max-w-[70ch]">
             Planora cung cấp tuỳ chọn “Tiếp tục với Google” nhằm mang lại trải nghiệm đăng nhập thuận tiện, an toàn và không cần ghi nhớ thêm mật khẩu. Chúng tôi cam kết minh bạch tuyệt đối về việc sử dụng thông tin từ Google:
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             {/* Nhóm thông tin Planora nhận */}
-            <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100">
-              <div className="flex items-center gap-2 mb-2 text-emerald-800 font-semibold text-xs uppercase tracking-wider">
-                <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  {' '}
+            <div className="p-4 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)]">
+              <div className="flex items-center gap-2 mb-2 text-emerald-700 dark:text-emerald-400 font-semibold text-[13px]">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  {' '}
                 </svg>
                 <span>
                   Dữ liệu Planora nhận từ Google
                 </span>
               </div>
-              <ul className="v3-space-y-1.5 text-xs sm:text-sm text-[#4a4038]">
+              <ul className="v3-space-y-1.5 text-sm text-[var(--ps-muted)]">
                 <li className="flex items-start gap-2">
-                  <span className="text-emerald-600 font-bold">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">
                     •
                   </span>
                   <span>
-                    <strong>
+                    <strong className="text-[var(--ps-ink)]">
                       Địa chỉ email
                     </strong>
                     {" để định danh tài khoản công việc."}
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-emerald-600 font-bold">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">
                     •
                   </span>
                   <span>
-                    <strong>
+                    <strong className="text-[var(--ps-ink)]">
                       Họ và tên hiển thị
                     </strong>
                     {" để chào hỏi và gán người yêu cầu."}
@@ -443,70 +344,65 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
               </ul>
             </div>
             {/* Nhóm thông tin Planora KHÔNG BAO GIỜ chạm tới */}
-            <div className="p-4 rounded-2xl bg-rose-50/60 border border-rose-100">
-              <div className="flex items-center gap-2 mb-2 text-rose-800 font-semibold text-xs uppercase tracking-wider">
-                <svg className="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  {' '}
+            <div className="p-4 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)]">
+              <div className="flex items-center gap-2 mb-2 text-rose-700 dark:text-rose-400 font-semibold text-[13px]">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                  {' '}
                 </svg>
                 <span>
                   Quyền truy cập Google
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-[#4a4038] leading-relaxed">
+              <p className="text-sm text-[var(--ps-muted)] leading-relaxed">
                 Đăng nhập Google chỉ dùng để xác định bạn là ai. Planora chỉ đọc hộp thư bạn tự kết nối, và chỉ hộp thư đó. Khi chưa kết nối dịch vụ cá nhân, Planora không truy cập Drive hay lịch cá nhân; khi bạn kết nối Google Sheets cá nhân (phạm vi OAuth drive.file), quyền truy cập chỉ giới hạn ở các tệp đã cấp quyền cho ứng dụng và danh sách bảng tính bạn đã chọn; khi bạn kết nối Google Calendar cá nhân (phạm vi OAuth calendar.readonly và calendar.events), Planora kiểm soát danh sách cho phép ở tầng ứng dụng và chỉ truy cập trên các lịch bạn đã chọn. Google Sheets và Google Calendar của nhóm được kết nối riêng bằng tài khoản dịch vụ do quản trị viên cấu hình.
               </p>
             </div>
           </div>
-          {gmailEnabled && <section aria-label="Dữ liệu Gmail" className="p-4 rounded-2xl bg-[#F8F4EE] border border-[#E8E0D6] text-xs sm:text-sm v3-space-y-3">
-              <h3 className="font-semibold text-[#1a0e08]">Hộp thư Gmail bạn kết nối</h3>
+          {gmailEnabled && <section aria-label="Dữ liệu Gmail" className="p-4 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)] text-sm text-[var(--ps-muted)] v3-space-y-3 mb-4 max-w-[70ch]">
+              <h3 className="font-semibold text-[var(--ps-ink)]">Hộp thư Gmail bạn kết nối</h3>
               <p>Nội dung và tiêu đề thư cần xử lý được gửi tới nhà cung cấp mô hình AI bên thứ ba đã cấu hình để lập kế hoạch, tóm tắt hoặc trả lời (tối đa 10 luồng mỗi lần tìm kiếm; mỗi luồng đọc tối đa 5 thư gần nhất với giới hạn 4.000 ký tự mỗi thư và 12.000 ký tự cả luồng, kèm chỉ số totalMessages/omittedMessages khi luồng bị cắt bớt).</p>
               <p>Token được mã hoá trong cơ sở dữ liệu. Thao tác ghi Gmail trong hội thoại luôn chờ bạn duyệt từng kế hoạch; riêng lịch trình tổng hợp định kỳ có nguồn Gmail chỉ tự động đọc và gửi tóm tắt sau khi bạn xác nhận một lần phạm vi nguồn cùng đích nhận đã ghim, và sẽ tự dừng nếu hộp thư đã ghim bị ngắt kết nối hoặc thay đổi. Nội dung thư nằm trong kết quả tra cứu và trong lời gọi model; câu trả lời, hội thoại và kế hoạch có nội dung thư được giữ lại. Tham số và kết quả bước đã chạy giữ người nhận, tiêu đề và nội dung thư Planora gửi. Khi bạn yêu cầu đọc tệp đính kèm (giới hạn 5 MB, rút trích tối đa 8.000 ký tự) hoặc bật tóm tắt AI cho bản tin, nội dung trích xuất có thể được gửi tới nhà cung cấp mô hình AI bên thứ ba đã cấu hình; bạn có thể tắt tóm tắt AI trên từng lịch bản tin Telegram. Bộ nhớ làm việc giữ ID và người tham gia; tiêu đề luồng còn ở nhãn tài nguyên, không gửi trong bộ nhớ cho model. Nhãn xem trước giữ tiêu đề luồng và nguồn người nhận.</p>
               <p>Khi ngắt kết nối Gmail, token mã hoá lưu cục bộ tại Planora bị xoá ngay; việc thu hồi quyền OAuth phía Google được thực hiện có điều kiện theo nỗ lực tốt nhất (ví dụ: không thu hồi chung nếu một kết nối Google cá nhân khác đang dùng chung grant hoặc khi kết nối mạng tới Google gặp lỗi — bạn luôn có thể thu hồi trực tiếp trong cài đặt Tài khoản Google). Dữ liệu phát sinh từ thư trong hội thoại, câu trả lời, kế hoạch, kết quả bước đã chạy và nhãn tài nguyên vẫn được giữ lại sau khi ngắt kết nối. Hiện chưa có chức năng xoá hội thoại. Planora không xoá vĩnh viễn thư.</p>
             </section>}
-          {mycalendarEnabled && <section aria-label="Dữ liệu Google Calendar của bạn" className="p-4 rounded-2xl bg-[#F8F4EE] border border-[#E8E0D6] text-xs sm:text-sm v3-space-y-3">
-              <h3 className="font-semibold text-[#1a0e08]">Dữ liệu Google Calendar của bạn</h3>
+          {mycalendarEnabled && <section aria-label="Dữ liệu Google Calendar của bạn" className="p-4 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)] text-sm text-[var(--ps-muted)] v3-space-y-3 mb-4 max-w-[70ch]">
+              <h3 className="font-semibold text-[var(--ps-ink)]">Dữ liệu Google Calendar của bạn</h3>
               <p>Khi kết nối, Google cấp quyền đọc lịch (calendar.readonly) và quản lý sự kiện (calendar.events); ở tầng ứng dụng, Planora kiểm soát danh sách lịch được phép và chỉ đọc hoặc truy vấn sự kiện trên các lịch bạn đã chọn. Dữ liệu văn bản cần thiết được gửi qua hệ thống AI lập kế hoạch để phân tích.</p>
               <p>Planora chỉ tạo, cập nhật hoặc huỷ sự kiện trên lịch đã chọn sau khi bạn bấm phê duyệt kế hoạch và chỉ gửi email mời họp khi bước kế hoạch bật rõ tuỳ chọn gửi lời mời.</p>
-              <p>Bạn có thể thay đổi danh sách lịch được dùng hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#mycalendar" onClick={appLink(navigate, '/settings#mycalendar')} className="text-[#FF5701] underline font-medium">Kết nối dịch vụ</a>. Khi ngắt kết nối, Planora xoá token cùng phạm vi lịch đã lưu và gửi yêu cầu thu hồi token tới Google (hội thoại và kế hoạch cũ vẫn được giữ lại); bạn cũng có thể kiểm tra hoặc gỡ quyền trực tiếp trong trang quản lý quyền của tài khoản Google (Google Account).</p>
+              <p>Bạn có thể thay đổi danh sách lịch được dùng hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#mycalendar" onClick={appLink(navigate, '/settings#mycalendar')} className="text-[var(--ps-accent-text)] underline font-medium">Kết nối dịch vụ</a>. Khi ngắt kết nối, Planora xoá token cùng phạm vi lịch đã lưu và gửi yêu cầu thu hồi token tới Google (hội thoại và kế hoạch cũ vẫn được giữ lại); bạn cũng có thể kiểm tra hoặc gỡ quyền trực tiếp trong trang quản lý quyền của tài khoản Google (Google Account).</p>
             </section>}
-          {mysheetsEnabled && <section aria-label="Bảng tính Google Sheets của bạn" className="p-4 rounded-2xl bg-[#F8F4EE] border border-[#E8E0D6] text-xs sm:text-sm v3-space-y-3">
-              <h3 className="font-semibold text-[#1a0e08]">Bảng tính Google Sheets của bạn</h3>
+          {mysheetsEnabled && <section aria-label="Bảng tính Google Sheets của bạn" className="p-4 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)] text-sm text-[var(--ps-muted)] v3-space-y-3 mb-4 max-w-[70ch]">
+              <h3 className="font-semibold text-[var(--ps-ink)]">Bảng tính Google Sheets của bạn</h3>
               <p>Planora truy cập các bảng tính mà bạn chủ động chọn trong cửa sổ Google Picker hoặc tạo qua ứng dụng (phạm vi OAuth drive.file). Dữ liệu ô tính được đọc đi qua 9router để model lập kế hoạch và trả lời.</p>
               <p>Đối với bảng tính, Planora kiểm tra danh sách cho phép (allowlist) ở tầng ứng dụng và chỉ thêm dòng, cập nhật cột, xoá dòng hoặc tạo trang tính (tab) sau khi bạn xem trước và phê duyệt kế hoạch. Ngoài các công cụ bảng tính, 2 công cụ đọc siêu dữ liệu/tài liệu Drive được mở trong phạm vi tệp đã cấp cho ứng dụng qua drive.file (mysheets.list_drive_files, mysheets.get_doc); toàn bộ 4 công cụ ghi Drive/Docs (create_drive_folder, create_doc, append_doc_text, move_drive_file) mặc định bị khóa bởi công tắc máy chủ (ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS=false) và khi bật phải tuân thủ kiểm tra đích cho phép (allowlist).</p>
               <p>Với lịch báo cáo tự động Google Sheets (cả Google Sheets cá nhân lẫn Google Sheets của Tổ chức/nhóm), khi bạn bật tùy chọn "Tóm tắt bằng AI bên thứ ba" (includeAiSummary = true), tiêu đề cột và tối đa 20 dòng cuối của vùng dữ liệu ở mỗi lượt chạy sẽ được gửi qua 9router tới nhà cung cấp mô hình AI bên thứ ba để viết đoạn nhận xét. Bạn có thể tắt tùy chọn này (includeAiSummary = false) ngay trên thẻ xác nhận hoặc cấp quyền lại lịch để chỉ chạy thống kê số liệu thuần (deterministic KPI) mà không gửi dữ liệu ô bảng tính định kỳ cho AI bên thứ ba.</p>
-              <p>Bạn có thể thay đổi danh sách bảng tính hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#mysheets" onClick={appLink(navigate, '/settings#mysheets')} className="text-[#FF5701] underline font-medium">Kết nối dịch vụ</a> hoặc thu hồi quyền trực tiếp tại Google. Khi ngắt kết nối, token và quyền truy cập sẽ bị thu hồi.</p>
+              <p>Bạn có thể thay đổi danh sách bảng tính hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#mysheets" onClick={appLink(navigate, '/settings#mysheets')} className="text-[var(--ps-accent-text)] underline font-medium">Kết nối dịch vụ</a> hoặc thu hồi quyền trực tiếp tại Google. Khi ngắt kết nối, token và quyền truy cập sẽ bị thu hồi.</p>
             </section>}
-          <section aria-label="Không gian Notion của bạn" className="p-4 rounded-2xl bg-[#F8F4EE] border border-[#E8E0D6] text-xs sm:text-sm v3-space-y-3 mt-4">
-            <h3 className="font-semibold text-[#1a0e08]">Không gian Notion bạn kết nối</h3>
+          <section aria-label="Không gian Notion của bạn" className="p-4 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)] text-sm text-[var(--ps-muted)] v3-space-y-3 mt-4 max-w-[70ch]">
+            <h3 className="font-semibold text-[var(--ps-ink)]">Không gian Notion bạn kết nối</h3>
             <p>Khi kết nối Notion cá nhân qua OAuth 2.0 1-Click, Planora chỉ đọc cấu trúc cột database, truy vấn/tìm trang, đọc nội dung khối, đọc bình luận, tạo hoặc cập nhật trang và thêm bình luận trong đúng danh sách Database (tối đa 10 database) mà bạn đã cấp quyền trong Workspace cá nhân (tách biệt hoàn toàn với cấu hình Notion dùng chung của Workspace Tổ chức).</p>
-            <p>Mọi thao tác tạo trang mới, cập nhật thuộc tính trang hoặc trạng thái thùng rác, nối khối văn bản và thêm bình luận đều phải hiển thị bản xem trước và được bạn bấm phê duyệt trước khi thực thi. Bạn có thể đổi phạm vi database, chuyển đổi Workspace hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#notion" onClick={appLink(navigate, '/settings#notion')} className="text-[#FF5701] underline font-medium">Kết nối dịch vụ</a>.</p>
+            <p>Mọi thao tác tạo trang mới, cập nhật thuộc tính trang hoặc trạng thái thùng rác, nối khối văn bản và thêm bình luận đều phải hiển thị bản xem trước và được bạn bấm phê duyệt trước khi thực thi. Bạn có thể đổi phạm vi database, chuyển đổi Workspace hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#notion" onClick={appLink(navigate, '/settings#notion')} className="text-[var(--ps-accent-text)] underline font-medium">Kết nối dịch vụ</a>.</p>
           </section>
-          <section aria-label="Tài khoản Jira Cloud bạn kết nối" className="p-4 rounded-2xl bg-[#F8F4EE] border border-[#E8E0D6] text-xs sm:text-sm v3-space-y-3 mt-4">
-            <h3 className="font-semibold text-[#1a0e08]">Tài khoản Jira Cloud bạn kết nối</h3>
+          <section aria-label="Tài khoản Jira Cloud bạn kết nối" className="p-4 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)] text-sm text-[var(--ps-muted)] v3-space-y-3 mt-4 max-w-[70ch]">
+            <h3 className="font-semibold text-[var(--ps-ink)]">Tài khoản Jira Cloud bạn kết nối</h3>
             <p>Khi bạn kết nối Jira Cloud qua Atlassian OAuth 2.0 (3LO) trong Workspace Tổ chức (<code>read:me</code>, <code>read:jira-work</code>, <code>write:jira-work</code>, <code>offline_access</code>), Planora chỉ truy cập đúng các site và project mà quản trị viên cùng bạn đã chọn cấp quyền trong Workspace hiện tại.</p>
             <p>Dữ liệu Jira đọc được (danh sách site, project, tiêu đề, mô tả, trạng thái và hạn xử lý của issue) được gửi tới nhà cung cấp mô hình AI bên thứ ba đã cấu hình để lập kế hoạch hoặc trả lời (trừ khi quản trị máy chủ tắt qua cấu hình <code>JIRA_LLM_EGRESS_ENABLED=off</code> hoặc bạn tắt tóm tắt AI trên lịch Bản tin Standup định kỳ).</p>
             <p>Planora chỉ tạo issue, cập nhật thuộc tính, chuyển trạng thái tiến độ hoặc thêm bình luận sau khi bạn xem trước đích ghi và bấm phê duyệt kế hoạch. Các bảng hội thoại, kế hoạch và bước thực thi vẫn giữ lại nội dung và tham số đã chạy kể cả sau khi bạn ngắt kết nối Jira.</p>
             <p>Ngắt kết nối trên Planora chỉ xoá token cục bộ và phạm vi project đã lưu, không tự xoá lịch sử hội thoại đã lưu và không tự thu hồi grant phía Atlassian nếu bạn chưa thu hồi quyền trực tiếp trong trang cài đặt tài khoản Atlassian.</p>
           </section>
-          <section aria-label="Tài khoản GitHub bạn kết nối" className="p-4 rounded-2xl bg-[#F8F4EE] border border-[#E8E0D6] text-xs sm:text-sm v3-space-y-3 mt-4">
-            <h3 className="font-semibold text-[#1a0e08]">Tài khoản GitHub bạn kết nối</h3>
+          <section aria-label="Tài khoản GitHub bạn kết nối" className="p-4 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)] text-sm text-[var(--ps-muted)] v3-space-y-3 mt-4 max-w-[70ch]">
+            <h3 className="font-semibold text-[var(--ps-ink)]">Tài khoản GitHub bạn kết nối</h3>
             <p>Khi kết nối GitHub qua OAuth 2.0 1-Click, Planora chỉ đọc và thao tác trong phạm vi tối đa 10 repository được chọn cho Workspace đang kích hoạt (ở Workspace cá nhân bạn tự chọn repository của mình; ở Workspace tổ chức, quản trị viên cấu hình danh sách repository dùng chung và từng thành viên tự liên kết tài khoản GitHub cá nhân). Dữ liệu đọc từ repository (tiêu đề, mô tả, bình luận và siêu dữ liệu issue/Pull Request) được gửi tới nhà cung cấp mô hình AI bên thứ ba đã cấu hình để lập kế hoạch, trả lời hoặc tóm tắt.</p>
             <p>Mọi thao tác ghi (tạo hoặc cập nhật issue, gắn nhãn, thêm bình luận, tạo Pull Request kể cả PR nháp và mời người review) luôn hiển thị bản xem trước và chỉ thực thi sau khi bạn bấm phê duyệt kế hoạch; lịch bản tin GitHub định kỳ chỉ sử dụng quyền đọc và kiểm tra lại quyền truy cập repository ở mỗi lượt chạy.</p>
-            <p>Bạn có thể đổi danh sách repository hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#github" onClick={appLink(navigate, '/settings#github')} className="text-[#FF5701] underline font-medium">Kết nối dịch vụ</a>. Ngắt kết nối trên Planora sẽ xoá ngay token mã hoá lưu cục bộ, vẫn giữ lại hội thoại, kế hoạch và kết quả bước đã lưu trong cơ sở dữ liệu, và không tự thu hồi grant phía GitHub nếu bạn chưa thu hồi quyền trực tiếp trong phần cài đặt ứng dụng của tài khoản GitHub.</p>
+            <p>Bạn có thể đổi danh sách repository hoặc ngắt kết nối bất cứ lúc nào tại <a href="/settings#github" onClick={appLink(navigate, '/settings#github')} className="text-[var(--ps-accent-text)] underline font-medium">Kết nối dịch vụ</a>. Ngắt kết nối trên Planora sẽ xoá ngay token mã hoá lưu cục bộ, vẫn giữ lại hội thoại, kế hoạch và kết quả bước đã lưu trong cơ sở dữ liệu, và không tự thu hồi grant phía GitHub nếu bạn chưa thu hồi quyền trực tiếp trong phần cài đặt ứng dụng của tài khoản GitHub.</p>
           </section>
-            {/* Quy định duyệt tài khoản Google mới */}
-          <div className="p-4 rounded-2xl bg-[#F8F4EE] border border-[#E8E0D6] text-xs sm:text-sm text-[#51463E]">
-            <div className="font-semibold text-[#1a0e08] mb-1 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#FF5701]" />
-              <span>
-                Lưu ý quan trọng về tài khoản Google mới:
-              </span>
+          {/* Quy định duyệt tài khoản Google mới */}
+          <div className="p-4 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)] text-sm text-[var(--ps-muted)] mt-4 max-w-[70ch]">
+            <div className="font-semibold text-[var(--ps-ink)] mb-1">
+              Lưu ý quan trọng về tài khoản Google mới
             </div>
             <p className="leading-relaxed">
               {"Đăng ký bằng tài khoản Google mới vẫn phải trải qua bước "}
-              <strong className="text-[#1a0e08]">
+              <strong className="text-[var(--ps-ink)]">
                 Quản trị viên nhóm phê duyệt
               </strong>
               {" giống như đăng ký bằng email thông thường. Điều này nhằm ngăn chặn người ngoài tổ chức tự ý đăng nhập vào các tài nguyên chung (Trello, Slack, GitHub) của nhóm bạn."}
@@ -516,33 +412,30 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
         {/* ======================================================= */}
         {/* PHẦN 4: PHÂN QUYỀN THÀNH VIÊN VÀ QUẢN TRỊ VIÊN */}
         {/* ======================================================= */}
-        <section id="member-roles" className="mb-14 scroll-mt-20" data-od-id="section-member-roles">
-          <h2 className="font-display font-medium text-2xl sm:text-[26px] text-[#1a0e08] tracking-tight mb-2">
-            4. Phân định quyền hạn: Thành viên &amp; Quản trị viên
+        <section id="member-roles" className="mb-12 scroll-mt-20" data-od-id="section-member-roles">
+          <h2 className="text-xl sm:text-2xl font-semibold text-[var(--ps-ink)] tracking-tight mb-2">
+            Phân định quyền hạn: Thành viên &amp; Quản trị viên
           </h2>
-          <p className="text-sm text-[#6A5F56] mb-6">
+          <p className="text-sm text-[var(--ps-muted)] mb-5 max-w-[70ch]">
             Hệ thống phân chia 2 vai trò rõ ràng để vừa đảm bảo tính tiện lợi trong công việc, vừa hạn chế rủi ro lộ khoá dịch vụ.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Cột Thành viên */}
-            <div className="p-6 bg-white rounded-3xl border border-[#E8E0D6] shadow-soft-card">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-[#1a0e08] flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-blue-500" />
-                  <span>
-                    Thành viên (Member)
-                  </span>
+            <div className="ps-panel p-5 sm:p-6">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <h3 className="text-base font-semibold text-[var(--ps-ink)]">
+                  Thành viên (Member)
                 </h3>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">
+                <span className="ps-status ps-status-neutral">
                   Người dùng thường
                 </span>
               </div>
-              <p className="text-xs text-[#6A5F56] mb-4">
+              <p className="text-[13px] text-[var(--ps-faint)] mb-4">
                 Dành cho các thành viên trong nhóm dùng Planora để điều phối công việc hằng ngày.
               </p>
-              <ul className="v3-space-y-2.5 text-xs sm:text-sm text-[#4a4038]">
+              <ul className="v3-space-y-2.5 text-sm text-[var(--ps-muted)]">
                 <li className="flex items-start gap-2">
-                  <span className="text-emerald-600 font-bold mt-0.5">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
                     ✓
                   </span>
                   <span>
@@ -550,7 +443,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-emerald-600 font-bold mt-0.5">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
                     ✓
                   </span>
                   <span>
@@ -558,7 +451,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-emerald-600 font-bold mt-0.5">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
                     ✓
                   </span>
                   <span>
@@ -566,7 +459,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-emerald-600 font-bold mt-0.5">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
                     ✓
                   </span>
                   <span>
@@ -574,14 +467,14 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-emerald-600 font-bold mt-0.5">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
                     ✓
                   </span>
                   <span>
                     Đổi tên hiển thị, mật khẩu và thu hồi các phiên đăng nhập cá nhân.
                   </span>
                 </li>
-                <li className="flex items-start gap-2 text-[#9CA3AF]">
+                <li className="flex items-start gap-2 text-[var(--ps-faint)]">
                   <span className="font-bold mt-0.5">
                     ✕
                   </span>
@@ -589,7 +482,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                     Không thể xem hoặc thay đổi khoá kết nối dịch vụ chung.
                   </span>
                 </li>
-                <li className="flex items-start gap-2 text-[#9CA3AF]">
+                <li className="flex items-start gap-2 text-[var(--ps-faint)]">
                   <span className="font-bold mt-0.5">
                     ✕
                   </span>
@@ -600,25 +493,21 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
               </ul>
             </div>
             {/* Cột Quản trị viên */}
-            <div className="p-6 bg-white rounded-3xl border border-[#FF5701]/30 shadow-soft-card relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-24 h-24 bg-[#FF5701]/5 rounded-bl-full pointer-events-none" aria-hidden="true" />
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-[#1a0e08] flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-[#FF5701]" />
-                  <span>
-                    Quản trị viên (Admin)
-                  </span>
+            <div className="ps-panel p-5 sm:p-6">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <h3 className="text-base font-semibold text-[var(--ps-ink)]">
+                  Quản trị viên (Admin)
                 </h3>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-orange-50 text-[#FF5701] font-semibold border border-orange-200">
+                <span className="ps-status text-[var(--ps-accent-text)]">
                   Toàn quyền kiểm soát
                 </span>
               </div>
-              <p className="text-xs text-[#6A5F56] mb-4">
+              <p className="text-[13px] text-[var(--ps-faint)] mb-4">
                 Dành cho trưởng nhóm, người quản lý môi trường làm việc và tích hợp công cụ.
               </p>
-              <ul className="v3-space-y-2.5 text-xs sm:text-sm text-[#4a4038]">
+              <ul className="v3-space-y-2.5 text-sm text-[var(--ps-muted)]">
                 <li className="flex items-start gap-2">
-                  <span className="text-[#FF5701] font-bold mt-0.5">
+                  <span className="text-[var(--ps-accent-text)] font-bold mt-0.5">
                     ✓
                   </span>
                   <span>
@@ -626,7 +515,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-[#FF5701] font-bold mt-0.5">
+                  <span className="text-[var(--ps-accent-text)] font-bold mt-0.5">
                     ✓
                   </span>
                   <span>
@@ -634,7 +523,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-[#FF5701] font-bold mt-0.5">
+                  <span className="text-[var(--ps-accent-text)] font-bold mt-0.5">
                     ✓
                   </span>
                   <span>
@@ -642,7 +531,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-[#FF5701] font-bold mt-0.5">
+                  <span className="text-[var(--ps-accent-text)] font-bold mt-0.5">
                     ✓
                   </span>
                   <span>
@@ -650,7 +539,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-[#FF5701] font-bold mt-0.5">
+                  <span className="text-[var(--ps-accent-text)] font-bold mt-0.5">
                     ✓
                   </span>
                   <span>
@@ -658,7 +547,7 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="text-[#FF5701] font-bold mt-0.5">
+                  <span className="text-[var(--ps-accent-text)] font-bold mt-0.5">
                     ✓
                   </span>
                   <span>
@@ -672,43 +561,34 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
         {/* ======================================================= */}
         {/* PHẦN 5: XỬ LÝ SỰ CỐ MẠNG & THU HỒI PHIÊN */}
         {/* ======================================================= */}
-        <section id="network-fail" className="mb-14 scroll-mt-20 bg-white p-6 sm:p-8 rounded-3xl border border-[#E8E0D6] shadow-soft-card" data-od-id="section-network-fail">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-xl bg-neutral-100 flex items-center justify-center text-[#1a0e08]">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                {' '}
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                {' '}
-              </svg>
-            </div>
-            <h2 className="font-display font-medium text-2xl text-[#1a0e08] tracking-tight">
-              5. Quy trình bảo vệ khi gián đoạn mạng và hết phiên
-            </h2>
-          </div>
-          <div className="v3-space-y-4 text-xs sm:text-sm text-[#51463E]">
-            <div className="p-4 rounded-2xl bg-[#F8F4EE] border border-[#E8E0D6]">
-              <h3 className="font-bold text-[#1a0e08] mb-1.5 text-sm sm:text-base">
+        <section id="network-fail" className="mb-12 scroll-mt-20 ps-panel p-6 sm:p-8" data-od-id="section-network-fail">
+          <h2 className="text-xl sm:text-2xl font-semibold text-[var(--ps-ink)] tracking-tight mb-4">
+            Quy trình bảo vệ khi gián đoạn mạng và hết phiên
+          </h2>
+          <div className="v3-space-y-4 text-sm text-[var(--ps-muted)] max-w-[70ch]">
+            <div className="p-4 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)]">
+              <h3 className="font-semibold text-[var(--ps-ink)] mb-1.5 text-base">
                 Mạng ngắt giữa chừng khi đang ghi dữ liệu
               </h3>
               <p className="leading-relaxed">
                 Nếu kết nối mạng của bạn hoặc kết nối giữa Planora và dịch vụ bên thứ ba (Slack, GitHub, Sheets...) bị ngắt trong lúc việc đang thực hiện, hệ thống không tự ý phát lệnh lại. Thay vào đó, giao diện làm việc sẽ hiển thị thông báo chi tiết: liệt kê chính xác các việc đã hoàn tất kèm đường dẫn kết quả, việc đang dở dang và việc chưa làm, để bạn có thể kiểm tra thực tế trên công cụ rồi mới quyết định tiếp tục hay dừng lại.
               </p>
             </div>
-            <div className="p-4 rounded-2xl bg-[#F8F4EE] border border-[#E8E0D6]">
-              <h3 className="font-bold text-[#1a0e08] mb-1.5 text-sm sm:text-base">
+            <div className="p-4 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)]">
+              <h3 className="font-semibold text-[var(--ps-ink)] mb-1.5 text-base">
                 Thời hạn phiên đăng nhập
               </h3>
               <p className="leading-relaxed">
                 Phiên đăng nhập có hạn 7 ngày. Khi phiên hết hạn, bạn đăng nhập lại; lịch sử hội thoại và kế hoạch đã lưu vẫn còn.
               </p>
             </div>
-            <div className="p-4 rounded-2xl bg-[#F8F4EE] border border-[#E8E0D6]">
-              <h3 className="font-bold text-[#1a0e08] mb-1.5 text-sm sm:text-base">
+            <div className="p-4 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)]">
+              <h3 className="font-semibold text-[var(--ps-ink)] mb-1.5 text-base">
                 Thu hồi phiên truy cập tức thì
               </h3>
               <p className="leading-relaxed">
                 Trong mục Cài đặt tài khoản (
-                <a href="/account" onClick={appLink(navigate, '/account')} className="text-[#FF5701] underline underline-offset-2">
+                <a href="/account" onClick={appLink(navigate, '/account')} className="text-[var(--ps-accent-text)] underline underline-offset-2">
                   Tài khoản
                 </a>
                 ), bạn có thể kiểm tra danh sách toàn bộ các thiết bị (trình duyệt, máy tính, điện thoại) đang đăng nhập và bấm nút “Đăng xuất khỏi mọi thiết bị khác” để chấm dứt phiên ngay lập tức khi phát hiện nghi vấn.
@@ -719,93 +599,78 @@ export function PrivacyPage({ navigate, user = null, onLogout = () => navigate('
         {/* ======================================================= */}
         {/* PHẦN 6: LƯU TRỮ VÀ QUYỀN XOÁ DỮ LIỆU */}
         {/* ======================================================= */}
-        <section id="retention-delete" className="mb-14 scroll-mt-20 bg-white p-6 sm:p-8 rounded-3xl border border-[#E8E0D6] shadow-soft-card" data-od-id="section-retention-delete">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-xl bg-neutral-100 flex items-center justify-center text-[#1a0e08]">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                {' '}
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                {' '}
-              </svg>
-            </div>
-            <h2 className="font-display font-medium text-2xl text-[#1a0e08] tracking-tight">
-              6. Thời hạn lưu trữ và quyền xoá dữ liệu
-            </h2>
-          </div>
-          <div className="v3-space-y-4 text-xs sm:text-sm text-[#51463E]">
+        <section id="retention-delete" className="mb-12 scroll-mt-20 ps-panel p-6 sm:p-8" data-od-id="section-retention-delete">
+          <h2 className="text-xl sm:text-2xl font-semibold text-[var(--ps-ink)] tracking-tight mb-4">
+            Thời hạn lưu trữ và quyền xoá dữ liệu
+          </h2>
+          <div className="v3-space-y-4 text-sm text-[var(--ps-muted)] max-w-[70ch]">
             <p className="leading-relaxed">
-              <strong className="text-[#1a0e08]">
+              <strong className="text-[var(--ps-ink)]">
                 Nhật ký điều phối:
               </strong>
               {" Planora lưu trong cơ sở dữ liệu của nhóm: các tin nhắn trong hội thoại, kế hoạch bạn đã duyệt và kết quả từng bước (kể cả dữ liệu Planora đọc được khi tra cứu, như tên bảng, tiêu đề issue, nội dung ô). Khoá dịch vụ được mã hoá khi lưu."}
             </p>
             <p className="leading-relaxed">
-              <strong className="text-[#1a0e08]">
+              <strong className="text-[var(--ps-ink)]">
                 Dữ liệu trên công cụ đối tác:
               </strong>
               {" Mọi thẻ Trello, issue GitHub, dòng Sheets hay tin nhắn Slack sau khi hoàn thành đều thuộc quyền sở hữu của bạn trên các nền tảng tương ứng. Khi cần chỉnh sửa hay xoá, bạn thao tác trực tiếp trên giao diện của công cụ đó theo quyền hạn của tài khoản."}
             </p>
             <p className="leading-relaxed">
-              <strong className="text-[#1a0e08]">
+              <strong className="text-[var(--ps-ink)]">
                 Ngừng sử dụng dịch vụ:
               </strong>
               {" Muốn ngừng dùng một dịch vụ nhóm, quản trị viên thu hồi khoá ngay trên trang của dịch vụ đó (Trello, Slack, GitHub…). Với các kết nối OAuth cá nhân (như Gmail, Google Calendar, Google Sheets), ngắt kết nối trên Planora sẽ xoá ngay token đã lưu cục bộ và gửi yêu cầu thu hồi grant tới nhà cung cấp có điều kiện theo nỗ lực tốt nhất (bạn luôn có thể thu hồi trực tiếp trên trang cài đặt tài khoản Google); dữ liệu đã phát sinh từ thư, lịch hoặc bảng tính trong hội thoại, câu trả lời, kế hoạch và kết quả bước trước đó vẫn lưu lại trong cơ sở dữ liệu."}
             </p>
           </div>
           {/* Khối liên hệ báo cáo bảo mật */}
-          <div className="mt-8 pt-6 border-t border-[#E8E0D6] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[#F8F4EE] p-5 rounded-2xl border border-[#E8E0D6]">
+          <div className="mt-8 pt-6 border-t border-[var(--ps-edge)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h4 className="text-sm font-bold text-[#1a0e08]">
+              <h4 className="text-sm font-semibold text-[var(--ps-ink)]">
                 Bạn có thắc mắc hoặc cần báo cáo vấn đề an toàn?
               </h4>
-              <p className="text-xs text-[#6A5F56] mt-0.5">
+              <p className="text-[13px] text-[var(--ps-faint)] mt-0.5">
                 Đội ngũ kỹ thuật nội bộ luôn sẵn sàng hỗ trợ và giải đáp minh bạch.
               </p>
             </div>
-            <div className="px-4 py-2 min-h-[40px] rounded-xl bg-white border border-[#E8E0D6] text-[#1a0e08] text-xs font-semibold shadow-sm flex-shrink-0 inline-flex items-center gap-2">
-              <svg className="w-4 h-4 text-[#FF5701]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                {' '}
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                {' '}
-              </svg>
-              <span>
-                Hãy báo quản trị viên của nhóm.
-              </span>
-            </div>
+            <p className="text-sm font-medium text-[var(--ps-ink)] flex-shrink-0">
+              Hãy báo quản trị viên của nhóm.
+            </p>
           </div>
         </section>
       </main>
-      {/* ==================== FOOTER ==================== */}
-      <footer className="mt-auto border-t border-[#E8E0D6] bg-white py-8 px-4 sm:px-6" data-od-id="privacy-footer">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-[#6A5F56]">
-          <div className="flex items-center gap-2">
-            <PlanoraMark className="w-4 h-4 text-[#1a0e08] dark:text-[#F3EEE8] flex-shrink-0" />
-            <span className="font-semibold text-[#1a0e08]">
-              Planora
-            </span>
-            <span>
-              — AI Workflow Automation Platform · 2026
-            </span>
+      {!user && (
+        <footer className="mt-auto border-t border-[var(--ps-edge)] bg-[var(--ps-sheet)] py-8 px-4 sm:px-6" data-od-id="privacy-footer">
+          <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-[13px] text-[var(--ps-faint)]">
+            <div className="flex items-center gap-2">
+              <PlanoraMark className="w-4 h-4 text-[var(--ps-ink)] flex-shrink-0" />
+              <span className="font-semibold text-[var(--ps-ink)]">
+                Planora
+              </span>
+              <span>
+                — AI Workflow Automation Platform · 2026
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[var(--ps-muted)]">
+              <a href="/" onClick={appLink(navigate, '/')} className="hover:text-[var(--ps-ink)] transition-colors">
+                Trang chủ
+              </a>
+              <a href="/guide" onClick={appLink(navigate, '/guide')} className="hover:text-[var(--ps-ink)] transition-colors">
+                Cẩm nang
+              </a>
+              <a href="/settings" onClick={appLink(navigate, '/settings')} className="hover:text-[var(--ps-ink)] transition-colors">
+                Kết nối dịch vụ
+              </a>
+              <a href="/history" onClick={appLink(navigate, '/history')} className="hover:text-[var(--ps-ink)] transition-colors">
+                Nhật ký điều phối
+              </a>
+              <a href="/privacy" onClick={appLink(navigate, '/privacy')} className="text-[var(--ps-accent-text)] font-medium transition-colors" aria-current="page">
+                Chính sách an toàn
+              </a>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[#51463E]">
-            <a href="/" onClick={appLink(navigate, '/')} className="hover:text-[#1a0e08] transition-colors">
-              {user ? 'Không gian làm việc' : 'Trang chủ'}
-            </a>
-            <a href="/guide" onClick={appLink(navigate, '/guide')} className="hover:text-[#1a0e08] transition-colors">
-              Cẩm nang
-            </a>
-            <a href="/settings" onClick={appLink(navigate, '/settings')} className="hover:text-[#1a0e08] transition-colors">
-              Kết nối dịch vụ
-            </a>
-            <a href="/history" onClick={appLink(navigate, '/history')} className="hover:text-[#1a0e08] transition-colors">
-              Nhật ký điều phối
-            </a>
-            <a href="/privacy" onClick={appLink(navigate, '/privacy')} className="text-[#FF5701] font-medium transition-colors" aria-current="page">
-              Chính sách an toàn
-            </a>
-          </div>
-        </div>
-      </footer>
+        </footer>
+      )}
     </>
   );
 }

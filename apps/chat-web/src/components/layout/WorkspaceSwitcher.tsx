@@ -412,14 +412,14 @@ export function WorkspaceSwitcher({ navigate, variant = 'bar' }: WorkspaceSwitch
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-medium text-[#51463E] dark:text-[#AFA59A] hover:bg-[#F3F3EF] dark:hover:bg-[#2A231E]"
+                    className="ps-btn-quiet"
                   >
                     Hủy
                   </button>
                   <button
                     type="submit"
                     disabled={createBusy}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#C84300] text-white hover:bg-[#A83800] shadow-xs disabled:opacity-50"
+                    className="ps-btn"
                   >
                     {createBusy ? 'Đang tạo...' : 'Xác nhận tạo'}
                   </button>
@@ -496,14 +496,14 @@ export function WorkspaceSwitcher({ navigate, variant = 'bar' }: WorkspaceSwitch
                   <button
                     type="button"
                     onClick={() => setShowJoinModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-medium text-[#51463E] dark:text-[#AFA59A] hover:bg-[#F3F3EF] dark:hover:bg-[#2A231E]"
+                    className="ps-btn-quiet"
                   >
                     Đóng
                   </button>
                   <button
                     type="submit"
                     disabled={joinBusy}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#C84300] text-white hover:bg-[#A83800] shadow-xs disabled:opacity-50"
+                    className="ps-btn"
                   >
                     {joinBusy ? 'Đang kiểm tra...' : 'Tham gia ngay'}
                   </button>
