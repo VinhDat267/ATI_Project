@@ -4,7 +4,7 @@ import { App } from '../src/App';
 import { ApiClient, apiClient } from '../src/services/api-client';
 import { authStorage } from '../src/services/auth-storage';
 import { useChatStore } from '../src/store/chat-store';
-import { UserNavMenu } from '../src/components/layout/UserNavMenu';
+import { MainNav } from '../src/components/layout/MainNav';
 
 const admin = { id: 'a1', email: 'admin@example.test', name: 'Admin', role: 'admin' as const };
 const candidate = { id: 'u1', email: 'candidate@example.test', name: 'Candidate', role: 'member', status: 'pending', emailVerified: true, hasPassword: true, hasGoogle: false, createdAt: '2026-10-04T01:00:00Z', openSessions: 0 };
@@ -40,15 +40,17 @@ it('hides the admin entry and denies direct navigation for a member', async () =
   expect(await screen.findByRole('alert')).toHaveTextContent('quyền quản trị');
   expect(apiClient.request).not.toHaveBeenCalled();
   cleanup();
-  render(<UserNavMenu user={member} onOpenSettings={() => {}} onLogout={() => {}} />);
+  render(<MainNav user={member} current="workspace" navigate={() => {}} onLogout={() => {}} />);
+  expect(screen.queryByRole('link', { name: 'Người dùng' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: /Menu người dùng/ }));
-  expect(screen.queryByText('Quản lý người dùng')).toBeNull();
+  expect(screen.queryByRole('menuitem', { name: /Người dùng/i })).toBeNull();
 });
 
 it('shows the admin navigation entry only with the current admin role', () => {
-  render(<UserNavMenu user={admin} onOpenSettings={() => {}} onLogout={() => {}} />);
+  render(<MainNav user={admin} current="workspace" navigate={() => {}} onLogout={() => {}} />);
+  expect(screen.getByRole('link', { name: 'Người dùng' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /Menu người dùng/ }));
-  expect(screen.getByRole('menuitem', { name: 'Quản lý người dùng' })).toBeInTheDocument();
+  expect(screen.queryByRole('menuitem', { name: /Người dùng/i })).toBeNull();
 });
 
 it('keeps pending accounts in the approval flow without lock or unlock actions', async () => {

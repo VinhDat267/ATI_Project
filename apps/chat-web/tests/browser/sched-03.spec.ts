@@ -34,10 +34,11 @@ async function shot(page: Page, name: string, info: TestInfo) {
   await appendFile(resolve(folder, 'manifest.sha256'), `${sha}  ${path}\n`); console.log(`SCHED-03 screenshot ${sha} ${path}`);
 }
 async function pendingBadge(page: Page, width: number, count: number) {
-  if (width >= 1024) await expect(page.getByRole('link', { name: count ? `Tự động, ${count} lượt chờ duyệt` : 'Tự động', exact: true })).toBeVisible();
+  const expected = count ? `Tự động, ${count} lượt chờ duyệt` : 'Tự động';
+  if (width >= 1024) await expect(page.getByRole('link', { name: expected, exact: true })).toBeVisible();
   else {
-    await page.getByRole('button', { name: /Menu người dùng:/ }).click();
-    await expect(page.getByRole('menuitem', { name: count ? `Tự động, ${count} lượt chờ duyệt` : 'Tự động', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Mở menu điều hướng' }).click();
+    await expect(page.getByRole('link', { name: expected, exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
   }
 }

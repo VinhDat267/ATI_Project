@@ -121,6 +121,7 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
     setMenuOpen(false);
+    if (path === '/settings' && onOpenSettings) { onOpenSettings(); return; }
     navigate(path);
   };
   const newRequest = () => {
@@ -193,7 +194,7 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
         <div className="ml-auto flex items-center gap-1 flex-shrink-0">
           {actions}
           <ThemeToggle />
-          <UserNavMenu user={user} pendingScheduleCount={pendingCount} variant="prototype" triggerClassName={AVATAR} menuItemClassName={MENU_ITEM} navigate={navigate} currentPath={current ? TABS.find(t => t.id === current)?.path : undefined} inboxBadgeCount={inboxBadgeCount} onOpenSettings={onOpenSettings ?? (() => navigate('/settings'))} onOpenAccount={() => navigate('/account')} onManageUsers={() => navigate('/admin/users')} onLogout={onLogout} />
+          <UserNavMenu user={user} variant="prototype" triggerClassName={AVATAR} menuItemClassName={MENU_ITEM} navigate={navigate} currentPath={current ? TABS.find(t => t.id === current)?.path : (typeof window !== 'undefined' ? window.location.pathname : undefined)} onOpenAccount={() => navigate('/account')} onLogout={onLogout} />
         </div>
       </div>
       {children}
