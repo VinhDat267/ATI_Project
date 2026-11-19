@@ -420,10 +420,18 @@ export class ChatService {
     onGitHubTeamRepos?: (repos: Array<{ repoId: string; fullName: string; name: string }>) => void,
     onTelegramChats?: (chats: Array<{ chatId: string; title: string }>) => void,
     onNotionDatabases?: (databases: Array<{ id: string; title: string }>) => void,
-    conversation?: { id: string; row: ConversationRow | null },
+    conversation?: string | { id: string; row: ConversationRow | null },
   ): Promise<PlannerResponse> {
     signal?.throwIfAborted();
-    const conversationId = conversation?.id;
+    const conversationId = typeof conversation === 'string' ? conversation : conversation?.id;
+    let resolvedConversationRow: ConversationRow | null | undefined =
+      conversation && typeof conversation !== 'string' ? conversation.row : undefined;
+    const getConversationRow = async (): Promise<ConversationRow | null> => {
+      if (resolvedConversationRow !== undefined) return resolvedConversationRow;
+      resolvedConversationRow =
+        conversationId && this.convRepo ? await this.convRepo.getConversation(conversationId) : null;
+      return resolvedConversationRow;
+    };
     const bound = withoutConnections(plan);
     const usesGmail = bound.steps.some((step) => step.tool.startsWith('gmail.'));
     const usesMyCalendar = bound.steps.some((step) => step.tool.startsWith('mycalendar.'));
@@ -1014,7 +1022,7 @@ export class ChatService {
                   { signal: precheckSignal }
                 );
               } else if (this.getAdapter) {
-                const convForTrello = conversation?.row;
+                const convForTrello = await getConversationRow();
                 const trelloWorkspaceMode =
                   convForTrello?.workspace_mode ?? (scopeId !== 'default' ? 'organization' : 'legacy');
                 const trelloWorkspaceId =
@@ -1431,7 +1439,7 @@ export class ChatService {
     }
 
     if (usesNotion) {
-      const conv = conversation?.row;
+      const conv = await getConversationRow();
       const isOrgConv = conv?.workspace_mode === 'organization' || Boolean(conv?.workspace_id);
       const usesPersonalOnlyNotion = bound.steps.some((step) => PERSONAL_NOTION_TOOL_NAMES.has(step.tool));
       if (isOrgConv) {
@@ -1606,7 +1614,7 @@ export class ChatService {
         unavailableServices.push({ id: 'myjira', name: 'Jira' });
         reasons.push('Tính năng Jira chưa được kích hoạt trên hệ thống.');
       } else {
-        const conv = conversation?.row;
+        const conv = await getConversationRow();
         if (!conv) {
           unavailableServices.push({ id: 'myjira', name: 'Jira' });
           reasons.push('Hội thoại không tồn tại.');

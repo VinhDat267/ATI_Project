@@ -212,10 +212,10 @@ html.dark .ps-status-error { color: #F87171; }
 .ps-rows > * + * { border-top: 1px solid var(--ps-edge); }
 
 /* Ô soạn và lối tắt trong không gian làm việc dùng chung tông với Cổng duyệt. */
-.request-composer:focus-within { border-color: var(--ps-accent-text); }
+.request-composer:focus-within { border-color: var(--ps-accent); }
 .request-input { color: var(--ps-ink); min-height: 5.25rem; max-height: 40vh; }
 .request-input::placeholder { color: var(--ps-faint); opacity: 1; }
-.request-input:focus { outline: none; }
+.request-input:focus { outline: 2px solid transparent; outline-offset: 2px; }
 .request-composer .request-submit { min-height: 40px; margin-left: auto; }
 .request-tool {
   min-height: 40px; padding: 0 8px; border-radius: 8px; font-size: 13px;
