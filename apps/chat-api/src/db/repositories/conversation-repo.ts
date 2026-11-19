@@ -685,11 +685,12 @@ export class ConversationRepo {
     try {
       await client.query('BEGIN');
       await client.query("SET LOCAL lock_timeout = '5s'");
+      // Lock conversations first, then let assertConversationAccess lock workspace_members -> users
+      // (and ati_workspaces -> ati_workspace_memberships) in the repo's canonical lock order.
       const locked = await client.query(
-        `SELECT c.id FROM conversations c JOIN users u ON u.id = c.user_id
-         WHERE c.id = $1 AND c.user_id = $2 AND c.workspace_id IS NOT DISTINCT FROM $3::uuid
-           AND u.status = 'active'
-         FOR UPDATE OF c FOR SHARE OF u`,
+        `SELECT id FROM conversations
+         WHERE id = $1 AND user_id = $2 AND workspace_id IS NOT DISTINCT FROM $3::uuid
+         FOR UPDATE`,
         [id, userId, workspaceId],
       );
       if (!locked.rowCount) {
@@ -701,6 +702,16 @@ export class ConversationRepo {
         expectedWorkspaceId: workspaceId ?? null,
         lockMembership: true,
       });
+      if (!workspaceId) {
+        const activeUser = await client.query(
+          `SELECT id FROM users WHERE id = $1 AND status = 'active' FOR SHARE`,
+          [userId],
+        );
+        if (!activeUser.rowCount) {
+          await client.query('COMMIT');
+          return false;
+        }
+      }
 
       // Serialize with plan approval and execution claims before deciding which rows can be removed.
       const plans = await client.query<{ id: string; status: string }>(

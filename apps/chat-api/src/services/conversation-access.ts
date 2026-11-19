@@ -135,9 +135,9 @@ export async function assertConversationAccess(
     if (conv.jira_context) {
       const jiraMemberRes = await poolOrClient.query<{ active: boolean }>(
         `SELECT (jm.status = 'active' AND jw.status = 'active') AS active
-         FROM ati_workspace_memberships jm
-         JOIN ati_workspaces jw ON jw.id = jm.workspace_id
-         WHERE jm.workspace_id = $1 AND jm.user_id = $2${options?.lockMembership ? ' FOR SHARE OF jm, jw' : ''}`,
+         FROM ati_workspaces jw
+         JOIN ati_workspace_memberships jm ON jm.workspace_id = jw.id
+         WHERE jw.id = $1 AND jm.user_id = $2${options?.lockMembership ? ' FOR SHARE OF jw, jm' : ''}`,
         [conv.workspace_id, userId]
       );
 
