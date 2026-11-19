@@ -16,5 +16,7 @@ export const GMAIL_SERVICE: ServiceDefinition = {
     /(?<![\p{L}\p{N}_])thư\s+(?:từ|của|gửi\s+từ|có\s+tiêu\s+đề|có\s+đính\s+kèm|đính\s+kèm|hóa\s+đơn|hoá\s+đơn|báo\s+giá|hợp\s+đồng|khẩn)(?![\p{L}\p{N}_])/iu,
     /(?<![\p{L}\p{N}_])(?:tệp|file)\s+đính\s+kèm\s+(?:trong\s+)?thư(?![\p{L}\p{N}_])/iu,
     /(?<![\p{L}\p{N}_])chuyển\s+(?:các\s+|những\s+|mọi\s+|luồng\s+)?thư(?!(?:\s*(?:viện|ký|kí|giãn|mục))|[\p{L}\p{N}_])(?:[^\n]{0,60})?\bvào\s+thùng\s+rác(?![\p{L}\p{N}_])/iu,
+    // Direct send/share/forward to an explicit email address (e.g. "gửi link cho a@b.com"), excluding calendar invites and Slack/Telegram targets.
+    /(?<![\p{L}\p{N}_])(?:gửi|chuyển\s+tiếp|chia\s+sẻ|send|forward|share)(?![\p{L}\p{N}_])(?:(?!(?<![\p{L}\p{N}_])(?:lời\s+mời|invite|slack|telegram|kênh|channel)(?![\p{L}\p{N}_])|#)[^\n]){0,80}?(?<![\p{L}\p{N}_])(?:cho|tới|đến|to)\s+[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}(?![\p{L}\p{N}_])/iu,
   ],
 };

@@ -124,6 +124,70 @@ describe('grounded reports keep what the user asked for', () => {
       .toContain('Báo cáo tiến độ Jira Sprint (Sprint 24 - FE)');
   });
 
+  it.each(['COMPLETE', 'PARTIAL'])('filters Jira before the limit and binds the %s source result to Slack', async (completeness) => {
+    const openIssue = { id: '1', key: 'ATIT-1', title: 'Open task', status: 'In Progress' };
+    const closedIssue = { id: '2', key: 'ATIT-2', title: 'Finished task', status: 'Done' };
+    const request = { siteId: 'site-ati', projectKey: 'ATIT', limit: 3 };
+    const issueLookup = { ...request, query: closedIssue.key, limit: 1 };
+    const calls: Record<string, unknown>[] = [];
+    let outputCount = 0;
+    const planner = new AIPlanner({
+      toolCatalog: MYJIRA_CATALOG,
+      serviceRegistry: [...SERVICE_REGISTRY, MYJIRA_SERVICE],
+      searchMode: 'llm',
+      prefetchDirectory: false,
+      reportEvidenceStore: new ReportArtifactStore(),
+      gatherSearch: async ({ args }) => {
+        calls.push(args);
+        if (args.query === closedIssue.key) return { issues: [closedIssue] };
+        return { issues: args.openOnly ? [openIssue] : [closedIssue, openIssue], coverage: { completeness } };
+      },
+      provider: {
+        name: 'mock', model: 'mock',
+        generatePlan: async ({ conversationHistory }) => {
+          if (outputCount++ === 0) {
+            return JSON.stringify({ kind: 'search', calls: [issueLookup, request].map((args) => ({ tool: 'myjira.search_issues', args })) });
+          }
+          expect(conversationHistory.at(-1)?.content).toContain('ATIT-1');
+          return JSON.stringify({ kind: 'plan', thinking: 'Đọc rồi gửi', summary: 'Gửi danh sách', warnings: [], steps: [
+            { id: 's_post', tool: 'slack.send_message', description: 'Gửi', args: { channel: 'C_ATI', text: 'Placeholder' }, dependsOn: [] },
+          ] });
+        },
+      },
+    });
+    const memory = new WorkingMemory();
+    memory.setEntity('workflow_resource_defaults', { slack: { channelId: 'C_ATI', channelName: 'ati-test' } });
+    memory.setEntity('jira_site', [{ id: 'site-ati', siteId: 'site-ati', cloudId: 'cloud-ati', workspaceId: 'w1', name: 'ATI Jira' }]);
+    memory.setEntity('jira_project', [{ id: '1001', key: 'ATIT', siteId: 'site-ati', cloudId: 'cloud-ati', workspaceId: 'w1', name: 'ATI Test' }]);
+
+    const response = await planner.processMessage({
+      userMessage: 'Tra cứu tối đa 3 công việc đang mở trong dự án Jira ATIT. Soạn bản tóm tắt demo gồm mã và trạng thái của các công việc để gửi vào kênh Slack #ati-test sau khi tôi duyệt.',
+      memory,
+      actor: { userId: 'u1', workspaceId: 'w1' },
+    });
+
+    expect(response.kind).toBe('plan');
+    if (response.kind !== 'plan') return;
+    const text = String(response.steps[0]?.args.text);
+    expect(calls).toEqual([issueLookup, { ...request, openOnly: true }]);
+    expect(text).toContain('Báo cáo issue Jira đang mở (ATIT)');
+    expect(text).toContain('ATIT-1');
+    expect(text).not.toContain('ATIT-2');
+    expect(response.reportEvidence?.itemCount).toBe(1);
+    expect(response.reportEvidence?.coverage).toBe(completeness.toLowerCase());
+    if (completeness === 'PARTIAL') {
+      expect(text).toContain('Đã đọc 1 ticket');
+      expect(text).not.toContain('Tổng số');
+    }
+    expect(response.reportEvidence?.contentHash).toBe(sha256(text));
+  });
+
+  it('does not imply zero matches when the Jira read was incomplete and returned no issues', () => {
+    const report = renderJiraProgressReport([], { sourcePartial: true, filters: { openOnly: true } });
+    expect(report.text).toContain('Chưa thấy ticket nào trong phần dữ liệu đã đọc.');
+    expect(report.coverage).toBe('partial');
+  });
+
   it.each([
     ['gửi vào Slack, mở đầu bằng [AUDIT 18/11 A1].', '[AUDIT 18/11 A1]'],
     ['gửi Slack và bắt đầu bằng "Bản tin sáng v1.2"', 'Bản tin sáng v1.2'],

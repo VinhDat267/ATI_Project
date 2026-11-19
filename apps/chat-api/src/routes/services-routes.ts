@@ -605,9 +605,14 @@ export function createServicesRoutes(options: ServicesRoutesOptions = {}): Route
                         : undefined;
                   let teamScope: { boards?: Array<{ boardId: string; boardName?: string }> } | null = null;
                   try {
-                    teamScope = await (trelloScopeId
-                      ? options.trelloTeamRepo.get(trelloScopeId)
-                      : options.trelloTeamRepo.get());
+                    if (trelloScopeId) {
+                      teamScope = await options.trelloTeamRepo.get(trelloScopeId);
+                    } else {
+                      teamScope = userId ? await options.trelloTeamRepo.get('personal:' + userId) : null;
+                      if (!teamScope?.boards?.length) {
+                        teamScope = await options.trelloTeamRepo.get();
+                      }
+                    }
                   } catch {
                     teamScope = null;
                   }

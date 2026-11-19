@@ -513,7 +513,14 @@ export class AdapterFactory {
         : context?.workspaceMode === 'organization' && context.workspaceId
           ? context.workspaceId
           : 'default';
-    const scope = this.options.trelloTeamRepo ? await this.options.trelloTeamRepo.get(scopeId) : null;
+    let scope = this.options.trelloTeamRepo
+      ? scopeId === 'default'
+        ? await this.options.trelloTeamRepo.get(`personal:${userId}`)
+        : await this.options.trelloTeamRepo.get(scopeId)
+      : null;
+    if (scopeId === 'default' && (!scope || !scope.boards || scope.boards.length === 0) && this.options.trelloTeamRepo) {
+      scope = await this.options.trelloTeamRepo.get('default');
+    }
     if (!scope || !scope.boards || scope.boards.length === 0) {
       throw trelloError('AUTH_ERROR', 'Quản trị chưa chọn bảng Trello.');
     }
@@ -1212,7 +1219,8 @@ export class AdapterFactory {
           context.stepLeaseMap.set(callOpts.stepId, leaseId);
         }
 
-        const effectiveBinding = bound ?? (rawOutput as any)?._leaseBinding;
+        const leaseBinding = (rawOutput as any)?._leaseBinding;
+        const effectiveBinding = bound ?? leaseBinding;
 
         const sourceRef = {
           binding: {
@@ -1225,14 +1233,26 @@ export class AdapterFactory {
             identityVersion: effectiveBinding?.identityVersion ?? 1,
           },
           workspaceId,
-          workspaceVersion: effectiveBinding?.workspaceVersion ?? bound?.workspaceVersion ?? 1,
+          workspaceVersion:
+            effectiveBinding?.workspaceVersion ??
+            bound?.workspaceVersion ??
+            leaseBinding?.workspaceVersion ??
+            (capabilities as any)?.workspaceVersion ??
+            1,
           siteId: resolvedSiteId,
           cloudId,
-          sitePolicyVersion: siteStep?.sitePolicyVersion ?? (targetSite as any)?.policyVersion ?? 1,
+          sitePolicyVersion:
+            siteStep?.sitePolicyVersion ??
+            leaseBinding?.sitePolicyVersion ??
+            (targetSite as any)?.policyVersion ??
+            1,
           ...(projectId
             ? {
                 projectId,
-                projectPolicyVersion: projectPolicyVersion ?? 1,
+                projectPolicyVersion:
+                  projectPolicyVersion ??
+                  leaseBinding?.projectPolicyVersion ??
+                  1,
                 resourceType: (tool.includes('issue') ? 'issue' : 'project') as any,
                 providerResourceId: projectId,
               }

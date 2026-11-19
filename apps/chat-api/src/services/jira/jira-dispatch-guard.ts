@@ -424,6 +424,7 @@ export class JiraDispatchGuard {
       }
 
       // 8. Lock project policy FOR SHARE if projectId is provided
+      let lockedProjectPolicyVersion: number | undefined;
       if (scope.projectId) {
         const projRes = await client.query<{ selected: boolean; policy_version: number }>(
           `SELECT selected, policy_version
@@ -438,6 +439,7 @@ export class JiraDispatchGuard {
         if (scope.projectPolicyVersion !== undefined && projRow.policy_version !== scope.projectPolicyVersion) {
           throw new JiraDispatchError('Project policy version changed before dispatch', 'PROJECT_POLICY_STALE');
         }
+        lockedProjectPolicyVersion = projRow.policy_version;
       }
 
       // 9. Lock lease row FOR UPDATE LAST to linearize against concurrent disconnect/markRevoked
@@ -486,7 +488,14 @@ export class JiraDispatchGuard {
           configurable: true,
         });
         Object.defineProperty(result, '_leaseBinding', {
-          value: lease.binding,
+          value: {
+            ...lease.binding,
+            workspaceVersion: Number(wsRes.rows[0]!.version),
+            sitePolicyVersion: Number(siteRow.policy_version),
+            ...(lockedProjectPolicyVersion !== undefined
+              ? { projectPolicyVersion: Number(lockedProjectPolicyVersion) }
+              : {}),
+          },
           enumerable: false,
           writable: true,
           configurable: true,

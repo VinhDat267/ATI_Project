@@ -7,6 +7,16 @@ function mentionsKeyword(message: string, keyword: string): boolean {
   return new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, 'iu').test(message);
 }
 
+// A task explicitly scoped to Jira should not match another service's generic task patterns.
+const JIRA_SCOPED_TASK =
+  /(?<![\p{L}\p{N}_])(?:công\s+việc|việc|tasks?)\s+(?:(?:đang\s+)?(?:quá\s+hạn|trễ\s+hạn|sắp\s+đến\s+hạn|chưa\s+hoàn\s+thành|chưa\s+xong)\s+)?(?:(?:trong|trên|thuộc|của)\s+(?:dự\s+án\s+)?|in\s+project\s+)(Jira)(?![\p{L}\p{N}_])/giu;
+
+// "email thông báo" / "thông báo qua Gmail|Telegram" is scoped to that channel, not Slack.
+const EMAIL_SCOPED_NOTICE =
+  /(?<![\p{L}\p{N}_])(email|e-mail|gmail|thư(?:\s+điện\s+tử)?)\s+thông\s+báo(?![\p{L}\p{N}_])/giu;
+const NON_SLACK_CHANNEL_NOTICE =
+  /(?<![\p{L}\p{N}_])thông\s+báo\s+(?:qua|bằng|trên|vào|tới)\s+(gmail|email|e-mail|telegram|thư(?:\s+điện\s+tử)?)(?![\p{L}\p{N}_])/giu;
+
 /** A completed action in an explicitly addressed notification is payload.
  * Keep any subsequent requested action and every later conversation line.
  * The original message still reaches the planner/model unchanged.
@@ -25,6 +35,10 @@ function routingText(message: string, services: ServiceDefinition[]): string {
         current = prefix + current.slice(quotedContent.index + quotedContent[0].length);
       }
     }
+    current = current
+      .replace(JIRA_SCOPED_TASK, '$1')
+      .replace(EMAIL_SCOPED_NOTICE, '$1')
+      .replace(NON_SLACK_CHANNEL_NOTICE, '$1');
     const reported = /(?<![\p{L}\p{N}_])(?:là|rằng)\s+đã\s+tạo(?![\p{L}\p{N}_])/iu.exec(current);
     if (!reported) return current;
     const prefix = current.slice(0, reported.index);

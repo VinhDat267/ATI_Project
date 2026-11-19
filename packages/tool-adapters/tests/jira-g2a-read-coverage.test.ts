@@ -114,6 +114,21 @@ describe('JIRA-G2A Adapter Read-Only Policy & Search Coverage Contracts', () => 
     expect(res.coverage).toMatchObject({ completeness: 'PARTIAL', truncationReason: 'ITEM_CAP_REACHED' });
   });
 
+  it('searches only open Jira statuses before the limit and excludes a completed direct match', async () => {
+    handler = ({ url }) => url.includes('/issue/')
+      ? { body: issue(1, { status: { name: 'Shipped', statusCategory: { key: 'done' } } }) }
+      : { body: { issues: [], isLast: true } };
+    const result = await makeAdapter().execute('myjira.search_issues', {
+      siteId: 'site_opaque_1', projectKey: 'ATI', query: 'ATI-1', limit: 1, openOnly: true,
+    });
+
+    expect(result.issues).toEqual([]);
+    expect(requests[1]?.body).toMatchObject({
+      jql: expect.stringContaining(' AND statusCategory != Done ORDER BY'),
+      maxResults: 1,
+    });
+  });
+
   it.each([{ status: 'Done' }, { priority: 'Low' }, { issueType: 'Task' }])('P1-02: does not inject a direct-key match outside filters %j', async (filter) => {
     handler = ({ url }) => url.includes('/issue/') ? { body: issue(1) } : { body: { issues: [], isLast: true } };
     const res: any = await makeAdapter().execute('myjira.search_issues', { siteId: 'site_opaque_1', projectKey: 'ATI', query: 'ATI-1', ...filter });

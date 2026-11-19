@@ -1,6 +1,7 @@
 import {
   SERVICE_REGISTRY,
   requiresReportEvidence,
+  requestsOpenJiraIssues,
   reportLiteralBodies,
   reportOutputTargets,
   isWorkItemWriteStep,
@@ -247,6 +248,15 @@ export function relevantGroundingUserTexts(history: ChatMessage[] = [], currentM
   return texts;
 }
 
+function withJiraOpenFilter(tool: string, args: Record<string, unknown>, openJiraIssues: boolean) {
+  const projectList = args.query === undefined || (typeof args.query === 'string' && !args.query.trim());
+  if (openJiraIssues && tool === 'myjira.search_issues' && projectList &&
+      args.openOnly === undefined && args.status === undefined) {
+    return { ...args, openOnly: true };
+  }
+  return args;
+}
+
 export class AIPlanner {
   private async measure<T>(phase: PlanningPhaseMetrics['phase'], input: ProcessMessageInput, work: () => Promise<T>): Promise<T> {
     const started = performance.now();
@@ -425,7 +435,8 @@ export class AIPlanner {
       const readStep = parsed.steps.find((s: any) => s && typeof s.tool === 'string' && REPORT_SOURCE_TOOLS.has(s.tool));
       if (readStep) {
         readTool = readStep.tool;
-        readArgs = readStep.args ?? {};
+        readArgs = withJiraOpenFilter(readStep.tool, readStep.args, requestsOpenJiraIssues(groundingUserTexts));
+        readStep.args = readArgs;
         rawResult = await this.gatherSearch({
           tool: readStep.tool,
           args: readArgs,
@@ -460,6 +471,24 @@ export class AIPlanner {
     let sourceLabel: string;
     let artifactItems: unknown[];
 
+    const rawObj =
+      rawResult && typeof rawResult === 'object' && !Array.isArray(rawResult)
+        ? (rawResult as Record<string, unknown>)
+        : null;
+    const rawCoverage =
+      rawObj?.coverage && typeof rawObj.coverage === 'object' && !Array.isArray(rawObj.coverage)
+        ? (rawObj.coverage as Record<string, unknown>)
+        : null;
+    const rawPartial = priorRead?.truncated === true || Boolean(
+      rawObj &&
+      (rawObj.truncated === true ||
+        rawObj.hasMore === true ||
+        rawObj.has_more === true ||
+        rawObj.wasSliced === true ||
+        rawCoverage?.complete === false ||
+        (typeof rawCoverage?.completeness === 'string' && rawCoverage.completeness !== 'COMPLETE')),
+    );
+
     if (readTool === 'github.list_pull_requests') {
       const items = Array.isArray(rawResult)
         ? rawResult
@@ -487,7 +516,9 @@ export class AIPlanner {
       const projectKey = typeof readArgs.projectKey === 'string' ? readArgs.projectKey : undefined;
       rendered = renderJiraProgressReport(items as any, {
         projectKey,
+        sourcePartial: rawPartial,
         filters: {
+          openOnly: readArgs.openOnly === true,
           overdueOnly: readArgs.overdueOnly === true,
           unassignedOnly: readArgs.unassignedOnly === true,
           ...(Number.isInteger(readArgs.dueWithinDays) ? { dueWithinDays: readArgs.dueWithinDays as number } : {}),
@@ -543,23 +574,6 @@ export class AIPlanner {
       artifactItems = Array.isArray(rawResult) ? rawResult : [rawResult];
     }
 
-    const rawObj =
-      rawResult && typeof rawResult === 'object' && !Array.isArray(rawResult)
-        ? (rawResult as Record<string, unknown>)
-        : null;
-    const rawCoverage =
-      rawObj?.coverage && typeof rawObj.coverage === 'object' && !Array.isArray(rawObj.coverage)
-        ? (rawObj.coverage as Record<string, unknown>)
-        : null;
-    const rawPartial = Boolean(
-      rawObj &&
-      (rawObj.truncated === true ||
-        rawObj.hasMore === true ||
-        rawObj.has_more === true ||
-        rawObj.wasSliced === true ||
-        rawCoverage?.complete === false ||
-        (typeof rawCoverage?.completeness === 'string' && rawCoverage.completeness !== 'COMPLETE')),
-    );
     if (rawPartial && rendered.coverage === 'complete') {
       rendered = { ...rendered, coverage: 'partial' };
     }
@@ -731,11 +745,15 @@ export class AIPlanner {
     calls: Array<{ tool: string; args: Record<string, unknown> }>,
     activeTools: ToolDefinition[],
     input: ProcessMessageInput,
+    openJiraIssues: boolean,
   ): Promise<SearchOutcome[]> {
     const { signal } = input;
     // The calls of one request are independent, so they run in parallel.
     return Promise.all(calls.map(async (call): Promise<SearchOutcome> => {
-      const prepared = prepareSearchCall(call, activeTools);
+      const prepared = prepareSearchCall({
+        tool: call.tool,
+        args: withJiraOpenFilter(call.tool, call.args, openJiraIssues),
+      }, activeTools);
       if ('error' in prepared) return { tool: call.tool, args: call.args, error: prepared.error };
       const tool = activeTools.find((candidate) => candidate.name === call.tool)!;
       // Remember the parent a scoped search ran under, e.g. the board of a member.
@@ -897,6 +915,7 @@ export class AIPlanner {
     const conversation: ChatMessage[] = [...history, { role: 'user', content: userMessage }];
     const userTexts = conversation.filter((message) => message.role === 'user').map((message) => message.content);
     const groundingUserTexts = relevantGroundingUserTexts(history, userMessage);
+    const openJiraIssues = requestsOpenJiraIssues(groundingUserTexts);
 
     // Route on the whole conversation: a short answer such as "Minh Anh" names no service.
     const route = this.route(userTexts.join('\n'), input);
@@ -931,7 +950,7 @@ export class AIPlanner {
           conversation.push({ role: 'user', content: 'The search limit was reached, so no more searches are allowed. Answer now with a plan, or ask the user for what is still missing.' });
         } else {
           searchRounds++;
-          const outcomes = await this.measure('search', input, () => this.runSearches(request.calls, activeTools, input));
+          const outcomes = await this.measure('search', input, () => this.runSearches(request.calls, activeTools, input, openJiraIssues));
           successfulReads.push(...outcomes.filter(outcome => outcome.result !== undefined && outcome.error === undefined));
           conversation.push({ role: 'user', content: formatSearchResults(outcomes, { readAnswers: this.readAnswers }) });
         }
