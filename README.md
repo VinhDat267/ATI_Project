@@ -75,7 +75,7 @@ Every adapter refuses resources outside the allowlist an admin configured. Servi
 |---|---|
 | Frontend | React 19, Vite 8, Tailwind CSS 4, Zustand, `fetch-event-source` |
 | Backend | Node.js 22+, Express 5, PostgreSQL 16 (`pg`), Nodemailer |
-| AI | Gemini (`@google/genai`) or any OpenAI-compatible gateway; currently `ag/gemini-3.8-flash` through a local 9router |
+| AI | DeepSeek API (`deepseek-chat` / `deepseek-reasoner`), Gemini (`@google/genai`), or any OpenAI-compatible endpoint |
 | Auth | JWT access tokens + rotating refresh tokens stored as SHA-256, email verification with admin approval, Google OIDC (PKCE) |
 | Testing | Vitest, Testing Library, Playwright (Chromium) against a real PostgreSQL |
 | Tooling | npm workspaces, TypeScript 5, GitHub Actions |

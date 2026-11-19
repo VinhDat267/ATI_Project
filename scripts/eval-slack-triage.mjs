@@ -91,8 +91,6 @@ export const REQUIRED_SLACK_EVAL_CATEGORIES = Object.freeze([
 const FORBIDDEN_BUILDER_MODELS = new Set([
   'gemini-3.8-flash-high',
   'gemini-3.8-flash',
-  'ag/gemini-3.8-flash',
-  'ag/gemini-3.8-flash-high',
 ]);
 
 const DEFAULT_RULES = Object.freeze([

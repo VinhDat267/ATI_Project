@@ -75,7 +75,7 @@ Mỗi adapter từ chối tài nguyên nằm ngoài allowlist do quản trị vi
 |---|---|
 | Frontend | React 19, Vite 8, Tailwind CSS 4, Zustand, `fetch-event-source` |
 | Backend | Node.js 22+, Express 5, PostgreSQL 16 (`pg`), Nodemailer |
-| AI | Gemini (`@google/genai`) hoặc gateway tương thích OpenAI; hiện dùng `ag/gemini-3.8-flash` qua 9router chạy ở máy |
+| AI | DeepSeek API (`deepseek-chat` / `deepseek-reasoner`), Gemini (`@google/genai`) hoặc endpoint tương thích OpenAI |
 | Xác thực | Access token JWT + refresh token xoay vòng lưu dạng SHA-256, xác minh email có quản trị viên duyệt, Google OIDC (PKCE) |
 | Kiểm thử | Vitest, Testing Library, Playwright (Chromium) trên PostgreSQL thật |
 | Công cụ | npm workspaces, TypeScript 5, GitHub Actions |
