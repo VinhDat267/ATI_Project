@@ -230,7 +230,7 @@ test('FE-09: Account Users History retain prototype layouts in light/dark at des
         expect(await avatar.evaluate(element => getComputedStyle(element).width)).toBe('32px');
         await avatar.press('ArrowDown');
         const menu = page.getByRole('menu');
-        await expect(page.getByRole('menuitem', { name: 'Nhật ký điều phối', exact: true })).toBeFocused();
+        await expect(page.getByRole('menuitem', { name: 'Tài khoản', exact: true })).toBeFocused();
         const box = await menu.boundingBox();
         expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
         expect(await page.getByRole('menuitem').first().evaluate(element => getComputedStyle(element).display)).toBe('flex');

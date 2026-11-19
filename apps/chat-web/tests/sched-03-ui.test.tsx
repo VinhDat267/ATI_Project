@@ -65,14 +65,14 @@ it('keeps all schedule API calls off when health omits the capability', async ()
   expect(screen.queryByRole('heading', { name: 'Lịch chạy' })).toBeNull();
   expect(screen.getByRole('link', { name: 'Nhật ký' })).toBeInTheDocument();
 });
-it('announces pending runs on the Tự động tab and the mobile avatar entry, not on Nhật ký', async () => {
+it('announces pending runs on the Tự động sidebar link, not on Nhật ký or duplicated in the avatar menu', async () => {
   vi.mocked(apiClient.getRuntime).mockResolvedValue({ runtimeMode: 'sandbox', schedulesEnabled: true });
   render(<SchedulesCapabilityContext.Provider value={true}><MainNav user={user} current="workspace" navigate={vi.fn()} onLogout={vi.fn()} /></SchedulesCapabilityContext.Provider>);
   expect(await screen.findByRole('link', { name: 'Tự động, 1 lượt chờ duyệt' })).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Nhật ký' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Menu người dùng: An' }));
-  expect(screen.getByRole('menuitem', { name: 'Tự động, 1 lượt chờ duyệt' })).toBeInTheDocument();
-  expect(screen.getByRole('menuitem', { name: 'Nhật ký điều phối' })).toBeInTheDocument();
+  expect(screen.queryByRole('menuitem', { name: /Tự động/ })).toBeNull();
+  expect(screen.queryByRole('menuitem', { name: /Nhật ký/ })).toBeNull();
 });
 const scheduledMessage = { id: 'run-message', role: 'user' as const, content: 'Gửi lịch họp', metadata: { type: 'schedule_run', name: 'Lịch họp', dueAt: '2026-10-26T01:00:00Z', scheduleId: 's', runId: 'run' } };
 const showDrawer = (enabled = true) => render(<SchedulesCapabilityContext.Provider value={enabled}><ConversationDrawer messages={useChatStore.getState().messages} isStreaming={false} composer={null} onClose={vi.fn()} /></SchedulesCapabilityContext.Provider>);

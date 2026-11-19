@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, act } from '@testing-library/react';
+import { MainNav } from '../src/components/layout/MainNav';
 import { UserNavMenu } from '../src/components/layout/UserNavMenu';
 import { App } from '../src/App';
 import { apiClient } from '../src/services/api-client';
@@ -20,22 +21,23 @@ it.each([['Lan Nguyễn', 'LN'], ['an', 'A'], ['', 'L']])('derives avatar initia
   render(<UserNavMenu user={{ ...user, name }} onOpenSettings={() => {}} onLogout={() => {}} />);
   expect(screen.getByRole('button', { name: /Menu người dùng/ })).toHaveTextContent(initials);
 });
-it('opens member menu with arrows, wraps, escapes to avatar and closes outside', () => {
-  render(<UserNavMenu user={user} onOpenSettings={() => {}} onLogout={() => {}} />);
+it('opens account menu with arrows, wraps, escapes to avatar and closes outside without duplicating sidebar nav', () => {
+  render(<UserNavMenu user={user} onLogout={() => {}} />);
   const avatar = screen.getByRole('button', { name: /Menu người dùng/ });
   fireEvent.keyDown(avatar, { key: 'ArrowDown' });
   const items = screen.getAllByRole('menuitem');
+  expect(items.map(item => item.textContent)).toEqual(['Tài khoản', 'Chính sách an toàn', 'Đăng xuất']);
   expect(items[0]).toHaveFocus();
-  expect(screen.queryByRole('menuitem', { name: 'Quản lý người dùng' })).toBeNull();
   fireEvent.keyDown(items[0], { key: 'ArrowUp' }); expect(items.at(-1)).toHaveFocus();
   fireEvent.keyDown(items.at(-1)!, { key: 'Escape' }); expect(avatar).toHaveFocus();
   expect(screen.queryByRole('menu')).toBeNull();
   fireEvent.click(avatar); fireEvent.mouseDown(document.body); expect(screen.queryByRole('menu')).toBeNull();
 });
-it('only exposes admin navigation to admins', () => {
-  render(<UserNavMenu user={{ ...user, role: 'admin' }} onOpenSettings={() => {}} onLogout={() => {}} />);
-  fireEvent.click(screen.getByRole('button', { name: /Menu người dùng/ }));
-  expect(screen.getByRole('menuitem', { name: 'Quản lý người dùng' })).toBeVisible();
+it('only exposes admin navigation in the sidebar to admins', () => {
+  const { rerender } = render(<MainNav user={user} current="workspace" navigate={() => {}} onLogout={() => {}} />);
+  expect(screen.queryByRole('link', { name: 'Người dùng' })).toBeNull();
+  rerender(<MainNav user={{ ...user, role: 'admin' }} current="workspace" navigate={() => {}} onLogout={() => {}} />);
+  expect(screen.getByRole('link', { name: 'Người dùng' })).toBeVisible();
 });
 it.each([['/guide', 'Cẩm nang kết nối & Mẫu câu lệnh Planora'], ['/privacy', 'Dữ liệu và quyền quyết định luôn thuộc về bạn và nhóm của bạn.']])('renders %s without a session', async (path, heading) => {
   window.history.replaceState({}, '', path); await act(async () => { render(<App />); });
