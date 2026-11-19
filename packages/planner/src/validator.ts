@@ -80,15 +80,36 @@ export function hasDeferredCalendarRecap(steps: readonly PlanStep[]): boolean {
   });
 }
 
+function sameConstValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((item, idx) => sameConstValue(item, b[idx]));
+  }
+  if (isObject(a) && isObject(b)) {
+    const keysA = Object.keys(a);
+    const keysB = Object.keys(b);
+    return keysA.length === keysB.length && keysA.every((k) => k in b && sameConstValue(a[k], b[k]));
+  }
+  return false;
+}
+
 export function validateSchemaValue(value: unknown, schema: Record<string, any>, path: string): string | null {
   if (schema['x-recipient']) {
     if (!Array.isArray(value) || value.some(address => !normalizedRecipient(address))) return `${path} must contain literal bare email addresses; references and templates are forbidden`;
     if (value.length < (schema.minItems ?? 0) || value.length > (schema.maxItems ?? 20)) return `${path} recipient count is out of range`;
   }
+  if ('const' in schema && !sameConstValue(value, schema.const)) {
+    return `${path} must equal ${JSON.stringify(schema.const)}`;
+  }
   const allowedTypes = Array.isArray(schema.type) ? schema.type : schema.type ? [schema.type] : [];
   if (isObject(value) && ('$ref' in value || '$template' in value)) {
     const key = '$ref' in value ? '$ref' : '$template';
-    if (!allowedTypes.includes('string') || Object.keys(value).length !== 1 ||
+    const refAllowedTypes = new Set(['string', 'number', 'integer', 'boolean']);
+    const supportsRefOrTemplate =
+      key === '$ref'
+        ? allowedTypes.length === 0 || allowedTypes.some((t: string) => refAllowedTypes.has(t))
+        : allowedTypes.includes('string');
+    if (!supportsRefOrTemplate || Object.keys(value).length !== 1 ||
       typeof value[key] !== 'string' || !value[key].trim()) {
       return `${path} must be a ${allowedTypes.join(' | ') || 'valid'} value or a single non-empty ${key} string`;
     }
@@ -112,7 +133,15 @@ export function validateSchemaValue(value: unknown, schema: Record<string, any>,
     return branchErrors.length === 1 ? branchErrors[0]! : `${path} must match type ${allowedTypes.join(' | ')}`;
   }
 
-  if (schema.type === 'object') {
+  const isObjectSchema =
+    schema.type === 'object' ||
+    (!schema.type &&
+      (Array.isArray(schema.required) ||
+        isObject(schema.properties) ||
+        Array.isArray(schema.anyOf) ||
+        schema.additionalProperties !== undefined));
+
+  if (isObjectSchema) {
     if (!isObject(value)) return `${path} must be an object`;
     const properties = schema.properties || {};
     for (const required of schema.required || []) {
@@ -167,6 +196,9 @@ export function validateSchemaValue(value: unknown, schema: Record<string, any>,
   if (typeof value === 'number') {
     if (schema.minimum !== undefined && value < schema.minimum) return `${path} is below minimum`;
     if (schema.maximum !== undefined && value > schema.maximum) return `${path} is above maximum`;
+  }
+  if (isObject(schema.not) && validateSchemaValue(value, schema.not, path) === null) {
+    return `${path} violates forbidden schema combination`;
   }
   return null;
 }
@@ -729,6 +761,17 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
       };
     }
 
+    if (
+      step.reuseExistingIssueFrom !== undefined &&
+      (step.tool !== 'myjira.create_issue' ||
+        typeof step.reuseExistingIssueFrom !== 'string' ||
+        !step.dependsOn.includes(step.reuseExistingIssueFrom) ||
+        !processedStepIds.has(step.reuseExistingIssueFrom) ||
+        stepMap.get(step.reuseExistingIssueFrom)?.tool !== 'myjira.search_issues')
+    ) {
+      return { valid: false, layer: 'semantic', error: `Step '${step.id}' must reuse Jira issues from an earlier myjira.search_issues dependency` };
+    }
+
     const argsError = validateSchemaValue(step.args, toolDef.inputSchema, `Step '${step.id}' args`);
     if (argsError) {
       return { valid: false, layer: 'schema', error: `${argsError} for tool '${step.tool}'` };
@@ -757,7 +800,8 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
     collectReferenceTargets(args, refTargets);
 
     for (const ref of refTargets) {
-      const parts = ref.split('.');
+      const normalizedRef = ref.replace(/\[(\d+)\]/g, '.$1');
+      const parts = normalizedRef.split('.');
       const targetStepId = parts[0];
       if (!targetStepId || !processedStepIds.has(targetStepId)) {
         return {
@@ -797,18 +841,47 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
 
       // If referencing targetStepId.output.<prop>, verify prop exists in outputSchema
       if (parts[1] === 'output' && parts[2]) {
-        const propName = parts[2];
         if (targetStep) {
           const targetToolDef = catalogMap.get(targetStep.tool);
           const outSchema = targetToolDef?.outputSchema;
-          if (outSchema && outSchema.type === 'object' && outSchema.properties) {
-            if (!(propName in outSchema.properties)) {
+          let cursorSchema: Record<string, any> | undefined = outSchema;
+          for (let idx = 2; idx < parts.length && cursorSchema; idx++) {
+            const segment = parts[idx]!;
+            if (/^\d+$/.test(segment)) {
+              if (cursorSchema.type === 'array' && isObject(cursorSchema.items)) {
+                cursorSchema = cursorSchema.items;
+                continue;
+              }
+              if (cursorSchema.type && cursorSchema.type !== 'array') {
+                return {
+                  valid: false,
+                  layer: 'semantic',
+                  error: `Referenced output index '${segment}' cannot index non-array schema of tool '${targetStep.tool}'`,
+                };
+              }
+              cursorSchema = undefined;
+              break;
+            }
+            if ((cursorSchema.type === 'object' || (!cursorSchema.type && !cursorSchema.items)) && isObject(cursorSchema.properties)) {
+              if (!(segment in cursorSchema.properties)) {
+                return {
+                  valid: false,
+                  layer: 'semantic',
+                  error: `Referenced output property '${segment}' does not exist in output schema of tool '${targetStep.tool}'`,
+                };
+              }
+              const nextSchema = cursorSchema.properties[segment];
+              cursorSchema = isObject(nextSchema) ? nextSchema : undefined;
+              continue;
+            }
+            if (cursorSchema.type === 'array') {
               return {
                 valid: false,
                 layer: 'semantic',
-                error: `Referenced output property '${propName}' does not exist in output schema of tool '${targetStep.tool}'`,
+                error: `Referenced output property '${segment}' cannot be read directly from array schema of tool '${targetStep.tool}'; index with [0] first`,
               };
             }
+            cursorSchema = undefined;
           }
         }
       }

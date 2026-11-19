@@ -48,6 +48,27 @@ export class SlackAdapter extends BaseAdapter {
     const rawUrl = endpoint.startsWith('http')
       ? endpoint
       : `${this.baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+    let parsedUrl: URL;
+    let allowedOrigin: string;
+    try {
+      allowedOrigin = new URL(this.baseUrl).origin;
+      parsedUrl = new URL(rawUrl);
+    } catch {
+      throw new StepError({
+        message: 'Invalid Slack request URL',
+        category: 'VALIDATION',
+        retryable: false,
+        details: { requestSent: false },
+      });
+    }
+    if (parsedUrl.origin !== allowedOrigin || parsedUrl.username || parsedUrl.password) {
+      throw new StepError({
+        message: `Slack endpoint origin is outside allowed baseUrl: ${parsedUrl.origin}`,
+        category: 'VALIDATION',
+        retryable: false,
+        details: { requestSent: false },
+      });
+    }
 
     const headers = new Headers(options.headers || {});
     headers.set('Authorization', `Bearer ${this.credentials.botToken}`);
@@ -97,7 +118,29 @@ export class SlackAdapter extends BaseAdapter {
           throw err;
         }
       }
-      if (beforeDispatch) await beforeDispatch();
+      if (beforeDispatch) {
+        try {
+          await beforeDispatch();
+        } catch (err: any) {
+          if (err instanceof StepError) {
+            throw new StepError({
+              message: err.message,
+              category: err.category,
+              statusCode: err.statusCode,
+              retryable: err.retryable,
+              details: { ...(err.details && typeof err.details === 'object' ? err.details : {}), requestSent: false },
+              cause: err.cause ?? err,
+            });
+          }
+          throw new StepError({
+            message: `Slack request aborted before dispatch: ${err?.message || err}`,
+            category: 'NETWORK',
+            retryable: false,
+            details: { requestSent: false },
+            cause: err,
+          });
+        }
+      }
       if (signal?.aborted && !writeDispatched) {
         throw new StepError({
           message: 'Slack request aborted before dispatch',
@@ -110,6 +153,7 @@ export class SlackAdapter extends BaseAdapter {
         if (isWrite) writeDispatched = true;
         res = await this.fetchFn(rawUrl, {
           ...options,
+          redirect: 'error',
           headers,
         });
       } catch (err: any) {
@@ -174,7 +218,18 @@ export class SlackAdapter extends BaseAdapter {
       });
     }
 
-    const data: any = await res.json();
+    let data: any;
+    try {
+      data = await res.json();
+    } catch (cause) {
+      throw new StepError({
+        message: 'Slack returned an invalid JSON response',
+        category: isWrite ? 'UNKNOWN' : 'SERVER_ERROR',
+        statusCode: res.status,
+        retryable: false,
+        cause,
+      });
+    }
     if (data && data.ok === false) {
       const err = String(data.error || 'unknown_error');
       // Slack answered ok:false with a definitive code: the method did not execute,

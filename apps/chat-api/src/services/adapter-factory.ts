@@ -762,7 +762,17 @@ export class AdapterFactory {
           id,
           telegramUserId,
           AbortSignal.timeout(10_000),
-        );
+        ).catch((error: unknown) => {
+          if (error instanceof TelegramBotError && error.status === 429) {
+            throw new StepError({
+              category: 'RATE_LIMIT',
+              statusCode: 429,
+              message: 'Telegram tạm thời giới hạn tần suất kiểm tra nhóm.',
+              details: { requestSent: false },
+            });
+          }
+          throw error;
+        });
         if (!isMember) {
           if (context?.phase === 'execution') {
             throw telegramError('AUTH_ERROR', 'Bạn không còn là thành viên của nhóm Telegram trong kế hoạch.');

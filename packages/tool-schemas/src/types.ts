@@ -84,6 +84,8 @@ export interface PlanStep {
   description: string;
   args: Record<string, ArgValue>;
   dependsOn: string[];
+  /** For MyJira creates that may reuse a matching issue from a declared search dependency. */
+  reuseExistingIssueFrom?: string;
   boardId?: string;
   repo?: string;
   chatId?: string;

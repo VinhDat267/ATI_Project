@@ -1,5 +1,11 @@
 import type { StepOutputs } from './types.js';
 
+function preDispatchRefError(message: string): Error {
+  const err: any = new Error(message);
+  err.details = { requestSent: false };
+  return err;
+}
+
 /**
  * Resolve a reference expression like 'step_1.output.id' against stepOutputs map.
  */
@@ -9,7 +15,7 @@ export function resolveRef(ref: string, stepOutputs: StepOutputs): any {
   const path = dotIndex === -1 ? '' : ref.slice(dotIndex + 1);
 
   if (!stepOutputs.has(stepId)) {
-    throw new Error(`Referenced step '${stepId}' output not found`);
+    throw preDispatchRefError(`Referenced step '${stepId}' output not found`);
   }
 
   const stepData = stepOutputs.get(stepId);
@@ -34,7 +40,7 @@ export function resolveRef(ref: string, stepOutputs: StepOutputs): any {
       !(part in current) ||
       current[part] === undefined
     ) {
-      throw new Error(`Property '${path}' not found on step '${stepId}'`);
+      throw preDispatchRefError(`Property '${path}' not found on step '${stepId}'`);
     }
     current = current[part];
   }
@@ -91,9 +97,35 @@ export function coerceStringParams(
   for (const [key, raw] of Object.entries(rawArgs ?? {})) {
     const value = resolvedArgs[key];
     const isRef = raw !== null && typeof raw === 'object' && !Array.isArray(raw) && typeof raw.$ref === 'string';
-    if (!isRef || properties[key]?.type !== 'string' || value === null || typeof value !== 'object') continue;
-    if (result === resolvedArgs) result = { ...resolvedArgs };
-    result[key] = formatTemplateValue(value);
+    const propSchema = properties[key];
+    if (!isRef || !propSchema) continue;
+    const types: string[] = Array.isArray(propSchema.type)
+      ? propSchema.type
+      : typeof propSchema.type === 'string'
+        ? [propSchema.type]
+        : [];
+    if (types.length === 0) continue;
+
+    if (types.includes('string')) {
+      const nullAllowed = value === null && types.includes('null');
+      if (value !== undefined && typeof value !== 'string' && !nullAllowed && !types.includes(typeof value)) {
+        if (result === resolvedArgs) result = { ...resolvedArgs };
+        result[key] = formatTemplateValue(value);
+      }
+    } else if (
+      (types.includes('integer') || types.includes('number')) &&
+      typeof value === 'string' &&
+      /^-?\d+(?:\.\d+)?$/.test(value.trim())
+    ) {
+      const n = Number(value.trim());
+      const validNum =
+        (types.includes('integer') && Number.isSafeInteger(n)) ||
+        (types.includes('number') && Number.isFinite(n));
+      if (validNum) {
+        if (result === resolvedArgs) result = { ...resolvedArgs };
+        result[key] = n;
+      }
+    }
   }
   return result;
 }

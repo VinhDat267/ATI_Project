@@ -106,9 +106,13 @@ export function routeIntent(
     mentionsKeyword(intent, 'lịch chung') ||
     mentionsKeyword(intent, 'lịch nhóm') ||
     mentionsKeyword(intent, 'lịch team') ||
+    mentionsKeyword(intent, 'lịch tổ chức') ||
+    mentionsKeyword(intent, 'lịch họp tổ chức') ||
     mentionsKeyword(intent, 'calendar chung') ||
+    mentionsKeyword(intent, 'calendar tổ chức') ||
     mentionsKeyword(intent, 'google calendar chung') ||
-    ['shared calendar', 'team calendar', 'group calendar', 'shared google calendar', 'team google calendar', 'group google calendar']
+    mentionsKeyword(intent, 'google calendar tổ chức') ||
+    ['shared calendar', 'team calendar', 'group calendar', 'org calendar', 'organization calendar', 'workspace calendar', 'shared google calendar', 'team google calendar', 'group google calendar']
       .some(keyword => mentionsKeyword(intent, keyword));
   const hasPersonalCalendar = matched.some((s) => s.connection === 'personal' && s.scopeKey === 'calendars');
   const hasSharedCalendar = matched.some((s) => s.connection !== 'personal' && s.scopeKey === 'calendars');
@@ -130,8 +134,12 @@ export function routeIntent(
     mentionsKeyword(intent, 'bảng tính chung') ||
     mentionsKeyword(intent, 'bảng tính nhóm') ||
     mentionsKeyword(intent, 'bảng tính team') ||
+    mentionsKeyword(intent, 'bảng tính tổ chức') ||
     mentionsKeyword(intent, 'sheet chung') ||
-    ['shared spreadsheet', 'team spreadsheet', 'team sheet']
+    mentionsKeyword(intent, 'sheet tổ chức') ||
+    mentionsKeyword(intent, 'sheets tổ chức') ||
+    mentionsKeyword(intent, 'google sheets tổ chức') ||
+    ['shared spreadsheet', 'team spreadsheet', 'team sheet', 'org spreadsheet', 'organization spreadsheet', 'org sheet', 'workspace spreadsheet']
       .some(keyword => mentionsKeyword(intent, keyword));
   const hasPersonalSheets = matched.some((s) => s.connection === 'personal' && s.scopeKey === 'spreadsheets');
   const hasSharedSheets = matched.some((s) => s.connection !== 'personal' && s.scopeKey === 'spreadsheets');

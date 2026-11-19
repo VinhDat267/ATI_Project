@@ -231,6 +231,12 @@ export const MYJIRA_TOOLS: ToolDefinition[] = [
           description: 'Số lượng issue tối đa trả về (1-50)',
         },
       },
+      not: {
+        required: ['overdueOnly', 'dueWithinDays'],
+        properties: {
+          overdueOnly: { const: true },
+        },
+      },
     },
     outputSchema: {
       type: 'object',

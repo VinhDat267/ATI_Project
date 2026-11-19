@@ -579,6 +579,7 @@ export class SlackDigestRunner {
       credentialRepo: this.options.credentialRepo,
       encryptionKey: this.options.encryptionKey,
       gmailOAuthClientId: this.options.gmailOAuthClientId,
+      mycalendarOAuthClientId: this.options.mycalendarOAuthClientId,
       mysheetsOAuthClientId: this.options.mysheetsOAuthClientId,
       pool: this.options.pool,
       adapterFactory: this.options.adapterFactory,

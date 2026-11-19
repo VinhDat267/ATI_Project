@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   validateWorkflowContext,
   type WorkflowContext,
 } from '@wap/tool-schemas';
 import { filterPermittedWorkflowDefaults } from '../../src/services/workflow-context-guard.js';
+import { ChatService } from '../../src/services/chat-service.js';
 
 describe('WorkflowContext Shared DTO & API Guard (FLOW-04)', () => {
   it('accepts valid workflowContext with allowed resourceDefaults', () => {
@@ -97,5 +98,116 @@ describe('WorkflowContext Shared DTO & API Guard (FLOW-04)', () => {
       },
     });
     expect(filtered.resourceDefaults?.mycalendar).toBeUndefined();
+  });
+
+  it('ChatService unwraps { status, connection } lookup envelopes for workflowContext and forwards workspaceMode/workspaceId to Trello precheck', async () => {
+    let seenWorkflowDefaults: any;
+    let seenTrelloScope: string | undefined;
+    let seenGithubScope: string | undefined;
+    const seenAdapterContexts: any[] = [];
+
+    const chatService = new ChatService({
+      convRepo: {
+        getConversation: async () => ({
+          id: 'conv-org-1',
+          user_id: 'u1',
+          workspace_mode: 'organization',
+          workspace_id: 'ws-org-1',
+        }),
+      } as any,
+      workspaceRepo: {
+        findMember: async () => ({ status: 'active' }),
+      } as any,
+      msgRepo: {
+        createMessage: async (_c: string, _r: string, _text: string, meta?: any) => ({ id: 'msg-1', metadata: meta }),
+        listMessages: async () => [],
+      } as any,
+      planRepo: {
+        savePlan: async () => ({ id: 'plan-1', plan_hash: 'h1' }),
+      } as any,
+      eventEmitter: { emit: () => {} },
+      trelloConnection: async (_userId: string, scopeId?: string) => {
+        seenTrelloScope = scopeId;
+        return {
+          status: 'connected',
+          connection: {
+            credentialId: 'cred-tr-1',
+            memberId: 'mem-1',
+            username: 'alice',
+            boardIds: ['board-allowed'],
+          },
+          teamBoards: [{ boardId: 'board-allowed', boardName: 'Engineering' }],
+        };
+      },
+      githubConnection: async (_userId: string, scopeId?: string) => {
+        seenGithubScope = scopeId;
+        return {
+          status: 'connected',
+          connection: {
+            credentialId: 'cred-gh-1',
+            githubUserId: '101',
+            login: 'octocat',
+            repos: ['org/allowed-repo'],
+          },
+          teamRepos: [{ repoId: 'r1', fullName: 'org/allowed-repo', name: 'allowed-repo' }],
+        };
+      },
+      getAdapter: async (service: string, context?: any) => {
+        seenAdapterContexts.push({ service, context });
+        return {
+          execute: async () => [],
+        };
+      },
+      planner: {
+        processMessage: async (input: any) => {
+          seenWorkflowDefaults = input.memory.getEntity('workflow_resource_defaults');
+          return {
+            kind: 'plan',
+            thinking: 'Create Trello card in allowed board',
+            summary: 'Create Trello card',
+            warnings: [],
+            steps: [
+              {
+                id: 'step_1',
+                tool: 'trello.create_card',
+                description: 'Create card',
+                args: { listId: 'list-1', title: 'Audit item' },
+                boardId: 'board-allowed',
+                dependsOn: [],
+              } as any,
+            ],
+          };
+        },
+        routeSchedule: () => ({ services: [], unavailable: [] }),
+      } as any,
+    });
+
+    await chatService.handleUserMessage({
+      conversationId: 'conv-org-1',
+      userId: 'u1',
+      content: 'Tạo card Audit item trong workspace',
+      workflowContext: {
+        templateId: 'DEV-02',
+        resourceDefaults: {
+          trello: { boardId: 'board-allowed', listId: 'list-1' },
+          github: { repo: 'org/allowed-repo' },
+        },
+      },
+    });
+
+    await vi.waitFor(() => {
+      expect(seenAdapterContexts.length).toBeGreaterThan(0);
+    });
+
+    expect(seenTrelloScope).toBe('ws-org-1');
+    expect(seenGithubScope).toBe('ws-org-1');
+    expect(seenWorkflowDefaults).toEqual({
+      trello: { boardId: 'board-allowed', listId: 'list-1' },
+      github: { repo: 'org/allowed-repo' },
+    });
+
+    const trelloPrecheck = seenAdapterContexts.find((c) => c.service === 'trello');
+    expect(trelloPrecheck?.context?.workspaceMode).toBe('organization');
+    expect(trelloPrecheck?.context?.workspaceId).toBe('ws-org-1');
   });
 });

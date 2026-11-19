@@ -943,8 +943,8 @@ export class PersonalSheetsAdapter extends BaseAdapter {
       }
 
       if (toolName === 'mysheets.list_drive_files') {
-        if (args.query !== undefined && (typeof args.query !== 'string' || args.query.length > 100)) {
-          invalid('query must be a string up to 100 chars');
+        if (args.query !== undefined && (typeof args.query !== 'string' || args.query.length > 200)) {
+          invalid('query must be a string up to 200 chars');
         }
         const query = typeof args.query === 'string' ? args.query.trim() : '';
         const rawMimeType = args.mimeType === undefined ? 'all' : args.mimeType;

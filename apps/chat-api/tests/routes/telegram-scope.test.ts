@@ -83,7 +83,7 @@ describe('Telegram chat & group scope routes', () => {
 
   const bearer = (who: Person) => `Bearer ${generateAccessToken(who, secret, who.sid).accessToken}`;
 
-  const build = () =>
+  const build = (fetchFn = fakeFetch) =>
     createApp({
       jwtSecret: secret,
       userRepo: db.users,
@@ -92,7 +92,7 @@ describe('Telegram chat & group scope routes', () => {
       serviceAdminUserIds: [admin.id],
       telegram: {
         bot: mockBotConfig,
-        fetchFn: fakeFetch,
+        fetchFn,
         teamRepo,
       },
     } as any);
@@ -180,6 +180,28 @@ describe('Telegram chat & group scope routes', () => {
       { chatId: '2000', title: 'Telegram của tôi (Alice)', type: 'private', selected: true, member: true },
       { chatId: '-100111', title: 'Đội Sản Phẩm', type: 'supergroup', selected: false, member: true },
     ]);
+  });
+
+  it('returns a temporary error and preserves the selected chats when Telegram rate limits a scope save', async () => {
+    await request(build())
+      .put('/api/connections/telegram/scope')
+      .set('Authorization', bearer(alice))
+      .send({ chatIds: ['-100111'] })
+      .expect(200);
+    const app = build(async (input, init) => String(input).endsWith('/getChatMember')
+      ? Response.json({ ok: false, error_code: 429 }, { status: 429 })
+      : fakeFetch(input, init));
+    const before = await credentials.getPersonalConnectionStatus('telegram', alice.id);
+    const response = await request(app)
+      .put('/api/connections/telegram/scope')
+      .set('Authorization', bearer(alice))
+      .send({ chatIds: ['2000', '-100111'] });
+    expect(response.status).toBe(429);
+    expect(response.body.code).toBe('TELEGRAM_RATE_LIMIT');
+    await request(app).get('/api/connections/telegram').set('Authorization', bearer(alice)).expect(429);
+    expect(await credentials.getPersonalConnectionStatus('telegram', alice.id)).toMatchObject({
+      id: before?.id, config: before?.config, status: 'active',
+    });
   });
 
   it('saves 1-10 valid chats in PUT /api/connections/telegram/scope and rejects 0 chats, >10 chats, or non-member chats', async () => {

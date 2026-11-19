@@ -238,6 +238,7 @@ export interface ChatServiceOptions {
     credentialRepo?: any;
     encryptionKey?: string;
     gmailOAuthClientId?: string;
+    mycalendarOAuthClientId?: string;
     mysheetsOAuthClientId?: string;
     mysheetsEnabled?: boolean;
     emitV2?: boolean;
@@ -1012,10 +1013,18 @@ export class ChatService {
                   { signal: precheckSignal }
                 );
               } else if (this.getAdapter) {
+                const convForTrello =
+                  conversationId && this.convRepo ? await this.convRepo.getConversation(conversationId) : null;
+                const trelloWorkspaceMode =
+                  convForTrello?.workspace_mode ?? (scopeId !== 'default' ? 'organization' : 'legacy');
+                const trelloWorkspaceId =
+                  convForTrello?.workspace_id ?? (scopeId !== 'default' ? scopeId : null);
                 const adapter = await this.getAdapter('trello', {
                   userId,
                   phase: 'planning',
-                  actor: { userId },
+                  workspaceMode: trelloWorkspaceMode,
+                  workspaceId: trelloWorkspaceId,
+                  actor: { userId, workspaceId: trelloWorkspaceId, workspaceMode: trelloWorkspaceMode },
                   connections: { trello: trello.connection },
                 });
                 if (adapter && typeof adapter.execute === 'function') {
@@ -1137,6 +1146,12 @@ export class ChatService {
       if (!github || github.status === 'not_connected' || github.status === 'reconnect_required') {
         unavailableServices.push({ id: 'github', name: 'GitHub' });
         reasons.push('Tài khoản của bạn chưa Kết nối GitHub hoặc cần kết nối lại.');
+      } else if (github.status === 'unavailable') {
+        return {
+          kind: 'refusal',
+          reason: 'GitHub tạm thời không phản hồi.',
+          suggestion: 'Kết nối GitHub của bạn vẫn còn hiệu lực. Hãy thử lại sau ít phút.',
+        };
       } else if (github.status === 'needs_scope') {
         return {
           kind: 'refusal',
@@ -1272,6 +1287,12 @@ export class ChatService {
       if (!telegram || telegram.status === 'not_connected' || telegram.status === 'reconnect_required') {
         unavailableServices.push({ id: 'telegram', name: 'Telegram' });
         reasons.push('Tài khoản của bạn chưa Kết nối Telegram hoặc cần kết nối lại.');
+      } else if (telegram.status === 'unavailable') {
+        return {
+          kind: 'refusal',
+          reason: 'Telegram tạm thời không phản hồi.',
+          suggestion: 'Kết nối Telegram của bạn vẫn còn hiệu lực. Hãy thử lại sau ít phút.',
+        };
       } else if (telegram.status === 'needs_scope' || !telegram.connection) {
         return {
           kind: 'refusal',
@@ -1761,6 +1782,15 @@ export class ChatService {
         /\b(bản\s+tin\s+github|github\s+digest|pull\s+request|pr\b|chờ\s+review|chưa\s+ai\s+nhận|unassigned|issue\s+mới|(?:quá|trên|hơn)\s*\d{1,2}\s*ngày|repo(?:sitory)?\s+[a-z0-9_.-]+|[a-z0-9_.-]+\/[a-z0-9_.-]+)\b/i.test(
           proposal.request!,
         ));
+    const isTrelloDigestOverTelegram =
+      uniqueServices.length === 2 &&
+      uniqueServices.includes('trello') &&
+      uniqueServices.includes('telegram') &&
+      Boolean(this.trelloConnection) &&
+      Boolean(this.telegramConnection) &&
+      Boolean(proposal.request) &&
+      Boolean(recurrence) &&
+      current?.kind !== 'telegram_digest';
     if (
       (proposal.action === 'create' || proposal.action === 'update') &&
       proposal.request &&
@@ -1791,13 +1821,25 @@ export class ChatService {
         telegramConnection: this.telegramConnection,
         getAdapter: this.getAdapter,
       });
+    } else if ((proposal.action === 'create' || proposal.action === 'update') && isTrelloDigestOverTelegram) {
+      digestCandidate = await evaluateTrelloDigestCandidate({
+        userId: actor.userId,
+        workspaceMode: trustedScope.workspaceMode,
+        workspaceId: trustedScope.workspaceId,
+        request: proposal.request!,
+        services,
+        recurrence: recurrence!,
+        trelloConnection: this.trelloConnection,
+        telegramConnection: this.telegramConnection,
+        getAdapter: this.getAdapter,
+      });
     } else if (
       (proposal.action === 'create' || proposal.action === 'update') &&
       proposal.request &&
       (services.includes('mysheets') || services.includes('sheets')) &&
       current?.kind !== 'slack_digest' &&
       current?.kind !== 'telegram_digest' &&
-      (current?.kind === 'sheets_digest' || uniqueServices.length <= 2) &&
+      (current?.kind === 'sheets_digest' || uniqueServices.filter((s) => s !== 'sheets' && s !== 'mysheets').length <= 1) &&
       this.schedules.credentialRepo &&
       this.schedules.encryptionKey
     ) {
@@ -1859,6 +1901,7 @@ export class ChatService {
             ? await createMyCalendarConnectionLookup(
                 this.schedules.credentialRepo,
                 this.schedules.encryptionKey,
+                this.schedules.mycalendarOAuthClientId,
               )(actor.userId).catch(() => null)
             : undefined
         : undefined;
@@ -1931,6 +1974,7 @@ export class ChatService {
             ? await createMyCalendarConnectionLookup(
                 this.schedules.credentialRepo,
                 this.schedules.encryptionKey,
+                this.schedules.mycalendarOAuthClientId,
               )(actor.userId).catch(() => null)
             : undefined
         : undefined;
@@ -2066,7 +2110,7 @@ export class ChatService {
         telegramLookup: null,
       });
     }
-    if (proposal.action === 'create' && digestCandidate?.canAutoDigest && digestCandidate.config && 'sources' in digestCandidate.config) {
+    if ((proposal.action === 'create' || proposal.action === 'update') && digestCandidate?.canAutoDigest && digestCandidate.config && 'sources' in digestCandidate.config) {
       const disabledReason = await verifyMySheetsDigestPreview(
         digestCandidate.config,
         { userId: actor.userId, workspaceMode: trustedScope.workspaceMode, workspaceId: trustedScope.workspaceId },
@@ -2421,24 +2465,54 @@ export class ChatService {
     return { write, announce };
   }
 
-  private async loadActiveConnections(userId: string): Promise<PlanConnections> {
-    const [gmail, mycalendar, mysheets, trello, github, telegram, notion] = await Promise.all([
+  private async loadActiveConnections(
+    userId: string,
+    actor?: { userId: string; workspaceId?: string | null; workspaceMode?: 'legacy' | 'personal' | 'organization' },
+  ): Promise<PlanConnections> {
+    const scopeId = actor?.workspaceMode === 'organization' && actor.workspaceId ? actor.workspaceId : 'default';
+    const githubScopeId = scopeId !== 'default' ? scopeId : `personal:${userId}`;
+    const [gmail, mycalendar, mysheets, trello, github, telegram, notion, myjiraCaps] = await Promise.all([
       this.gmailConnection?.(userId).catch(() => null),
       this.mycalendarConnection?.(userId).catch(() => null),
       this.mysheetsConnection?.(userId).catch(() => null),
-      this.trelloConnection?.(userId).catch(() => null),
-      this.githubConnection?.(userId).catch(() => null),
+      this.trelloConnection?.(userId, scopeId).catch(() => null),
+      this.githubConnection?.(userId, githubScopeId).catch(() => null),
       this.telegramConnection?.(userId).catch(() => null),
       this.notionConnection?.(userId).catch(() => null),
+      this.jiraPolicyService && typeof (this.jiraPolicyService as any).getCapabilities === 'function' && actor?.workspaceId
+        ? (this.jiraPolicyService as any).getCapabilities(actor.workspaceId, userId).catch(() => null)
+        : Promise.resolve(null),
     ]);
+    const unwrap = <T>(raw: any): T | undefined => {
+      if (!raw || typeof raw !== 'object') return undefined;
+      if (typeof raw.status === 'string') {
+        return raw.status === 'connected' && raw.connection ? (raw.connection as T) : undefined;
+      }
+      return raw as T;
+    };
     const connections: PlanConnections = {};
-    if (gmail) connections.gmail = gmail;
-    if (mycalendar) connections.mycalendar = mycalendar;
-    if (mysheets) connections.mysheets = mysheets;
-    if (trello) connections.trello = trello;
-    if (github) connections.github = github;
-    if (telegram) connections.telegram = telegram;
-    if (notion) connections.notion = notion;
+    const gmailConn = unwrap<NonNullable<PlanConnections['gmail']>>(gmail);
+    const mycalConn = unwrap<NonNullable<PlanConnections['mycalendar']>>(mycalendar);
+    const mysheetsConn = unwrap<NonNullable<PlanConnections['mysheets']>>(mysheets);
+    const trelloConn = unwrap<NonNullable<PlanConnections['trello']>>(trello);
+    const githubConn = unwrap<NonNullable<PlanConnections['github']>>(github);
+    const telegramConn = unwrap<NonNullable<PlanConnections['telegram']>>(telegram);
+    const notionConn = unwrap<NonNullable<PlanConnections['notion']>>(notion);
+    if (gmailConn) connections.gmail = gmailConn;
+    if (mycalConn) connections.mycalendar = mycalConn;
+    if (mysheetsConn) connections.mysheets = mysheetsConn;
+    if (trelloConn) connections.trello = trelloConn;
+    if (githubConn) connections.github = githubConn;
+    if (telegramConn) connections.telegram = telegramConn;
+    if (notionConn) connections.notion = notionConn;
+    if (Array.isArray(myjiraCaps?.sites)) {
+      const siteEntries = myjiraCaps.sites
+        .filter((s: any) => s && s.selected !== false && typeof s.siteId === 'string')
+        .map((s: any, idx: number) => [`s_${idx}`, { siteId: s.siteId }]);
+      if (siteEntries.length > 0) {
+        connections.myjira = { siteSteps: Object.fromEntries(siteEntries) } as any;
+      }
+    }
     if (this.slackWrites) connections.myslack = { credentialId: 'slack', scopes: [] } as any;
     return connections;
   }
@@ -2529,7 +2603,7 @@ export class ChatService {
 
     // FLOW-04: Validate workflowContext defaults against user's actual connections and seed into memory
     if (workflowContext) {
-      const activeConnections = await this.loadActiveConnections(userId);
+      const activeConnections = await this.loadActiveConnections(userId, actor);
       const filtered = filterPermittedWorkflowDefaults(workflowContext, activeConnections);
       if (filtered.resourceDefaults) {
         memory.setEntity('workflow_resource_defaults', filtered.resourceDefaults);

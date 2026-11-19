@@ -1,5 +1,5 @@
 import { ALL_TOOLS, GMAIL_SERVICE, GMAIL_TOOLS, MYCALENDAR_SERVICE, MYJIRA_SERVICE, MYSHEETS_SERVICE, NOTION_OAUTH_TOOLS, SERVICE_REGISTRY, SHEETS_EXTENDED_TOOLS, SLACK_EXTENDED_TOOLS, type AllowedScope, type SheetsAppendLeaseStore } from '@wap/tool-schemas';
-import { createGmailToolAdapter, createPersonalCalendarAdapter, createPersonalSheetsAdapter, type GmailAccessTokenProvider } from '@wap/tool-adapters';
+import { createGmailToolAdapter, createPersonalCalendarAdapter, createPersonalSheetsAdapter, StepError, type GmailAccessTokenProvider } from '@wap/tool-adapters';
 import { routeIntent, type ProcessMessageInput } from '@wap/planner';
 import type { CredentialRepo } from '../db/repositories/credential-repo.js';
 import type { AdapterContext } from '../services/adapter-factory.js';
@@ -54,6 +54,7 @@ export async function runtimeToolCatalog(
     gmailOAuthClientId?: string;
     mycalendarEnabled?: boolean;
     mycalendarOAuthClientId?: string;
+    mycalendarConnection?: (userId: string) => Promise<any>;
     mysheetsEnabled?: boolean;
     mysheetsOAuthClientId?: string;
     trelloEnabled?: boolean;
@@ -81,6 +82,7 @@ export async function runtimeToolCatalog(
   const hasMyCalendar = personal.some((t) => t.service === 'mycalendar');
   const hasMySheetsSpreadsheets = personal.some((t) => t.name === 'mysheets.read_range');
   const isOrgMode = options.workspaceMode === 'organization' && Boolean(options.workspaceId);
+  const stripSharedCalendar = hasMyCalendar && !isOrgMode;
   const stripSharedSheets = hasMySheetsSpreadsheets && !isOrgMode;
   if (mode === 'live') {
     const hasSlack = personal.some((t) => t.service === 'slack');
@@ -88,7 +90,7 @@ export async function runtimeToolCatalog(
     const unified = [
       ...personal.filter(
         (t) =>
-          (!hasMyCalendar || t.service !== 'calendar') &&
+          (!stripSharedCalendar || t.service !== 'calendar') &&
           (!stripSharedSheets || t.service !== 'sheets')
       ),
       ...(hasSlack ? SLACK_EXTENDED_TOOLS : []),
@@ -104,7 +106,7 @@ export async function runtimeToolCatalog(
         t.service !== 'github' &&
         t.service !== 'telegram' &&
         (keepSharedJira || t.service !== 'jira') &&
-        (!hasMyCalendar || t.service !== 'calendar') &&
+        (!stripSharedCalendar || t.service !== 'calendar') &&
         (!stripSharedSheets || t.service !== 'sheets')
     ),
     ...SLACK_EXTENDED_TOOLS,
@@ -176,6 +178,58 @@ export function runtimeMySheetsEndpoints(mode: RuntimeMode, apiBaseUrl?: string)
   return {
     fakePickerBaseUrl: mode === 'sandbox' ? apiBaseUrl : undefined,
     driveApiBaseUrl: mode === 'sandbox' ? apiBaseUrl : undefined,
+  };
+}
+
+const SANDBOX_SCOPE_DEFAULTS = {
+  trello: ['b1', 'b2', 'board_frontend'],
+  github: ['owner/repo', 'nhom/ati', 'octo/repo', 'wap/platform'],
+  telegram: ['-1001234567890', '100000001'],
+} as const;
+
+export function wrapSandboxAdapterWithScope<T extends { execute: (tool: string, args: any, ctx?: any) => Promise<any> }>(
+  serviceName: 'trello' | 'github' | 'telegram',
+  adapter: T,
+  context?: AdapterContext,
+): T {
+  return {
+    ...adapter,
+    execute: async (tool: string, args: any, ctx?: any) => {
+      if (serviceName === 'trello') {
+        const allowed = context?.connections?.trello?.boardIds ?? [...SANDBOX_SCOPE_DEFAULTS.trello];
+        const target = ctx?.boardId ?? args?.boardId;
+        if (target && !allowed.includes(String(target))) {
+          throw new StepError({
+            category: 'AUTH_ERROR',
+            message: 'Bảng không nằm trong phạm vi được phép.',
+            details: { requestSent: false },
+          });
+        }
+      } else if (serviceName === 'github') {
+        const allowedLower = new Set(
+          (context?.connections?.github?.repos ?? [...SANDBOX_SCOPE_DEFAULTS.github]).map((r) => r.toLowerCase()),
+        );
+        const target = ctx?.repo ?? args?.repo;
+        if (target && !allowedLower.has(String(target).toLowerCase())) {
+          throw new StepError({
+            category: 'AUTH_ERROR',
+            message: 'Repository không nằm trong phạm vi được phép.',
+            details: { requestSent: false },
+          });
+        }
+      } else {
+        const allowed = context?.connections?.telegram?.chatIds ?? [...SANDBOX_SCOPE_DEFAULTS.telegram];
+        const target = ctx?.chatId ?? args?.chatId;
+        if (target && !allowed.includes(String(target))) {
+          throw new StepError({
+            category: 'AUTH_ERROR',
+            message: 'Cuộc trò chuyện không nằm trong phạm vi được phép.',
+            details: { requestSent: false },
+          });
+        }
+      }
+      return adapter.execute(tool, args, ctx);
+    },
   };
 }
 

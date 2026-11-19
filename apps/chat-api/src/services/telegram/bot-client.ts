@@ -177,7 +177,7 @@ export class TelegramBotClient {
       }
       return false;
     } catch (err) {
-      if (err instanceof TelegramBotError && err.kind === 'rejected') {
+      if (err instanceof TelegramBotError && err.kind === 'rejected' && err.status !== 429) {
         return false;
       }
       throw err;

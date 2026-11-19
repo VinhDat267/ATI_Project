@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
+import { cp, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
 // Live audit 18/11/2026: `npm run db:migrate:v3` failed with 23514 on a database that already had a
 // `myjira_digest` schedule, because 0016–0020/0032 re-create `schedules_kind_check` with an older list.
+const REPO_NODE_MODULES = fileURLToPath(new URL('../../../../node_modules', import.meta.url));
+const MIGRATE_DIR = fileURLToPath(new URL('../../../../db/v3', import.meta.url));
 const MIGRATE_SCRIPT = fileURLToPath(new URL('../../../../db/v3/migrate.mjs', import.meta.url));
 const DIGEST_KINDS = [
   'sheets_digest', 'calendar_digest', 'github_digest', 'telegram_digest',
@@ -79,6 +84,49 @@ describe.skipIf(!process.env.DATABASE_URL)('db/v3/migrate.mjs re-run with rows t
         await db.end();
       }
     } finally {
+      await admin.query(`DROP DATABASE IF EXISTS "${dbName}" WITH (FORCE)`).catch(() => {});
+      await admin.end();
+    }
+  }, 60_000);
+
+  it('rolls back all migrations atomically if a failure occurs after 0034', async () => {
+    const rawUrl = process.env.DATABASE_URL!;
+    const dbName = `mig_atom_${randomUUID().replaceAll('-', '').slice(0, 10)}`;
+    const adminUrl = new URL(rawUrl);
+    adminUrl.pathname = '/postgres';
+    const targetUrl = new URL(rawUrl);
+    targetUrl.pathname = `/${dbName}`;
+    const admin = new pg.Pool({ connectionString: adminUrl.href, max: 1 });
+    const stageDir = await mkdtemp(join(tmpdir(), 'wap-mig-atom-'));
+    try {
+      await admin.query(`CREATE DATABASE "${dbName}"`);
+      await cp(MIGRATE_DIR, stageDir, { recursive: true });
+      await symlink(REPO_NODE_MODULES, join(stageDir, 'node_modules'), 'junction');
+      await writeFile(
+        join(stageDir, '9999_fail_after_0034.sql'),
+        'CREATE TABLE IF NOT EXISTS should_roll_back_after_0034 (id INT);\nSELECT 1 / 0;\n',
+        'utf8',
+      );
+      const result = spawnSync(process.execPath, [join(stageDir, 'migrate.mjs')], {
+        env: { ...process.env, DATABASE_URL: targetUrl.href },
+        encoding: 'utf8',
+      });
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('division by zero');
+
+      const db = new pg.Pool({ connectionString: targetUrl.href, max: 1 });
+      db.on('error', () => {});
+      try {
+        const res = await db.query<{ users_tbl: string | null; later_tbl: string | null }>(
+          `SELECT to_regclass('public.users')::text AS users_tbl,
+                  to_regclass('public.should_roll_back_after_0034')::text AS later_tbl`,
+        );
+        expect(res.rows[0]).toEqual({ users_tbl: null, later_tbl: null });
+      } finally {
+        await db.end();
+      }
+    } finally {
+      await rm(stageDir, { recursive: true, force: true }).catch(() => {});
       await admin.query(`DROP DATABASE IF EXISTS "${dbName}" WITH (FORCE)`).catch(() => {});
       await admin.end();
     }

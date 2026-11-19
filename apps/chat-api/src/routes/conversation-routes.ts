@@ -39,10 +39,23 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
           res.status(401).json({ error: 'Unauthorized' });
           return;
         }
-        const conversation = await convRepo.getConversation(conversationId);
-        if (!conversation || conversation.user_id !== userId) {
-          res.status(404).json({ error: 'Conversation not found' });
-          return;
+        try {
+          await assertConversationAccessWithFallback(
+            { pool, convRepo },
+            conversationId,
+            userId,
+            {
+              legacyNonOwnerStatus: 404,
+              expectedWorkspaceId: req.workspace?.workspaceId ?? null,
+              expectedWorkspaceMode: req.workspace?.mode,
+            },
+          );
+        } catch (err: any) {
+          if (err instanceof ConversationAccessDeniedError) {
+            res.status(err.status).json({ error: err.message });
+            return;
+          }
+          throw err;
         }
         const body = req.body;
         if (
@@ -80,10 +93,23 @@ export function createConversationRoutes(options: ConversationRoutesOptions): Ro
           res.status(401).json({ error: 'Unauthorized' });
           return;
         }
-        const conversation = await convRepo.getConversation(conversationId);
-        if (!conversation || conversation.user_id !== userId) {
-          res.status(404).json({ error: 'Conversation not found' });
-          return;
+        try {
+          await assertConversationAccessWithFallback(
+            { pool, convRepo },
+            conversationId,
+            userId,
+            {
+              legacyNonOwnerStatus: 404,
+              expectedWorkspaceId: req.workspace?.workspaceId ?? null,
+              expectedWorkspaceMode: req.workspace?.mode,
+            },
+          );
+        } catch (err: any) {
+          if (err instanceof ConversationAccessDeniedError) {
+            res.status(err.status).json({ error: err.message });
+            return;
+          }
+          throw err;
         }
         const body = req.body;
         if (

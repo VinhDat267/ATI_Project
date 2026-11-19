@@ -26,8 +26,18 @@ export function validateSlackPostPlan(value:unknown,owner:string){
 export function validateSlackSourceReplyPlan(value:unknown,owner:string){
  const p=strictSlackObject(value,['kind','thinking','summary','steps','warnings','connections']);
  if(p.kind!=='plan'||!Array.isArray(p.steps)||p.steps.length<1||p.steps.length>8)throw new Error('SLACK_SOURCE_REPLY_PLAN_INVALID');
- const steps=p.steps.map(s=>strictSlackObject(s,['id','tool','description','args','dependsOn']) as unknown as PlanStep);
+ const steps:PlanStep[]=p.steps.map(s=>{
+  const keys=['id','tool','description','args','dependsOn'];
+  if(s&&typeof s==='object'&&Object.hasOwn(s,'reuseExistingIssueFrom'))keys.push('reuseExistingIssueFrom');
+  return strictSlackObject(s,keys) as unknown as PlanStep;
+ });
  if(new Set(steps.map(s=>s.id)).size!==steps.length||steps.some(s=>typeof s.id!=='string'||!s.id||s.id.length>128||typeof s.tool!=='string'||s.tool.startsWith('slack.')||!Array.isArray(s.dependsOn)))throw new Error('SLACK_SOURCE_REPLY_PLAN_INVALID');
+ for(const [index,step] of steps.entries()){
+  const source=step.reuseExistingIssueFrom;
+  if(Object.hasOwn(step,'reuseExistingIssueFrom')&&
+   (step.tool!=='myjira.create_issue'||typeof source!=='string'||!step.dependsOn.includes(source)||
+    !steps.slice(0,index).some(dep=>dep.id===source&&dep.tool==='myjira.search_issues')))throw new Error('SLACK_SOURCE_REPLY_PLAN_INVALID');
+ }
  const slackSteps=steps.filter(s=>s.tool.startsWith('myslack.'));
  const step=steps.at(-1);
  if(slackSteps.length!==1||!step||step!==slackSteps[0]||step.tool!=='myslack.chat_postMessage')throw new Error('SLACK_SOURCE_REPLY_PLAN_INVALID');
@@ -38,7 +48,7 @@ export function validateSlackSourceReplyPlan(value:unknown,owner:string){
  else{const tpl=strictSlackObject(params.text,['$template']);if(typeof tpl.$template!=='string'||!tpl.$template.trim()||tpl.$template.length>4000)throw new Error('SLACK_SOURCE_REPLY_PLAN_INVALID');}
  const dependencies=deriveSlackDependencySelectors(step.args,steps);
  if(dependencies.some(d=>d.kind!=='other'||!step.dependsOn?.includes(d.refStepId)||steps.findIndex(s=>s.id===d.refStepId)>=steps.length-1||!CERTIFIED_REPLY_OUTPUT_PATH.test(d.path)))throw new Error('SLACK_SOURCE_REPLY_PLAN_INVALID');
- const allowedConnectionKeys=['myslack','trello','github','gmail','mycalendar','mysheets','myjira','telegram'];
+ const allowedConnectionKeys=['myslack','trello','github','gmail','mycalendar','mysheets','myjira','telegram','notion'];
  if(!p.connections||typeof p.connections!=='object'||Array.isArray(p.connections)||Object.getPrototypeOf(p.connections)!==Object.prototype||
   !Object.hasOwn(p.connections,'myslack')||Object.keys(p.connections).some(k=>!allowedConnectionKeys.includes(k)))throw new Error('SLACK_SOURCE_REPLY_PLAN_INVALID');
  const connections=p.connections as Record<string,unknown>,m=strictSlackObject(connections.myslack,['bindings','steps']);

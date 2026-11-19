@@ -320,7 +320,21 @@ export class TelegramAdapter extends BaseAdapter {
       // the per-chat send interval. A provider retry takes a fresh message slot.
       if (pacing) await this.slot(pacing.limiter, pacing.key, signal);
       if (signal?.aborted) throw fail('NETWORK', undefined, { requestSent: false });
-      await pacing?.beforeDispatch?.();
+      try {
+        await pacing?.beforeDispatch?.();
+      } catch (err) {
+        if (err instanceof StepError) {
+          throw new StepError({
+            message: err.message,
+            category: err.category,
+            statusCode: err.statusCode,
+            retryable: err.retryable,
+            cause: err.cause ?? err,
+            details: { ...(err.details ?? {}), requestSent: false },
+          });
+        }
+        throw fail('NETWORK', undefined, { requestSent: false });
+      }
       if (signal?.aborted) throw fail('NETWORK', undefined, { requestSent: false });
       let response: Response;
       try {

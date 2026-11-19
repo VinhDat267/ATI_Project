@@ -374,6 +374,7 @@ export async function executeMultiDigestReadSources(input: {
   credentialRepo: Pick<CredentialRepo, 'getPersonalCredentials'>;
   encryptionKey: string;
   gmailOAuthClientId?: string;
+  mycalendarOAuthClientId?: string;
   mysheetsOAuthClientId?: string;
   pool?: pg.Pool | Pick<pg.Pool, 'query'> | null;
   adapterFactory: {
@@ -391,7 +392,11 @@ export async function executeMultiDigestReadSources(input: {
   }
   if (mycalendar.kind === 'bound') {
     signal.throwIfAborted();
-    const lookup = createMyCalendarConnectionLookup(input.credentialRepo, input.encryptionKey);
+    const lookup = createMyCalendarConnectionLookup(
+      input.credentialRepo,
+      input.encryptionKey,
+      input.mycalendarOAuthClientId,
+    );
     const live = await lookup(userId).catch(() => null);
     signal.throwIfAborted();
     if (!matchesMyCalendarDigestBinding(live, mycalendar.binding)) {

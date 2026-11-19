@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { validatePlan } from '../src/index.js';
-import { TRELLO_TOOLS, TRELLO_OAUTH_TOOLS, SLACK_TOOLS, GITHUB_TOOLS, SHEETS_TOOLS, NOTION_TOOLS } from '@wap/tool-schemas';
+import { validatePlan, validateSchemaValue } from '../src/index.js';
+import { TRELLO_TOOLS, TRELLO_OAUTH_TOOLS, SLACK_TOOLS, GITHUB_TOOLS, SHEETS_TOOLS, NOTION_TOOLS, MYJIRA_TOOLS } from '@wap/tool-schemas';
 
 describe('packages/planner (Task 9: 4-Layer Plan Validator with Thinking Precedence)', () => {
   const catalog = [...TRELLO_TOOLS, ...SLACK_TOOLS];
@@ -513,5 +513,79 @@ describe('packages/planner member board check', () => {
       { grounding: { memory: cardMemory, userTexts: [] } }
     );
     expect(validResult.valid).toBe(true);
+  });
+});
+
+describe('schema const and not validation (Finding 1.2)', () => {
+  const myjiraCatalog = [...MYJIRA_TOOLS, ...SLACK_TOOLS];
+  const jiraSearchSchema = MYJIRA_TOOLS.find((t) => t.name === 'myjira.search_issues')!.inputSchema;
+  const jiraGrounding = {
+    memory: {
+      jira_site: [{ id: 'site_1', siteId: 'site_1', cloudId: 'cloud-1', workspaceId: 'ws-1' }],
+      jira_project: [{ key: 'OPS', siteId: 'site_1', cloudId: 'cloud-1', workspaceId: 'ws-1' }],
+      channel: [{ id: 'C123', name: 'general' }],
+    },
+    userTexts: ['Check OPS in site_1 and notify C123'],
+  };
+
+  const jiraWithNotifyPlan = (searchArgs: unknown) =>
+    JSON.stringify({
+      kind: 'plan',
+      thinking: 'Search Jira issues then summarize',
+      summary: 'Search Jira issues and notify Slack',
+      warnings: [],
+      steps: [
+        {
+          id: 'step_1',
+          tool: 'myjira.search_issues',
+          description: 'Search Jira issues',
+          args: { siteId: 'site_1', projectKey: 'OPS', ...(searchArgs as Record<string, unknown>) },
+          dependsOn: [],
+        },
+        {
+          id: 'step_2',
+          tool: 'slack.send_message',
+          description: 'Notify team',
+          args: { channel: 'C123', text: 'Search complete' },
+          dependsOn: ['step_1'],
+        },
+      ],
+    });
+
+  it('rejects myjira.search_issues when overdueOnly=true is combined with dueWithinDays', () => {
+    const res = validatePlan(
+      jiraWithNotifyPlan({ overdueOnly: true, dueWithinDays: 3 }),
+      myjiraCatalog,
+      { grounding: jiraGrounding },
+    );
+    expect(res.valid).toBe(false);
+    if (!res.valid) {
+      expect(res.layer).toBe('schema');
+    }
+  });
+
+  it('rejects myjira.search_issues when overdueOnly=true is combined with a $ref dueWithinDays', () => {
+    const err = validateSchemaValue(
+      { siteId: 'site_1', projectKey: 'OPS', overdueOnly: true, dueWithinDays: { $ref: 'step_0.output.days' } },
+      jiraSearchSchema,
+      'steps[1].args',
+    );
+    expect(err).not.toBeNull();
+  });
+
+  it.each([
+    { overdueOnly: true },
+    { dueWithinDays: 7 },
+    { overdueOnly: false, dueWithinDays: 7 },
+    {},
+  ])('accepts valid non-conflicting myjira.search_issues args: %j', (args) => {
+    const res = validatePlan(jiraWithNotifyPlan(args), myjiraCatalog, { grounding: jiraGrounding });
+    expect(res.valid).toBe(true);
+  });
+
+  it('enforces schema.const even when a non-object value or $ref is passed', () => {
+    expect(validateSchemaValue(true, { const: true }, 'flag')).toBeNull();
+    expect(validateSchemaValue(false, { const: true }, 'flag')).not.toBeNull();
+    expect(validateSchemaValue({ $ref: 'step_0.output.flag' }, { const: true }, 'flag')).not.toBeNull();
   });
 });

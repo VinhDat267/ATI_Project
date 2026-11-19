@@ -53,6 +53,12 @@ export interface GithubDigestRunnerOptions {
   aiTimeoutMs?: number;
 }
 
+function isTransientDigestError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const cat = (err as { category?: unknown }).category;
+  return typeof cat === 'string' && ['NETWORK', 'SERVER_ERROR', 'RATE_LIMIT', 'TIMEOUT'].includes(cat);
+}
+
 function toUtcIsoSeconds(date: Date): string {
   return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
@@ -305,8 +311,22 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
     let gh: any;
     try {
       gh = await options.githubConnection?.(run.userId, githubScopeId);
-    } catch {
+    } catch (err) {
+      signal.throwIfAborted();
+      if (isTransientDigestError(err)) {
+        return {
+          state: 'digest_failed',
+          error: 'GitHub tạm thời không phản hồi. Lịch sẽ tự thử lại ở kỳ tiếp theo.',
+        };
+      }
       gh = null;
+    }
+
+    if (gh?.status === 'unavailable') {
+      return {
+        state: 'digest_failed',
+        error: 'GitHub tạm thời không phản hồi. Lịch sẽ tự thử lại ở kỳ tiếp theo.',
+      };
     }
 
     if (
@@ -351,6 +371,13 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
         },
       });
     } catch (err: any) {
+      signal.throwIfAborted();
+      if (isTransientDigestError(err)) {
+        return {
+          state: 'digest_failed',
+          error: 'GitHub tạm thời không phản hồi. Lịch sẽ tự thử lại ở kỳ tiếp theo.',
+        };
+      }
       const msg = err?.message || 'Kết nối dịch vụ không khả dụng.';
       return { state: 'blocked', error: msg, pauseReason: msg };
     }
@@ -491,6 +518,16 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
         let tg: any = null;
         if (options.telegramConnection) {
           tg = await options.telegramConnection(run.userId);
+          if (
+            tg?.status === 'unavailable' ||
+            (Array.isArray(tg?.unavailableChatIds) &&
+              tg.unavailableChatIds.includes(String(config.telegramChatId)))
+          ) {
+            return {
+              state: 'digest_failed',
+              error: 'Telegram tạm thời không phản hồi. Lịch sẽ tự thử lại ở kỳ tiếp theo.',
+            };
+          }
           const allowedChatIds = new Set(
             ((tg?.connection?.chatIds ?? []) as string[]).map((id) => String(id)),
           );
@@ -534,6 +571,13 @@ export function createGithubDigestRunner(options: GithubDigestRunnerOptions): Ru
         });
       }
     } catch (err: any) {
+      signal.throwIfAborted();
+      if (isTransientDigestError(err)) {
+        return {
+          state: 'digest_failed',
+          error: 'Dịch vụ nhận bản tin tạm thời không phản hồi. Lịch sẽ tự thử lại ở kỳ tiếp theo.',
+        };
+      }
       const msg = err?.message || 'Kết nối dịch vụ không khả dụng.';
       return { state: 'blocked', error: msg, pauseReason: msg };
     }

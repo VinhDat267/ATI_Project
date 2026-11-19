@@ -683,6 +683,10 @@ export class PersonalJiraAdapter extends BaseAdapter {
         }
       }
 
+      if (args.parentKey !== undefined) {
+        await this.verifyIssueWriteTarget(site, args.parentKey, callOpts);
+      }
+
       const types = await this.issueTypes(site.cloudId, proj.key, callOpts);
       const standard = types.filter((type) => type.subtask === false);
       const selected =
