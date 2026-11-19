@@ -22,7 +22,7 @@ test('AUTH-03: admin approves a pending account, member logs in, disable revokes
     await db.query("INSERT INTO users(id,email,password,name,status,role,email_verified) VALUES($1,$2,$3,'AUTH03 browser candidate','pending','member',true)", [id, email, hashPassword(password)]);
     expect((await member.request.post('/api/auth/login', { data: { email, password } })).status()).toBe(403);
     await login(admin, process.env.CHAT_ADMIN_EMAIL!, process.env.CHAT_ADMIN_PASSWORD!);
-    await admin.getByRole('link', { name: 'Người dùng', exact: true }).click();
+    await admin.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Người dùng', exact: true }).click();
     await expect(admin).toHaveURL(/\/admin\/users$/);
     await admin.getByRole('tab', { name: /Chờ duyệt/ }).click();
     await admin.getByRole('searchbox', { name: 'Tìm kiếm theo tên hoặc email' }).fill(email);

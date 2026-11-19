@@ -30,9 +30,10 @@ test('FE-04: shell menu, protected routes, cross-tab theme and mobile sandbox wa
   await avatar.press('ArrowDown');
   await expect(page.getByRole('menuitem', { name: 'Tài khoản' })).toBeFocused();
   await page.getByRole('menuitem', { name: 'Tài khoản' }).press('Escape'); await expect(avatar).toBeFocused();
-  await page.getByRole('link', { name: 'Kết nối dịch vụ', exact: true }).click();
+  const nav = page.getByRole('navigation', { name: 'Điều hướng chính' });
+  await nav.getByRole('link', { name: 'Kết nối dịch vụ', exact: true }).click();
   await expect(page).toHaveURL(/\/settings$/); await expect(page.getByRole('heading', { name: 'Kết nối dịch vụ', level: 1 })).toBeVisible();
-  await page.getByRole('link', { name: 'Nhật ký', exact: true }).click();
+  await nav.getByRole('link', { name: 'Nhật ký', exact: true }).click();
   // Redesign 11/2026 bước 6c: tiêu đề /history rút thành danh từ ngắn "Nhật ký".
   await expect(page).toHaveURL(/\/history$/); await expect(page.getByRole('heading', { name: 'Nhật ký', level: 1, exact: true })).toBeVisible();
   const other = await context.newPage(); await other.goto('/guide');
@@ -59,7 +60,7 @@ for (const theme of ['light', 'dark'] as const) {
     const newConversation = page.getByRole('button', { name: 'Yêu cầu mới', exact: true });
     await expect(newConversation).toBeVisible();
     // Cockpit uses prototype typography under spec 1.2. Other pages retain FE-04.
-    await page.getByRole('link', { name: 'Kết nối dịch vụ', exact: true }).click();
+    await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Kết nối dịch vụ', exact: true }).click();
     await page.getByRole('button', { name: /Slack —/ }).click();
     const save = page.getByRole('button', { name: 'Lưu thay đổi', exact: true });
     await expect(save).toBeVisible(); expect(await save.evaluate(el => getComputedStyle(el).fontWeight)).toBe('600');
@@ -97,7 +98,7 @@ test('FE-04: mobile prototype drawers preserve scope editing with source-sized t
   await page.screenshot({ path: info.outputPath('FE04-mobile-drawer-targets.png'), animations: 'disabled' });
   await close.click();
   await page.getByRole('button', { name: 'Mở menu điều hướng' }).click();
-  await page.getByRole('link', { name: 'Kết nối dịch vụ', exact: true }).click();
+  await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Kết nối dịch vụ', exact: true }).click();
   // Spec 1.1.4/1.2.6: Settings now uses the React prototype's sizes;
   // retire only the 40x40 dimension assertion, retain scope add/remove behavior.
   await page.getByRole('button', { name: /Slack —/ }).click();
