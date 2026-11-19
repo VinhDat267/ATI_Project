@@ -19,7 +19,7 @@ import { ScheduleSection } from '../../pages/History/ScheduleSection';
 
 export const inboxMeta: PageMeta = {
   id: 'inbox',
-  title: 'Hộp thư đề xuất & Bản tóm tắt — Planora',
+  title: 'Tự động — Planora',
   htmlClass: '',
   bodyClass: 'min-h-screen flex flex-col bg-[#F8F4EE] text-[#1a0e08]',
   css,
@@ -45,7 +45,7 @@ const digestStatusLabels: Record<string, string> = {
 
 export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalInboxProps) {
   usePrototypePage(inboxMeta);
-  const [connections, setConnections] = useState<SlackConnectionPublicInfo[]>([]);
+  const [connections, setConnections] = useState<SlackConnectionPublicInfo[] | null>(null);
   const [selectedConnectionId, setSelectedConnectionId] = useState('');
   const [proposals, setProposals] = useState<SlackProposalViewDto[]>([]);
   const [digests, setDigests] = useState<SlackDigestViewDto[]>([]);
@@ -62,7 +62,7 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
     return authStorage.subscribeAuthTokens(() => {
       if (!owns()) {
         generation.current++;
-        setConnections([]);
+        setConnections(null);
         setSelectedConnectionId('');
         setProposals([]);
         setDigests([]);
@@ -86,9 +86,10 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
         setSelectedConnectionId((prev) => (rows.some((r) => r.id === prev) ? prev : rows[0]?.id ?? ''));
         if (rows.length === 0) setLoading(false);
       })
-      .catch(() => {
+      .catch((reason) => {
         if (owns() && epoch === generation.current) {
-          setConnections([]);
+          setConnections(null);
+          if (reason?.status !== 404) setError('Không tải được kết nối Slack.');
           setLoading(false);
         }
       });
@@ -163,33 +164,40 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
     );
   });
 
+  const filters = [
+    ['all', 'Tất cả', totalCount],
+    ['action_needed', 'Cần xử lý', actionNeededCount],
+    ['awaiting_approval', 'Chờ phê duyệt', awaitingApprovalCount],
+    ['resolved', 'Đã xử lý', resolvedCount],
+  ] as const;
+
   return (
-    <div className="min-h-screen bg-[#F8F4EE] dark:bg-[#0E0B09] text-[#1a0e08] dark:text-[#F3EEE8]">
+    <div className="min-h-screen bg-[#F8F4EE] dark:bg-[#131010] text-[#1a0e08] dark:text-[#F3EEE8]">
       <MainNav
         user={user}
         current="inbox"
-        pageName="Hộp thư đề xuất"
+        pageName="Tự động"
         inboxBadgeCount={badgeCount}
         navigate={navigate}
         onLogout={onLogout}
       />
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E6DED3] dark:border-[#3a312a] pb-5">
-          <div>
-            <h1 className="font-sans text-2xl sm:text-[26px] font-semibold tracking-tight text-[#1a0e08] dark:text-white">
-              Hộp thư đề xuất &amp; Bản tóm tắt
-            </h1>
-            <p className="text-sm text-[#51463E] dark:text-[#9CA3AF] mt-1">
-              Mọi đề xuất đều cần bạn kiểm tra và phê duyệt trước khi thực thi sang dịch vụ đích.
-            </p>
-          </div>
-          {connections.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <label className="text-sm flex items-center gap-2">
-                <span>Workspace</span>
+      {/* Bước 5b: một trang cho mọi việc Planora làm thay bạn: lịch chạy định kỳ, đề xuất từ Slack và bản tóm tắt. */}
+      <main data-automations className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 v3-space-y-10">
+        <div className="ps-pagehead">
+          <h1>Tự động</h1>
+          <p>Lịch chạy định kỳ và đề xuất việc từ tin nhắn Slack. Lịch chỉ chạy khi bạn đã xác nhận, đề xuất chỉ ghi khi bạn duyệt.</p>
+        </div>
+
+        <ScheduleSection user={user} navigate={navigate} />
+
+        <section aria-labelledby="proposals-heading" className="v3-space-y-4">
+          <div className="ps-sectionhead">
+            <h2 id="proposals-heading">Hộp thư đề xuất</h2>
+            {connections && connections.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
                 <select
                   aria-label="Chọn workspace"
-                  className="rounded-xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] px-3 py-1.5 text-sm !outline-none focus-visible:!outline-none focus:border-[#1a0e08]"
+                  className="ps-field"
                   value={selectedConnectionId}
                   onChange={(e) => setSelectedConnectionId(e.target.value)}
                 >
@@ -199,214 +207,168 @@ export function SlackProposalInbox({ user, navigate, onLogout }: SlackProposalIn
                     </option>
                   ))}
                 </select>
-              </label>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => setReloadTick((v) => v + 1)}
-                className="rounded-xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#221C18] px-3 py-1.5 text-xs font-semibold hover:bg-neutral-50 dark:hover:bg-[#312923] disabled:opacity-50"
-              >
-                Tải lại hộp thư
-              </button>
-            </div>
-          )}
-        </div>
-
-        {connections.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" aria-label="Thống kê đề xuất">
-            <div className="rounded-2xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] p-4 shadow-2xs">
-              <p className="text-xs font-medium text-[#6A5F56] dark:text-[#9CA3AF]">Tổng đề xuất</p>
-              <p className="mt-1 font-sans text-2xl font-semibold tabular-nums">{totalCount}</p>
-            </div>
-            <div className="rounded-2xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] p-4 shadow-2xs">
-              <p className="text-xs font-medium text-[#6A5F56] dark:text-[#9CA3AF]">Cần xử lý</p>
-              <p className="mt-1 font-sans text-2xl font-semibold tabular-nums text-[#B43E00]">{actionNeededCount}</p>
-            </div>
-            <div className="rounded-2xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] p-4 shadow-2xs">
-              <p className="text-xs font-medium text-[#6A5F56] dark:text-[#9CA3AF]">Chờ phê duyệt</p>
-              <p className="mt-1 font-sans text-2xl font-semibold tabular-nums text-amber-700 dark:text-amber-400">{awaitingApprovalCount}</p>
-            </div>
-            <div className="rounded-2xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] p-4 shadow-2xs">
-              <p className="text-xs font-medium text-[#6A5F56] dark:text-[#9CA3AF]">Đã xử lý</p>
-              <p className="mt-1 font-sans text-2xl font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">{resolvedCount}</p>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <p role="alert" className="text-sm text-red-700 dark:text-red-300">
-            {error}
-          </p>
-        )}
-        {loading && <p role="status" className="text-xs text-[#6A5F56]">Đang tải hộp thư đề xuất…</p>}
-
-        {!loading && connections.length === 0 && (
-          <div className="rounded-2xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1.5">
-              <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#B43E00] bg-[#FFF6EE] border border-[#F7D7BE] px-2.5 py-0.5 rounded-full">
-                <span>Đề xuất công việc từ tin nhắn Slack</span>
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setReloadTick((v) => v + 1)}
+                  className="ps-btn-quiet"
+                >
+                  Tải lại hộp thư
+                </button>
               </div>
-              <p className="text-sm font-medium text-[#1a0e08] dark:text-white leading-relaxed">
-                Chưa có workspace nào được kết nối. Hãy kết nối trong trang Kết nối dịch vụ để Planora tự động phát hiện công việc được giao và gửi đề xuất về đây.
+            )}
+          </div>
+
+          {error && (
+            <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+              {error}
+            </p>
+          )}
+          {loading && <p role="status" className="ps-note">Đang tải hộp thư đề xuất…</p>}
+
+          {!loading && !error && connections === null && (
+            <p className="ps-note">Slack cá nhân chưa khả dụng trên máy chủ.</p>
+          )}
+          {!loading && connections?.length === 0 && (
+            <div data-inbox-connect className="ps-panel p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <p className="ps-note">
+                Kết nối Slack cá nhân để Planora nhận ra việc được giao cho bạn trong tin nhắn và gửi đề xuất về đây.
               </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
               <a
                 href="/settings"
                 onClick={(e) => {
                   e.preventDefault();
                   navigate('/settings');
                 }}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#C84300] hover:bg-[#A83800] text-white px-4 py-2 text-xs font-semibold shadow-2xs transition-colors"
+                className="ps-btn-quiet flex-shrink-0 self-start sm:self-auto"
               >
-                <span>Mở Kết nối dịch vụ →</span>
+                Mở Kết nối dịch vụ
               </a>
             </div>
-          </div>
-        )}
+          )}
 
-        <section aria-labelledby="proposals-heading" className="space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 id="proposals-heading" className="font-sans text-lg font-semibold tracking-tight">
-              Đề xuất từ tin nhắn
-            </h2>
-            {proposals.length > 0 && (
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#131010] p-1 text-xs">
-                  {(
-                    [
-                      ['all', 'Tất cả'],
-                      ['action_needed', 'Cần xử lý'],
-                      ['awaiting_approval', 'Chờ phê duyệt'],
-                      ['resolved', 'Đã xử lý'],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setStatusFilter(key)}
-                      className={`rounded-lg px-2.5 py-1 font-semibold transition-colors ${
-                        statusFilter === key
-                          ? 'bg-[#1a0e08] text-white'
-                          : 'text-[#51463E] dark:text-[#9CA3AF] hover:text-[#1a0e08] dark:hover:text-white'
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+          {connections && connections.length > 0 && (
+            <>
+              <div role="group" aria-label="Thống kê đề xuất" className="ps-panel ps-stats">
+                {filters.map(([key, label, count]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className="ps-stat"
+                    aria-pressed={statusFilter === key}
+                    onClick={() => setStatusFilter(key)}
+                  >
+                    <span className="ps-stat-label">{label}</span>
+                    <span className="ps-stat-value">{count}</span>
+                  </button>
+                ))}
+              </div>
+              {proposals.length > 0 && (
                 <input
                   type="search"
                   aria-label="Tìm kiếm đề xuất"
                   placeholder="Tìm theo tiêu đề, kênh, nội dung…"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="rounded-xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] px-3 py-1.5 text-xs placeholder-[#6A5F56] dark:placeholder-[#A39A90] !outline-none focus-visible:!outline-none focus:border-[#1a0e08]"
+                  className="ps-field w-full sm:w-80"
                 />
+              )}
+              {proposals.length === 0 && !loading ? (
+                <p className="ps-note">Chưa có đề xuất nào cho workspace này.</p>
+              ) : filteredProposals.length === 0 && !loading ? (
+                <p className="ps-note">Không có đề xuất nào khớp với bộ lọc hiện tại.</p>
+              ) : (
+                <div className="v3-space-y-3">
+                  {filteredProposals.map((proposal) => (
+                    <SlackProposalCard
+                      key={proposal.id}
+                      proposal={proposal}
+                      navigate={navigate}
+                      onUpdated={(updated) =>
+                        setProposals((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
+        {connections && connections.length > 0 && (
+          <section aria-labelledby="digests-heading" className="v3-space-y-4">
+            <div className="ps-sectionhead">
+              <h2 id="digests-heading">Bản tóm tắt hàng ngày</h2>
+            </div>
+            {digests.length === 0 && !loading ? (
+              <p className="ps-note">Chưa có bản tóm tắt hàng ngày nào.</p>
+            ) : (
+              <div className="v3-space-y-3">
+                {digests.map((digest) => (
+                  <article key={digest.id} className="ps-panel p-4 sm:p-5 v3-space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="font-sans text-base font-semibold">Bản tóm tắt ngày {digest.localDate}</h3>
+                      <button
+                        type="button"
+                        className="ps-btn-quiet"
+                        disabled={refreshingDigestId === digest.id || digest.body === null}
+                        onClick={() => void handleRefreshDigest(digest.id)}
+                      >
+                        Làm mới trạng thái
+                      </button>
+                    </div>
+                    {digest.body === null || digest.status === 'stale' ? (
+                      <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
+                        Bản tóm tắt đã hết hiệu lực hoặc nguồn dữ liệu đã thay đổi.
+                      </p>
+                    ) : (
+                      (() => {
+                        const entries = digest.body.entries ?? digest.body.items ?? [];
+                        const counts =
+                          typeof digest.body.summary === 'object' && digest.body.summary !== null
+                            ? digest.body.summary
+                            : {
+                                totalProposals: entries.length,
+                                pendingCount: entries.filter((e) => e.status === 'pending' || e.status === 'needs_info')
+                                  .length,
+                                awaitingApprovalCount: entries.filter((e) => e.status === 'awaiting_approval').length,
+                                approvedCount: entries.filter(
+                                  (e) => e.status === 'approved' || e.status === 'completed',
+                                ).length,
+                                rejectedCount: entries.filter((e) => e.status === 'rejected').length,
+                              };
+                        return (
+                          <div className="space-y-2 text-xs text-[#51463E] dark:text-[#9CA3AF]">
+                            {typeof digest.body.summary === 'string' && <p>{digest.body.summary}</p>}
+                            <p>
+                              Tổng {counts.totalProposals} đề xuất · {counts.pendingCount} đang chờ ·{' '}
+                              {counts.awaitingApprovalCount} chờ duyệt · {counts.approvedCount} đã duyệt ·{' '}
+                              {counts.rejectedCount} đã từ chối
+                            </p>
+                            <ul className="space-y-1">
+                              {entries.map((item) => (
+                                <li key={item.proposalId} className="flex flex-wrap items-center gap-1.5">
+                                  <span>
+                                    • {item.title} ({item.status})
+                                  </span>
+                                  {digestStatusLabels[item.status] && (
+                                    <span className="rounded bg-[#F3F4F6] dark:bg-[#221C18] px-1.5 py-0.5 text-[11px] font-medium text-[#4a4038] dark:text-[#D7CEC4]">
+                                      {digestStatusLabels[item.status]}
+                                    </span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })()
+                    )}
+                  </article>
+                ))}
               </div>
             )}
-          </div>
-          {proposals.length === 0 && !loading ? (
-            <p className="text-sm text-[#6A5F56] dark:text-[#9CA3AF]">Chưa có đề xuất nào cho workspace này.</p>
-          ) : filteredProposals.length === 0 && !loading ? (
-            <p className="text-sm text-[#6A5F56] dark:text-[#9CA3AF]">
-              Không có đề xuất nào khớp với bộ lọc hiện tại.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {filteredProposals.map((proposal) => (
-                <SlackProposalCard
-                  key={proposal.id}
-                  proposal={proposal}
-                  navigate={navigate}
-                  onUpdated={(updated) =>
-                    setProposals((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
-                  }
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section aria-labelledby="digests-heading" className="space-y-3">
-          <h2 id="digests-heading" className="font-sans text-lg font-semibold tracking-tight">
-            Bản tóm tắt hàng ngày
-          </h2>
-          {digests.length === 0 && !loading ? (
-            <p className="text-sm text-[#6A5F56] dark:text-[#9CA3AF]">Chưa có bản tóm tắt hàng ngày nào.</p>
-          ) : (
-            <div className="space-y-3">
-              {digests.map((digest) => (
-                <article
-                  key={digest.id}
-                  className="rounded-2xl border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] p-4 sm:p-5 space-y-2 shadow-2xs"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="font-sans text-base font-semibold">Bản tóm tắt ngày {digest.localDate}</h3>
-                    <button
-                      type="button"
-                      className="rounded-lg border border-[#E6DED3] dark:border-[#3a312a] bg-white dark:bg-[#221C18] px-3 py-1 text-xs font-medium hover:bg-neutral-50 dark:hover:bg-[#312923] disabled:opacity-50"
-                      disabled={refreshingDigestId === digest.id || digest.body === null}
-                      onClick={() => void handleRefreshDigest(digest.id)}
-                    >
-                      Làm mới trạng thái
-                    </button>
-                  </div>
-                  {digest.body === null || digest.status === 'stale' ? (
-                    <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">
-                      Bản tóm tắt đã hết hiệu lực hoặc nguồn dữ liệu đã thay đổi.
-                    </p>
-                  ) : (
-                    (() => {
-                      const entries = digest.body.entries ?? digest.body.items ?? [];
-                      const counts =
-                        typeof digest.body.summary === 'object' && digest.body.summary !== null
-                          ? digest.body.summary
-                          : {
-                              totalProposals: entries.length,
-                              pendingCount: entries.filter((e) => e.status === 'pending' || e.status === 'needs_info')
-                                .length,
-                              awaitingApprovalCount: entries.filter((e) => e.status === 'awaiting_approval').length,
-                              approvedCount: entries.filter(
-                                (e) => e.status === 'approved' || e.status === 'completed',
-                              ).length,
-                              rejectedCount: entries.filter((e) => e.status === 'rejected').length,
-                            };
-                      return (
-                        <div className="space-y-2 text-xs text-[#51463E] dark:text-[#9CA3AF]">
-                          {typeof digest.body.summary === 'string' && <p>{digest.body.summary}</p>}
-                          <p>
-                            Tổng {counts.totalProposals} đề xuất · {counts.pendingCount} đang chờ ·{' '}
-                            {counts.awaitingApprovalCount} chờ duyệt · {counts.approvedCount} đã duyệt ·{' '}
-                            {counts.rejectedCount} đã từ chối
-                          </p>
-                          <ul className="space-y-1">
-                            {entries.map((item) => (
-                              <li key={item.proposalId} className="flex flex-wrap items-center gap-1.5">
-                                <span>
-                                  • {item.title} ({item.status})
-                                </span>
-                                {digestStatusLabels[item.status] && (
-                                  <span className="rounded bg-[#F3F4F6] dark:bg-[#221C18] px-1.5 py-0.5 text-[11px] font-medium text-[#4a4038] dark:text-[#D7CEC4]">
-                                    {digestStatusLabels[item.status]}
-                                  </span>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      );
-                    })()
-                  )}
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <div className="pt-2 border-t border-[#E8E0D6] dark:border-[#3a312a]">
-          <ScheduleSection user={user} navigate={navigate} />
-        </div>
+          </section>
+        )}
       </main>
     </div>
   );

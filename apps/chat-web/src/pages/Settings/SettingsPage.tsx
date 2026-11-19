@@ -41,30 +41,10 @@ const RESULT = {
 // getStatusBadgeHtml.
 function StatusBadge({ service }: { service: Service }) {
   const timeStr = service.lastCheckTime ? ` · kiểm tra lúc ${service.lastCheckTime}` : '';
-  if (!service.configured) {
-    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-neutral-100 text-[#6A5F56] border border-[#E8E0D6]">
-      <span className="w-1.5 h-1.5 rounded-full bg-[#9CA3AF]" />
-      <span>{`Chưa kết nối${timeStr}`}</span>
-    </span>;
-  }
-  if (service.statusType === 'untested') {
-    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-      <span>{`Chưa kiểm tra${timeStr}`}</span>
-    </span>;
-  }
-  if (service.statusType === 'ok') {
-    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-      <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
-      <span>{`Kết nối tốt${timeStr}`}</span>
-    </span>;
-  }
-  if (service.statusType === 'failed') {
-    return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200">
-      <span className="w-1.5 h-1.5 rounded-full bg-[#DC2626]" />
-      <span>{`Không kết nối được${timeStr}`}</span>
-    </span>;
-  }
+  if (!service.configured) return <span className="ps-status ps-status-neutral">{`Chưa kết nối${timeStr}`}</span>;
+  if (service.statusType === 'untested') return <span className="ps-status ps-status-warning">{`Chưa kiểm tra${timeStr}`}</span>;
+  if (service.statusType === 'ok') return <span className="ps-status ps-status-connected">{`Kết nối tốt${timeStr}`}</span>;
+  if (service.statusType === 'failed') return <span className="ps-status ps-status-error">{`Không kết nối được${timeStr}`}</span>;
   return null;
 }
 
@@ -76,26 +56,24 @@ function ServiceRow({ service, onOpen }: { service: Service; onOpen: (id: string
     id={`service-row-${service.id}`}
     onClick={() => onOpen(service.id)}
     onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(service.id); } }}
-    className="group bg-white hover:bg-[#FDFDFD] border border-[#E8E0D6] hover:border-[#FF5701]/40 rounded-xl p-4 sm:p-5 transition-all shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none"
+    className="group h-full ps-panel hover:border-[#C9BBA8] dark:hover:border-[#4a4038] p-4 sm:p-5 transition-colors flex flex-wrap items-center justify-between gap-x-3 gap-y-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-[#FF5701] focus-visible:v3-outline-none"
     aria-haspopup="dialog"
     aria-label={`${service.name} — bấm để xem chi tiết kết nối`}
   >
-    <div className="flex items-start sm:items-center gap-3.5 min-w-0">
-      <div className="w-10 h-10 rounded-xl bg-[#F8F4EE] border border-[#E8E0D6] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-        <ServiceLogo service={service.id} className="w-6 h-6" />
-      </div>
+    <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1 basis-56">
+      <ServiceLogo service={service.id} className="w-6 h-6 flex-shrink-0" />
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <h3 className="font-sans font-semibold text-base text-[#1a0e08] group-hover:text-[#B43E00] transition-colors">
+          <h3 className="font-sans font-semibold text-base text-[#1a0e08] dark:text-white">
             {service.name}
           </h3>
         </div>
-        <p className="text-xs text-[#51463E] mt-0.5 line-clamp-1 sm:line-clamp-2">
+        <p className="text-[13px] text-[#51463E] dark:text-[#D7CEC4] mt-0.5 line-clamp-2">
           {service.capabilities}
         </p>
       </div>
     </div>
-    <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#E8E0D6]/60">
+    <div className="flex items-center justify-end gap-2 flex-shrink-0">
       <div><StatusBadge service={service} /></div>
       <div className="text-[#6A5F56] group-hover:text-[#FF5701] transition-colors">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
@@ -174,72 +152,23 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
       <MainNav user={user} current="settings" pageName="Kết nối dịch vụ" navigate={navigate} onLogout={onLogout} />
       {/* NỘI DUNG CHÍNH */}
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 sm:py-10">
-        {/* Tiêu đề trang & Nguyên tắc */}
-        <div className="mb-8 sm:mb-10">
-          {/* Context Pill */}
-          <div className="mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E8E0D6] dark:border-[#3a312a] bg-white dark:bg-[#1A1613] text-xs text-[#1a0e08] dark:text-[#F3EEE8] shadow-sm">
-            {workspace.id === 'personal' ? (
-              <svg className="w-3.5 h-3.5 text-[#6A5F56] dark:text-[#9CA3AF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            ) : (
-              <svg className="w-3.5 h-3.5 text-[#6A5F56] dark:text-[#9CA3AF]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            )}
-            <span className="font-semibold text-[#51463E] dark:text-[#D1D5DB]">
-              {workspace.id === 'personal'
-                ? 'Đang cấu hình kết nối cho: Không gian Cá nhân'
-                : `Đang cấu hình kết nối cho: ${workspace.name}`}
-            </span>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 mb-3">
-            <h1 className="font-sans text-2xl sm:text-[26px] leading-tight font-semibold text-[#1a0e08] dark:text-white tracking-tight">
-              Kết nối dịch vụ
-            </h1>
-            {hasCatalogue ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
-                  <span id="summary-connected-count" className="text-sm sm:text-base font-semibold text-[#1a0e08] dark:text-white">
-                    {`${configured.length} / ${list.length} dịch vụ đã thiết lập · ${okCount} kết nối tốt`}
-                  </span>
-                </div>
-                <span data-testid="settings-oauth-summary" className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/60">
-                  Liên kết tài khoản cá nhân &amp; Không gian làm việc
-                </span>
-              </div>
-            ) : (
-              <span data-testid="settings-oauth-summary" className="px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/60">
-                Liên kết trực tiếp · Tự chọn phạm vi dữ liệu
-              </span>
-            )}
-          </div>
-          {/* Khung nguyên tắc an toàn dữ liệu */}
-          <div className="bg-white dark:bg-[#1A1613] rounded-xl p-4 sm:p-5 border border-[#E8E0D6] dark:border-[#3a312a] shadow-sm flex items-start gap-3">
-            <div className="w-6 h-6 rounded-full bg-[#FF5701]/10 text-[#FF5701] flex items-center justify-center flex-shrink-0 mt-0.5">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <div className="text-xs sm:text-sm text-[#51463E] dark:text-[#9CA3AF] leading-relaxed">
-              <strong className="text-[#1a0e08] dark:text-white font-semibold">
-                Nguyên tắc an toàn của nhóm:
-              </strong>
-              {" Planora chỉ đọc và ghi ở những bảng, lịch, tệp hoặc kênh bạn đã chọn bên dưới. Thông tin xác thực được mã hoá an toàn và bạn có thể ngắt kết nối bất cứ lúc nào."}
-            </div>
-          </div>
+        {/* Tiêu đề trang: phạm vi đang cấu hình và nguyên tắc an toàn trong một câu (bước 5b). */}
+        <div className="ps-pagehead mb-8 sm:mb-10">
+          <h1>Kết nối dịch vụ</h1>
+          <p data-testid="settings-oauth-summary">
+            {`${workspace.id === 'personal' ? 'Đang cấu hình kết nối cho: Không gian Cá nhân' : `Đang cấu hình kết nối cho: ${workspace.name}`}. Planora chỉ đọc và ghi ở những bảng, lịch, tệp hoặc kênh bạn chọn, và bạn ngắt kết nối được bất cứ lúc nào.`}
+          </p>
         </div>
         {loading && <p role="status" className="text-xs text-[#6A5F56] mb-4">Đang tải dịch vụ...</p>}
         {loadError && <div role="alert" className="text-xs text-[#DC2626] mb-4">{loadError} <button type="button" onClick={() => void refresh()} className="underline">Thử lại</button></div>}
         {connectedEmail && <p role="status" className="text-sm text-[#1a0e08] dark:text-white mb-4">Đã kết nối {connectedEmail}</p>}
-        <section aria-labelledby="heading-personal-services" className="mb-8 v3-space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-[#E8E0D6] dark:border-[#3a312a]">
+        <section aria-labelledby="heading-personal-services" className="mb-12 v3-space-y-6">
+          <div className="ps-sectionhead">
             <div>
-              <h2 id="heading-personal-services" className="text-sm font-semibold text-[#1a0e08] dark:text-white">Của riêng bạn</h2>
-              <p className="text-xs text-[#6A5F56] dark:text-[#9CA3AF] mt-0.5">Liên kết tài khoản trực tiếp · Chỉ truy cập đúng dữ liệu bạn cho phép</p>
+              <h2 id="heading-personal-services">Của riêng bạn</h2>
+              <p className="ps-note mt-0.5">Tài khoản bạn tự liên kết; Planora chỉ dùng đúng phần dữ liệu bạn cho phép.</p>
             </div>
-            <div role="tablist" aria-label="Phân nhóm dịch vụ" className="inline-flex flex-wrap items-center gap-1 p-1 rounded-xl bg-[#F3F2EE] dark:bg-[#131010] border border-[#E8E0D6] dark:border-[#3a312a]">
+            <div role="tablist" aria-label="Phân nhóm dịch vụ" className="ps-segmented">
               {([
                 { id: 'all', label: 'Tất cả' },
                 { id: 'google', label: 'Google Workspace' },
@@ -252,11 +181,6 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
                   role="tab"
                   aria-selected={categoryFilter === tab.id}
                   onClick={() => setCategoryFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    categoryFilter === tab.id
-                      ? 'bg-white dark:bg-[#221C18] text-[#1a0e08] dark:text-[#F3EEE8] shadow-sm'
-                      : 'text-[#6A5F56] dark:text-[#9CA3AF] hover:text-[#1a0e08] dark:hover:text-white'
-                  }`}
                 >
                   {tab.label}
                 </button>
@@ -267,101 +191,65 @@ export function SettingsPage({ user, navigate, onLogout }: SettingsPageProps) {
           {/* Nhóm 1: Hệ sinh thái Google Workspace */}
           {(personal || personalMyCalendar || personalMySheets) && (
             <div className={categoryFilter !== 'all' && categoryFilter !== 'google' ? 'hidden' : 'v3-space-y-3'}>
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-[#1a0e08] dark:text-white">
-                  Google Workspace · Thư, Lịch họp &amp; Bảng tính
-                </h3>
-                <span className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">Cấp quyền riêng từng tệp &amp; lịch</span>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+              <h3 className="ps-grouptitle">Google Workspace</h3>
+              <div className="ps-cardgrid">
                 {personal && <PersonalGmail key={`gmail-${user?.id}`} selected={selected} service={personal} refresh={refresh} standalone={false} />}
                 {personalMyCalendar && <PersonalMyCalendar key={`mycalendar-${user?.id}`} selected={selected} service={personalMyCalendar} refresh={refresh} navigate={navigate} standalone={false} />}
-                {personalMySheets && (
-                  <div className="lg:col-span-2">
-                    <PersonalMySheets key={`mysheets-${user?.id}`} selected={selected} service={personalMySheets} refresh={refresh} navigate={navigate} standalone={false} />
-                  </div>
-                )}
+                {personalMySheets && <PersonalMySheets key={`mysheets-${user?.id}`} selected={selected} service={personalMySheets} refresh={refresh} navigate={navigate} standalone={false} />}
               </div>
             </div>
           )}
 
           {/* Nhóm 2: Quản lý dự án, Tài liệu & Mã nguồn */}
           <div className={categoryFilter !== 'all' && categoryFilter !== 'work' ? 'hidden' : 'v3-space-y-3'}>
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-[#1a0e08] dark:text-white">
-                Quản lý dự án, Tài liệu &amp; Mã nguồn
-              </h3>
-              <span className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">Bảng công việc, kho mã &amp; tài liệu nhóm</span>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+            <h3 className="ps-grouptitle">Dự án, tài liệu và mã nguồn</h3>
+            <div className="ps-cardgrid">
               <TrelloConnection key={`trello-${user?.id}`} user={user} selected={selected} refresh={refresh} standalone={false} />
               <GitHubConnection key={`github-${user?.id}`} user={user} selected={selected} refresh={refresh} standalone={false} />
-              <div className="lg:col-span-2">
-                <JiraConnection key={`jira-${user?.id}`} user={user} selected={selected} refresh={refresh} navigate={navigate} standalone={false} />
-              </div>
-              <div className="lg:col-span-2">
-                <NotionConnection key={`notion-${user?.id}`} user={user} selected={selected === 'notion'} refresh={refresh} standalone={false} />
-              </div>
+              <JiraConnection key={`jira-${user?.id}`} user={user} selected={selected} refresh={refresh} navigate={navigate} standalone={false} />
+              <NotionConnection key={`notion-${user?.id}`} user={user} selected={selected === 'notion'} refresh={refresh} standalone={false} />
             </div>
           </div>
 
           {/* Nhóm 3: Tin nhắn & Kênh thông báo */}
           <div className={categoryFilter !== 'all' && categoryFilter !== 'messaging' ? 'hidden' : 'v3-space-y-3'}>
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-[#1a0e08] dark:text-white">
-                Tin nhắn &amp; Kênh thông báo tự động
-              </h3>
-              <span className="text-xs text-[#6A5F56] dark:text-[#9CA3AF]">Nhận báo cáo &amp; nhắc việc tức thì</span>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-              <div className={slackOAuthEnabled ? '' : 'lg:col-span-2'}>
-                <TelegramConnection key={`telegram-${user?.id}`} user={user} selected={selected} refresh={refresh} navigate={navigate} standalone={false} />
-              </div>
+            <h3 className="ps-grouptitle">Tin nhắn và thông báo</h3>
+            <div className="ps-cardgrid">
+              <TelegramConnection key={`telegram-${user?.id}`} user={user} selected={selected} refresh={refresh} navigate={navigate} standalone={false} />
               {slackOAuthEnabled && <PersonalSlack key={`slack-${user?.id}`} standalone={false} />}
             </div>
           </div>
         </section>
-        {/* DANH SÁCH 2 NHÓM DỊCH VỤ */}
-        {hasCatalogue && <div className="v3-space-y-8 sm:v3-space-y-10">
-          {/* Nhóm 1: Đã thiết lập */}
-          <section aria-labelledby="heading-connected-services">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mb-3.5">
-              <h2 id="heading-connected-services" className="text-xs font-bold uppercase tracking-wider text-[#6A5F56] flex items-center gap-2 whitespace-nowrap">
-                <span>
-                  Đã thiết lập
-                </span>
-                <span id="badge-count-connected" className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#16A34A]/10 text-[#16A34A]">
-                  {configured.length}
-                </span>
-              </h2>
-              <span className="text-xs text-[#6A5F56]">
-                Bấm vào hàng để xem hoặc đổi nơi được dùng
-              </span>
+        {/* KHOÁ DỊCH VỤ DÙNG CHUNG: quản trị viên thêm khoá, cả không gian dùng. Bộ đếm chỉ đếm các dịch vụ này. */}
+        {hasCatalogue && <div className="v3-space-y-6">
+          <div className="ps-sectionhead">
+            <div>
+              <h2>Khoá dịch vụ</h2>
+              <p className="ps-note mt-0.5">Khoá truy cập dùng chung cho cả không gian; quản trị viên thêm và kiểm tra.</p>
             </div>
-            <div id="list-connected-services" className="v3-space-y-3" role="list">
+            <span id="summary-connected-count" className="text-sm font-medium text-[#1a0e08] dark:text-white tabular-nums">
+              {`${configured.length}/${list.length} đã thiết lập · ${okCount} kết nối tốt`}
+            </span>
+          </div>
+          {/* Nhóm 1: Đã thiết lập */}
+          <section aria-labelledby="heading-connected-services" className="v3-space-y-3">
+            <h3 id="heading-connected-services" className="ps-grouptitle">
+              Đã thiết lập <span id="badge-count-connected" className="ps-groupcount">{configured.length}</span>
+            </h3>
+            <div id="list-connected-services" className="ps-cardgrid" role="list">
               {configured.length === 0
-                ? <div role="listitem" className="p-6 text-center text-xs text-[#6A5F56] dark:text-[#AFA59A] bg-white dark:bg-[#1A1613] rounded-xl border border-[#E8E0D6] dark:border-[#3a312a]">Chưa có dịch vụ nào được thiết lập.</div>
-                : configured.map(s => <div key={s.id} role="listitem"><ServiceRow service={s} onOpen={actions.openServiceDrawer} /></div>)}
+                ? <div role="listitem" className="ps-panel p-5 ps-note">Chưa có dịch vụ nào được thiết lập.</div>
+                : [...configured].sort((a, b) => Number(b.statusType === 'failed') - Number(a.statusType === 'failed')).map(s => <div key={s.id} role="listitem"><ServiceRow service={s} onOpen={actions.openServiceDrawer} /></div>)}
             </div>
           </section>
           {/* Nhóm 2: Chưa thiết lập */}
-          <section aria-labelledby="heading-unconnected-services">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 mb-3.5">
-              <h2 id="heading-unconnected-services" className="text-xs font-bold uppercase tracking-wider text-[#6A5F56] flex items-center gap-2 whitespace-nowrap">
-                <span>
-                  Chưa thiết lập
-                </span>
-                <span id="badge-count-unconnected" className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-neutral-200 text-[#51463E]">
-                  {unconfigured.length}
-                </span>
-              </h2>
-              <span className="text-xs text-[#6A5F56]">
-                Bấm để thêm khoá truy cập và kích hoạt
-              </span>
-            </div>
-            <div id="list-unconnected-services" className="v3-space-y-3" role="list">
+          <section aria-labelledby="heading-unconnected-services" className="v3-space-y-3">
+            <h3 id="heading-unconnected-services" className="ps-grouptitle">
+              Chưa thiết lập <span id="badge-count-unconnected" className="ps-groupcount">{unconfigured.length}</span>
+            </h3>
+            <div id="list-unconnected-services" className="ps-cardgrid" role="list">
               {unconfigured.length === 0
-                ? <div role="listitem" className="p-6 text-center text-xs text-[#6A5F56] bg-white rounded-xl border border-[#E8E0D6]">{`Tất cả ${list.length} dịch vụ đều đã được thiết lập.`}</div>
+                ? <div role="listitem" className="ps-panel p-5 ps-note">{`Tất cả ${list.length} dịch vụ đều đã được thiết lập.`}</div>
                 : unconfigured.map(s => <div key={s.id} role="listitem"><ServiceRow service={s} onOpen={actions.openServiceDrawer} /></div>)}
             </div>
           </section>

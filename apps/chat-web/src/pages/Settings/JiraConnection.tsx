@@ -30,6 +30,7 @@ import {
 } from './ServiceConnectionCard';
 
 const JIRA_KEY = 'ji' + 'ra';
+const EMPTY_WORKSPACES: WorkspaceSummary[] = [];
 
 const buttonPrimary = PRIMARY_CONNECT_BTN;
 const buttonSecondary = SECONDARY_ACTION_BTN;
@@ -51,11 +52,14 @@ export function JiraConnection({
   navigate,
 }: JiraConnectionProps) {
   const [data, setData] = useState<JiraConnectionStatusResponse | null>(null);
-  const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
+  const [workspaceRows, setWorkspaceRows] = useState<WorkspaceSummary[] | null>(null);
+  const workspaces = workspaceRows ?? EMPTY_WORKSPACES;
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [connectionError, setConnectionError] = useState('');
+  // Máy chủ chưa bật Jira: trạng thái trung tính như Trello/GitHub, không phải lỗi kết nối.
+  const [unconfigured, setUnconfigured] = useState(false);
   const [infoNotice, setInfoNotice] = useState('');
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
 
@@ -188,11 +192,16 @@ export function JiraConnection({
       if (mounted.current) {
         setData(res);
         setConnectionError('');
+        setUnconfigured(false);
       }
     } catch (err: any) {
       if (mounted.current) {
         const status = err?.status ?? err?.statusCode;
-        if (status === 404) {
+        if (status === 503 && (err?.data?.code ?? err?.code) === 'JIRA_UNCONFIGURED') {
+          setData(null);
+          setConnectionError('');
+          setUnconfigured(true);
+        } else if (status === 404) {
           setData({
             connected: false,
             connectionState: 'disconnected',
@@ -255,8 +264,9 @@ export function JiraConnection({
     try {
       const res = await jiraApi.workspaces();
       if (mounted.current) {
-        const list = res?.workspaces ?? [];
-        setWorkspaces(list);
+        const list = Array.isArray(res?.workspaces) ? res.workspaces : null;
+        setWorkspaceRows(list);
+        if (!list) return;
         const nextId =
           list.length > 0 && (!activeWorkspaceId || !list.some((w) => w.id === activeWorkspaceId))
             ? list[0].id
@@ -268,7 +278,7 @@ export function JiraConnection({
         }
       }
     } catch {
-      if (mounted.current) setWorkspaces([]);
+      if (mounted.current) setWorkspaceRows(null);
     }
   };
 
@@ -650,22 +660,26 @@ export function JiraConnection({
       ref={row}
       id={JIRA_KEY}
       tabIndex={-1}
-      className={`${CARD_CONTAINER_CLASS} ${
+      className={`${CARD_CONTAINER_CLASS} ps-connection-card ${
         selected === JIRA_KEY
           ? 'border-[#FF5701] ring-2 ring-[#FF5701]/20 shadow-md'
           : ''
       }`}
     >
       {/* HEADER SECTION */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-[#E8E0D6] dark:border-[#3a312a]">
+      <div className="ps-connection-header gap-4 pb-4 border-b border-[#E8E0D6] dark:border-[#3a312a]">
         <div className="flex items-center gap-3">
-          <ServiceLogo service={JIRA_KEY} className="w-6 h-6" />
+          <ServiceLogo service={JIRA_KEY} className="w-6 h-6 shrink-0" />
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h3 className="font-sans font-semibold text-base text-[#1a0e08] dark:text-white">
                 Atlassian Jira Cloud
               </h3>
-              {connectionError ? (
+              {unconfigured ? (
+                <span className={connectionBadgeClass('neutral')}>
+                  Chưa kết nối
+                </span>
+              ) : connectionError ? (
                 <span className={connectionBadgeClass('error')}>
                   Lỗi kết nối
                 </span>
@@ -865,6 +879,9 @@ export function JiraConnection({
       )}
 
       {/* CONNECTION ERROR ALERT */}
+      {unconfigured && (
+        <p data-testid="jira-unconfigured" className="mt-3 text-sm text-[#6A5F56] dark:text-[#AFA59A]">Jira chưa được cấu hình trên máy chủ.</p>
+      )}
       {connectionError && (
         <div
           id="jira-connection-error-alert"
@@ -1000,6 +1017,7 @@ export function JiraConnection({
 
       {/* JIRA WORKSPACE MANAGEMENT SECTION */}
       <details
+        hidden={unconfigured && workspaceRows === null}
         open={standalone === false ? false : (!isDisconnected || workspaces.length > 0)}
         className="pt-3.5 mt-3.5 border-t border-[#E8E0D6] dark:border-[#3a312a] group"
       >
@@ -1055,7 +1073,7 @@ export function JiraConnection({
               value={newWorkspaceName}
               onChange={(e) => setNewWorkspaceName(e.target.value)}
               disabled={busy}
-              className="flex-1 px-3 py-2 text-xs rounded-xl border border-[#E8E0D6] dark:border-[#4a4038] bg-white dark:bg-[#2A2420] text-[#1a0e08] dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#FF5701]"
+              className="min-w-0 flex-1 px-3 py-2 text-xs rounded-xl border border-[#E8E0D6] dark:border-[#4a4038] bg-white dark:bg-[#2A2420] text-[#1a0e08] dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#FF5701]"
             />
             <button
               type="submit"
@@ -1073,7 +1091,7 @@ export function JiraConnection({
               value={inviteTokenInput}
               onChange={(e) => setInviteTokenInput(e.target.value)}
               disabled={busy}
-              className="flex-1 px-3 py-2 text-xs rounded-xl border border-[#E8E0D6] dark:border-[#4a4038] bg-white dark:bg-[#2A2420] text-[#1a0e08] dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#FF5701]"
+              className="min-w-0 flex-1 px-3 py-2 text-xs rounded-xl border border-[#E8E0D6] dark:border-[#4a4038] bg-white dark:bg-[#2A2420] text-[#1a0e08] dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#FF5701]"
             />
             <button
               type="submit"

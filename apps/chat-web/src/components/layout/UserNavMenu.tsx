@@ -10,6 +10,12 @@ export interface UserNavMenuProps {
   variant?: 'prototype';
   triggerClassName?: string; menuItemClassName?: string;
 }
+/** Tên đọc của mục Tự động: mỗi hàng đợi giữ danh từ của nó (lượt lịch chạy chờ duyệt, đề xuất Slack cần xử lý). */
+export function automationLabel(pendingRuns: number, proposals: number): string {
+  const parts = [pendingRuns > 0 ? `${pendingRuns} lượt chờ duyệt` : '', proposals > 0 ? `${proposals} đề xuất cần xử lý` : ''].filter(Boolean);
+  return parts.length ? `Tự động, ${parts.join(', ')}` : 'Tự động';
+}
+
 export function avatarInitials(user: User | null) {
   const words = user?.name?.trim().split(/\s+/).filter(Boolean) ?? [];
   return words.length ? `${words[0][0]}${words.length > 1 ? words.at(-1)![0] : ''}`.toLocaleUpperCase('vi-VN') : user?.email?.[0]?.toUpperCase() || 'AO';
@@ -34,9 +40,9 @@ export function UserNavMenu({ user, onOpenSettings, onLogout, onManageUsers, onO
     | { kind: 'sep'; key: string }
     | { kind: 'item'; label: string; ariaLabel?: string; badge?: number; path?: string; action?: () => void; danger?: boolean };
   const entries: MenuEntry[] = [
-    { kind: 'item', label: pendingScheduleCount > 0 ? `Nhật ký điều phối, ${pendingScheduleCount} lượt chờ duyệt` : 'Nhật ký điều phối', path: '/history', action: () => navigate?.('/history') },
+    { kind: 'item', label: 'Nhật ký điều phối', path: '/history', action: () => navigate?.('/history') },
     { kind: 'item', label: 'Không gian làm việc', path: '/', action: () => navigate?.('/') },
-    { kind: 'item', label: 'Hộp thư đề xuất', ariaLabel: inboxBadgeCount > 0 ? `Hộp thư đề xuất, ${inboxBadgeCount} đề xuất cần xử lý` : 'Hộp thư đề xuất', badge: inboxBadgeCount > 0 ? inboxBadgeCount : undefined, path: '/inbox', action: () => navigate?.('/inbox') },
+    { kind: 'item', label: 'Tự động', ariaLabel: automationLabel(pendingScheduleCount, inboxBadgeCount), badge: pendingScheduleCount + inboxBadgeCount > 0 ? pendingScheduleCount + inboxBadgeCount : undefined, path: '/inbox', action: () => navigate?.('/inbox') },
     { kind: 'sep', key: 'sep-workspace' },
     { kind: 'item', label: 'Kết nối dịch vụ', path: '/settings', action: onOpenSettings },
     { kind: 'item', label: 'Cẩm nang', path: '/guide', action: () => navigate?.('/guide') },

@@ -234,6 +234,8 @@ describe('MyJira App Wiring & Flag-Off Invariants (JIRA-04 Task 6)', () => {
         if (p.body) req.send(p.body);
         const res = await req;
         expect(res.status, `Expected 503 for absent jira on ${p.method.toUpperCase()} ${p.url}`).toBe(503);
+        // Bước 5b: mã riêng để giao diện báo "chưa cấu hình" thay vì lỗi kết nối.
+        expect(res.body.code).toBe('JIRA_UNCONFIGURED');
       }
     });
 
@@ -257,6 +259,8 @@ describe('MyJira App Wiring & Flag-Off Invariants (JIRA-04 Task 6)', () => {
         if (p.body) req.send(p.body);
         const res = await req;
         expect(res.status, `Expected 503 for disabled jira on ${p.method.toUpperCase()} ${p.url}`).toBe(503);
+        // Bước 5b: mã riêng để giao diện báo "chưa cấu hình" thay vì lỗi kết nối.
+        expect(res.body.code).toBe('JIRA_UNCONFIGURED');
       }
     });
 

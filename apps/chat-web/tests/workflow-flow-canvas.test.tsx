@@ -11,6 +11,7 @@ import { ScheduleMoment } from '../src/pages/Cockpit/ScheduleMoment';
 import { PreviewContents } from '../src/pages/Cockpit/PreviewContents';
 import { RequestMoment } from '../src/pages/Cockpit/RequestMoments';
 import { HistoryPage } from '../src/pages/History/HistoryPage';
+import { ScheduleSection } from '../src/pages/History/ScheduleSection';
 import { SettingsPage } from '../src/pages/Settings/SettingsPage';
 import { SchedulesCapabilityContext } from '../src/hooks/use-schedules';
 import { apiClient } from '../src/services/api-client';
@@ -506,7 +507,7 @@ describe('WorkflowFlowCanvas — Make.com Orbital Workflow Visualizer', () => {
 
     render(<SettingsPage user={{ id: 'u-1', email: 'u@example.com', name: 'User', role: 'admin' }} navigate={vi.fn()} onLogout={vi.fn()} />);
 
-    expect(await screen.findByText('2 / 2 dịch vụ đã thiết lập · 2 kết nối tốt')).toBeInTheDocument();
+    expect(await screen.findByText('2/2 đã thiết lập · 2 kết nối tốt')).toBeInTheDocument();
     expect(screen.getByText('Tất cả 2 dịch vụ đều đã được thiết lập.')).toBeInTheDocument();
     expect(screen.getByTestId('settings-oauth-summary')).toBeInTheDocument();
     expect(document.body).toHaveTextContent(
@@ -555,6 +556,8 @@ describe('WorkflowFlowCanvas — Make.com Orbital Workflow Visualizer', () => {
     render(
       <SchedulesCapabilityContext.Provider value={true}>
         <HistoryPage user={{ id: 'u-1', email: 'u@example.com', name: 'User', role: 'admin' }} navigate={vi.fn()} onLogout={vi.fn()} />
+        {/* Bước 5b: Lịch chạy nằm ở trang Tự động, không còn trong HistoryPage. */}
+        <ScheduleSection user={{ id: 'u-1', email: 'u@example.com', name: 'User', role: 'admin' }} navigate={vi.fn()} />
       </SchedulesCapabilityContext.Provider>
     );
 

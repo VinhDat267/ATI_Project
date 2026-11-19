@@ -49,7 +49,7 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark']) {
     const row = page.locator('#service-row-gmail');
     await expect(row).toBeFocused(); await expect(row).toContainText('không xoá vĩnh viễn');
     expect(await row.getByRole('heading', { name: 'Gmail' }).evaluate(element => getComputedStyle(element).color)).toBe(theme === 'dark' ? 'rgb(243, 238, 232)' : 'rgb(26, 14, 8)');
-    expect(await row.getByRole('button', { name: 'Kết nối Gmail', exact: true }).evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(255, 87, 1)');
+    expect(await row.getByRole('button', { name: 'Kết nối Gmail', exact: true }).evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgb(200, 67, 0)'); // Bước 5b: nút chính .ps-btn của khung app
     await page.evaluate(() => { window.location.hash = 'slack'; });
     await expect(page.getByRole('dialog', { name: 'Slack' })).toBeVisible();
     await page.evaluate(() => { window.location.hash = 'gmail'; });

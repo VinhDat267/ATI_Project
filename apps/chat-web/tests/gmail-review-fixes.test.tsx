@@ -143,8 +143,8 @@ it('keeps the connection with a secondary "Giữ kết nối" button in the disc
   fireEvent.click(await screen.findByRole('button', { name: 'Ngắt kết nối' }));
   const dialog = await screen.findByRole('dialog', { name: 'Ngắt kết nối Gmail?' });
   const keep = within(dialog).getByRole('button', { name: 'Giữ kết nối' });
-  expect(keep.className).not.toContain('#FF5701');
-  expect(within(dialog).getByRole('button', { name: 'Xác nhận ngắt kết nối' }).className).toContain('#FF5701');
+  expect(keep).not.toHaveClass('ps-btn');
+  expect(within(dialog).getByRole('button', { name: 'Xác nhận ngắt kết nối' })).toHaveClass('ps-btn');
   expect(within(dialog).queryByRole('button', { name: 'Tiếp tục kết nối' })).toBeNull();
   fireEvent.click(keep);
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());

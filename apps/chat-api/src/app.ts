@@ -512,7 +512,7 @@ export function createApp(options: AppOptions): Express {
     app.use('/api/connections/myjira', createMyJiraConnectionRoutes(jiraRoutes));
   } else {
     app.use('/api/connections/myjira', (_req: Request, res: Response) => {
-      res.status(503).json({ error: 'Kết nối Jira chưa sẵn sàng.' });
+      res.status(503).json({ error: 'Kết nối Jira chưa sẵn sàng.', code: 'JIRA_UNCONFIGURED' });
     });
   }
 

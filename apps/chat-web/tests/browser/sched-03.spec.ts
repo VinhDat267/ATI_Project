@@ -34,10 +34,10 @@ async function shot(page: Page, name: string, info: TestInfo) {
   await appendFile(resolve(folder, 'manifest.sha256'), `${sha}  ${path}\n`); console.log(`SCHED-03 screenshot ${sha} ${path}`);
 }
 async function pendingBadge(page: Page, width: number, count: number) {
-  if (width >= 1024) await expect(page.getByRole('link', { name: count ? `Nhật ký, ${count} lượt chờ duyệt` : 'Nhật ký', exact: true })).toBeVisible();
+  if (width >= 1024) await expect(page.getByRole('link', { name: count ? `Tự động, ${count} lượt chờ duyệt` : 'Tự động', exact: true })).toBeVisible();
   else {
     await page.getByRole('button', { name: /Menu người dùng:/ }).click();
-    await expect(page.getByRole('menuitem', { name: count ? `Nhật ký điều phối, ${count} lượt chờ duyệt` : 'Nhật ký điều phối', exact: true })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: count ? `Tự động, ${count} lượt chờ duyệt` : 'Tự động', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
   }
 }
@@ -86,7 +86,7 @@ for (const width of [1440, 375]) for (const theme of ['light', 'dark'] as const)
     try {
       await page.setViewportSize({ width, height: 900 }); await login(page, db);
       await page.evaluate(value => { localStorage.setItem('ati-theme', value); document.documentElement.classList.toggle('dark', value === 'dark'); }, theme);
-      await create(page); await page.goto('/history');
+      await create(page); await page.goto('/inbox');
       const section = page.getByRole('region', { name: 'Lịch chạy' }); await expect(section).toBeVisible(); await shot(page, 'history', info);
       await section.getByRole('button', { name: 'Tạm dừng', exact: true }).click(); await expect(section.getByText('Đã tạm dừng', { exact: true })).toBeVisible();
       await section.getByRole('button', { name: 'Chạy tiếp', exact: true }).click(); await expect(section.getByText(/^Đang bật/)).toBeVisible();
@@ -163,7 +163,7 @@ test('SCHED-03: long names and requests fit 375 pixels and ignore remains local'
 test('SCHED-03: stale versions reload before a second action', async ({ page }) => {
   test.skip(!enabled); const db = pool();
   try {
-    const owner = await login(page, db); await create(page); await page.goto('/history');
+    const owner = await login(page, db); await create(page); await page.goto('/inbox');
     const section = page.getByRole('region', { name: 'Lịch chạy' }); await expect(section.getByRole('button', { name: 'Tạm dừng', exact: true })).toBeVisible();
     const renamed = await db.query("UPDATE schedules SET version=version+1,name='Phiên bản mới' WHERE user_id=$1 RETURNING id", [owner]);
     for (const row of renamed.rows) await certifyFixtureSchedule(db, row.id);
@@ -195,12 +195,14 @@ for (const state of ['expired', 'planning_failed', 'interrupted'] as const) test
     expect((await db.query('SELECT count(*)::int AS n FROM execution_steps WHERE plan_id=$1', [replanned.plan_id])).rows[0].n).toBe(0);
   } finally { await db.end(); }
 });
-test('SCHED-03 off: no schedule requests or history section', async ({ page }) => {
+test('SCHED-03 off: no schedule requests or schedule section on Tự động and Nhật ký', async ({ page }) => {
   test.skip(enabled); const db = pool();
   try {
     const calls: string[] = []; page.on('request', request => { if (/\/api\/(schedules|schedule-runs)/.test(request.url())) calls.push(request.url()); });
     await login(page, db); await expect(page.locator('[data-schedule-count]')).toHaveCount(0);
     await page.goto('/history'); await expect(page.getByRole('heading', { name: /Nhật ký điều phối &/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Lịch chạy', exact: true })).toHaveCount(0);
+    await page.goto('/inbox'); await expect(page.getByRole('heading', { name: 'Tự động', level: 1 })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Lịch chạy', exact: true })).toHaveCount(0); await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     expect(calls).toEqual([]);
   } finally { await db.end(); }

@@ -446,8 +446,8 @@ test.describe('Browser UI E2E (Mocked API): Sheets Digest V2 Preview, Reauthoriz
 
     await page.setViewportSize({ width: 1440, height: 900 });
 
-    // 1. Open /history and verify paused sheets_digest schedule + "Xem trước & Cấp quyền lại" CTA
-    await page.goto(`${baseUrl}/history`);
+    // 1. Open Tự động (/inbox) and verify paused sheets_digest schedule + "Xem trước & Cấp quyền lại" CTA
+    await page.goto(`${baseUrl}/inbox`);
     await expect(page.getByText('Báo cáo Doanh thu Q4 mỗi sáng')).toBeVisible();
     await expect(
       page.getByText(/REAUTH_REQUIRED: Lịch gửi báo cáo Google Sheets tự động thuộc phiên bản cũ \(v1\)/)
@@ -487,8 +487,8 @@ test.describe('Browser UI E2E (Mocked API): Sheets Digest V2 Preview, Reauthoriz
     await page.getByRole('button', { name: 'Xác nhận', exact: true }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Đang bật' })).toBeVisible();
 
-    // 4. Navigate back to /history where uncertainRun1 is in needs_attention (SHEETS_DELIVERY_UNKNOWN)
-    await page.goto(`${baseUrl}/history`);
+    // 4. Navigate back to Tự động (/inbox) where uncertainRun1 is in needs_attention (SHEETS_DELIVERY_UNKNOWN)
+    await page.goto(`${baseUrl}/inbox`);
     await expect(page.getByRole('button', { name: 'Lập lại kế hoạch' })).toHaveCount(0);
 
     const recoveryPanel = page.getByTestId('sheets-delivery-recovery-panel');
@@ -540,7 +540,7 @@ test.describe('Browser UI E2E (Mocked API): Sheets Digest V2 Preview, Reauthoriz
         deliveryFollowupRunId: null,
       },
     };
-    await page.goto(`${baseUrl}/history`);
+    await page.goto(`${baseUrl}/inbox`);
     await expect(page.getByRole('alert')).toContainText('GMAIL_RATE_LIMIT: Tạm thời không thể gửi báo cáo.');
     await expect(page.getByTestId('sheets-delivery-recovery-panel')).toHaveCount(0);
     await expect(page.getByTestId('btn-resolve-mark-sent')).toHaveCount(0);

@@ -2,14 +2,15 @@
 // Redesign 11/2026 (phong cách "framed sheet"): thanh bên trái và thanh trên cùng một nền ấm (hình chữ L),
 // nội dung nằm trên tờ giấy. Từ 1024 px thanh bên luôn hiện; hẹp hơn thì thanh bên thành tấm menu toàn màn hình
 // mở bằng nút menu trên thanh trên, nên điện thoại vẫn tới được mọi trang mà không phải vào menu avatar.
-// Mỗi đích chỉ còn một lối vào: Hộp thư đề xuất nằm trong danh sách, không còn chip "Sự kiện" riêng.
+// Mỗi đích chỉ còn một lối vào. Bước 5b: "Tự động" (/inbox) gom Lịch chạy, Hộp thư đề xuất và Bản tóm tắt;
+// số lượt chờ duyệt và đề xuất cần xử lý cùng nằm trên mục này, Nhật ký chỉ còn hội thoại.
 // Giao diện của khung nằm ở src/styles/app-shell.css; MainNav gắn data-app-shell lên <html> khi có mặt.
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
-import { BookOpen, History, Inbox, Menu, MessagesSquare, Plug, SquarePen, Users, X } from 'lucide-react';
+import { BookOpen, History, Menu, MessagesSquare, Plug, SquarePen, Users, X, Zap } from 'lucide-react';
 import { ThemeToggle } from '../../prototype/ThemeToggle';
 import { PlanoraMark } from '../PlanoraMark';
 import type { User } from '../../types';
-import { UserNavMenu } from './UserNavMenu';
+import { UserNavMenu, automationLabel } from './UserNavMenu';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { SidebarRecent } from './SidebarRecent';
 import { useChatStore } from '../../store/chat-store';
@@ -19,7 +20,7 @@ import { getActiveWorkspaceSummary, subscribeWorkspace } from '../../services/wo
 export type NavTab = 'workspace' | 'history' | 'settings' | 'guide' | 'users' | 'inbox';
 export const NAV_ITEMS = [
   { to: '/', label: 'Không gian làm việc', end: true },
-  { to: '/inbox', label: 'Hộp thư đề xuất', end: false },
+  { to: '/inbox', label: 'Tự động', end: false },
   { to: '/history', label: 'Nhật ký', end: false },
   { to: '/settings', label: 'Kết nối dịch vụ', end: false },
   { to: '/guide', label: 'Cẩm nang', end: false },
@@ -28,7 +29,7 @@ type Tab = { id: NavTab; path: string; name: string; icon: typeof History; group
 const TABS: Tab[] = [
   { id: 'workspace', path: '/', name: 'Không gian làm việc', icon: MessagesSquare, group: 'work' },
   { id: 'history', path: '/history', name: 'Nhật ký', icon: History, group: 'work' },
-  { id: 'inbox', path: '/inbox', name: 'Hộp thư đề xuất', icon: Inbox, group: 'work' },
+  { id: 'inbox', path: '/inbox', name: 'Tự động', icon: Zap, group: 'work' },
   { id: 'settings', path: '/settings', name: 'Kết nối dịch vụ', icon: Plug, group: 'work' },
   { id: 'guide', path: '/guide', name: 'Cẩm nang', icon: BookOpen, group: 'more' },
   { id: 'users', path: '/admin/users', name: 'Người dùng', icon: Users, group: 'more', adminOnly: true },
@@ -46,7 +47,7 @@ export interface MainNavProps {
   pageName?: string;
   /** Nút riêng của trang, đặt trước nút sáng/tối (cockpit: Lịch sử, Xem hội thoại). */
   actions?: ReactNode;
-  /** Số đề xuất cần xử lý trong Hộp thư đề xuất. */
+  /** Số đề xuất Slack cần xử lý (trang Tự động truyền vào khi đã tải hộp thư). */
   inboxBadgeCount?: number;
   /** Phần nằm ngay dưới thanh trên, trong cùng header dính (cockpit: dải Chế độ thử nghiệm). */
   children?: ReactNode;
@@ -132,11 +133,10 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
   const usersPendingCount = activeWorkspace.id !== 'personal' && typeof activeWorkspace.pendingCount === 'number' ? activeWorkspace.pendingCount : 0;
   const inboxCount = typeof inboxBadgeCount === 'number' && inboxBadgeCount > 0 ? inboxBadgeCount : 0;
   const tabs = TABS.filter(tab => !tab.adminOnly || canManageUsers);
-  const countFor = (id: NavTab) => (id === 'history' ? pendingCount : id === 'users' ? usersPendingCount : id === 'inbox' ? inboxCount : 0);
+  const countFor = (id: NavTab) => (id === 'users' ? usersPendingCount : id === 'inbox' ? pendingCount + inboxCount : 0);
   const labelFor = (tab: Tab, count: number) => {
     if (!count) return tab.name;
-    if (tab.id === 'history') return `Nhật ký, ${count} lượt chờ duyệt`;
-    if (tab.id === 'inbox') return `Hộp thư đề xuất, ${count} đề xuất cần xử lý`;
+    if (tab.id === 'inbox') return automationLabel(pendingCount, inboxCount);
     return `${tab.name}, ${count} chờ duyệt`;
   };
   const link = (tab: Tab) => {
@@ -154,7 +154,7 @@ export function MainNav({ user, current, navigate, onLogout, onOpenSettings, pag
       >
         <Icon aria-hidden="true" strokeWidth={1.75} />
         <span className="truncate">{tab.name}</span>
-        {count > 0 && <span aria-hidden="true" className="ps-navcount" data-schedule-count={tab.id === 'history' ? '' : undefined} data-users-pending-count={tab.id === 'users' ? '' : undefined} data-inbox-badge-count={tab.id === 'inbox' ? '' : undefined}>{count}</span>}
+        {count > 0 && <span aria-hidden="true" className="ps-navcount" data-schedule-count={tab.id === 'inbox' && pendingCount > 0 ? '' : undefined} data-users-pending-count={tab.id === 'users' ? '' : undefined} data-inbox-badge-count={tab.id === 'inbox' && inboxCount > 0 ? '' : undefined}>{count}</span>}
       </a>
     );
   };

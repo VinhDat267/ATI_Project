@@ -216,7 +216,8 @@ test('SLACK-M4: multi-service targets, URL thread parser, directory picker and P
  // 4. Navigate to /inbox via "Mở hộp thư đề xuất" and verify KPI, Filter, Search, and Target Override
  await card.getByRole('link', { name: 'Mở hộp thư đề xuất' }).first().click();
  await expect(page).toHaveURL(/\/inbox$/);
- await expect(page.getByRole('heading', { name: 'Hộp thư đề xuất & Bản tóm tắt' })).toBeVisible();
+ await expect(page.getByRole('heading', { name: 'Tự động', level: 1 })).toBeVisible();
+ await expect(page.getByRole('heading', { name: 'Hộp thư đề xuất', level: 2 })).toBeVisible();
  await expect(page.getByLabel('Thống kê đề xuất')).toBeVisible();
  await expect(page.locator('[data-inbox-badge-count]')).toHaveText('1');
  await expect(page.getByText('Xử lý lỗi memory leak dịch vụ thanh toán')).toBeVisible();

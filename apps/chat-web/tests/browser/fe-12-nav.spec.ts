@@ -5,11 +5,11 @@ import pg from 'pg';
 import {fixtureConversation,fixtureMessage,certifyFixturePlan} from './persisted-artifacts.fixture.js';
 import { hashPassword } from '../../../chat-api/src/db/repositories/user-repo.js';
 
-// Redesign 11/2026: thanh bên trái; Hộp thư đề xuất nằm trong danh sách.
+// Redesign 11/2026: thanh bên trái; trang Tự động (trước là Hộp thư đề xuất) nằm trong danh sách.
 const TABS = [
   ['Không gian làm việc', /\/$/],
   ['Nhật ký', /\/history$/],
-  ['Hộp thư đề xuất', /\/inbox$/],
+  ['Tự động', /\/inbox$/],
   ['Kết nối dịch vụ', /\/settings$/],
   ['Cẩm nang', /\/guide$/],
   ['Người dùng', /\/admin\/users$/],
@@ -17,7 +17,7 @@ const TABS = [
 const PAGES = [
   { path: '/', current: 'Không gian làm việc' },
   { path: '/history', current: 'Nhật ký' },
-  { path: '/inbox', current: 'Hộp thư đề xuất' },
+  { path: '/inbox', current: 'Tự động' },
   { path: '/settings', current: 'Kết nối dịch vụ' },
   { path: '/account', current: null },
   { path: '/admin/users', current: 'Người dùng' },
@@ -136,6 +136,45 @@ test('FE-12: all six recent conversations can be reached in a short landscape me
     await oldestLink.click({ timeout: 5000 });
     await expect(page).toHaveURL(new RegExp(`/c/${oldest}$`));
   } finally { await db.end(); }
+});
+
+test('FE-12: connected Notion and Jira cards fit their columns in the connection grid', async ({ page }) => {
+  await admin(page);
+  await page.route('**/api/connections/notion', route => route.fulfill({
+    json: {
+      available: true, status: 'connected', workspaceName: 'Thiết kế Planora',
+      selectedDatabases: [{ id: 'projects', title: 'Kế hoạch dự án' }], connections: [],
+    },
+  }));
+  await page.route('**/api/connections/myjira', route => route.fulfill({
+    json: {
+      connected: true, connectionState: 'connected', jiraAccountId: 'jira', atlassianAccountId: 'account',
+      displayName: 'Lan', hasWriteScope: false, sites: [],
+    },
+  }));
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await page.goto('/settings');
+  const notion = page.getByRole('region', { name: 'Của riêng bạn' }).locator('#service-row-notion');
+  const jira = page.locator('#jira');
+  await expect(notion.getByRole('button', { name: 'Ngắt kết nối', exact: true })).toBeVisible();
+  await expect(jira.getByRole('button', { name: 'Cấp quyền ghi Jira', exact: true })).toBeVisible();
+
+  for (const width of [1024, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect.poll(() => notion.evaluate(card => {
+      const description = card.querySelector('p')!.getBoundingClientRect();
+      const cardWidth = card.getBoundingClientRect().width;
+      return description.width / cardWidth;
+    }), { message: `Notion description remains readable at ${width}px` }).toBeGreaterThanOrEqual(0.5);
+    for (const card of [notion, jira]) {
+      await expect.poll(() => card.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    }
+    const manager = jira.locator('summary').filter({ hasText: 'Quản lý Không gian làm việc Jira' });
+    await manager.click();
+    await expect(jira.getByRole('button', { name: 'Tham gia Jira workspace' })).toBeVisible();
+    await expect.poll(() => jira.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    await manager.click();
+  }
 });
 
 test('FE-12: an admin reaches every tab from every page and the current tab is marked', async ({ page }) => {
@@ -300,7 +339,7 @@ test('FE-12: a member gets five links on desktop and reaches every page from the
     await expect(mainNav(page).getByRole('link', { name: 'Người dùng' })).toHaveCount(0);
     await page.setViewportSize({ width: 375, height: 812 });
     const menuButton = page.getByRole('button', { name: 'Mở menu điều hướng' });
-    for (const [item, url] of [['Kết nối dịch vụ', /\/settings$/], ['Cẩm nang', /\/guide$/], ['Hộp thư đề xuất', /\/inbox$/], ['Nhật ký', /\/history$/]] as const) {
+    for (const [item, url] of [['Kết nối dịch vụ', /\/settings$/], ['Cẩm nang', /\/guide$/], ['Tự động', /\/inbox$/], ['Nhật ký', /\/history$/]] as const) {
       await expect(mainNav(page)).toBeHidden();
       await menuButton.click();
       await expect(mainNav(page)).toBeVisible();

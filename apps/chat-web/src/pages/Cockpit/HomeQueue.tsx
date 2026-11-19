@@ -99,9 +99,9 @@ function WorkspaceHomeQueue({ user, onOpenConversation, navigate, workspace }: H
         ))}
         {schedules > 0 && (
           <li>
-            <button type="button" className={ROW} onClick={() => navigate('/history')}>
+            <button type="button" className={ROW} onClick={() => navigate('/inbox')}>
               <span className="block text-sm font-medium text-[#1a0e08] tabular-nums">{schedules} lịch chạy chờ bạn xác nhận</span>
-              <span className={ACTION}>Mở Nhật ký</span>
+              <span className={ACTION}>Mở Tự động</span>
             </button>
           </li>
         )}
