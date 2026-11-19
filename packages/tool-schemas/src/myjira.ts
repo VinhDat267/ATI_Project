@@ -197,6 +197,10 @@ export const MYJIRA_TOOLS: ToolDefinition[] = [
           maxLength: 100,
           description: 'Lọc theo tên trạng thái issue (ví dụ: To Do, In Progress, Done)',
         },
+        openOnly: {
+          type: 'boolean',
+          description: 'Chỉ tìm issue đang mở hoặc chưa hoàn thành, bỏ mọi trạng thái thuộc nhóm Done',
+        },
         priority: {
           type: 'string',
           minLength: 1,

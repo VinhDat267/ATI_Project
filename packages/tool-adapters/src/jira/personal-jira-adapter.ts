@@ -298,7 +298,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
     site: ScopedSite,
     issueKey: string,
     projectKey: string,
-    options?: { signal?: AbortSignal; timeoutMs?: number } | AbortSignal
+    options?: { signal?: AbortSignal; timeoutMs?: number; openOnly?: boolean } | AbortSignal
   ) {
     const opts = options instanceof AbortSignal ? { signal: options } : options;
     let value: any;
@@ -315,7 +315,8 @@ export class PersonalJiraAdapter extends BaseAdapter {
     }
     if (!record(value) || !record(value.fields?.project)) throw fail('SERVER_ERROR');
     return value.fields.project.key === projectKey && value.key === issueKey &&
-      this.matchesProjectId(value.fields.project, this.resolveProject(site, projectKey))
+      this.matchesProjectId(value.fields.project, this.resolveProject(site, projectKey)) &&
+      (!opts?.openOnly || ['new', 'indeterminate'].includes(value.fields.status?.statusCategory?.key))
       ? this.issueRow(value, site, projectKey)
       : null;
   }
@@ -471,13 +472,14 @@ export class PersonalJiraAdapter extends BaseAdapter {
       this.input(
         args,
         ['siteId', 'projectKey'],
-        ['query', 'status', 'priority', 'issueType', 'overdueOnly', 'dueWithinDays', 'unassignedOnly', 'limit']
+        ['query', 'status', 'openOnly', 'priority', 'issueType', 'overdueOnly', 'dueWithinDays', 'unassignedOnly', 'limit']
       );
       const site = this.resolveSite(args.siteId);
       const proj = this.resolveProject(site, args.projectKey);
       const limit = this.limit(args.limit, 50, 20);
       if (args.query !== undefined && !text(args.query, 0, 2000)) throw fail('VALIDATION');
       if (args.status !== undefined && !text(args.status, 1, 100)) throw fail('VALIDATION');
+      if (args.openOnly !== undefined && typeof args.openOnly !== 'boolean') throw fail('VALIDATION');
       if (args.priority !== undefined && !text(args.priority, 1, 100)) throw fail('VALIDATION');
       if (args.issueType !== undefined && !text(args.issueType, 1, 100)) throw fail('VALIDATION');
       if (args.overdueOnly !== undefined && typeof args.overdueOnly !== 'boolean') throw fail('VALIDATION');
@@ -503,7 +505,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
       const isDirectKey = JIRA_ISSUE_PATTERN.test(directKey) && directKey.split('-')[0] === proj.key;
       const directRemainingMs = Math.max(1, effectiveBudgetMs - (Date.now() - startedAt));
       const directCandidate = isDirectKey
-        ? await this.issueByKey(site, directKey, proj.key, { signal, timeoutMs: directRemainingMs })
+        ? await this.issueByKey(site, directKey, proj.key, { signal, timeoutMs: directRemainingMs, openOnly: args.openOnly === true })
         : null;
       const todayIso = new Date().toISOString().slice(0, 10);
       const maxDueIso = args.dueWithinDays !== undefined
@@ -531,6 +533,7 @@ export class PersonalJiraAdapter extends BaseAdapter {
         jql += ` AND duedate >= startOfDay() AND duedate <= "+${Number(args.dueWithinDays)}d"`;
       }
       if (args.unassignedOnly === true) jql += ' AND assignee is EMPTY';
+      if (args.openOnly === true) jql += ' AND statusCategory != Done';
       if (args.overdueOnly === true || args.dueWithinDays !== undefined || args.unassignedOnly === true) {
         jql += ' AND resolution = Unresolved';
       }
