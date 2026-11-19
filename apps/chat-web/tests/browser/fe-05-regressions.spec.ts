@@ -86,8 +86,9 @@ test('FE-05: native terminal SSE planner error remains visible in the cockpit',a
   let sends=0;
   await page.route('**/api/conversations/*/messages',async route=>{sends++;await route.fulfill({status:202,json:{messageId:`bounded-message-${sends}`}});});
   try {
-    await page.getByRole('button',{name:'Yêu cầu mới',exact:true}).click();await expect(page).toHaveURL(/\/c\//);
+    await page.getByRole('button',{name:'Yêu cầu mới',exact:true}).click();
     const input=page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });await input.fill('Request with an explicit planning failure');await input.press('Enter');
+    await expect(page).toHaveURL(/\/c\//);
     // Open while discovery is active; moment 1 hides the source chat button.
     await page.getByRole('button',{name:'Xem hội thoại',exact:true}).click(); release();
     await expect(page.getByRole('log').getByText(`Lỗi: ${message}`,{exact:true}).first()).toBeVisible();

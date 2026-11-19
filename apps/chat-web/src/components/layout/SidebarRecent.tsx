@@ -22,7 +22,8 @@ export function SidebarRecent(props: SidebarRecentProps) {
 
 function WorkspaceRecent({ follow, workspace }: SidebarRecentProps & { workspace: ReturnType<typeof getActiveWorkspaceSelection> }) {
   const conversationId = useChatStore(state => state.conversationId);
-  const renameRevision = useChatStore(state => state.conversationRenameRevision);
+  const listRevision = useChatStore(state => state.conversationListRevision);
+  const deletedId = useChatStore(state => state.lastDeletedConversationId);
   // Tiêu đề hội thoại mới có sau tin nhắn đầu tiên; tải lại khi tin đó được xác nhận.
   const firstSent = useChatStore(state => state.messages.find(message => message.role === 'user' && message.status === 'sent')?.id);
   const [rows, setRows] = useState<Conversation[] | null>(null);
@@ -30,13 +31,14 @@ function WorkspaceRecent({ follow, workspace }: SidebarRecentProps & { workspace
     let mounted = true;
     if (typeof apiClient.getConversations !== 'function') return;
     const isCurrent = () => mounted && workspace === getActiveWorkspaceSelection()
-      && renameRevision === useChatStore.getState().conversationRenameRevision;
+      && listRevision === useChatStore.getState().conversationListRevision;
+    if (deletedId) setRows(current => current?.filter(row => row.id !== deletedId) ?? null);
     void Promise.resolve()
       .then(() => apiClient.getConversations({ limit: LIMIT }))
       .then(page => { if (isCurrent()) setRows((page?.conversations ?? []).slice(0, LIMIT)); })
       .catch(() => { if (isCurrent()) setRows(current => current ?? []); });
     return () => { mounted = false; };
-  }, [workspace, conversationId, firstSent, renameRevision]);
+  }, [workspace, conversationId, firstSent, listRevision, deletedId]);
 
   if (!rows?.length) return null;
   const current = typeof window === 'undefined' ? null : window.location.pathname.match(/^\/c\/([^/]+)\/?$/)?.[1] ?? null;

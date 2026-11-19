@@ -13,7 +13,7 @@ import { conversationPath, type AppRoute } from '../routes';
 import { NotFoundView } from '../views/NotFoundView';
 import { useNetworkStatus } from '../hooks/use-network-status';
 import { OfflineBanner } from '../pages/Errors/PlanningErrors';
-import { getActiveWorkspaceId, subscribeWorkspace } from '../services/workspace-storage';
+import { getActiveWorkspaceId, getActiveWorkspaceSelection, subscribeWorkspace } from '../services/workspace-storage';
 
 interface WorkspaceProps {
   authToken: string; user: User | null; authError: string | null;
@@ -40,8 +40,16 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
   const [servicesError, setServicesError] = useState<string | null>(null);
   const [servicesLoading, setServicesLoading] = useState(false);
   const [canConfigureServices, setCanConfigureServices] = useState(false);
+  const lastDeletedConversationId = useChatStore(state => state.lastDeletedConversationId);
+  useEffect(() => {
+    if (route.kind === 'conversation' && route.conversationId === lastDeletedConversationId) navigate('/', true);
+  }, [route, lastDeletedConversationId, navigate]);
   const currentRoute = useRef(route);
   currentRoute.current = route;
+  const replaceDraftOnSend = useRef(false);
+  useEffect(() => {
+    if (route.kind !== 'home') replaceDraftOnSend.current = false;
+  }, [route.kind]);
   const workspaceMounted = useRef(true);
   const unsentDraftRequest = useRef<string | null>(null);
   useEffect(() => {
@@ -108,14 +116,13 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
   const { disconnected, reconnect } = useSSE(conversationId, authToken);
   const network = useNetworkStatus();
 
-  // A message sent before "Cuộc hội thoại mới" gets its ID belongs to that conversation (FE-03b).
-  const newConversation = useRef<Promise<string | null> | null>(null);
-  const createWorkspaceConversation = async () => {
-    if (getActiveWorkspaceId() === 'personal') return apiClient.createConversation();
+  const createWorkspaceConversation = async (workspace: ReturnType<typeof getActiveWorkspaceSelection>) => {
+    if (workspace.id === 'personal') return apiClient.createConversation();
     let availableServices = services;
     if (availableServices.length === 0) {
       try {
         const data = await apiClient.getServices();
+        if (!workspaceMounted.current || getActiveWorkspaceSelection() !== workspace) return;
         if (Array.isArray(data?.services)) {
           availableServices = data.services;
           setServices(availableServices);
@@ -126,82 +133,44 @@ export const Workspace: React.FC<WorkspaceProps> = ({ authToken, user, onLogout,
         // Proceed with standard conversation creation if service discovery fails
       }
     }
+    if (!workspaceMounted.current || getActiveWorkspaceSelection() !== workspace) return;
     return availableServices.some((s) => s.id === 'myjira')
       ? apiClient.createConversation(undefined, { jiraContext: true })
       : apiClient.createConversation();
   };
-  const handleNewConversation = async () => {
-    if (newConversation.current) return;
-    const previous = useChatStore.getState();
-    const previousRoute = route;
+  const handleNewConversation = () => {
     setActionError(null);
     reset({ preservePlanning: true });
-    setConversationId(null);
-    navigate('/');
-    const request = (async () => {
-      const data = await createWorkspaceConversation();
-      if (!workspaceMounted.current) return null;
-      const newConv = data.conversation;
-      if (!newConv?.id) throw new Error('Máy chủ không trả về phiên hội thoại hợp lệ.');
-      if (currentRoute.current.kind === 'home' && useChatStore.getState().conversationId === null) {
-        setConversationId(newConv.id);
-        navigate(conversationPath(newConv.id), true);
-      }
-      useChatStore.getState().setConversations([
-        newConv, ...useChatStore.getState().conversations.filter(c => c.id !== newConv.id),
-      ]);
-      return newConv.id as string;
-    })();
-    newConversation.current = request.catch(() => null);
-    try { await request; }
-    catch (error) {
-      if (!workspaceMounted.current) return;
-      if (currentRoute.current.kind === 'home' && useChatStore.getState().conversationId === null) {
-        useChatStore.setState({
-          messages: previous.messages, streamingText: previous.streamingText, isStreaming: previous.isStreaming,
-          activePlan: previous.activePlan, planStatus: previous.planStatus,
-          activeClarification: previous.activeClarification, gatherState: previous.gatherState,
-          stepStatuses: previous.stepStatuses, stepErrors: previous.stepErrors,
-          executionSnapshot: previous.executionSnapshot, executionLoadError: previous.executionLoadError,
-          retiredExecutionPlanId: previous.retiredExecutionPlanId, settledPlanIds: previous.settledPlanIds,
-        });
-        setConversationId(previous.conversationId);
-        if (previousRoute.kind === 'conversation') {
-          const path = conversationPath(previousRoute.conversationId);
-          window.addEventListener('popstate', () => navigate(path, true), { once: true });
-          window.history.back();
-        }
-      }
-      setActionError(userErrorMessage(error));
-    }
-    finally { newConversation.current = null; }
+    const alreadyHome = route.kind === 'home';
+    if (!alreadyHome) replaceDraftOnSend.current = true;
+    navigate('/', alreadyHome);
   };
 
   const handleSendMessage = async (content: string, options?: { slackConnectionId?: string; slackChannel?: string; workflowContext?: { templateId?: string; resourceDefaults?: Record<string, Record<string, string>> } }) => {
     const tempId = `temp-${crypto.randomUUID()}`;
-    const pendingConversation = newConversation.current;
     let currentConvId = route.kind === 'conversation' ? route.conversationId : null;
     if (!useChatStore.getState().beginPlanning(currentConvId, tempId)) return;
     if (!currentConvId) {
+      const workspace = getActiveWorkspaceSelection();
+      const replaceDraft = replaceDraftOnSend.current;
       unsentDraftRequest.current = tempId;
       try {
-        if (pendingConversation) currentConvId = await pendingConversation;
-        else currentConvId = (await createWorkspaceConversation()).conversation?.id;
-        if (!workspaceMounted.current) return;
+        currentConvId = (await createWorkspaceConversation(workspace))?.conversation?.id ?? null;
+        if (!workspaceMounted.current || getActiveWorkspaceSelection() !== workspace) return;
         if (currentConvId) {
           useChatStore.getState().transferPlanning(null, currentConvId, tempId);
           if (unsentDraftRequest.current === tempId) unsentDraftRequest.current = null;
-          if (currentRoute.current.kind === 'home' && useChatStore.getState().conversationId === null) {
+          if (currentRoute.current === route && useChatStore.getState().conversationId === null) {
             setConversationId(currentConvId);
-            navigate(conversationPath(currentConvId));
+            navigate(conversationPath(currentConvId), replaceDraft);
           }
         }
       } catch (err) {
-        if (!workspaceMounted.current) return;
+        if (!workspaceMounted.current || getActiveWorkspaceSelection() !== workspace) return;
         console.warn('Could not create conversation via API:', err);
       }
       if (!currentConvId) {
-        if (currentRoute.current.kind === 'home') useChatStore.getState().addMessage({
+        if (currentRoute.current === route) useChatStore.getState().addMessage({
           id: `err-${Date.now()}`,
           role: 'system',
           content: '[Lỗi]: Không thể tạo phiên hội thoại mới trên máy chủ.',

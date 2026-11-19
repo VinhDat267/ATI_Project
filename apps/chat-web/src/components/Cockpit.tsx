@@ -191,7 +191,7 @@ export function Cockpit(props: Props) {
   useEffect(() => { setPreview(null); }, [state.conversationId, state.activePlan?.id]);
   const startNewConversation = () => {
     setDraft('');
-    // Reset the composer template on click, even while the new conversation ID is pending.
+    // Reset the composer template when starting a draft.
     setRequestVersion(version => version + 1);
     props.onNewConversation();
   };

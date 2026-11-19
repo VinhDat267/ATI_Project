@@ -14,7 +14,8 @@ import type {
 export interface ChatStoreState {
   conversationId: string | null;
   conversations: Conversation[];
-  conversationRenameRevision: number;
+  conversationListRevision: number;
+  lastDeletedConversationId: string | null;
   messages: ChatMessage[];
   streamingText: string;
   isStreaming: boolean;
@@ -48,6 +49,7 @@ export interface ChatStoreState {
   setConversationId: (id: string | null) => void;
   setConversations: (conversations: Conversation[]) => void;
   applyConversationRename: (conversation: Conversation) => void;
+  applyConversationDeletion: (id: string) => void;
   addMessage: (message: ChatMessage) => void;
   addOptimisticMessage: (params: { id: string; content: string }) => void;
   confirmMessage: (tempId: string, confirmedId: string) => void;
@@ -71,7 +73,8 @@ export interface ChatStoreState {
 const initialState = {
   conversationId: null,
   conversations: [],
-  conversationRenameRevision: 0,
+  conversationListRevision: 0,
+  lastDeletedConversationId: null,
   messages: [],
   streamingText: '',
   isStreaming: false,
@@ -101,8 +104,18 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   setConversations: (conversations) => set({ conversations }),
   applyConversationRename: (conversation) => set(state => ({
     conversations: state.conversations.map(row => row.id === conversation.id ? conversation : row),
-    conversationRenameRevision: state.conversationRenameRevision + 1,
+    conversationListRevision: state.conversationListRevision + 1,
   })),
+  applyConversationDeletion: (id) => {
+    const state = get();
+    if (state.conversationId === id) state.reset({ preservePlanning: true });
+    state.setIsPlanning(false, id);
+    set(current => ({
+      conversations: current.conversations.filter(row => row.id !== id),
+      conversationListRevision: current.conversationListRevision + 1,
+      lastDeletedConversationId: id,
+    }));
+  },
 
   addMessage: (message) =>
     set((state) => {

@@ -15,6 +15,42 @@ async function login(page: Page) {
 }
 async function owner(db: pg.Pool) { return (await db.query('SELECT id FROM users WHERE email=$1', [email])).rows[0].id; }
 
+test('FE-02: confirmed history deletion removes a conversation and its recent link', async ({ page }, info) => {
+  const db = pool();
+  try {
+    const title = 'Kế hoạch chuẩn bị buổi họp tuần';
+    const id = await fixtureConversation(db, await owner(db), title);
+    await fixtureMessage(db, id, 'user', 'Nội dung kiểm tra');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await login(page);
+    await page.getByRole('link', { name: 'Nhật ký', exact: true }).click();
+    const remove = page.getByRole('button', { name: `Xoá ${title}`, exact: true });
+    const dialog = page.getByRole('alertdialog', { name: 'Xoá hội thoại?' });
+    const recent = page.getByRole('link', { name: title, exact: true });
+    await expect(recent).toBeVisible();
+    await remove.click();
+    await expect(dialog.getByRole('button', { name: 'Huỷ' })).toBeFocused();
+    await page.screenshot({ path: info.outputPath('delete-desktop.png') });
+    await page.keyboard.press('Escape');
+    await expect(remove).toBeFocused();
+    expect((await db.query('SELECT 1 FROM conversations WHERE id=$1', [id])).rowCount).toBe(1);
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    await remove.click();
+    await expect(dialog).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: info.outputPath('delete-mobile.png') });
+    await dialog.getByRole('button', { name: 'Xác nhận xoá' }).click();
+    await expect(page.getByRole('main').getByText('Đã xoá hội thoại.')).toBeVisible();
+    await expect(remove).toHaveCount(0);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(recent).toHaveCount(0);
+    expect((await db.query('SELECT 1 FROM messages WHERE conv_id=$1', [id])).rowCount).toBe(0);
+    await page.goto(`/c/${id}`);
+    await expect(page.getByText('Không tìm thấy hội thoại.')).toBeVisible();
+  } finally { await db.end(); }
+});
+
 test('FE-02: Back/Forward, direct reload restores pending plan and saved execution, foreign link has no data', async ({ page }, testInfo) => {
   const db = pool();
   try {

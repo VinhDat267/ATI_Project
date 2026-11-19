@@ -226,19 +226,30 @@ it('FE-05b limits configured service suggestions to four cards', () => {
   const grid = screen.getByText('Gợi ý việc phổ biến theo công cụ của bạn').nextElementSibling!;
   expect(within(grid as HTMLElement).getAllByRole('button')).toHaveLength(4);
 });
-it.each([
-    ['Trello', 'bg-blue-50', 'text-blue-600', 'bg-blue-500/5'],
-    ['Google Sheets', 'bg-green-50', 'text-emerald-600', 'bg-emerald-500/5'],
-    ['Notion', 'bg-neutral-100', 'text-neutral-800', 'bg-neutral-900/5'],
-    ['GitHub', 'bg-neutral-900', 'text-neutral-900', 'bg-neutral-900/5'],
-  ])('FE-05b suggestion for %s keeps the source icon, typography and service colors', (name, background, textColor, decoration) => {
+it('replaces an existing draft when a quick suggestion is selected', () => {
+  const { send } = setup();
+  const input = screen.getByRole('textbox', { name: 'Mô tả công việc bạn muốn thực hiện' });
+  fireEvent.change(input, { target: { value: 'Yêu cầu đang soạn' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Tạo issue mới trên GitHub' }));
+  expect(input).toHaveValue('Tạo issue mới trên GitHub');
+  expect(input).toHaveFocus();
+  expect(send).not.toHaveBeenCalled();
+});
+it('does not submit while Enter is confirming text input composition', () => {
+  const { send } = setup();
+  const input = screen.getByRole('textbox', { name: 'Mô tả công việc bạn muốn thực hiện' });
+  fireEvent.change(input, { target: { value: 'Gửi báo cáo' } });
+  fireEvent.keyDown(input, { key: 'Enter', isComposing: true });
+  expect(send).not.toHaveBeenCalled();
+  fireEvent.keyDown(input, { key: 'Enter' });
+  expect(send).toHaveBeenCalledExactlyOnceWith('Gửi báo cáo');
+});
+it.each(['Trello', 'Google Sheets', 'Notion', 'GitHub'])('shows the service mark and full prompt in the %s suggestion', (name) => {
     setup(connected);
     const grid = screen.getByText('Gợi ý việc phổ biến theo công cụ của bạn').nextElementSibling!;
     const card = within(grid as HTMLElement).getByRole('button', { name: new RegExp(name) });
-    expect(within(card).getByTitle(name)).toHaveClass('p-1.5', 'group-hover:scale-105', background);
-    expect(within(card).getByText(name, { exact: true })).toHaveClass('font-medium', textColor);
-    expect(card.firstElementChild).toHaveClass(decoration);
-    expect(card.querySelector('.leading-snug')).toHaveClass('font-medium');
+    expect(within(card).getByTitle(name).querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(within(card).getByText(new RegExp(name))).not.toHaveClass('truncate');
 });
 it('FE-05b uses service logos only for unambiguous service choices and renders clarification context', () => {
   useChatStore.setState({

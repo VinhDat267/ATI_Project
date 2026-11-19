@@ -11,7 +11,7 @@ async function login(page: Page) {
 }
 const conversationIds = async (pool: pg.Pool) => (await pool.query(
   'SELECT c.id FROM conversations c JOIN users u ON u.id = c.user_id WHERE u.email = $1', [email])).rows.map(row => row.id as string);
-test('FE-03b: a message sent while New conversation is pending goes to that conversation', async ({ page }) => {
+test('FE-03b: leaving new drafts creates no rows, then the first send creates one conversation', async ({ page }) => {
   const pool = new pg.Pool({ connectionString });
   try {
     await login(page);
@@ -27,12 +27,21 @@ test('FE-03b: a message sent while New conversation is pending goes to that conv
     await page.route('**/api/conversations/*/messages', async route => { await sendGate; await route.continue(); });
 
     const input = page.getByRole('textbox', { name: /Mô tả công việc bạn muốn thực hiện|Nhập câu trả lời làm rõ yêu cầu/ });
+    const newRequest = page.getByRole('button', { name: 'Yêu cầu mới', exact: true });
     await input.fill('FE-03b bản nháp của yêu cầu trước');
-    await page.getByRole('button', { name: 'Yêu cầu mới', exact: true }).click();
-    await expect.poll(() => creates).toBe(1);
+    await newRequest.click();
+    await expect(input).toHaveValue('');
+    await input.fill('FE-03b rời đi khi chưa gửi');
+    await page.getByRole('link', { name: 'Nhật ký', exact: true }).click();
+    await expect(page).toHaveURL(/\/history$/);
+    expect(creates).toBe(0);
+    expect((await conversationIds(pool)).filter(id => !before.has(id))).toEqual([]);
+    await newRequest.click();
+    await expect(page).toHaveURL(/\/$/);
     const content = `FE-03b gửi khi đang tạo hội thoại ${Date.now()}`;
     await expect(input).toHaveValue('');
     await input.fill(content); await input.press('Enter');
+    await expect.poll(() => creates).toBe(1);
     releaseCreate();
 
     await expect(page).toHaveURL(/\/c\/[0-9a-f-]{36}$/);

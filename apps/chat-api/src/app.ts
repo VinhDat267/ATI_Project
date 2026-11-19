@@ -557,6 +557,7 @@ export function createApp(options: AppOptions): Express {
         pool: dbPool,
         enableWorkspaceConversations: options.enableWorkspaceConversations,
         jiraHistorySanitizer: options.jiraHistorySanitizer,
+        sseManager: options.sseManager,
       })
     );
   }

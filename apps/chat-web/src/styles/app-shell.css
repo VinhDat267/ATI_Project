@@ -154,6 +154,8 @@ html.dark .ps-btn-danger:hover { color: #FCA5A5; border-color: #7F1D1D; backgrou
 .ps-status-warning { color: #B45309; }
 .ps-status-error { color: #B91C1C; }
 .ps-status-neutral { color: var(--ps-faint); }
+/* Một số thẻ kết nối còn tự vẽ chấm (span rỗng đầu tiên); chấm chung đã có ở ::before nên ẩn chấm riêng để không hiện hai chấm. */
+.ps-status > span:first-child:empty { display: none; }
 html.dark .ps-status-connected { color: #34D399; }
 html.dark .ps-status-warning { color: #FBBF24; }
 html.dark .ps-status-error { color: #F87171; }
@@ -209,6 +211,38 @@ html.dark .ps-status-error { color: #F87171; }
 /* Mẫu gợi ý: các hàng trong một bảng, không phải lưới thẻ có nhãn màu. */
 .ps-rows > * + * { border-top: 1px solid var(--ps-edge); }
 
+/* Ô soạn và lối tắt trong không gian làm việc dùng chung tông với Cổng duyệt. */
+.request-composer:focus-within { border-color: var(--ps-accent-text); }
+.request-input { color: var(--ps-ink); min-height: 5.25rem; max-height: 40vh; }
+.request-input::placeholder { color: var(--ps-faint); opacity: 1; }
+.request-input:focus { outline: none; }
+.request-composer .request-submit { min-height: 40px; margin-left: auto; }
+.request-tool {
+  min-height: 40px; padding: 0 8px; border-radius: 8px; font-size: 13px;
+  font-weight: 500; color: var(--ps-muted); cursor: pointer;
+}
+.request-tool:hover:not(:disabled) { background: var(--ps-hover); color: var(--ps-ink); }
+.request-tool:disabled { color: var(--ps-faint); cursor: not-allowed; }
+.request-suggestions-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: 8px;
+}
+.request-suggestion {
+  display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px;
+  text-align: left; font-size: 14px; font-weight: 500; line-height: 1.4;
+  color: var(--ps-ink); background: var(--ps-panel); border: 1px solid var(--ps-edge); border-radius: 8px;
+}
+.request-suggestion:hover:not(:disabled) { background: var(--ps-hover); cursor: pointer; }
+.request-suggestion:disabled { color: var(--ps-faint); cursor: not-allowed; }
+html[data-app-shell] :is(.request-tool, .request-suggestion, .request-echo-disclosure > summary):focus-visible {
+  outline: 2px solid var(--ps-accent-text); outline-offset: 2px;
+}
+@media (max-width: 639.98px) {
+  .request-composer .request-submit { width: 100%; min-height: 44px; }
+  .request-suggestions-grid { grid-template-columns: minmax(0, 1fr); }
+  .ps-segmented.ps-filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .ps-filter-grid > button { height: auto; min-height: 40px; padding: 6px 8px; }
+}
+
 /* ---- Bố cục theo bề ngang ---- */
 @media (min-width: 1024px) {
   /* Thanh bên đã có danh sách gần đây: nút ngăn kéo "Gần đây" chỉ còn ở màn hẹp. */
@@ -242,6 +276,19 @@ html.dark .ps-status-error { color: #F87171; }
   .ps-sidebar[data-open] .ps-recentlink { height: 44px; font-size: 15px; }
 }
 @media (prefers-reduced-motion: reduce) { .ps-navlink, .ps-action, .ps-iconbtn { transition: none; } }
+
+/* Sơ đồ luồng trong app theo tông đen ấm của khung giấy, thay sắc xanh navy cũ trên nền tối. */
+html.dark[data-app-shell] [data-testid="workflow-flow-canvas"] { background-color: var(--ps-sheet) !important; border-color: var(--ps-edge) !important; }
+html.dark[data-app-shell] [data-testid="workflow-flow-canvas"] :is([class*="dark:bg-[#0E1528]"]) { background-color: var(--ps-sheet) !important; }
+html.dark[data-app-shell] [data-testid="workflow-flow-canvas"] :is([class*="dark:bg-[#131B2F]"]) { background-color: var(--ps-panel) !important; }
+html.dark[data-app-shell] [data-testid="workflow-flow-canvas"] :is([class*="dark:bg-[#19233B]"]) { background-color: var(--ps-hover) !important; }
+html.dark[data-app-shell] [data-testid="workflow-flow-canvas"] :is([class*="dark:bg-[#1E293B]"]) { background-color: var(--ps-active) !important; }
+html.dark[data-app-shell] [data-testid="workflow-flow-canvas"] :is([class*="dark:border-[#24324D]"], [class*="dark:border-[#293653]"], [class*="dark:border-[#2C3B5E]"]) { border-color: var(--ps-edge) !important; }
+html.dark[data-app-shell] [data-testid="workflow-flow-canvas"] :is([class*="dark:border-[#475569]"]) { border-color: #4A3F37 !important; }
+html.dark[data-app-shell] [data-testid="workflow-flow-canvas"] :is([class*="dark:text-[#F1F5F9]"]) { color: var(--ps-ink) !important; }
+html.dark[data-app-shell] [data-testid="workflow-flow-canvas"] :is([class*="dark:text-[#CBD5E1]"]) { color: var(--ps-muted) !important; }
+html.dark[data-app-shell] [data-testid="workflow-flow-canvas"] :is([class*="dark:text-[#94A3B8]"]) { color: var(--ps-faint) !important; }
+html.dark[data-app-shell] [data-testid="workflow-flow-canvas"] :is([class*="dark:hover:bg-[#1F2A44]"]):hover { background-color: var(--ps-hover) !important; }
 
 /* Landing, đăng nhập và đăng ký đã có thiết kế riêng: theme.css dùng chung đã đổi sang đen ấm, nhưng trang landing
    giữ nền tối gốc của nó. */

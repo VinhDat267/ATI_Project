@@ -2,10 +2,11 @@ import { usePrototypePage, type PageMeta } from '../../prototype/usePrototypePag
 import { MainNav } from '../../components/layout/MainNav';
 import type { User } from '../../types';
 import css from './page.css?inline';
-import { useState, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useRef, useState, type MouseEvent as ReactMouseEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { Conversation } from '../../types';
 import { formatConversationTime } from '../../services/conversation-time';
 import { useHistory } from './useHistory';
+import { usePageDialog } from '../usePageDialog';
 
 function statusClass(status?: string): string {
   if (status === 'completed') return 'ps-status ps-status-connected';
@@ -59,14 +60,17 @@ function RequestCard({ req, isEditing, actions, title, saving }: { req: HistoryR
           </>
         )}
       </div>
-      {/* Cụm phải: Đổi tên + Mở hội thoại */}
-      <div className="flex items-center gap-3 flex-shrink-0">
+      <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
         {!isEditing && (
           <button type="button" onClick={(event) => actions.startInlineRename(req.id, event)} className="ps-btn-quiet" id={`rename-button-${req.id}`} aria-label={`Đổi tên ${rawTitle}`} title="Đổi tên hội thoại">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
             <span>Đổi tên</span>
           </button>
         )}
+        {!isEditing && <button type="button" onClick={() => actions.askDelete(req)} className="ps-btn-quiet ps-btn-danger"
+          disabled={saving} aria-label={`Xoá ${rawTitle}`}>
+          Xoá
+        </button>}
         <a href={`/c/${encodeURIComponent(req.id)}`} onClick={event => { event.preventDefault(); actions.openConversation(req.id); }} className="text-sm font-medium text-[var(--ps-accent-text)] hover:underline whitespace-nowrap inline-flex items-center gap-1 py-1.5">
           <span>Mở hội thoại</span>
           <span aria-hidden="true">→</span>
@@ -74,6 +78,31 @@ function RequestCard({ req, isEditing, actions, title, saving }: { req: HistoryR
       </div>
     </div>
   </article>;
+}
+
+function DeleteConversationDialog({ title, busy, error, onCancel, onConfirm }: {
+  title: string; busy: boolean; error: string | null; onCancel: () => void; onConfirm: () => void;
+}) {
+  const id = 'delete-conversation-dialog';
+  usePageDialog(id, onCancel, busy);
+  return (
+    <div id={id} role="alertdialog" aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={`${id}-details`}
+      aria-busy={busy} tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45">
+      <div className="ps-panel w-full max-w-md min-w-0 p-6 v3-space-y-4">
+        <h2 id={`${id}-title`} className="text-lg font-semibold text-[var(--ps-ink)]">Xoá hội thoại?</h2>
+        <p id={`${id}-details`} className="ps-note break-words">
+          Hội thoại “{title}” và nội dung đã lưu sẽ bị xoá vĩnh viễn khỏi Planora.
+        </p>
+        {error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button type="button" className="ps-btn-quiet" disabled={busy} onClick={onCancel}>Huỷ</button>
+          <button type="button" className="ps-btn-quiet ps-btn-danger" disabled={busy} onClick={onConfirm}>
+            {busy ? 'Đang xoá…' : 'Xác nhận xoá'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export const meta: PageMeta = {
@@ -86,13 +115,15 @@ export const meta: PageMeta = {
 
 
 type HistoryRow = Conversation & { timeStr: string; dateGroup: string; statusLabel: string };
-type CardActions = { startInlineRename: (id: string, event: ReactMouseEvent) => void; handleRenameKey: (event: ReactKeyboardEvent, id: string) => void; saveInlineRename: (id: string) => void; cancelInlineRename: () => void; openConversation: (id: string) => void; setTitle: (value: string) => void };
+type CardActions = { startInlineRename: (id: string, event: ReactMouseEvent) => void; handleRenameKey: (event: ReactKeyboardEvent, id: string) => void; saveInlineRename: (id: string) => void; cancelInlineRename: () => void; openConversation: (id: string) => void; setTitle: (value: string) => void; askDelete: (row: Conversation) => void };
 const GROUPS = [{ key: 'today', title: 'Hôm nay' }, { key: 'yesterday', title: 'Hôm qua' }, { key: 'older', title: 'Trước đó' }];
 const STATUS_LABEL: Record<string, string> = { chatting: 'Đang trao đổi', planning: 'Đang lập kế hoạch', completed: 'Hoàn thành', executing: 'Đang chạy', partial: 'Cần xử lý', failed: 'Cần xử lý', reconciliation_required: 'Cần đối soát', stopped: 'Đã dừng', rejected: 'Đã từ chối' };
 export interface HistoryPageProps { user: User | null; navigate: (path: string) => void; onLogout: () => void }
 export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
   usePrototypePage(meta);
-  const { rows, search, setSearch, cursor, loading, error, notice, editing, title, setTitle, saving, edit, cancel, rename, loadMore } = useHistory(user);
+  const { rows, search, setSearch, cursor, loading, error, notice, editing, title, setTitle, saving, edit, cancel, rename, loadMore,
+    deleteTarget, deleting, deleteError, askDelete, cancelDelete, remove } = useHistory(user);
+  const searchInput = useRef<HTMLInputElement>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'needs_action' | 'chatting'>('all');
   const day = new Date(); day.setHours(0,0,0,0); const yesterday = new Date(day); yesterday.setDate(yesterday.getDate() - 1);
   const allDisplayed: HistoryRow[] = rows.map(row => { const value = row.updatedAt ?? row.updated_at ?? row.created_at; const time = value ? new Date(value).getTime() : NaN; return { ...row, timeStr: formatConversationTime(value), dateGroup: time >= day.getTime() ? 'today' : time >= yesterday.getTime() ? 'yesterday' : 'older', statusLabel: STATUS_LABEL[row.status ?? ''] ?? 'Hội thoại' }; });
@@ -107,7 +138,7 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
   const actions: CardActions & { loadMoreRequests: () => void } = {
     startInlineRename(id, event) { event.stopPropagation(); edit(id); },
     handleRenameKey(event, id) { if (event.nativeEvent.isComposing) return; if (event.key === 'Enter') { event.preventDefault(); void rename(id); } if (event.key === 'Escape') { event.preventDefault(); cancel(); } },
-    saveInlineRename(id) { void rename(id); }, cancelInlineRename: cancel, setTitle, openConversation(id) { navigate(`/c/${encodeURIComponent(id)}`); }, loadMoreRequests: loadMore,
+    saveInlineRename(id) { void rename(id); }, cancelInlineRename: cancel, setTitle, openConversation(id) { navigate(`/c/${encodeURIComponent(id)}`); }, loadMoreRequests: loadMore, askDelete,
   };
   return <>
       {/* FE-12: thanh điều hướng chung thay thanh trên của bản mẫu. */}
@@ -119,9 +150,6 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
         {loading && <p role="status" className="ps-note">Đang tải hội thoại...</p>}
         <div className="ps-pagehead">
           <h1>Nhật ký</h1>
-          <p>
-            Lịch sử hội thoại của bạn. Tìm theo tiêu đề, đổi tên và mở lại hội thoại để tiếp tục công việc.
-          </p>
         </div>
         {/* THANH TÌM KIẾM VÀ BỘ LỌC */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -134,9 +162,9 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
-            <input value={search} onChange={event => setSearch(event.target.value)} type="search" id="search-input" placeholder="Tìm theo tiêu đề hội thoại…" className="ps-field w-full pl-9" />
+            <input ref={searchInput} value={search} onChange={event => setSearch(event.target.value)} type="search" id="search-input" placeholder="Tìm theo tiêu đề hội thoại…" className="ps-field w-full pl-9" />
           </div>
-          <div role="group" aria-label="Bộ lọc trạng thái hội thoại" className="ps-segmented self-start">
+          <div role="group" aria-label="Bộ lọc trạng thái hội thoại" className="ps-segmented ps-filter-grid self-start">
             {([
               { key: 'all', label: 'Tất cả' },
               { key: 'completed', label: 'Hoàn thành' },
@@ -202,5 +230,9 @@ export function HistoryPage({ user, navigate, onLogout }: HistoryPageProps) {
         </div>}
         {/* Bước 5b: Lịch chạy chuyển sang trang Tự động (/inbox); Nhật ký chỉ còn hội thoại. */}
       </main>
+      {deleteTarget && <DeleteConversationDialog title={deleteTarget.title || 'Hội thoại mới'} busy={deleting} error={deleteError}
+        onCancel={cancelDelete} onConfirm={() => void remove().then(removed => {
+          if (removed) requestAnimationFrame(() => searchInput.current?.focus());
+        })} />}
     </>;
 }
