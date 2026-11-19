@@ -33,7 +33,7 @@ Số lần sửa lấy từ PostgreSQL: mỗi kế hoạch sau kế hoạch đ�
 
 Người điều phối:
 1. Chạy app ở chế độ live theo mục "Through the app" của `evaluations/README.md`:
-   - `RUNTIME_MODE=live`, model `ag/gemini-3.8-flash` qua 9router;
+   - `RUNTIME_MODE=live`, `LLM_PROVIDER=deepseek`, model `deepseek-chat` (DeepSeek API);
    - `GMAIL_ENABLED=off`, `PLANNER_READ_ANSWERS=off`;
    - một PostgreSQL riêng cho buổi thử, giữ nguyên cho tới khi chạy xong báo cáo.
 2. Lưu khoá của 8 dịch vụ; "Kiểm tra kết nối" của cả 8 phải OK.

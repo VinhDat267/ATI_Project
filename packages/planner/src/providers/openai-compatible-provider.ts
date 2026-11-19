@@ -2,7 +2,7 @@ import type { LLMProvider, LLMGeneratePlanInput, ModelCallMetrics } from '../typ
 import { callWithRetry, validateModelOutputLimit } from './transport.js';
 
 export interface OpenAICompatibleProviderConfig {
-  /** Gateway root including the version segment, e.g. http://localhost:20128/v1 */
+  /** Endpoint root including the version segment, e.g. http://localhost:8080/v1 */
   baseUrl: string;
   apiKey?: string;
   model: string;
@@ -35,9 +35,10 @@ function messageText(content: unknown): string {
 }
 
 /**
- * Chat Completions provider for OpenAI-compatible gateways (9router, OpenRouter,
- * Ollama, OpenAI). A completion served by a model other than the configured one
- * is rejected, so gateway fallback cannot silently change the evaluated model.
+ * Chat Completions provider for OpenAI-compatible endpoints (OpenRouter,
+ * Ollama, OpenAI, or local loopback test servers). A completion served by a
+ * model other than the configured one is rejected, so silent model fallback
+ * cannot change the evaluated model.
  */
 export class OpenAICompatibleProvider implements LLMProvider {
   public readonly name = 'openai-compatible';
@@ -104,10 +105,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
       const count = (value: unknown) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
       metrics.usage = { promptTokens: count(json.usage?.prompt_tokens), completionTokens: count(json.usage?.completion_tokens),
         reasoningTokens: count(json.usage?.completion_tokens_details?.reasoning_tokens ?? json.usage?.prompt_tokens_details?.reasoning_tokens) };
-      // The owner confirmed this exact 9router response alias on 2026-10-07.
-      // Keep the raw served name in evidence; do not accept other suffixes/routes.
-      const confirmedRouterAlias = this.model === 'ag/gemini-3.8-flash' && served === 'gemini-3.8-flash-n';
-      if (served && baseModel(served) !== baseModel(this.model) && !confirmedRouterAlias) {
+      if (served && baseModel(served) !== baseModel(this.model)) {
         throw new Error(`Completion was served by ${served}, not the configured ${this.model}; disable gateway fallback for this model`);
       }
       return messageText(json.choices?.[0]?.message?.content);

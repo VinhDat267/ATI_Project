@@ -12,7 +12,7 @@
 | **Node.js** | `>= 22.12.0` hoặc `>= 24.0.0` (khuyến nghị `v24.x`) | `node -v` |
 | **Docker Desktop** | Engine đang chạy, hỗ trợ `docker compose` | `docker info` |
 | **PostgreSQL 16** | Container `ati-v3-postgres-1` (cổng `55533`) hoặc DB demo riêng | `docker ps` |
-| **Cổng LLM (`9router`)** | Hoạt động tại `http://localhost:20128/v1` (OpenAI-compatible) | `curl http://localhost:20128/v1/models` |
+| **DeepSeek API** | Kết nối trực tiếp `https://api.deepseek.com` kèm `DEEPSEEK_API_KEY` | `curl -I https://api.deepseek.com` |
 | **Cổng Backend (`chat-api`)** | `http://127.0.0.1:3000` (`/api/health` trả `200 OK`) | `curl http://127.0.0.1:3000/api/health` |
 | **Cổng Frontend (`chat-web`)** | `http://127.0.0.1:5174` (Vite) | Mở trình duyệt Chromium / Chrome |
 
@@ -28,10 +28,10 @@ Trong file `.env` tại thư mục gốc (không commit vào Git), đảm bảo 
 RUNTIME_MODE=live
 PORT=3000
 
-# LLM Gateway (9router)
-LLM_PROVIDER=openai-compatible
-LLM_BASE_URL=http://localhost:20128/v1
-LLM_MODEL=ag/gemini-3.8-flash
+# LLM Provider (DeepSeek API trực tiếp)
+LLM_PROVIDER=deepseek
+DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_BASE_URL=https://api.deepseek.com
 PLANNER_SEARCH_MODE=llm
 
 # Bật đầy đủ các tính năng v3 đã nghiệm thu
@@ -152,18 +152,15 @@ MYSLACK_AUTOMATION_ENABLED=on
 
 ## 5. Quy Trình Chuyển Đổi LLM Dự Phòng (`Fallback Drill` < 60 Giây)
 
-Thực hiện ngay khi model chính (`ag/gemini-3.8-flash`) có độ trễ cao (> 45 giây) hoặc trả lỗi từ upstream provider:
+Thực hiện ngay khi model chính (`deepseek-chat`) có độ trễ cao (> 45 giây) hoặc trả lỗi từ upstream provider:
 
-1. **Mở file `.env` và đổi biến `LLM_MODEL` sang model dự phòng đã kiểm chứng:**
+1. **Mở file `.env` và đổi biến `DEEPSEEK_MODEL` (hoặc `LLM_PROVIDER`) sang model dự phòng đã kiểm chứng:**
    ```dotenv
-   # Phương án dự phòng 1 (trên 9router):
-   LLM_MODEL=cx/gpt-6.1-sol
-
-   # Phương án dự phòng 2 (DeepSeek API trực tiếp không qua 9router):
+   # Phương án dự phòng 1 (DeepSeek Reasoner trực tiếp):
    LLM_PROVIDER=deepseek
-   DEEPSEEK_MODEL=deepseek-chat
+   DEEPSEEK_MODEL=deepseek-reasoner
 
-   # Phương án dự phòng 3 (Gemini trực tiếp không qua 9router):
+   # Phương án dự phòng 2 (Gemini trực tiếp):
    LLM_PROVIDER=gemini
    GEMINI_MODEL=gemini-2.5-flash
    ```
@@ -179,9 +176,9 @@ Thực hiện ngay khi model chính (`ag/gemini-3.8-flash`) có độ trễ cao 
 
 | Sự cố phát sinh | Dấu hiệu nhận biết | Hành động xử lý tức thì (< 30 giây) |
 |---|---|---|
-| **1. `9router` ngừng phản hồi** | `curl http://localhost:20128/v1/models` lỗi kết nối | Khởi động lại `9router` hoặc đổi `.env` sang `LLM_PROVIDER=gemini` + `GEMINI_MODEL=gemini-2.5-flash`, chạy lại `npm run up`. |
+| **1. DeepSeek API ngừng phản hồi / quá tải** | API trả `429`/`5xx` hoặc timeout | Đổi `.env` sang `DEEPSEEK_MODEL=deepseek-reasoner` hoặc `LLM_PROVIDER=gemini` + `GEMINI_MODEL=gemini-2.5-flash`, chạy lại `npm run up`. |
 | **2. Một dịch vụ ngoài trả `401 Unauthorized`** | Thẻ dịch vụ ở `/settings` báo `unhealthy` hoặc dừng ở Moment 7 | Mở `/settings`, bấm **Kết nối lại OAuth 1-Click** cho dịch vụ đó; hoặc tại Moment 7 bấm **"Bỏ qua việc này"** (`Skip`) để minh họa tính năng phục hồi lỗi cục bộ (Partial Failure Recovery). |
-| **3. Lập kế hoạch quá 60 giây** | Màn hình Moment 2 hiện thông báo chờ lâu | Bấm nút **"Thôi chờ"**, chuyển `LLM_MODEL` theo Mục 5 và gửi lại câu lệnh. |
+| **3. Lập kế hoạch quá 60 giây** | Màn hình Moment 2 hiện thông báo chờ lâu | Bấm nút **"Thôi chờ"**, chuyển model dự phòng theo Mục 5 và gửi lại câu lệnh. |
 | **4. Mất kết nối Internet tại phòng bảo vệ** | Toàn bộ OAuth / API bên ngoài không truy cập được | Chuyển sang chế độ Sandbox nội bộ (`RUNTIME_MODE=sandbox SANDBOX_SCENARIO=nine_service npm run up`) để demo trực tiếp trên trình duyệt + PostgreSQL thật tại máy, kết hợp phát video dự phòng (`VIDEO-01`). |
 
 ---
@@ -189,7 +186,7 @@ Thực hiện ngay khi model chính (`ag/gemini-3.8-flash`) có độ trễ cao 
 ## 7. Checklist 15 Phút Trước Giờ Bảo Vệ (`Pre-Flight Checklist`)
 
 - [ ] **T-15 phút:** Cắm sạc máy tính, tắt chế độ Sleep, đóng các tab không liên quan.
-- [ ] **T-12 phút:** Kiểm tra `docker ps` (PostgreSQL container `healthy`) và `curl http://localhost:20128/v1/models` (`9router` sẵn sàng).
+- [ ] **T-12 phút:** Kiểm tra `docker ps` (PostgreSQL container `healthy`) và kết nối DeepSeek API (`DEEPSEEK_API_KEY` hợp lệ, `LLM_PROVIDER=deepseek`).
 - [ ] **T-10 phút:** Chạy `npm run up`, mở `http://127.0.0.1:5174` và đăng nhập sẵn.
 - [ ] **T-08 phút:** Mở `/settings`, xác nhận các dịch vụ hiển thị trạng thái **Đã kết nối (`healthy`)**.
 - [ ] **T-05 phút:** Mở sẵn các tab đích trên trình duyệt: Jira Project `ATI`, GitHub repo `ati-test`, bảng Trello, trang Notion, bảng tính Google Sheets, Google Calendar, Gmail, Telegram Web và kênh Slack `#general` / `#ati-test`.

@@ -16,7 +16,7 @@ function scriptedFetch(script: Array<(call: Call) => Promise<Response>>) {
   return { fetchFn, calls };
 }
 
-const completion = (content: unknown, model = 'ag/gemini-3.8-flash') => async () =>
+const completion = (content: unknown, model = 'provider/example-model') => async () =>
   new Response(JSON.stringify({ model, choices: [{ message: { role: 'assistant', content } }] }), { status: 200 });
 const status = (code: number) => async () => new Response(JSON.stringify({ error: { message: `status ${code}` } }), { status: code });
 const hang = (call: Call) => new Promise<Response>((_, reject) => {
@@ -24,7 +24,7 @@ const hang = (call: Call) => new Promise<Response>((_, reject) => {
   signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
 });
 
-const base = { baseUrl: 'http://localhost:20128/v1/', apiKey: 'sk-test-secret', model: 'ag/gemini-3.8-flash', retryDelayMs: 1 };
+const base = { baseUrl: 'http://localhost:8080/v1/', apiKey: 'sk-test-secret', model: 'provider/example-model', retryDelayMs: 1 };
 const input = {
   systemPrompt: 'You are the planner.',
   conversationHistory: [
@@ -40,10 +40,10 @@ describe('OpenAICompatibleProvider', () => {
     const { fetchFn, calls } = scriptedFetch([completion('{"kind":"refusal","reason":"x"}')]);
     const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn });
     await expect(provider.generatePlan(input)).resolves.toBe('{"kind":"refusal","reason":"x"}');
-    expect(calls[0]!.url).toBe('http://localhost:20128/v1/chat/completions');
+    expect(calls[0]!.url).toBe('http://localhost:8080/v1/chat/completions');
     expect(calls[0]!.init.method).toBe('POST');
     expect(new Headers(calls[0]!.init.headers).get('authorization')).toBe('Bearer sk-test-secret');
-    expect(calls[0]!.body).toMatchObject({ model: 'ag/gemini-3.8-flash', stream: false, response_format: { type: 'json_object' } });
+    expect(calls[0]!.body).toMatchObject({ model: 'provider/example-model', stream: false, response_format: { type: 'json_object' } });
     expect(calls[0]!.body.messages.map((m: any) => m.role)).toEqual(['system', 'user', 'assistant', 'user']);
     expect(calls[0]!.body.messages[0].content).toContain('You are the planner.');
     expect(calls[0]!.body.messages[0].content).toContain('"id": "l1"');
@@ -73,41 +73,24 @@ describe('OpenAICompatibleProvider', () => {
   });
 
   it('rejects a completion served by a different model, without retrying', async () => {
-    const { fetchFn, calls } = scriptedFetch([completion('{}', 'kr/some-free-fallback')]);
+    const { fetchFn, calls } = scriptedFetch([completion('{}', 'fallback/some-other-model')]);
     const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn });
-    await expect(provider.generatePlan(input)).rejects.toThrow(/served by kr\/some-free-fallback.*ag\/gemini-3.8-flash/);
+    await expect(provider.generatePlan(input)).rejects.toThrow(/served by fallback\/some-other-model.*provider\/example-model/);
     expect(calls).toHaveLength(1);
   });
 
   it('accepts the served model named without the gateway prefix and records it', async () => {
-    const { fetchFn } = scriptedFetch([completion('{}', 'gemini-3.8-flash')]);
+    const { fetchFn } = scriptedFetch([completion('{}', 'example-model')]);
     const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn });
     await provider.generatePlan(input);
-    expect(provider.lastServedModel).toBe('gemini-3.8-flash');
+    expect(provider.lastServedModel).toBe('example-model');
   });
 
-  it('accepts the user-confirmed 9router flash-n alias without changing the request or metrics', async () => {
-    const { fetchFn, calls } = scriptedFetch([completion('{}', 'gemini-3.8-flash-n')]);
-    const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn });
-    await expect(provider.generatePlan(input)).resolves.toBe('{}');
-    expect(calls).toHaveLength(1);
-    expect(calls[0]!.body.model).toBe('ag/gemini-3.8-flash');
-    expect(provider.lastServedModel).toBe('gemini-3.8-flash-n');
-    expect(provider.lastCallMetrics?.servedModel).toBe('gemini-3.8-flash-n');
-    expect(provider.lastCallMetrics?.attempts[0]?.outcome).toBe('success');
-  });
-
-  it.each(['gemini-3.8-flash-other', 'gemini-3.8-pro-n'])('still rejects unconfirmed alias %s', async served => {
+  it.each(['example-model-n', 'example-model-other', 'other-model'])('rejects unconfigured served model alias %s', async served => {
     const { fetchFn, calls } = scriptedFetch([completion('{}', served)]);
     const provider = new OpenAICompatibleProvider({ ...base, fetch: fetchFn });
     await expect(provider.generatePlan(input)).rejects.toThrow(/served by/);
     expect(calls).toHaveLength(1);
-  });
-
-  it('does not apply the 9router alias to another configured model route', async () => {
-    const { fetchFn } = scriptedFetch([completion('{}', 'gemini-3.8-flash-n')]);
-    const provider = new OpenAICompatibleProvider({ ...base, model: 'other/gemini-3.8-flash', fetch: fetchFn });
-    await expect(provider.generatePlan(input)).rejects.toThrow(/served by/);
   });
 
   it('aborts a hung request when the per-call timeout elapses', async () => {
@@ -159,10 +142,10 @@ describe('OpenAICompatibleProvider', () => {
 describe('createProviderFromEnv', () => {
   it('builds an OpenAI-compatible provider from LLM_* settings', () => {
     const provider = createProviderFromEnv({
-      LLM_PROVIDER: 'openai-compatible', LLM_BASE_URL: 'http://localhost:20128/v1', LLM_API_KEY: 'k', LLM_MODEL: 'ag/gemini-3.8-flash',
+      LLM_PROVIDER: 'openai-compatible', LLM_BASE_URL: 'http://localhost:8080/v1', LLM_API_KEY: 'k', LLM_MODEL: 'provider/example-model',
     });
     expect(provider).toBeInstanceOf(OpenAICompatibleProvider);
-    expect(provider.model).toBe('ag/gemini-3.8-flash');
+    expect(provider.model).toBe('provider/example-model');
   });
 
   it('keeps Gemini as the default provider', () => {

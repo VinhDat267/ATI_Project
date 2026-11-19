@@ -25,7 +25,7 @@ describe('runtime mode fail-closed boundaries', () => {
       JWT_SECRET: 'secure-jwt-secret-for-test-at-least-32-chars', ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef',
     };
     expect(() => validateEnv(live)).toThrow(/GEMINI_API_KEY/);
-    const gateway = { ...live, LLM_PROVIDER: 'openai-compatible', LLM_BASE_URL: 'http://localhost:20128/v1', LLM_MODEL: 'ag/gemini-3.8-flash' };
+    const gateway = { ...live, LLM_PROVIDER: 'openai-compatible', LLM_BASE_URL: 'http://localhost:8080/v1', LLM_MODEL: 'example-model' };
     expect(validateEnv(gateway).LLM_PROVIDER).toBe('openai-compatible');
     expect(() => validateEnv({ ...gateway, LLM_MODEL: '' })).toThrow(/LLM_MODEL/);
     expect(() => validateEnv({ ...gateway, LLM_BASE_URL: '' })).toThrow(/LLM_BASE_URL/);

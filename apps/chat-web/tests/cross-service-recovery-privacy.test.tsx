@@ -605,7 +605,8 @@ describe('XSVC-INTEGRATION-V2 Task D: Combined ScheduleRunRecovery, Sheets Appen
     expect(sheetsRegion).toHaveTextContent('ENABLE_MYSHEETS_DRIVE_WRITE_TOOLS=false');
     expect(sheetsRegion).toHaveTextContent('includeAiSummary = true');
     expect(sheetsRegion).toHaveTextContent('includeAiSummary = false');
-    expect(sheetsRegion).toHaveTextContent('9router');
+    expect(sheetsRegion).not.toHaveTextContent(/9router/i);
+    expect(sheetsRegion).toHaveTextContent(/DeepSeek API/);
 
     const overviewHeading = screen.getByText('Quyền truy cập Google');
     const overviewCardText = overviewHeading.closest('div')?.parentElement?.textContent ?? '';
