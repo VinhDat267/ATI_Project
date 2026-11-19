@@ -65,7 +65,7 @@ function ServiceGuideDetail({ serviceId, navigate, guides = SERVICE_GUIDES }: { 
     </div>
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <div className="p-3.5 rounded-xl bg-[var(--ps-sheet)] border border-[var(--ps-edge)]">
-        <div className="text-[13px] text-[var(--ps-faint)] font-medium">Phương thức kết nối</div>
+        <div className="text-[13px] text-[var(--ps-faint)] font-medium">Phương thức kết nối:</div>
         <div className="font-medium text-sm text-[var(--ps-ink)] mt-1 flex flex-wrap items-center gap-1.5">
           {['gmail', 'mysheets'].includes(s.id) && <span>Google OAuth · không nhập khoá</span>}
           {s.keys.map(k => <span key={k} className="bg-[var(--ps-panel)] px-2 py-0.5 rounded border border-[var(--ps-edge)] text-[13px] text-[var(--ps-ink)]">{k}</span>)}
