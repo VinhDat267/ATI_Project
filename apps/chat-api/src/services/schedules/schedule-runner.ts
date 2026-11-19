@@ -151,6 +151,9 @@ export async function reconcileScheduleRuns(pool: pg.Pool): Promise<void> {
              AND jsonb_typeof(r.dispatched_config->'telegramUserId') = 'string'
              AND jsonb_typeof(r.dispatched_config->'chatId') = 'string'
              AND jsonb_typeof(r.dispatched_config->'sources') = 'array' THEN $5
+           WHEN r.delivery_started_at IS NOT NULL AND r.dispatched_config_hash <> ''
+             AND jsonb_typeof(r.dispatched_config->'trelloMemberId') = 'string'
+             AND jsonb_typeof(r.dispatched_config->'boards') = 'array' THEN $4
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'sheets_digest' THEN $3
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'trello_digest' THEN $4
            WHEN r.delivery_started_at IS NOT NULL AND s.kind = 'telegram_digest' THEN $5

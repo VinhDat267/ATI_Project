@@ -37,7 +37,7 @@ import { MessageRepo } from '../../db/repositories/message-repo.js';
 import { ScheduleRepo, type Queryable, type ScheduleRow, type ScheduleScope } from '../../db/repositories/schedule-repo.js';
 import { isUuid } from '../../db/repositories/uuid.js';
 import { calendarDigestCandidateMatches, computeCalendarDigestHash, evaluateCalendarDigestCandidate } from './calendar-digest-candidate.js';
-import { calendarOrGithubDeliveryUnknownKind, getJiraDeliveryUnknown, getSheetsDeliveryUnknown, getSlackDeliveryUnknown, getTrelloDeliveryUnknown, hasUnknownTelegramDispatch, isNotionDeliveryUnknown, matchesDispatchedDigestConfig, runState, runView } from './run-state.js';
+import { calendarOrGithubDeliveryUnknownKind, getJiraDeliveryUnknown, getSheetsDeliveryUnknown, getSlackDeliveryUnknown, getTrelloDeliveryUnknown, hasUnknownTelegramDispatch, isNotionDeliveryUnknown, matchesDispatchedDigestConfig, matchesDispatchedSheetsConfig, runState, runView } from './run-state.js';
 import { nextOccurrence, nextRuns } from './next-occurrence.js';
 import { captureScheduleArtifact, guardScheduleArtifact, prelockScheduleArtifacts, registerScheduleFields, scheduleRegistry, scheduleSourceContext, tagScheduleContext } from '../slack/slack-schedule-lineage.js';
 import { messageOutputSelectors } from '../slack/slack-message-selectors.js';
@@ -3403,6 +3403,9 @@ export class ScheduleService {
             'SCHEDULE_PAUSED',
             'Lịch đang tạm dừng. Vui lòng tiếp tục (Chạy tiếp) lịch trước khi tạo lượt gửi bù mới để lượt chạy bù không bị hủy.',
           );
+        }
+        if (!matchesDispatchedSheetsConfig(run, schedule)) {
+          throw new ScheduleConflict('CONFIG_CHANGED_SINCE_RUN');
         }
       } else {
         if (schedule.status === 'paused') {

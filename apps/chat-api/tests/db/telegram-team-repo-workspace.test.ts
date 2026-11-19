@@ -66,6 +66,41 @@ describe('Per-workspace TelegramTeamRepo & routes scope isolation (Task 6)', () 
     ]);
   });
 
+  it('serializes replacements of the same workspace scope without merging their chat lists', async () => {
+    const admin = await db.person('Concurrent scope admin');
+    const workspace = await workspaceRepo.create(admin.id, 'Concurrent scope');
+    const replacement = (chatId: string) => ({
+      scopeId: workspace.id,
+      chosenBy: admin.id,
+      chats: [{ chatId, title: chatId, type: 'group' as const }],
+    });
+    await teamRepo.replace(replacement('-101'));
+
+    const blocker = await db.pool.connect();
+    let writes: ReturnType<typeof teamRepo.replace>[] = [];
+    try {
+      await blocker.query('BEGIN');
+      await blocker.query('SELECT 1 FROM telegram_team_chats WHERE scope_id = $1 FOR UPDATE', [workspace.id]);
+      writes = [teamRepo.replace(replacement('-102')), teamRepo.replace(replacement('-103'))];
+      await vi.waitFor(async () => {
+        const { rows: [{ waiting }] } = await db.pool.query(`
+          SELECT count(*)::int AS waiting FROM pg_stat_activity
+          WHERE datname = current_database() AND wait_event_type = 'Lock'
+            AND (query LIKE 'DELETE FROM telegram_team_chats%' OR query LIKE 'INSERT INTO telegram_team_scope%')
+        `);
+        expect(waiting).toBe(2);
+      }, { timeout: 2_000, interval: 20 });
+    } finally {
+      await blocker.query('ROLLBACK');
+      blocker.release();
+      await Promise.all(writes);
+    }
+
+    const scope = await teamRepo.get(workspace.id);
+    expect(scope?.chats).toHaveLength(1);
+    expect(['-102', '-103']).toContain(scope?.chats[0]?.chatId);
+  });
+
   it('routes/connections/telegram passes req.workspace.workspaceId to TelegramTeamRepo in organization mode', async () => {
     const admin = await db.person('Org Route Admin');
     const wsA = await workspaceRepo.create(admin.id, 'Org A');

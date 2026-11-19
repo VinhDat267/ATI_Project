@@ -32,7 +32,8 @@ import {
 } from '../../src/services/schedules/calendar-digest-runner.js';
 import { computeSheetsDigestHash, analyzeSheetsDigestCandidate } from '../../src/services/schedules/sheets-digest-candidate.js';
 import { SHEETS_DELIVERY_UNKNOWN } from '../../src/services/schedules/sheets-digest-runner.js';
-import { ScheduleRunner } from '../../src/services/schedules/schedule-runner.js';
+import { GITHUB_DELIVERY_UNKNOWN } from '../../src/services/schedules/github-digest-runner.js';
+import { reconcileScheduleRuns, ScheduleRunner } from '../../src/services/schedules/schedule-runner.js';
 import { ScheduleService } from '../../src/services/schedules/schedule-service.js';
 import { computeSlackDigestConfigHash } from '../../src/services/schedules/slack-digest-candidate.js';
 import { SlackDigestRunner } from '../../src/services/schedules/slack-digest-runner.js';
@@ -42,7 +43,7 @@ import {
   computeTrelloDigestConfigHash,
   evaluateTrelloDigestCandidate,
 } from '../../src/services/schedules/trello-digest-candidate.js';
-import { createTrelloDigestRunner } from '../../src/services/schedules/trello-digest-runner.js';
+import { createTrelloDigestRunner, TRELLO_DELIVERY_UNKNOWN } from '../../src/services/schedules/trello-digest-runner.js';
 import { certifyScheduleFixture } from '../../src/services/slack/slack-schedule-origin.js';
 import { createMigratedSchema } from '../helpers/gmail-test-db.js';
 import {
@@ -84,6 +85,81 @@ describe('Task 6 Backend Audit Hardening on PostgreSQL 16', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('confirms a historical GitHub delivery using its snapshot after the schedule changes to Trello', async () => {
+    const owner = fixtures.personalA.user;
+    const conv = await convRepo.createConversation(owner.id, 'Digest history');
+    const recurrence = { type: 'daily' as const, time: '08:00' };
+    const trelloConfig = {
+      credentialId: randomUUID(),
+      trelloMemberId: 'trello-member',
+      username: 'trello-user',
+      boards: [{ id: 'b1', name: 'Board' }],
+      channelId: 'C_TRELLO',
+      channelName: 'trello',
+      dueSoonHours: 24,
+      destination: 'slack' as const,
+    };
+    const { rows: [schedule] } = await db.pool.query(
+      `INSERT INTO schedules(user_id, conv_id, name, request, recurrence, services, status,
+         next_run_at, kind, digest_config, digest_config_hash, digest_approved_at, version)
+       VALUES($1, $2, 'Digest history', 'Trello digest to Slack', $3, '{trello,slack}', 'active',
+         $4, 'trello_digest', $5, $6, $4, 2) RETURNING id`,
+      [owner.id, conv.id, recurrence, NOW, trelloConfig, computeTrelloDigestConfigHash({ config: trelloConfig, recurrence, userId: owner.id })],
+    );
+    await certifyScheduleFixture(db.pool, schedule.id);
+    const { rows: [run] } = await db.pool.query(
+      `INSERT INTO schedule_runs(schedule_id, schedule_version, trigger, due_at, status, conv_id, error,
+         delivery_started_at, dispatched_config, dispatched_config_hash)
+       VALUES($1, 1, 'scheduled', $2, 'needs_attention', $3, $4, $2, $5, $6) RETURNING id`,
+      [schedule.id, NOW, conv.id, GITHUB_DELIVERY_UNKNOWN, {
+        githubUserId: 'github-member',
+        repos: ['acme/repo'],
+        destination: 'telegram',
+        telegramChatId: '-10011',
+      }, 'a'.repeat(64)],
+    );
+    const service = new ScheduleService({ pool: db.pool, timeZone: TZ });
+    const result = await service.resolveRunDelivery({
+      userId: owner.id, runId: run.id, resolution: 'mark_sent', now: NOW,
+    });
+    expect(result.run.delivery).toMatchObject({
+      telegramChatId: '-10011',
+      counts: { newIssues: 0, stalePrs: 0, unassignedIssues: 0 },
+    });
+
+    // A restart must also classify an in-flight Trello dispatch using its own snapshot.
+    const slackConfig: SlackDigestConfig = {
+      destination: 'slack',
+      workspaceMode: 'personal',
+      workspaceId: null,
+      slackCredentialId: randomUUID(),
+      channelId: 'C_SLACK',
+      channelName: 'slack',
+      sources: [{ service: 'github', tool: 'github.search_issues', args: { repo: 'acme/repo' }, label: 'Issues' }],
+      recurrence,
+      timeZone: TZ,
+    };
+    await db.pool.query(
+      "UPDATE schedules SET kind = 'slack_digest', services = '{github,slack}', digest_config = $2, digest_config_hash = $3, version = 3 WHERE id = $1",
+      [schedule.id, slackConfig, computeSlackDigestConfigHash(slackConfig)],
+    );
+    await certifyScheduleFixture(db.pool, schedule.id);
+    const { rows: [inFlight] } = await db.pool.query(
+      `INSERT INTO schedule_runs(schedule_id, schedule_version, trigger, due_at, status, conv_id,
+         delivery_started_at, dispatched_config, dispatched_config_hash)
+       VALUES($1, 2, 'manual', $2, 'planning', $3, $2, $4, $5) RETURNING id`,
+      [schedule.id, NOW, conv.id, trelloConfig,
+        computeTrelloDigestConfigHash({ config: trelloConfig, recurrence, userId: owner.id })],
+    );
+    await reconcileScheduleRuns(db.pool);
+    const { rows: [reconciled] } = await db.pool.query('SELECT status, error FROM schedule_runs WHERE id = $1', [inFlight.id]);
+    expect(reconciled).toEqual({ status: 'needs_attention', error: TRELLO_DELIVERY_UNKNOWN });
+    const trelloReceipt = await service.resolveRunDelivery({
+      userId: owner.id, runId: inFlight.id, resolution: 'mark_sent', now: NOW,
+    });
+    expect(trelloReceipt.run.delivery).toMatchObject({ destination: 'slack', targetId: 'C_TRELLO' });
   });
 
   it('1. dispatches one-time (recurrence.type=once) telegram_digest and slack_digest instead of discarding on completed status', async () => {

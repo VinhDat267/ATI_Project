@@ -323,9 +323,10 @@ export function planSlackProposalWorkflow(input:SlackProposalPlanInput):SlackPro
    {
     id:'step_2',
     tool:bugCreateTool,
-    description:'Tạo phiếu lỗi mới sau khi kiểm tra trùng lặp',
+    description:useMyJira?'Dùng lại phiếu lỗi trùng hoặc tạo phiếu mới nếu chưa có':'Tạo phiếu lỗi mới sau khi kiểm tra trùng lặp',
     args:{...(myjiraSiteId?{siteId:myjiraSiteId}:{}),projectKey,summary:title,description:summary,issueType:'Bug'},
     dependsOn:['step_1'],
+    ...(useMyJira?{reuseExistingIssueFrom:'step_1'}:{}),
    },
   ];
   const destConn:Partial<PlanConnections>|undefined=input.targetConnections?.myjira?{myjira:input.targetConnections.myjira}:undefined;

@@ -102,32 +102,35 @@ export class StepRunner {
         catalog.get(step.tool)?.inputSchema as { properties?: Record<string, any> } | undefined,
       );
 
-      if ((step.tool === SLACK_PROPOSAL_WORKFLOW_TOOLS.bugCreateTool || step.tool === 'myjira.create_issue') && Array.isArray(step.dependsOn) && step.dependsOn.length > 0 && typeof resolvedArgs.summary === 'string') {
+      const isMyJiraCreate = step.tool === 'myjira.create_issue';
+      const reuseSource = step.reuseExistingIssueFrom;
+      const issueLookups = step.tool === SLACK_PROPOSAL_WORKFLOW_TOOLS.bugCreateTool
+        ? step.dependsOn
+        : isMyJiraCreate && typeof reuseSource === 'string' && step.dependsOn?.includes(reuseSource)
+          ? [reuseSource]
+          : [];
+      if (Array.isArray(issueLookups) && issueLookups.length > 0 && typeof resolvedArgs.summary === 'string') {
         const wanted = resolvedArgs.summary.trim().toLowerCase();
         const targetProjectKey = typeof resolvedArgs.projectKey === 'string' ? resolvedArgs.projectKey.trim().toUpperCase() : '';
         const targetSiteId = typeof resolvedArgs.siteId === 'string' ? resolvedArgs.siteId.trim() : '';
-        for (const depId of step.dependsOn) {
+        for (const depId of issueLookups) {
           const depOut = stepOutputs.get(depId) as any;
           const issues = Array.isArray(depOut?.issues) ? depOut.issues : Array.isArray(depOut?.output?.issues) ? depOut.output.issues : null;
           const match = issues?.find((item: any) => {
             if (typeof item?.title !== 'string' || item.title.trim().toLowerCase() !== wanted) return false;
             if (typeof item.id !== 'string' || typeof item.key !== 'string' || typeof item.url !== 'string') return false;
-            if (targetSiteId && typeof item.siteId === 'string' && item.siteId.trim() !== targetSiteId) return false;
+            if (isMyJiraCreate && (!targetSiteId || item.siteId !== targetSiteId || !targetProjectKey)) return false;
             if (!targetProjectKey) return true;
             const itemProjectKey = typeof item.projectKey === 'string' ? item.projectKey.trim().toUpperCase() : '';
             const keyPrefix = item.key.trim().toUpperCase().split('-')[0] ?? '';
             return itemProjectKey === targetProjectKey || keyPrefix === targetProjectKey;
           });
           if (match) {
-            const matchedSiteId =
-              typeof match.siteId === 'string' && match.siteId.trim()
-                ? match.siteId
-                : targetSiteId || undefined;
             return {
               stepId: step.id,
               status: 'success',
               output: {
-                ...(step.tool === 'myjira.create_issue' && matchedSiteId ? { siteId: matchedSiteId } : {}),
+                ...(isMyJiraCreate ? { siteId: targetSiteId } : {}),
                 id: match.id,
                 key: match.key,
                 url: match.url,

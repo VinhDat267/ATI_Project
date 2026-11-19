@@ -7,7 +7,8 @@ import { computeTrelloDigestConfigHash } from '../../src/services/schedules/trel
 import { createGitHubConnectionLookup } from '../../src/services/github/connection-reference.js';
 import { GitHubOAuthError } from '../../src/services/github/oauth-client.js';
 import { createTelegramConnectionLookup } from '../../src/services/telegram/connection-reference.js';
-import { TelegramBotError } from '../../src/services/telegram/bot-client.js';
+import { TelegramBotClient, TelegramBotError } from '../../src/services/telegram/bot-client.js';
+import { AdapterFactory } from '../../src/services/adapter-factory.js';
 import { ChatService } from '../../src/services/chat-service.js';
 import { createGithubDigestRunner } from '../../src/services/schedules/github-digest-runner.js';
 import { createTrelloDigestRunner } from '../../src/services/schedules/trello-digest-runner.js';
@@ -102,6 +103,49 @@ describe('Transient provider outage resilience across GitHub, Telegram, ChatServ
     expect(res2.status).toBe('connected');
     expect(res2.connection?.chatIds).toEqual(['10001']);
     expect(res2.unavailableChatIds).toEqual(['-100999']);
+  });
+
+  it('preserves Telegram membership rate limits through the bot client, lookup, and adapter factory', async () => {
+    const bot = {
+      botToken: 'fixture-token',
+      botUsername: 'fixture_bot',
+      callbackUrl: 'http://127.0.0.1/callback',
+      apiBaseUrl: 'http://127.0.0.1',
+      deepLinkBaseUrl: 'https://t.me',
+    };
+    const botClient = new TelegramBotClient(bot, async () => Response.json({ ok: false, error_code: 429 }, { status: 429 }));
+    const config = encryptCredentials({
+      telegramUserId: '10001',
+      selectedChats: [{ chatId: '-100999', title: 'Team Chat', type: 'supergroup' }],
+    }, encKey);
+    const row = { id: 'cred-tg-1', status: 'active', config };
+    const credentialRepo = {
+      getPersonalConnectionStatus: vi.fn().mockResolvedValue(row),
+      getPersonalCredentials: vi.fn().mockResolvedValue(row),
+    };
+    const lookup = createTelegramConnectionLookup({
+      credentialRepo,
+      encryptionKey: encKey,
+      botClient,
+    });
+
+    expect(await lookup('u1')).toMatchObject({
+      status: 'unavailable',
+      unavailableChatIds: ['-100999'],
+    });
+    const factory = new AdapterFactory({
+      credentialRepo: credentialRepo as any,
+      encryptionKey: encKey,
+      telegramBot: bot,
+      telegramBotClient: botClient,
+    });
+    await expect(factory.getAdapterForService('telegram', {
+      userId: 'u1',
+      phase: 'execution',
+      connections: {
+        telegram: { credentialId: row.id, telegramUserId: '10001', username: '', chatIds: ['-100999'] },
+      },
+    })).rejects.toMatchObject({ category: 'RATE_LIMIT', statusCode: 429, details: { requestSent: false } });
   });
 
   it('ChatService returns temporary unavailability refusal (not reconnect_required) for GitHub and Telegram outages', async () => {

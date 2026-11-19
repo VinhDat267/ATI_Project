@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type NextFunction, type Request, type Response } from 'express';
 import { createHash, randomBytes } from 'node:crypto';
 import { decryptCredentials, encryptCredentials } from '@wap/tool-adapters';
 import { createAuthMiddleware, isAdmin, type AuthUser } from '../../auth/jwt.js';
@@ -225,6 +225,7 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
         try {
           member = await botClient!.getChatMember(c.chatId, telegramUserId, AbortSignal.timeout(timeoutMs));
         } catch (err) {
+          if (err instanceof TelegramBotError && err.status === 429 && selectedSet.has(c.chatId)) throw err;
           if (err instanceof TelegramBotError && err.kind === 'unauthorized') {
             await options.credentialRepo!.markReconnectRequired('telegram', user.id, record.id);
             options.onConnectionChanged?.(user.id);
@@ -666,6 +667,14 @@ export function createTelegramConnectionRoutes(options: TelegramConnectionsOptio
     await options.credentialRepo!.deleteCredentials('telegram', user.id);
     options.onConnectionChanged?.(user.id);
     res.json({ success: true });
+  });
+
+  router.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
+    if (err instanceof TelegramBotError && err.status === 429) {
+      res.status(429).json({ error: 'Telegram tạm thời giới hạn tần suất. Vui lòng thử lại sau.', code: 'TELEGRAM_RATE_LIMIT' });
+      return;
+    }
+    next(err);
   });
 
   return router;

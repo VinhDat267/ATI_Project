@@ -335,6 +335,7 @@ describe('Backend Audit Hardening — Planner, Validator & Routing (Task 3)', ()
         ]);
         expect(planned.plan.steps[0]?.args).toMatchObject({ siteId: 'site-1', projectKey: 'ATI' });
         expect(planned.plan.steps[1]?.args).toMatchObject({ siteId: 'site-1', projectKey: 'ATI' });
+        expect(planned.plan.steps[1]?.reuseExistingIssueFrom).toBe('step_1');
       }
 
       const notionConnectedPlan = {

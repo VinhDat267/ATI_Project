@@ -164,6 +164,15 @@ export function matchesDispatchedDigestConfig(run: RunRow, schedule: DeliverySch
     (run.dispatched_config_hash == null || run.dispatched_config_hash === schedule.digest_config_hash);
 }
 
+export function matchesDispatchedSheetsConfig(run: RunRow, schedule: DeliverySchedule): boolean {
+  // A pause or resume changes the schedule version while preserving the approved digest hash.
+  return schedule.kind === 'sheets_digest' &&
+    Boolean(schedule.digest_config && schedule.digest_config_hash) &&
+    (run.dispatched_config_hash
+      ? run.dispatched_config_hash === schedule.digest_config_hash
+      : run.schedule_version === schedule.version);
+}
+
 export function hasUnknownTelegramDispatch(run: RunRow): boolean {
   const config = run.dispatched_config;
   // Keep the snapshot identity aligned with startup reconciliation.
@@ -219,7 +228,7 @@ export function getSheetsDeliveryUnknown(
 
 export function getTrelloDeliveryUnknown(
   run: RunRow,
-  schedule?: Pick<ScheduleRow, 'kind'>,
+  schedule?: Pick<ScheduleRow, 'kind' | 'version'>,
 ): boolean {
   if (
     run.status !== 'needs_attention' ||
@@ -230,18 +239,14 @@ export function getTrelloDeliveryUnknown(
     return false;
   }
   const config = run.dispatched_config;
-  const hasTrelloSnapshot = Boolean(
-    config &&
-      typeof config === 'object' &&
-      'trelloMemberId' in config &&
-      typeof config.trelloMemberId === 'string' &&
-      'boards' in config &&
-      Array.isArray(config.boards),
-  );
-  return (
-    (schedule?.kind === 'trello_digest' && run.error.trim().length > 0) ||
-    (hasTrelloSnapshot && (run.error.includes('TRELLO_DELIVERY_UNKNOWN') || run.error.includes(TRELLO_DELIVERY_UNKNOWN)))
-  );
+  if (config && typeof config === 'object') {
+    return 'trelloMemberId' in config && typeof config.trelloMemberId === 'string' &&
+      'boards' in config && Array.isArray(config.boards);
+  }
+  return run.error.includes('TRELLO_DELIVERY_UNKNOWN') ||
+    (schedule?.kind === 'trello_digest' &&
+      schedule.version === run.schedule_version &&
+      run.error.trim().length > 0);
 }
 
 export function isNotionDeliveryUnknown(run: RunRow, schedule?: DeliverySchedule): boolean {
@@ -288,6 +293,7 @@ export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): Sc
   let error = jiraUnknown ? MYJIRA_DELIVERY_UNKNOWN
     : slackUnknown && !row.error?.startsWith(SLACK_DELIVERY_UNKNOWN_PREFIX) ? SLACK_DIGEST_DELIVERY_UNKNOWN
     : telegramUnknown ? TELEGRAM_DELIVERY_UNKNOWN
+    : trelloUnknown ? TRELLO_DELIVERY_UNKNOWN
     : notionUnknown ? NOTION_DELIVERY_UNKNOWN : row.error;
   if (row.status === 'digest_failed' && error?.startsWith(TRELLO_READ_UNAVAILABLE_PREFIX)) {
     error = error.slice(TRELLO_READ_UNAVAILABLE_PREFIX.length);
@@ -317,8 +323,7 @@ export function runView(row: RunRow, now: Date, schedule?: DeliverySchedule): Sc
     view.canRetryDelivery = schedule.kind === 'myjira_digest' && schedule.status === 'active' &&
       matchesDispatchedDigestConfig(row, schedule);
   } else if (schedule && sheetsUnknown) {
-    view.canRetryDelivery = schedule.kind === 'sheets_digest' && schedule.status === 'active' &&
-      matchesDispatchedDigestConfig(row, schedule);
+    view.canRetryDelivery = schedule.status === 'active' && matchesDispatchedSheetsConfig(row, schedule);
   } else if (schedule && unknownKind) {
     view.canRetryDelivery = schedule.kind === unknownKind &&
       (schedule.status === 'active' || (schedule.status === 'completed' && schedule.recurrence.type === 'once')) &&

@@ -57,8 +57,8 @@ export class TelegramTeamRepo {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      await client.query('DELETE FROM telegram_team_chats WHERE scope_id = $1', [scopeId]);
 
+      // Lock the scope before the child DELETE takes its statement snapshot.
       await client.query(
         `INSERT INTO telegram_team_scope (id, chosen_by, updated_at)
          VALUES ($1, $2, now())
@@ -68,6 +68,7 @@ export class TelegramTeamRepo {
         [scopeId, input.chosenBy],
       );
 
+      await client.query('DELETE FROM telegram_team_chats WHERE scope_id = $1', [scopeId]);
       for (let i = 0; i < input.chats.length; i++) {
         const c = input.chats[i]!;
         await client.query(

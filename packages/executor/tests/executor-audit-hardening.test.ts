@@ -61,8 +61,9 @@ describe('Backend Audit Hardening — Executor (Task 3)', () => {
     expect(res2.error?.details?.requestSent).toBe(false);
   });
 
-  it('deduplicates myjira.create_issue against preceding myjira.search_issues step output preserving siteId', async () => {
-    const executeSpy = vi.fn();
+  it('reuses a matching Jira issue only when the create step explicitly opts in', async () => {
+    const created = { siteId: 'site-1', id: '10100', key: 'ATI-100', url: 'https://ati.atlassian.net/browse/ATI-100' };
+    const executeSpy = vi.fn().mockResolvedValue(created);
     const runner = new StepRunner({
       getAdapter: () => ({ execute: executeSpy }),
     });
@@ -88,7 +89,7 @@ describe('Backend Audit Hardening — Executor (Task 3)', () => {
     const createStep: PlanStep = {
       id: 'step_create',
       tool: 'myjira.create_issue',
-      description: 'Create Jira bug if missing',
+      description: 'Create a new Jira bug',
       args: {
         siteId: 'site-1',
         projectKey: 'ATI',
@@ -99,7 +100,15 @@ describe('Backend Audit Hardening — Executor (Task 3)', () => {
       dependsOn: ['step_search'],
     };
 
-    const res = await runner.executeStep(createStep, stepOutputs);
+    const unconditional = await runner.executeStep(createStep, stepOutputs);
+    expect(unconditional.output).toEqual(created);
+    expect(executeSpy).toHaveBeenCalledTimes(1);
+    executeSpy.mockClear();
+
+    const res = await runner.executeStep({
+      ...createStep,
+      reuseExistingIssueFrom: 'step_search',
+    }, stepOutputs);
     expect(res.status).toBe('success');
     expect(res.output).toEqual({
       siteId: 'site-1',
@@ -108,6 +117,15 @@ describe('Backend Audit Hardening — Executor (Task 3)', () => {
       url: 'https://ati.atlassian.net/browse/ATI-99',
     });
     expect(executeSpy).not.toHaveBeenCalled();
+    const wrongSite = new Map([['step_search', {
+      issues: [{ ...stepOutputs.get('step_search').issues[0], siteId: 'site-2' }],
+    }]]);
+    const anotherSite = await runner.executeStep({
+      ...createStep,
+      reuseExistingIssueFrom: 'step_search',
+    }, wrongSite);
+    expect(anotherSite.output).toEqual(created);
+    expect(executeSpy).toHaveBeenCalledTimes(1);
   });
 
   it('coerceStringParams supports union types, stringifies primitives, and parses numeric strings for number/integer $ref params', () => {

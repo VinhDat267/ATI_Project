@@ -761,6 +761,17 @@ export function validatePlan(rawOutput: string, catalog: ToolDefinition[], optio
       };
     }
 
+    if (
+      step.reuseExistingIssueFrom !== undefined &&
+      (step.tool !== 'myjira.create_issue' ||
+        typeof step.reuseExistingIssueFrom !== 'string' ||
+        !step.dependsOn.includes(step.reuseExistingIssueFrom) ||
+        !processedStepIds.has(step.reuseExistingIssueFrom) ||
+        stepMap.get(step.reuseExistingIssueFrom)?.tool !== 'myjira.search_issues')
+    ) {
+      return { valid: false, layer: 'semantic', error: `Step '${step.id}' must reuse Jira issues from an earlier myjira.search_issues dependency` };
+    }
+
     const argsError = validateSchemaValue(step.args, toolDef.inputSchema, `Step '${step.id}' args`);
     if (argsError) {
       return { valid: false, layer: 'schema', error: `${argsError} for tool '${step.tool}'` };

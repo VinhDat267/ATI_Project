@@ -608,11 +608,13 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
       );
       const run = runRes.rows[0]!;
 
-      // Pause schedule manually
-      await db.pool.query(
-        "UPDATE schedules SET status = 'paused', next_run_at = NULL WHERE id = $1",
-        [sched.id]
-      );
+      const controls = {
+        scheduleId: sched.id,
+        userId: personalA.user.id,
+        now: NOW,
+        scope: { workspaceMode: 'personal' as const, workspaceId: null },
+      };
+      const paused = await service.setStatus({ ...controls, action: 'pause', version: sched.version });
 
       const pausedRetry = await request(app)
         .post(`/api/schedule-runs/${run.id}/resolve-delivery`)
@@ -635,10 +637,31 @@ describe('Google Sheets R2 Audit Remediation (GAS-01 .. GAS-11)', () => {
         CLAIMED_AT.toISOString()
       );
 
-      // Resume schedule -> active, then retry_new_run succeeds
+      const resumed = await service.setStatus({ ...controls, action: 'resume', version: paused.schedule.version });
+      expect(resumed.schedule.version).toBeGreaterThan(run.schedule_version);
+      const [runView] = await service.listRuns(controls.userId, sched.id, 1, NOW, controls.scope);
+      expect(runView?.canRetryDelivery).toBe(true);
+
+      const edited = {
+        ...config,
+        destination: { ...config.destination, recipientEmail: 'different@example.test' },
+      };
       await db.pool.query(
-        "UPDATE schedules SET status = 'active', next_run_at = '2026-11-03T01:00:00.000Z' WHERE id = $1",
-        [sched.id]
+        'UPDATE schedules SET digest_config = $2, digest_config_hash = $3, version = version + 1 WHERE id = $1',
+        [sched.id, edited, computeSheetsDigestHash({
+          config: edited, userId: controls.userId, recurrence: { type: 'daily', time: '08:00' },
+        })],
+      );
+      const [editedView] = await service.listRuns(controls.userId, sched.id, 1, NOW, controls.scope);
+      expect(editedView?.canRetryDelivery).toBe(false);
+      await expect(service.resolveRunDelivery({
+        userId: controls.userId, scope: controls.scope, now: NOW, runId: run.id,
+        resolution: 'retry_new_run', confirmDuplicateRisk: true,
+      })).rejects.toMatchObject({ code: 'CONFIG_CHANGED_SINCE_RUN' });
+      expect(plannedRuns).toEqual([]);
+      await db.pool.query(
+        'UPDATE schedules SET digest_config = $2, digest_config_hash = $3 WHERE id = $1',
+        [sched.id, config, sched.digest_config_hash],
       );
 
       const activeRetry = await request(app)
